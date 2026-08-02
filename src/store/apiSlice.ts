@@ -26,8 +26,49 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit'],
+  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor'],
   endpoints: (builder) => ({
+    // VENDOR ENDPOINTS
+    getVendors: builder.query<any[], { month?: string, fy?: string } | void>({
+      query: (params) => {
+        if (params && (typeof params === 'object') && (params.month || params.fy)) {
+          const searchParams = new URLSearchParams();
+          if (params.month) searchParams.append('month', params.month);
+          if (params.fy) searchParams.append('fy', params.fy);
+          return { url: `/vendors?${searchParams.toString()}` };
+        }
+        return { url: '/vendors' };
+      },
+      providesTags: ['Vendor'],
+    }),
+    getVendorLedger: builder.query<any[], string>({
+      query: (id) => `/vendors/${id}/ledger`,
+      providesTags: ['Vendor', 'Production'],
+    }),
+    createVendor: builder.mutation<any, Partial<any>>({
+      query: (vendor) => ({
+        url: '/vendors',
+        method: 'POST',
+        body: vendor,
+      }),
+      invalidatesTags: ['Vendor'],
+    }),
+    updateVendor: builder.mutation<any, { id: string, vendor: Partial<any> }>({
+      query: ({ id, vendor }) => ({
+        url: `/vendors/${id}`,
+        method: 'PUT',
+        body: vendor,
+      }),
+      invalidatesTags: ['Vendor'],
+    }),
+    deleteVendor: builder.mutation<{ success: boolean; id: string }, string>({
+      query: (id) => ({
+        url: `/vendors/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Vendor'],
+    }),
+
     getLeads: builder.query<any[], void>({
       query: () => '/leads',
       providesTags: ['Lead'],
@@ -173,6 +214,10 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/hr/staff/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Attendance', 'Production']
     }),
+    editStaff: builder.mutation<any, { id: string, data: any }>({
+      query: ({ id, data }) => ({ url: `/hr/staff/${id}`, method: 'PUT', body: data }),
+      invalidatesTags: ['Attendance', 'Production']
+    }),
 
     getCategories: builder.query<any[], void>({
       query: () => '/categories',
@@ -239,6 +284,50 @@ export const apiSlice = createApi({
     }),
     createProductionLog: builder.mutation<any, Partial<any>>({
       query: (body) => ({ url: '/production', method: 'POST', body }),
+      invalidatesTags: ['Production']
+    }),
+    getSlabs: builder.query<any[], string>({
+      query: (projectId) => `/slabs/project/${projectId}`,
+      providesTags: ['Production']
+    }),
+    addPieces: builder.mutation<any, { slabId: string; data: any }>({
+      query: ({ slabId, data }) => ({
+        url: `/slabs/${slabId}/pieces`,
+        method: 'POST',
+        body: data
+      }),
+      invalidatesTags: ['Production']
+    }),
+    getAllPieces: builder.query<any[], void>({
+      query: () => `/slabs/pieces`,
+      providesTags: ['Production']
+    }),
+    createSlab: builder.mutation<any, any>({
+      query: (body) => ({ url: '/slabs', method: 'POST', body }),
+      invalidatesTags: ['Production']
+    }),
+    updateSlab: builder.mutation<any, { id: string; data: any }>({
+      query: ({ id, data }) => ({ url: `/slabs/${id}`, method: 'PUT', body: data }),
+      invalidatesTags: ['Production']
+    }),
+    deleteSlab: builder.mutation<any, string>({
+      query: (id) => ({ url: `/slabs/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Production']
+    }),
+    syncSlabs: builder.mutation<any, string>({
+      query: (projectId) => ({ url: `/projects/${projectId}/sync-slabs`, method: 'POST' }),
+      invalidatesTags: ['Production']
+    }),
+    updatePiece: builder.mutation<any, { id: string; data: any }>({
+      query: ({ id, data }) => ({ url: `/slabs/piece/${id}`, method: 'PUT', body: data }),
+      invalidatesTags: ['Production']
+    }),
+    deletePiece: builder.mutation<any, string>({
+      query: (id) => ({ url: `/slabs/piece/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Production']
+    }),
+    createPieceLog: builder.mutation<any, { id: string; data: any }>({
+      query: ({ id, data }) => ({ url: `/slabs/piece/${id}/log`, method: 'POST', body: data }),
       invalidatesTags: ['Production']
     }),
     createMaterialLog: builder.mutation<any, Partial<any>>({
@@ -347,10 +436,19 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/production/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Production']
     }),
+    editProductionLog: builder.mutation<any, { id: string; data: any }>({
+      query: ({ id, data }) => ({ url: `/production/${id}`, method: 'PUT', body: data }),
+      invalidatesTags: ['Production']
+    }),
   }),
 });
 
 export const {
+  useGetVendorsQuery,
+  useGetVendorLedgerQuery,
+  useCreateVendorMutation,
+  useUpdateVendorMutation,
+  useDeleteVendorMutation,
   useGetLeadsQuery,
   useCreateLeadMutation,
   useGetProjectsQuery,
@@ -379,6 +477,16 @@ export const {
   useGetActiveSessionQuery,
   useMachineClockInMutation,
   useMachineClockOutMutation,
+  useGetSlabsQuery,
+  useGetAllPiecesQuery,
+  useAddPiecesMutation,
+  useCreateSlabMutation,
+  useUpdateSlabMutation,
+  useDeleteSlabMutation,
+  useSyncSlabsMutation,
+  useUpdatePieceMutation,
+  useDeletePieceMutation,
+  useCreatePieceLogMutation,
   useGetDailyMachineLogsQuery,
   useApproveMachineLogMutation,
   useRejectMachineLogMutation,
@@ -390,6 +498,9 @@ export const {
   useCreateDispatchMutation,
   useGetAttendanceQuery,
   useGetStaffSalaryQuery,
+  useGetStaffListQuery,
+  useDeleteStaffMutation,
+  useEditStaffMutation,
   useGetCategoriesQuery,
   useCreateCategoryMutation,
   useDeleteCategoryMutation,
@@ -404,8 +515,6 @@ export const {
   useCreateQuotationMutation,
   useGetProjectProductionLogsQuery,
   useDeleteProjectMutation,
-  useGetStaffListQuery,
-  useDeleteStaffMutation,
   useCreateMaterialLogMutation,
   useGetPendingApprovalsQuery,
   useApproveMaterialLogMutation,
@@ -413,6 +522,7 @@ export const {
   useGetActiveOutLogsQuery,
   useUpdateQuotationMutation,
   useUpdateMaterialLogMutation,
-  useEditProductionLogMutation,
-  useDeleteProductionLogMutation
+  useUpdateReturnQtyMutation,
+  useDeleteProductionLogMutation,
+  useEditProductionLogMutation
 } = apiSlice;

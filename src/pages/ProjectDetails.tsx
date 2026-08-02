@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, Tabs, Tab } from '@mui/material';
+import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, Tabs, Tab, Collapse } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import CancelIcon from '@mui/icons-material/Cancel';
 import RemoveIcon from '@mui/icons-material/Remove';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -12,6 +13,10 @@ import InfoIcon from '@mui/icons-material/Info';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ImageIcon from '@mui/icons-material/Image';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import AddIcon from '@mui/icons-material/Add';
+import CircleIcon from '@mui/icons-material/Circle';
 import { 
   useGetProjectByIdQuery, useUpdateProjectMutation, useCreateQuotationMutation, 
   useCreateInvoiceMutation, useUploadFilesMutation, useGetDrawingsQuery, 
@@ -20,13 +25,95 @@ import {
   useGetProjectProductionLogsQuery, useCreateProductionLogMutation, useUpdateProductionLogMutation,
   useGetInventoryQuery, useGetCategoriesQuery, useCreateCategoryMutation, useDeleteCategoryMutation,
   useGetUnitsQuery, useCreateUnitMutation, useDeleteUnitMutation,
-  useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation
+  useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation,
+  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useAddPiecesMutation, useSyncSlabsMutation
 } from '../store/apiSlice';
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
 
 const crmSteps = ['Enquiry Details', 'Reference Image', 'Quotation & Costing', 'Advance Payment'];
 const projectSteps = ['Shop Drawing & Approval', 'Material Planning', 'Production', 'Work Order Active'];
 const steps = [...crmSteps, ...projectSteps];
+
+const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[] }) => {
+  const { id: projectId } = useParams();
+  const navigate = useNavigate();
+
+  const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
+  const dimensionStr = slab.size
+    ? slab.size.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')
+    : (matchedProduct 
+      ? `${matchedProduct.length || 0}L × ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
+      : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : ''));
+
+  const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+
+  const getStageStatus = (stageName: string) => {
+    if (!slab.pieces || slab.pieces.length === 0) return 'Not Started';
+    const stageIdx = STAGES.indexOf(stageName);
+    
+    let allPiecesPassed = true;
+    let anyPiecePassed = false;
+    
+    for (const p of slab.pieces) {
+      const pStageIdx = STAGES.indexOf(p.stage);
+      const isPassed = pStageIdx > stageIdx || (p.stage === stageName && p.status === 'completed');
+      
+      if (!isPassed) {
+        allPiecesPassed = false;
+      } else {
+        anyPiecePassed = true;
+      }
+    }
+    
+    if (allPiecesPassed && slab.pieces.length > 0) return 'Completed';
+    if (anyPiecePassed) return 'Under Process';
+    return 'Not Started';
+  };
+
+  const getStageColor = (status: string) => {
+    if (status === 'Completed') return 'success';
+    if (status === 'Under Process') return 'warning';
+    return 'default';
+  };
+
+  return (
+    <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
+      <TableCell sx={{ color: '#444' }}>
+        <Typography variant="body2">{slab.name}</Typography>
+      </TableCell>
+      <TableCell sx={{ color: '#666' }}>
+        <Typography variant="body2">{dimensionStr}</Typography>
+      </TableCell>
+      {STAGES.map(stage => {
+        const status = getStageStatus(stage);
+        let icon;
+        if (status === 'Completed') {
+           icon = <CheckCircleIcon sx={{ fontSize: 18, color: '#4caf50' }} />;
+        } else if (status === 'Under Process') {
+           icon = <CircleIcon sx={{ fontSize: 16, color: '#ffb300' }} />;
+        } else {
+           icon = <CircleIcon sx={{ fontSize: 16, color: '#d1c4e9' }} />;
+        }
+        
+        return (
+          <TableCell key={stage}>
+            <Box 
+              onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)}
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
+            >
+              {icon}
+              <Typography variant="body2" sx={{ color: '#444' }}>{status}</Typography>
+            </Box>
+          </TableCell>
+        );
+      })}
+      <TableCell align="center">
+        <IconButton color="primary" size="small" onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
+        <IconButton color="error" size="small" onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}><DeleteIcon fontSize="small" /></IconButton>
+      </TableCell>
+    </TableRow>
+  );
+};
 
 const filter = createFilterOptions<any>();
 
@@ -39,7 +126,7 @@ const ProjectDetails: React.FC = () => {
   const [updateProject] = useUpdateProjectMutation();
   const [createQuotation] = useCreateQuotationMutation();
   const [updateQuotation] = useUpdateQuotationMutation();
-  const [createInvoice] = useCreateInvoiceMutation();
+  const [createInvoice, { isLoading: isCreatingInvoice }] = useCreateInvoiceMutation();
   const [uploadFiles] = useUploadFilesMutation();
   const [addDrawing] = useAddDrawingMutation();
   const [approveDrawing] = useApproveDrawingMutation();
@@ -53,8 +140,18 @@ const ProjectDetails: React.FC = () => {
   const { data: allMachineLogs, isLoading: machineLogsLoading } = useGetMachineLogsQuery();
   const projectMachineLogs = allMachineLogs?.filter((log: any) => log.projectId === id) || [];
 
+  const { data: projectSlabs, refetch: refetchSlabs } = useGetSlabsQuery(id as string, { skip: !id });
+  const [createSlab] = useCreateSlabMutation();
+  const [updateSlab] = useUpdateSlabMutation();
+  const [deleteSlab] = useDeleteSlabMutation();
+  const [syncSlabs] = useSyncSlabsMutation();
+
   const [activeStep, setActiveStep] = useState(0);
   const [viewingStepOverride, setViewingStepOverride] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    // Auto-sync slabs removed per user request
+  }, [project, projectSlabs]);
 
   const queryParams = new URLSearchParams(location.search);
   const viewParam = queryParams.get('view');
@@ -66,30 +163,48 @@ const ProjectDetails: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [cameraPurpose, setCameraPurpose] = useState<'drawing' | 'clientPhoto'>('drawing');
+  const [slabDialogOpen, setSlabDialogOpen] = useState(false);
+  const [editSlabDialogOpen, setEditSlabDialogOpen] = useState(false);
+  const [editingSlabId, setEditingSlabId] = useState<string | null>(null);
+  const [slabForm, setSlabForm] = useState({ name: '', size: '', cost: 0, inventoryId: '' });
 
-  // Product Production States
-  const [productionDialogOpen, setProductionDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [productionForm, setProductionForm] = useState({ stage: 'cutting', quantityProduced: 1, remarks: '' });
-  const handleProductProductionSubmit = async () => {
-    if (!selectedProduct) return;
+  const handleCreateSlab = async () => {
     try {
-      await createProductionLog({
-        projectId: id,
-        stage: productionForm.stage,
-        quantityProduced: productionForm.quantityProduced,
-        remarks: productionForm.remarks,
-        transactionType: 'IN', // As it's produced
-        productId: selectedProduct.id,
-        productName: selectedProduct.name
-      }).unwrap();
-      setSnackbarMessage(`Successfully recorded ${productionForm.quantityProduced} for ${selectedProduct.name}`);
-      setProductionDialogOpen(false);
-      setProductionForm({ stage: 'cutting', quantityProduced: 1, remarks: '' });
-      refetch();
-    } catch (err) {
-      console.error('Failed to log product production', err);
-      setSnackbarMessage('Error logging production');
+      await createSlab({ projectId: id, ...slabForm }).unwrap();
+      setSlabDialogOpen(false);
+      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '' });
+      refetchSlabs();
+      setSnackbarMessage('Slab added successfully!');
+    } catch (error) {
+      console.error(error);
+      setSnackbarMessage('Failed to add slab.');
+    }
+  };
+
+  const handleEditSlabClick = (slab: any) => {
+    setEditingSlabId(slab.id);
+    setSlabForm({ name: slab.name, size: slab.size || '', cost: slab.cost || 0, inventoryId: slab.inventoryId || '' });
+    setEditSlabDialogOpen(true);
+  };
+
+  const handleUpdateSlab = async () => {
+    try {
+      await updateSlab({ id: editingSlabId as string, data: slabForm }).unwrap();
+      setEditSlabDialogOpen(false);
+      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '' });
+      setEditingSlabId(null);
+      refetchSlabs();
+      setSnackbarMessage('Slab updated successfully!');
+    } catch (error) {
+      console.error(error);
+      setSnackbarMessage('Failed to update slab.');
+    }
+  };
+
+  const handleDeleteSlab = async (slabId: string) => {
+    if (window.confirm("Delete this slab?")) {
+      await deleteSlab(slabId).unwrap();
+      refetchSlabs();
     }
   };
   
@@ -197,6 +312,14 @@ const ProjectDetails: React.FC = () => {
 
   const [advancePayment, setAdvancePayment] = useState(0);
   const [productionTab, setProductionTab] = useState(0);
+  const [gstPercent, setGstPercent] = useState<number>(() => {
+    const saved = localStorage.getItem(`gstPercentDraft_${id}`);
+    return saved ? Number(saved) : 18;
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem(`gstPercentDraft_${id}`, gstPercent.toString());
+  }, [gstPercent, id]);
 
   const { data: categories = [] } = useGetCategoriesQuery();
   const [createCategory] = useCreateCategoryMutation();
@@ -391,7 +514,7 @@ const ProjectDetails: React.FC = () => {
     const breadthDec = p.breadth || 1; // Default to 1 if breadth is 0
 
     if (p.unit !== 'Pieces') {
-      amount = lengthDec * widthDec * breadthDec * p.qty * p.rate;
+      amount = lengthDec * widthDec * p.qty * p.rate;
     } else {
       amount = p.qty * p.rate;
     }
@@ -533,7 +656,8 @@ const ProjectDetails: React.FC = () => {
       
       await handleNextStage('shop_drawing');
       setViewingStepOverride(null);
-      setSnackbarMessage("Payment recorded! Proceeding to Shop Drawings.");
+      setSnackbarMessage("Payment recorded! Proceeding to Active Work Orders.");
+      navigate('/active-work-orders');
     } catch (err) {
       console.error(err);
     }
@@ -910,7 +1034,7 @@ const ProjectDetails: React.FC = () => {
                           <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Unit</TableCell>
                           <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Length (L)</TableCell>
                           <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Width (W)</TableCell>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Breadth (B)</TableCell>
+                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>MM</TableCell>
                           <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Qty</TableCell>
                           <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Rate</TableCell>
                           <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Amount</TableCell>
@@ -947,20 +1071,6 @@ const ProjectDetails: React.FC = () => {
                                 )}
                                 <Box>
                                   <Typography variant="body2">{p.category}</Typography>
-                                  <Button 
-                                    size="small" 
-                                    variant="text" 
-                                    sx={{ fontSize: '0.7rem', p: 0, minWidth: 'auto', mt: 0.5, color: 'primary.main', textTransform: 'none' }}
-                                    onClick={() => {
-                                      setActiveCostProductId(p.id);
-                                      if (!quoteDetails[p.id]) {
-                                        setQuoteDetails(prev => ({ ...prev, [p.id]: getDefaultCosts() }));
-                                      }
-                                      setIsCategoryCostsDialogOpen(true);
-                                    }}
-                                  >
-                                    + Add Costs
-                                  </Button>
                                 </Box>
                               </Box>
                             </TableCell>
@@ -989,8 +1099,38 @@ const ProjectDetails: React.FC = () => {
                       </TableBody>
                     </Table>
                   </TableContainer>
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                    <Typography variant="subtitle1" fontWeight="bold">Total Products Amount: ₹{products.reduce((acc, p) => acc + p.amount, 0).toLocaleString('en-IN')}</Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', mt: 3, gap: 1 }}>
+                    {(() => {
+                      const totalProductsAmount = products.reduce((acc, p) => acc + p.amount, 0);
+                      const gstAmount = (totalProductsAmount * gstPercent) / 100;
+                      const finalBill = totalProductsAmount + gstAmount;
+
+                      return (
+                        <>
+                          <Typography variant="subtitle1" fontWeight="bold" color="text.secondary">Total Products Amount: ₹{totalProductsAmount.toLocaleString('en-IN')}</Typography>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+                            <Typography variant="subtitle1" fontWeight="bold">GST (%):</Typography>
+                            <Select
+                              size="small"
+                              value={gstPercent}
+                              onChange={(e) => setGstPercent(Number(e.target.value))}
+                              sx={{ width: 100, height: 32, borderRadius: 2 }}
+                            >
+                              <MenuItem value={0}>0%</MenuItem>
+                              <MenuItem value={5}>5%</MenuItem>
+                              <MenuItem value={12}>12%</MenuItem>
+                              <MenuItem value={18}>18%</MenuItem>
+                              <MenuItem value={28}>28%</MenuItem>
+                            </Select>
+                            <Typography variant="subtitle1" fontWeight="bold" color="error.main">+ ₹{gstAmount.toLocaleString('en-IN')}</Typography>
+                          </Box>
+
+                          <Divider sx={{ width: '300px', my: 1.5 }} />
+                          <Typography variant="h5" fontWeight="bold" color="primary.main">Grand Total: ₹{finalBill.toLocaleString('en-IN')}</Typography>
+                        </>
+                      )
+                    })()}
                   </Box>
                 </Box>
 
@@ -1042,27 +1182,6 @@ const ProjectDetails: React.FC = () => {
                 })()}
 
 
-                {/* DYNAMIC ESTIMATED TOTAL QUOTE BOX WITH REAL-TIME BREAKDOWN */}
-                <Box sx={{ 
-                  p: 3, mb: 4, 
-                  background: 'linear-gradient(90deg, #2A2D3E 0%, #1A1C29 100%)', 
-                  borderRadius: 3, 
-                  color: '#FFF'
-                }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1" sx={{ color: '#E8E1D5' }}>Total Products Amount:</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>₹{products.reduce((acc, p) => acc + p.amount, 0).toLocaleString('en-IN')}</Typography>
-                  </Box>
-                  <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)', mb: 2 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" sx={{ color: '#E8E1D5', fontWeight: 500 }}>Estimated Total Quote:</Typography>
-                    <Typography variant="h4" sx={{ color: '#E5C07B', fontWeight: 'bold' }}>
-                      ₹{
-                        (products.reduce((acc, p) => acc + p.amount, 0)).toLocaleString('en-IN')
-                      }
-                    </Typography>
-                  </Box>
-                </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Button variant="outlined" size="large" onClick={() => {
@@ -1076,7 +1195,6 @@ const ProjectDetails: React.FC = () => {
                       // Triggering a save draft (localStorage) which is already handled via useEffect,
                       // or we can just notify user.
                       setSnackbarMessage('Quotation progress saved!');
-                      if (viewingStepOverride !== null) setViewingStepOverride(null);
                     }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
                       {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
                     </Button>
@@ -1163,8 +1281,8 @@ const ProjectDetails: React.FC = () => {
                     <Button variant="contained" color="success" size="large" onClick={() => {
                        if (viewingStepOverride !== null) setViewingStepOverride(null);
                        else handleAdvancePayment();
-                    }} startIcon={viewingStepOverride !== null ? null : <CheckCircleIcon />} sx={{ px: 4, py: 1.5, borderRadius: 2, bgcolor: viewingStepOverride !== null ? 'primary.main' : '#2E7D32', '&:hover': { bgcolor: viewingStepOverride !== null ? 'primary.dark' : '#1B5E20' } }}>
-                      {viewingStepOverride !== null ? 'Back to Active Step' : 'Confirm & Proceed to Shop Drawings'}
+                    }} disabled={isCreatingInvoice} startIcon={viewingStepOverride !== null ? null : <CheckCircleIcon />} sx={{ px: 4, py: 1.5, borderRadius: 2, bgcolor: viewingStepOverride !== null ? 'primary.main' : '#2E7D32', '&:hover': { bgcolor: viewingStepOverride !== null ? 'primary.dark' : '#1B5E20' } }}>
+                      {viewingStepOverride !== null ? 'Back to Active Step' : (isCreatingInvoice ? 'Processing...' : 'Confirm & Proceed to Shop Drawings')}
                     </Button>
                   </Box>
                 </Box>
@@ -1410,254 +1528,32 @@ const ProjectDetails: React.FC = () => {
                    </Button>
                 )}
 
-                {/* Production Tabs */}
-                <Paper sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-                  <Tabs value={productionTab} onChange={(e, v) => setProductionTab(v)}>
-                    <Tab label="Machine Usage" sx={{ fontWeight: 'bold' }} />
-                    <Tab label="Material Ledger" sx={{ fontWeight: 'bold' }} />
-                  </Tabs>
-                </Paper>
-
-                {/* TAB 0: Machine Usage */}
-                {productionTab === 0 && (
+                {/* Machine Usage */}
                  <Box sx={{ mb: 6 }}>
                   <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4, overflow: 'hidden' }}>
                     <Table>
                       <TableHead sx={{ bgcolor: '#FDFBF7' }}>
                         <TableRow>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Machine Name</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Category / Product Name</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '15%' }}>Qty (Done / Total)</TableCell>
-
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Punch In</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Punch Out</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Total Hours</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Status</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Work Report</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Product Name</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Size</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Dispatch</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }} align="center">Action</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {(() => {
-                          if (machineLogsLoading) {
-                            return <TableRow><TableCell colSpan={6} align="center" sx={{ py: 5 }}>Loading...</TableCell></TableRow>;
-                          }
-                          const tableRows: any[] = [];
-                          
-                          // 1. Standalone logs (no product selected)
-                          if (projectMachineLogs) {
-                            projectMachineLogs.filter((l: any) => !l.productId).forEach((log: any) => {
-                              tableRows.push({ type: 'unassigned_log', log });
-                            });
-                          }
-                          
-                          // 2. Product pieces
-                          if (products) {
-                            products.forEach((product: any) => {
-                              const totalQty = product.qty || 1;
-                              const productLogs = (projectMachineLogs || [])
-                                .filter((l: any) => l.productId === product.id)
-                                .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-                                
-                              let completedCount = 0;
-                              
-                              productLogs.filter((l: any) => l.status === 'completed').forEach((log: any) => {
-                                const qty = log.quantityProduced || 1;
-                                for (let i = 0; i < qty; i++) {
-                                  completedCount++;
-                                  tableRows.push({ type: 'piece', product, pieceNumber: completedCount, status: 'completed', log });
-                                }
-                              });
-                              
-                              let activeCount = completedCount;
-                              productLogs.filter((l: any) => l.status === 'active').forEach((log: any) => {
-                                activeCount++;
-                                tableRows.push({ type: 'piece', product, pieceNumber: activeCount, status: 'active', log });
-                              });
-                              
-                              for (let i = activeCount + 1; i <= totalQty; i++) {
-                                tableRows.push({ type: 'piece', product, pieceNumber: i, status: 'pending', log: null });
-                              }
-                            });
-                          }
-                          
-                          if (tableRows.length === 0) {
-                            return <TableRow><TableCell colSpan={6} align="center" sx={{ py: 5, color: 'text.secondary' }}>No machines or products found for this project yet.</TableCell></TableRow>;
-                          }
-
-                          // Sort rows to show most recent activity at the top
-                          tableRows.sort((a, b) => {
-                            const aHasLog = !!a.log;
-                            const bHasLog = !!b.log;
-                            
-                            if (aHasLog && bHasLog) {
-                               return new Date(b.log.startTime).getTime() - new Date(a.log.startTime).getTime();
-                            }
-                            
-                            if (aHasLog && !bHasLog) return -1;
-                            if (!aHasLog && bHasLog) return 1;
-                            
-                            // Both pending: sort by product name, then piece number
-                            const aName = a.product?.name || a.product?.category || '';
-                            const bName = b.product?.name || b.product?.category || '';
-                            if (aName !== bName) {
-                               return aName.localeCompare(bName);
-                            }
-                            return (a.pieceNumber || 0) - (b.pieceNumber || 0);
-                          });
-                          
-                          return tableRows.map((row: any, idx: number) => {
-                            if (row.type === 'unassigned_log') {
-                              const log = row.log;
-                              return (
-                                <TableRow key={`ulog-${log.id}`} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'text.primary' }}>{log.machine?.name || 'Manual (No Machine)'}</TableCell>
-                                  <TableCell>
-                                    {log.productName ? (
-                                      <Typography variant="body2" fontWeight="bold" sx={{ fontSize: '0.95rem' }}>{log.productName}</Typography>
-                                    ) : (
-                                      <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'text.secondary' }}>-</Typography>
-                                    )}
-                                  </TableCell>
-                                  <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '0.95rem' }}>-</TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'text.primary' }}>{new Date(log.startTime).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}</TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'text.primary' }}>{log.endTime ? new Date(log.endTime).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase() : '-'}</TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: '#2E7D32' }}>
-                                    {log.endTime ? ((new Date(log.endTime).getTime() - new Date(log.startTime).getTime()) / (1000 * 60 * 60)).toFixed(2) + 'h' : '-'}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Chip label={log.status.toUpperCase()} color={log.status === 'active' ? 'warning' : 'success'} size="small" variant={log.status === 'active' ? 'filled' : 'outlined'} sx={{ fontWeight: 'bold', fontSize: '0.75rem' }} />
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'text.primary', maxWidth: 150, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={log.remarks || ''}>
-                                    {log.remarks || '-'}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            } else {
-                              const { product, pieceNumber, status, log } = row;
-                              return (
-                                <TableRow key={`piece-${product.id}-${pieceNumber}`} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: status === 'pending' ? 'text.secondary' : 'text.primary', fontStyle: status === 'pending' ? 'italic' : 'normal' }}>
-                                    {log ? (log.machine?.name || 'Manual') : 'Not Started'}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Box>
-                                      <Typography variant="body2" fontWeight="bold" sx={{ fontSize: '0.95rem' }}>{product.name || product.category} <Typography component="span" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>(Piece {pieceNumber} / {product.qty || 1})</Typography></Typography>
-                                      {product.name && product.category && <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary', fontSize: '0.85rem' }}>{product.category}</Typography>}
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="caption" fontWeight="bold" color={status === 'completed' ? 'success.main' : 'primary'} sx={{ fontSize: '0.9rem' }}>
-                                          {status === 'completed' ? '1 / 1' : '0 / 1'}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary', fontSize: '0.9rem' }}>
-                                          {status === 'completed' ? '70%' : '0%'}
-                                        </Typography>
-                                      </Box>
-                                      <LinearProgress variant="determinate" value={status === 'completed' ? 70 : 0} color={status === 'completed' ? 'success' : 'primary'} sx={{ height: 6, borderRadius: 3 }} />
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'text.primary' }}>
-                                    {log ? new Date(log.startTime).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase() : '-'}
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'text.primary' }}>
-                                    {(log && log.endTime) ? new Date(log.endTime).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase() : '-'}
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: '#2E7D32' }}>
-                                    {(log && log.endTime) ? ((new Date(log.endTime).getTime() - new Date(log.startTime).getTime()) / (1000 * 60 * 60)).toFixed(2) + 'h' : '-'}
-                                  </TableCell>
-                                  <TableCell>
-                                    {status === 'completed' && <Chip label="COMPLETED" color="success" size="small" variant="outlined" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }} />}
-                                    {status === 'active' && <Chip label="ACTIVE" color="warning" size="small" variant="filled" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }} />}
-                                    {status === 'pending' && <Chip label="PENDING" size="small" variant="outlined" sx={{ fontWeight: 'bold', fontSize: '0.75rem', color: 'text.secondary', borderColor: 'divider' }} />}
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'text.primary', maxWidth: 150, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={log?.remarks || ''}>
-                                    {log?.remarks || '-'}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            }
-                          });
-                        })()}
+                        {projectSlabs?.map((slab: any, idx: number) => (
+                          <SlabRowGroup key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} />
+                        ))}
+                        {(!projectSlabs || projectSlabs.length === 0) && (
+                           <TableRow><TableCell colSpan={9} align="center" sx={{ py: 5, color: 'text.secondary' }}>No slabs created yet.</TableCell></TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </Paper>
-                </Box>
-                )}
-
-                {/* TAB 1: Material Ledger */}
-                {productionTab === 1 && (
-                  <Box sx={{ mb: 6 }}>
-                    <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4, overflow: 'hidden' }}>
-                      <Table>
-                        <TableHead sx={{ bgcolor: '#FAFAFA' }}>
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>DATE OUT</TableCell>
-                            <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>STAFF / VENDOR</TableCell>
-                            <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>STAGE / WORK</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>QTY OUT</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>QTY IN</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>PENDING</TableCell>
-                            <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>STATUS</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {(!productionLogs || productionLogs.filter((l: any) => l.approvalStatus === 'approved' && l.transactionType === 'OUT').length === 0) ? (
-                            <TableRow><TableCell colSpan={7} align="center" sx={{ py: 5, color: 'text.secondary' }}>No material outward logs found for this project.</TableCell></TableRow>
-                          ) : productionLogs.filter((l: any) => l.approvalStatus === 'approved' && l.transactionType === 'OUT').map((log: any, idx: number) => {
-                            const qtyOut = log.quantityProduced || 0;
-                            const qtyIn = log.returnedQty || 0;
-                            const pending = Math.max(0, qtyOut - qtyIn);
-                            let statusLabel = 'PENDING'; let statusColor = 'error'; let progress = 0;
-                            if (qtyOut === 0) { statusLabel = 'PENDING'; statusColor = 'default'; }
-                            else if (qtyIn >= qtyOut) { statusLabel = 'COMPLETE'; statusColor = 'success'; progress = 100; }
-                            else if (qtyIn > 0) { statusLabel = 'PARTIAL'; statusColor = 'warning'; progress = Math.round((qtyIn / qtyOut) * 100); }
-                            
-                            return (
-                              <TableRow key={log.id} sx={{ '&:hover': { bgcolor: 'rgba(139,69,19,0.02)' } }}>
-                                <TableCell sx={{ fontWeight: 700, color: 'text.primary' }}>
-                                  {new Date(log.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                                </TableCell>
-                                <TableCell>
-                                  <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: 'text.primary' }}>
-                                    {log.vendorName ? `${log.vendorName} (Vendor)` : log.worker?.name || 'Unknown'}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'text.primary' }}>
-                                    {log.stage}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell align="center">
-                                  <Chip label={qtyOut} sx={{ fontWeight: 900, bgcolor: 'rgba(237,108,2,0.1)', color: '#ed6c02', fontSize: '0.85rem' }} size="small" />
-                                </TableCell>
-                                <TableCell align="center">
-                                  <Chip label={qtyIn} sx={{ fontWeight: 900, bgcolor: qtyIn > 0 ? 'rgba(46,125,50,0.1)' : 'rgba(0,0,0,0.05)', color: qtyIn > 0 ? '#2E7D32' : 'text.secondary', fontSize: '0.85rem' }} size="small" />
-                                </TableCell>
-                                <TableCell align="center">
-                                  {pending > 0 ? (
-                                    <Box>
-                                      <Chip label={pending} color="error" size="small" sx={{ fontWeight: 900, fontSize: '0.85rem' }} />
-                                      <Box sx={{ mt: 0.5 }}>
-                                        <LinearProgress variant="determinate" value={progress} color={statusColor as any} sx={{ height: 4, borderRadius: 2, width: 60, mx: 'auto' }} />
-                                      </Box>
-                                    </Box>
-                                  ) : (
-                                    <Chip label="0" color="success" size="small" sx={{ fontWeight: 900 }} />
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <Chip label={statusLabel} color={statusColor as any} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </Paper>
-                  </Box>
-                )}
+                 </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
                   <Button variant="outlined" size="large" onClick={() => {
@@ -1711,54 +1607,16 @@ const ProjectDetails: React.FC = () => {
         {/* RIGHT SIDEBAR TIMELINE */}
         {stepToRender !== 6 && (
           <Box sx={{ width: { xs: '100%', md: 350 }, flexShrink: 0, position: 'sticky', top: 24 }}>
-            <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-            <Typography variant="h6" fontWeight="bold" mb={3} color="text.primary">Activity Log</Typography>
-            
-            <Stepper orientation="vertical" activeStep={displayActiveStep} sx={{ '& .MuiStepConnector-line': { minHeight: 40 } }}>
-              {currentSteps.map((label, index) => {
-                const absoluteIndex = isCrmView ? index : index + 4;
-                const dbStep = project ? getStepIndex(project.status) : 0;
-                const isCompleted = dbStep > absoluteIndex;
-                const dateToShow = absoluteIndex === 0 ? project?.createdAt : project?.updatedAt;
-                const dateStr = dateToShow ? new Date(dateToShow).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
-
-                return (
-                <Step key={label}>
-                  <StepLabel 
-                    sx={{ cursor: dbStep >= absoluteIndex ? 'pointer' : 'default', '& .MuiStepIcon-root': { color: activeStep > absoluteIndex || dbStep > absoluteIndex ? '#4CAF50 !important' : activeStep === absoluteIndex ? '#B38B36 !important' : '#E0E0E0' } }}
-                    onClick={() => {
-                      if (dbStep >= absoluteIndex) {
-                        setViewingStepOverride(null);
-                        setActiveStep(absoluteIndex);
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                      <Typography sx={{ fontWeight: activeStep === absoluteIndex ? 700 : 500, color: activeStep >= absoluteIndex || dbStep >= absoluteIndex ? 'text.primary' : 'text.secondary' }}>
-                        {label}
-                      </Typography>
-                      {dbStep > absoluteIndex ? (
-                        <Typography variant="caption" color="success.main">Completed • {dateStr}</Typography>
-                      ) : activeStep === absoluteIndex && dbStep === absoluteIndex ? (
-                        <Typography variant="caption" color="primary.main" fontWeight="bold">In Progress</Typography>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">Pending</Typography>
-                      )}
-                    </Box>
-                  </StepLabel>
-                </Step>
-              )})}
-            </Stepper>
-          </Paper>
 
           {stepToRender === 2 && (
-            <Paper elevation={0} sx={{ p: 4, mt: 3, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-              <Typography variant="h6" fontWeight="bold" color="text.primary" mb={2}>Select Category to Add Costs</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Paper elevation={0} sx={{ p: 4, mt: 10, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
+              <Typography variant="h6" fontWeight="bold" color="text.primary" mb={1}>Costs Category</Typography>
+              <Typography variant="body2" color="text.secondary" mb={3}>Select a category to view and edit its cost estimation.</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {products.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">No products added yet.</Typography>
                 ) : (
-                  products.map(p => {
+                  products.map((p, idx) => {
                     const currentCostId = activeCostProductId || products[0].id;
                     const isSelected = p.id === currentCostId;
                     const hasCosts = (quoteDetails[p.id] || []).some((c: any) => c.amount > 0);
@@ -1773,20 +1631,31 @@ const ProjectDetails: React.FC = () => {
                         }}
                         sx={{ 
                           p: 2, 
-                          border: '1px solid', 
+                          border: isSelected ? '2px solid' : '1px solid', 
                           borderColor: isSelected ? '#B38B36' : '#E8E1D5', 
-                          borderRadius: 2, 
-                          bgcolor: isSelected ? 'rgba(179, 139, 54, 0.05)' : '#FFFDF5',
+                          borderRadius: 3, 
+                          bgcolor: isSelected ? '#FFF' : '#FAFAFA',
                           cursor: 'pointer',
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          transition: '0.2s',
-                          '&:hover': { borderColor: '#B38B36', bgcolor: 'rgba(179, 139, 54, 0.05)' }
+                          transition: 'all 0.2s ease-in-out',
+                          boxShadow: isSelected ? '0 4px 12px rgba(179, 139, 54, 0.15)' : 'none',
+                          transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                          '&:hover': { borderColor: '#B38B36', bgcolor: '#FFF', boxShadow: '0 4px 12px rgba(179, 139, 54, 0.1)' }
                         }}
                       >
-                        <Typography variant="subtitle2" fontWeight={isSelected ? "bold" : "medium"} color={isSelected ? "#B38B36" : "text.primary"}>{p.category}</Typography>
-                        {hasCosts && <CheckCircleIcon fontSize="small" sx={{ color: 'success.main' }} />}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar sx={{ width: 28, height: 28, bgcolor: isSelected ? '#B38B36' : '#E0E0E0', color: isSelected ? '#FFF' : 'text.secondary', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                            {idx + 1}
+                          </Avatar>
+                          <Typography variant="subtitle2" fontWeight={isSelected ? 700 : 500} color={isSelected ? "#333" : "text.secondary"}>{p.category}</Typography>
+                        </Box>
+                        {hasCosts ? (
+                           <CheckCircleIcon fontSize="small" sx={{ color: 'success.main' }} />
+                        ) : (
+                           <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: isSelected ? '#B38B36' : '#E0E0E0' }} />
+                        )}
                       </Box>
                     )
                   })
@@ -2356,7 +2225,7 @@ const ProjectDetails: React.FC = () => {
                     <TextField size="small" type="number" value={ep.width === 0 ? '' : ep.width} onChange={e => handleUpdateEditingProduct(index, 'width', Number(e.target.value))} fullWidth />
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Breadth (B)</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>MM</Typography>
                     <TextField size="small" type="number" value={ep.breadth === 0 ? '' : ep.breadth} onChange={e => handleUpdateEditingProduct(index, 'breadth', Number(e.target.value))} fullWidth />
                   </Box>
                 </Box>
@@ -2382,7 +2251,7 @@ const ProjectDetails: React.FC = () => {
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                   <TextField 
                     size="small" type="number" label={`Total ${ep.unit || ''}`} 
-                    value={(ep.length || 0) * (ep.width || 0) * (ep.breadth || 1)} 
+                    value={(ep.length || 0) * (ep.width || 0)} 
                     disabled 
                     fullWidth 
                     sx={{ bgcolor: '#f5f5f5' }}
@@ -2498,6 +2367,79 @@ const ProjectDetails: React.FC = () => {
         </Box>
       </Dialog>
 
+      {/* CREATE SLAB DIALOG */}
+      <Dialog open={slabDialogOpen} onClose={() => setSlabDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Add New Slab</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <FormControl fullWidth>
+            <InputLabel>Link Raw Material (Optional)</InputLabel>
+            <Select
+              label="Link Raw Material (Optional)"
+              value={slabForm.inventoryId}
+              onChange={(e) => setSlabForm({ ...slabForm, inventoryId: e.target.value })}
+            >
+              <MenuItem value="" disabled>Select Raw Material</MenuItem>
+              {inventoryItems?.filter((i: any) => i.quantity > 0).map((item: any) => (
+                <MenuItem key={item.id} value={item.id}>
+                  {item.itemName} (Block: {item.blockNumber || 'N/A'}) - Avail: {item.quantity}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField 
+            select
+            label="Select Slab Category (From Quotation)" 
+            fullWidth 
+            value={slabForm.name} 
+            onChange={(e) => setSlabForm({ ...slabForm, name: e.target.value })} 
+          >
+            {products?.filter(p => !projectSlabs?.some((s: any) => s.name === p.category)).length > 0 ? (
+              products.filter(p => !projectSlabs?.some((s: any) => s.name === p.category)).map((p: any) => (
+                <MenuItem key={p.id} value={p.category}>{p.category}</MenuItem>
+              ))
+            ) : (
+              <MenuItem value="" disabled>All Categories Added / None Found</MenuItem>
+            )}
+          </TextField>
+          <TextField 
+            label="Size (e.g., 5x2)" 
+            fullWidth 
+            value={slabForm.size} 
+            onChange={(e) => setSlabForm({ ...slabForm, size: e.target.value })} 
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setSlabDialogOpen(false)} color="inherit">Cancel</Button>
+          <Button variant="contained" onClick={handleCreateSlab} disabled={!slabForm.name}>Add Slab</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={editSlabDialogOpen} onClose={() => setEditSlabDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Slab</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
+          <TextField 
+            select
+            label="Select Slab Category (From Quotation)" 
+            fullWidth 
+            value={slabForm.name} 
+            onChange={(e) => setSlabForm({ ...slabForm, name: e.target.value })} 
+          >
+            {products?.filter(p => p.category === slabForm.name || !projectSlabs?.some((s: any) => s.name === p.category)).length > 0 ? (
+              products.filter(p => p.category === slabForm.name || !projectSlabs?.some((s: any) => s.name === p.category)).map((p: any) => (
+                <MenuItem key={p.id} value={p.category}>{p.category}</MenuItem>
+              ))
+            ) : (
+              <MenuItem value="" disabled>All Categories Added / None Found</MenuItem>
+            )}
+          </TextField>
+          <TextField label="Grid Layout / Size (e.g. 5x2)" value={slabForm.size} onChange={(e) => setSlabForm({ ...slabForm, size: e.target.value })} fullWidth />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setEditSlabDialogOpen(false)} color="inherit">Cancel</Button>
+          <Button variant="contained" onClick={handleUpdateSlab} disabled={!slabForm.name}>Update Slab</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* RESERVE MATERIAL DIALOG */}
       <Dialog open={reserveDialogOpen} onClose={() => setReserveDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold' }}>Reserve Material</DialogTitle>
@@ -2569,6 +2511,8 @@ const ProjectDetails: React.FC = () => {
           <Button variant="contained" color="primary" onClick={handleSaveDrawingEdit}>Save</Button>
         </Box>
       </Dialog>
+
+
 
       <Snackbar
         open={!!snackbarMessage}

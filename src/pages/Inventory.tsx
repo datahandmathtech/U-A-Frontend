@@ -54,17 +54,19 @@ const Inventory: React.FC = () => {
               <TableCell><strong>Item Name</strong></TableCell>
               <TableCell><strong>Type</strong></TableCell>
               <TableCell><strong>Job Work</strong></TableCell>
-              <TableCell><strong>Dimensions (LxWxH)</strong></TableCell>
-              <TableCell><strong>Quantity</strong></TableCell>
+              <TableCell align="center"><strong>Opening</strong></TableCell>
+              <TableCell align="center"><strong>Monthly In</strong></TableCell>
+              <TableCell align="center"><strong>Monthly Out</strong></TableCell>
+              <TableCell align="center"><strong>Closing (Current)</strong></TableCell>
               <TableCell><strong>Unit Cost</strong></TableCell>
               <TableCell><strong>Supplier</strong></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} align="center">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} align="center">Loading...</TableCell></TableRow>
             ) : inventory?.length === 0 ? (
-              <TableRow><TableCell colSpan={7} align="center">No inventory found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} align="center">No inventory found.</TableCell></TableRow>
             ) : (
               inventory?.map((item: any) => (
                 <TableRow key={item.id} hover>
@@ -86,14 +88,18 @@ const Inventory: React.FC = () => {
                       size="small" 
                     />
                   </TableCell>
-                  <TableCell>
-                    {(item.length || item.width || item.height) ? 
-                      `${item.length || 0} x ${item.width || 0} x ${item.height || 0}` : 
-                      'N/A'
-                    }
-                    {item.weight && ` (${item.weight} tons)`}
+                  <TableCell align="center">
+                    <Typography fontWeight="bold" color="text.secondary">{item.openingStock} {item.unit}</Typography>
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>{item.quantity} {item.unit}</TableCell>
+                  <TableCell align="center">
+                    <Typography fontWeight="bold" color="success.main">+{item.inCurrentMonth || 0}</Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Typography fontWeight="bold" color="error.main">-{item.outCurrentMonth || 0}</Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Typography fontWeight="900" sx={{ fontSize: '1.05rem' }}>{item.closingStock} {item.unit}</Typography>
+                  </TableCell>
                   <TableCell>₹{item.costPerUnit}</TableCell>
                   <TableCell>{item.supplier || 'N/A'}</TableCell>
                 </TableRow>

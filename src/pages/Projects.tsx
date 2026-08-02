@@ -155,9 +155,10 @@ const Projects: React.FC = () => {
                 const remainingPieces = Math.max(0, totalPieces - completedPieces);
                 
                 let deliveryDateColor = '#333';
-                if (project.deadline) {
+                const finalEndDate = project.deadline || project.deliveryDate;
+                if (finalEndDate) {
                    const today = new Date();
-                   const delivery = new Date(project.deadline);
+                   const delivery = new Date(finalEndDate);
                    if (delivery < today) deliveryDateColor = '#d32f2f'; // overdue (red)
                    else if (delivery.getTime() - today.getTime() < 3 * 24 * 60 * 60 * 1000) deliveryDateColor = '#ed6c02'; // close (orange)
                    else deliveryDateColor = '#2e7d32'; // fine (green)
@@ -186,7 +187,7 @@ const Projects: React.FC = () => {
                     <TableCell align="center" sx={{ color: '#333' }}>{completedPieces}</TableCell>
                     <TableCell align="center" sx={{ color: '#333' }}>{remainingPieces}</TableCell>
                     <TableCell sx={{ color: deliveryDateColor, fontWeight: 'bold' }}>
-                      {project.deadline ? new Date(project.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
+                      {finalEndDate ? new Date(finalEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
                     </TableCell>
                     <TableCell sx={{ color: '#333' }}>{project.clientHandle || project.assignedTo?.name || '-'}</TableCell>
                     <TableCell align="center">
@@ -254,12 +255,12 @@ const Projects: React.FC = () => {
                 onChange={(e) => setFormData({...formData, totalPieces: parseInt(e.target.value) || 0})} 
               />
               <TextField 
-                label="Delivery Date" 
+                label="End Date" 
                 type="date"
                 fullWidth 
                 slotProps={{ inputLabel: { shrink: true } }}
-                value={formData.deliveryDate} 
-                onChange={(e) => setFormData({...formData, deliveryDate: e.target.value})} 
+                value={formData.deadline || formData.deliveryDate} 
+                onChange={(e) => setFormData({...formData, deadline: e.target.value, deliveryDate: e.target.value})} 
               />
             </Box>
             <TextField 

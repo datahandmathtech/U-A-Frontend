@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, Paper, TextField, MenuItem, CircularProgress, Alert, Snackbar, Divider, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip } from '@mui/material';
-import { useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, useGetActiveSessionQuery, useMachineClockInMutation, useGetDailyMachineLogsQuery, useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, useGetActiveOutLogsQuery, useGetProjectsQuery } from '../store/apiSlice';
+import { Box, Typography, Button, Paper, TextField, MenuItem, CircularProgress, Alert, Snackbar, Divider, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, RadioGroup, FormControlLabel, Radio, FormControl, Grid } from '@mui/material';
+import { useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, useGetActiveSessionQuery, useMachineClockInMutation, useGetDailyMachineLogsQuery, useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, useGetActiveOutLogsQuery, useGetProjectsQuery, useGetVendorsQuery } from '../store/apiSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/authSlice';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +15,8 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import OutputIcon from '@mui/icons-material/Output';
 import InputIcon from '@mui/icons-material/Input';
 import InventoryIcon from '@mui/icons-material/Inventory';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 
 const ImageUploadBox = ({ label, previewUrl, onClick }: { label: string, previewUrl: string, onClick: () => void }) => {
   return (
@@ -62,6 +64,7 @@ const WorkerDashboard: React.FC = () => {
   const [createMaterialLog, { isLoading: creatingMaterial }] = useCreateMaterialLogMutation();
   const { data: activeMachineLogs, refetch: refetchMachineLogs } = useGetDailyMachineLogsQuery();
   const { data: staffList } = useGetStaffListQuery();
+  const { data: vendorsList } = useGetVendorsQuery();
   const { data: activeOutLogs, refetch: refetchActiveOutLogs } = useGetActiveOutLogsQuery(undefined, {
     skip: !activeSession
   });
@@ -70,6 +73,7 @@ const WorkerDashboard: React.FC = () => {
   const [selectedMachine, setSelectedMachine] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState('');
   const [photos, setPhotos] = useState({ machine: '', unit: '', software: '' });
   const [startMachineDialogOpen, setStartMachineDialogOpen] = useState(false);
   
@@ -84,12 +88,16 @@ const WorkerDashboard: React.FC = () => {
   // Material Tracking State
   const [materialDialogOpen, setMaterialDialogOpen] = useState(false);
   const [materialType, setMaterialType] = useState<'OUT' | 'IN'>('OUT');
-  const [materialStage, setMaterialStage] = useState('');
+  const [dialogOrigin, setDialogOrigin] = useState('');
+  const [materialStage, setMaterialStage] = useState('Pending Assignment');
   const [materialQuantity, setMaterialQuantity] = useState('');
   const [materialPhotos, setMaterialPhotos] = useState({ machine: '', unit: '', software: '' });
-  const [assigneeType, setAssigneeType] = useState<'self'|'worker'|'vendor'>('self');
+  const [assigneeType, setAssigneeType] = useState<'self'|'worker'|'vendor'>('vendor');
+  const [selectedVendors, setSelectedVendors] = useState<any[]>([]); // Keep for legacy
+  const [vendorRows, setVendorRows] = useState<any[]>([{ vendorId: '', vendorName: '', stage: 'Production', qty: '' }]);
   const [selectedStaffId, setSelectedStaffId] = useState('');
-  const [vendorName, setVendorName] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+
   const [selectedOutLogId, setSelectedOutLogId] = useState('');
 
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
@@ -183,18 +191,19 @@ const WorkerDashboard: React.FC = () => {
       
       await machineClockIn({ 
         machineId: selectedMachine, 
-        machinePhotoUrl: photos.machine,
-        unitPhotoUrl: photos.unit,
+        machinePhotoUrl: photos.machine, 
+        unitPhotoUrl: photos.unit, 
         softwarePhotoUrl: photos.software,
-        remarks: '',
         projectId: selectedProjectId || undefined,
         productId: selectedProductId || undefined,
-        productName: productName || undefined
+        productName: productName || undefined,
+        estimatedHours: estimatedHours || undefined
       }).unwrap();
       showToast("Machine Log started successfully!");
       setSelectedMachine('');
       setSelectedProjectId('');
       setSelectedProductId('');
+      setEstimatedHours('');
       setPhotos({ machine: '', unit: '', software: '' });
       setStartMachineDialogOpen(false);
       refetchMachineLogs();
@@ -221,13 +230,11 @@ const WorkerDashboard: React.FC = () => {
         remarks: endRemarks,
         endMachinePhotoUrl: endPhotos.machine,
         endUnitPhotoUrl: endPhotos.unit,
-        endSoftwarePhotoUrl: endPhotos.software,
-        quantityProduced: endQuantity ? parseFloat(endQuantity) : 0
+        endSoftwarePhotoUrl: endPhotos.software
       }).unwrap();
       showToast("Machine Log ended successfully!");
       setSelectedEndMachine('');
       setEndRemarks('');
-      setEndQuantity('');
       setEndPhotos({ machine: '', unit: '', software: '' });
       setEndMachineDialogOpen(false);
       refetchMachineLogs();
@@ -236,14 +243,18 @@ const WorkerDashboard: React.FC = () => {
     }
   };
 
-  const handleOpenMaterialDialog = (type: 'OUT' | 'IN') => {
+  const handleOpenMaterialDialog = (type: 'OUT' | 'IN', stageName: string) => {
     setMaterialType(type);
-    setMaterialStage('');
+    setDialogOrigin(stageName);
+    setMaterialStage(stageName);
     setMaterialQuantity('');
     setMaterialPhotos({ machine: '', unit: '', software: '' });
-    setAssigneeType('self');
+    setAssigneeType('vendor');
     setSelectedStaffId('');
-    setVendorName('');
+    setSelectedVendors([]);
+    setVendorRows([{ vendorId: '', vendorName: '', stage: 'Production', qty: '' }]);
+    setVehicleNumber('');
+
     setSelectedOutLogId('');
     if (type === 'IN') {
       refetchActiveOutLogs();
@@ -252,23 +263,41 @@ const WorkerDashboard: React.FC = () => {
   };
 
   const handleMaterialSubmit = async () => {
+    if (materialType === 'IN' && selectedOutLogId) {
+      const outLog = activeOutLogs?.find((l: any) => l.id === selectedOutLogId);
+      if (outLog) {
+        const pending = (outLog.quantityProduced || 0) - (outLog.returnedQty || 0);
+        if (Number(materialQuantity) > pending) {
+          alert(`Error: You cannot return more than ${pending} pending pieces!`);
+          return;
+        }
+      }
+    }
+
     try {
       await createMaterialLog({
-        stage: materialType === 'IN' ? 'Material Return' : materialStage,
+        stage: materialStage,
         quantityProduced: materialQuantity,
         transactionType: materialType,
         startPhotos: materialPhotos,
-        workerId: assigneeType === 'self' ? user?.id : (assigneeType === 'worker' ? selectedStaffId : undefined),
-        vendorName: assigneeType === 'vendor' ? vendorName : undefined,
-        parentLogId: undefined // Admin will assign project/category during approval instead of linking to parent OUT log directly
+        workerId: assigneeType === 'worker' ? selectedStaffId : (assigneeType === 'self' ? (user?.id || user?._id) : undefined),
+        vendors: vendorRows,
+        vehicleNumber: vehicleNumber || undefined,
+        parentLogId: materialType === 'IN' ? selectedOutLogId : undefined,
+        source: 'Material Tracking',
       }).unwrap();
-      showToast(`Material ${materialType} logged successfully! Waiting for Admin approval.`);
+      showToast(
+        materialType === 'OUT' 
+          ? `Material OUT logged successfully!`
+          : `Material IN logged successfully!`
+      );
       setMaterialDialogOpen(false);
       if (materialType === 'IN') {
         refetchActiveOutLogs();
       }
     } catch (err: any) {
-      showToast(err.data?.message || "Failed to submit material log.", 'error');
+      console.error("Material Submit Error:", err);
+      showToast(err.data?.message || err.message || "Failed to submit material log.", 'error');
     }
   };
 
@@ -297,7 +326,10 @@ const WorkerDashboard: React.FC = () => {
         </Button>
       </Paper>
 
-      <Box sx={{ maxWidth: 600, mx: 'auto', px: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4, px: 2, maxWidth: 1000, mx: 'auto' }}>
+        
+        {/* Left Column: Main Steps */}
+        <Box sx={{ flex: 1, maxWidth: { md: 600 } }}>
         
         {/* Step 1: Punch In / Out Card */}
         <Paper elevation={2} sx={{ p: 3, borderRadius: 4, mb: 4 }}>
@@ -353,32 +385,7 @@ const WorkerDashboard: React.FC = () => {
           )}
         </Paper>
 
-        {/* Active Machine Logs */}
-        {activeMachineLogs && activeMachineLogs.filter((l: any) => l.status === 'active').length > 0 && (
-          <Paper elevation={2} sx={{ p: 3, borderRadius: 4, mb: 4, bgcolor: '#FFFDF5', border: '1px solid #E8E1D5' }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PrecisionManufacturingIcon /> Active Machine Logs
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {activeMachineLogs.filter((l: any) => l.status === 'active').map((log: any) => (
-                <Box key={log.id} sx={{ p: 2, bgcolor: '#FFF', borderRadius: 3, border: '1px solid #E8E1D5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
-                      {log.machine?.name}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>Client: {log.project?.clientName || 'General / Walk-in'}</Typography>
-                    {log.project && <Typography variant="body2" color="textSecondary">Project: {log.project?.projectId}</Typography>}
-                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5, fontWeight: 'bold' }}>
-                      Started at: {new Date(log.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </Typography>
-                  </Box>
-                  <Chip label="IN PROGRESS" size="small" color="success" variant="outlined" sx={{ fontWeight: 'bold' }} />
-                </Box>
-              ))}
-            </Box>
-          </Paper>
-        )}
+        {/* Active Machine Logs Removed per request */}
 
         {/* Action Buttons for Machine Work */}
         <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
@@ -411,29 +418,60 @@ const WorkerDashboard: React.FC = () => {
         <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
           <InventoryIcon /> Step 3: Material Tracking
         </Typography>
-        <Divider sx={{ mb: 3 }} />
+        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Move raw materials around. (No admin approval required)</Typography>
         <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
-          <Button 
-            variant="contained" 
-            color="warning" 
-            size="large" 
-            fullWidth 
-            startIcon={<OutputIcon />}
-            onClick={() => handleOpenMaterialDialog('OUT')}
+          <Button variant="contained" color="warning" size="large" fullWidth startIcon={<OutputIcon />}
+            onClick={() => handleOpenMaterialDialog('OUT', 'Material Tracking')}
             sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(237,108,2,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
           >
-            MATERIAL OUT (TAKE)
+            MATERIAL OUT
           </Button>
-          <Button 
-            variant="contained" 
-            color="info" 
-            size="large" 
-            fullWidth 
-            startIcon={<InputIcon />}
-            onClick={() => handleOpenMaterialDialog('IN')}
+          <Button variant="contained" color="info" size="large" fullWidth startIcon={<InputIcon />}
+            onClick={() => handleOpenMaterialDialog('IN', 'Material Tracking')}
             sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(2,136,209,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
           >
-            MATERIAL IN (RETURN)
+            MATERIAL IN
+          </Button>
+        </Box>
+
+        {/* Polishing */}
+        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
+          ✨ Step 4: Polishing
+        </Typography>
+        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Polishing IN requires admin approval.</Typography>
+        <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
+          <Button variant="contained" color="info" size="large" fullWidth startIcon={<InputIcon />}
+            onClick={() => handleOpenMaterialDialog('IN', 'Polishing')}
+            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(2,136,209,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
+          >
+            POLISHING IN
+          </Button>
+        </Box>
+
+        {/* Packing */}
+        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
+          📦 Step 5: Packing
+        </Typography>
+        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Send material for packing.</Typography>
+        <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
+          <Button variant="contained" color="warning" size="large" fullWidth startIcon={<OutputIcon />}
+            onClick={() => handleOpenMaterialDialog('OUT', 'Packing')}
+            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(237,108,2,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
+          >
+            PACKING OUT
+          </Button>
+        </Box>
+
+        {/* Dispatch */}
+        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
+          🚚 Step 6: Dispatch
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
+          <Button variant="contained" color="warning" size="large" fullWidth startIcon={<OutputIcon />}
+            onClick={() => handleOpenMaterialDialog('OUT', 'Dispatch')}
+            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(237,108,2,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
+          >
+            DISPATCH OUT
           </Button>
         </Box>
 
@@ -461,7 +499,15 @@ const WorkerDashboard: React.FC = () => {
                 )) : <MenuItem value="" disabled>No machines available</MenuItem>}
               </TextField>
 
-
+              <TextField 
+                fullWidth 
+                label="Estimated Time (in Hours)" 
+                type="number"
+                value={estimatedHours}
+                onChange={(e) => setEstimatedHours(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                placeholder="e.g., 2.5"
+              />
 
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>2. Upload Mandatory Photos</Typography>
@@ -509,23 +555,14 @@ const WorkerDashboard: React.FC = () => {
               >
                 {activeMachineLogs?.filter((l: any) => l.status === 'active').map((log: any) => (
                   <MenuItem key={log.id} value={log.id}>
-                    {log.machine?.name} (Client: {log.project?.clientName || 'General / Walk-in'})
+                    {log.machine?.name}
                   </MenuItem>
                 ))}
               </TextField>
 
               <TextField 
                 fullWidth 
-                label="2. Quantity Produced (Pieces/Sq.Ft)" 
-                type="number"
-                value={endQuantity}
-                onChange={(e) => setEndQuantity(e.target.value)}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-              />
-
-              <TextField 
-                fullWidth 
-                label="3. Work Completed / Remarks" 
+                label="2. Work Completed / Remarks" 
                 multiline 
                 rows={3}
                 value={endRemarks}
@@ -534,7 +571,7 @@ const WorkerDashboard: React.FC = () => {
               />
 
               <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>4. Upload Final Photos</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>3. Upload Final Photos</Typography>
                 <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
                   <ImageUploadBox label="MACHINE" previewUrl={endPhotos.machine} onClick={() => startCamera('end_machine')} />
                   <ImageUploadBox label="STONE/UNIT" previewUrl={endPhotos.unit} onClick={() => startCamera('end_unit')} />
@@ -550,7 +587,7 @@ const WorkerDashboard: React.FC = () => {
               variant="contained" 
               color="error" 
               onClick={handleMachineClockOut}
-              disabled={!selectedEndMachine || !endPhotos.machine || !endPhotos.unit || !endPhotos.software || !endQuantity || clockingOut}
+              disabled={!selectedEndMachine || !endPhotos.machine || !endPhotos.unit || !endPhotos.software || clockingOut}
               sx={{ fontWeight: 'bold' }}
             >
               {clockingOut ? 'Ending...' : 'Submit & End Work'}
@@ -561,8 +598,7 @@ const WorkerDashboard: React.FC = () => {
         {/* Dialog: Material Tracking */}
         <Dialog open={materialDialogOpen} onClose={() => setMaterialDialogOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, bgcolor: materialType === 'OUT' ? 'warning.light' : 'info.light', color: materialType === 'OUT' ? 'warning.dark' : 'info.dark' }}>
-            {materialType === 'OUT' ? <OutputIcon /> : <InputIcon />} 
-            {materialType === 'OUT' ? 'Material OUT (Take from Stock)' : 'Material IN (Return to Stock)'}
+            {materialType === 'OUT' ? 'OUT (Take)' : 'IN (Return)'} - {materialStage}
           </DialogTitle>
           <DialogContent dividers>
             <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
@@ -570,65 +606,86 @@ const WorkerDashboard: React.FC = () => {
             </Typography>
             
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {materialType === 'OUT' && (
+              {dialogOrigin === 'Material Tracking' && (
                 <>
-                  <TextField 
-                    select
-                    label="Select Work Stage" 
-                    fullWidth 
-                    value={materialStage} 
-                    onChange={(e) => setMaterialStage(e.target.value)} 
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                  >
-                    {['CNC Carving', 'Inlay Work', 'Hand Carving', 'Polishing', 'Finishing', 'Assembly', 'Packing Preparation'].map((stage) => (
-                      <MenuItem key={stage} value={stage}>{stage}</MenuItem>
-                    ))}
-                  </TextField>
-
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    {assigneeType === 'worker' && (
-                      <TextField 
-                        select
-                        label="Select Staff" 
-                        fullWidth 
-                        value={selectedStaffId} 
-                        onChange={(e) => setSelectedStaffId(e.target.value)} 
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                      >
-                        {staffList?.map((staff: any) => (
-                          <MenuItem key={staff.id} value={staff.id}>{staff.name}</MenuItem>
-                        ))}
-                      </TextField>
-                    )}
-
-                    {assigneeType === 'vendor' && (
-                      <TextField 
-                        label="Vendor Name" 
-                        fullWidth 
-                        value={vendorName} 
-                        onChange={(e) => setVendorName(e.target.value)} 
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                      />
-                    )}
+                  <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <>
+                            {vendorRows.map((row, index) => (
+                              <Paper key={index} elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Typography variant="subtitle2" fontWeight="bold">Assignment {index + 1}</Typography>
+                                  {vendorRows.length > 1 && (
+                                    <IconButton size="small" color="error" onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))}>
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                </Box>
+                                <TextField 
+                                  select
+                                  label="Select Vendor" 
+                                  fullWidth 
+                                  value={row.vendorId} 
+                                  onChange={(e) => {
+                                    const vName = vendorsList?.find((v:any) => v.id === e.target.value)?.name || '';
+                                    setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], vendorId: e.target.value, vendorName: vName }; return arr; });
+                                  }}
+                                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                                >
+                                  {vendorsList?.map((v: any) => (
+                                    <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
+                                  ))}
+                                </TextField>
+                                <Box sx={{ display: 'flex', gap: 2 }}>
+                                  <TextField 
+                                    select
+                                    label="Work Stage" 
+                                    fullWidth 
+                                    value={row.stage} 
+                                    onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], stage: e.target.value }; return arr; })} 
+                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                                  >
+                                    <MenuItem value="Production">Production</MenuItem>
+                                    <MenuItem value="Polishing">Polishing</MenuItem>
+                                    <MenuItem value="Packing">Packing</MenuItem>
+                                    <MenuItem value="Dispatch">Dispatch</MenuItem>
+                                  </TextField>
+                                  <TextField 
+                                    fullWidth 
+                                    label="Quantity" 
+                                    type="number"
+                                    value={row.qty}
+                                    onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
+                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                                  />
+                                </Box>
+                              </Paper>
+                            ))}
+                            <Button startIcon={<AddIcon />} onClick={() => setVendorRows(prev => [...prev, { vendorId: '', vendorName: '', stage: 'Production', qty: '' }])} sx={{ alignSelf: 'flex-start' }}>
+                              Add Another Vendor
+                            </Button>
+                          </>
                   </Box>
                 </>
               )}
 
-              <TextField 
-                fullWidth 
-                label="2. Quantity of Goods (Pieces)" 
-                type="number"
-                value={materialQuantity}
-                onChange={(e) => setMaterialQuantity(e.target.value)}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-              />
+
+
+
+
+              {!(materialType === 'IN' && materialStage === 'Polishing') && !(materialType === 'OUT' && materialStage === 'Packing') && (
+                <TextField 
+                  fullWidth 
+                  label="Vehicle Number (Optional)" 
+                  value={vehicleNumber}
+                  onChange={(e) => setVehicleNumber(e.target.value.substring(0, 10).toUpperCase())}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                />
+              )}
 
               <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>3. Upload Mandatory Photos</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>3. Upload Mandatory Photo</Typography>
                 <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
-                  <ImageUploadBox label="MATERIAL" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
-                  <ImageUploadBox label="STONE/UNIT" previewUrl={materialPhotos.unit} onClick={() => startCamera('mat_unit')} />
-                  <ImageUploadBox label="WORK TICKET" previewUrl={materialPhotos.software} onClick={() => startCamera('mat_software')} />
+                  <ImageUploadBox label="PHOTO" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
                 </Box>
               </Box>
 
@@ -640,7 +697,13 @@ const WorkerDashboard: React.FC = () => {
               variant="contained" 
               color={materialType === 'OUT' ? 'warning' : 'info'} 
               onClick={handleMaterialSubmit}
-              disabled={!materialStage || !materialQuantity || !materialPhotos.machine || !materialPhotos.unit || !materialPhotos.software || creatingMaterial}
+              disabled={
+                (materialType === 'OUT' && assigneeType === 'self' && !materialStage) || 
+                (assigneeType === 'vendor' && materialType === 'OUT' && vendorRows.some(r => !r.vendorId || !r.qty)) || 
+                (!materialQuantity && !(assigneeType === 'vendor' && materialType === 'OUT')) || 
+                !materialPhotos.machine || 
+                creatingMaterial
+              }
               sx={{ fontWeight: 'bold' }}
             >
               {creatingMaterial ? 'Submitting...' : 'Submit to Admin'}
@@ -648,7 +711,111 @@ const WorkerDashboard: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-      </Box>
+      </Box> {/* End Left Column */}
+
+      {/* Right Column: Pending Items */}
+      <Box sx={{ width: { md: 420 }, shrink: 0 }}>
+        <Paper elevation={0} sx={{ 
+          position: 'sticky', top: 20, 
+          borderRadius: 4, 
+          overflow: 'hidden',
+          bgcolor: '#ffffff',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.08)',
+          border: '1px solid #f0f0f0'
+        }}>
+          {/* Header */}
+          <Box sx={{ 
+            bgcolor: '#fff3e0', 
+            p: 3, 
+            borderBottom: '1px solid #ffe0b2' 
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: '900', color: '#e65100', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              📥 PENDING PACKING
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1, fontWeight: 500, color: '#ef6c00' }}>
+              Select items below to return them one by one.
+            </Typography>
+          </Box>
+
+          {/* List Content */}
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 2.5, 
+            maxHeight: 'calc(100vh - 160px)', 
+            overflowY: 'auto', 
+            p: 3,
+            bgcolor: '#fafafa'
+          }}>
+            {activeOutLogs?.filter((log: any) => log.stage === 'Packing' && (log.quantityProduced - (log.returnedQty || 0)) > 0).flatMap((log: any) => {
+              const pending = (log.quantityProduced || 0) - (log.returnedQty || 0);
+              return Array.from({ length: pending }).map((_, index) => (
+                <Paper key={`${log.id}-${index}`} elevation={0} sx={{ 
+                  p: 2.5, 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  borderRadius: 3, 
+                  border: '1px solid #ffcc80',
+                  borderLeft: '6px solid #ed6c02', 
+                  bgcolor: '#ffffff',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 12px rgba(237,108,2,0.1)',
+                  '&:hover': { 
+                    transform: 'translateY(-3px)',
+                    boxShadow: '0 6px 16px rgba(237,108,2,0.2)'
+                  }
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    {(log.startPhotos?.machine || log.startPhotos?.unit) && (
+                      <Box 
+                        component="img" 
+                        src={log.startPhotos?.machine || log.startPhotos?.unit} 
+                        sx={{ width: 48, height: 48, borderRadius: 2, objectFit: 'cover', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }} 
+                      />
+                    )}
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: '800', color: '#424242' }}>
+                        📦 Item {index + 1} <span style={{ color: '#9e9e9e', fontSize: '0.9em', fontWeight: '500' }}>of {pending}</span>
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#757575', display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, fontWeight: 500 }}>
+                        <AccessTimeIcon sx={{ fontSize: 14 }} /> {new Date(log.createdAt).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Button variant="contained" color="warning" size="medium" sx={{ 
+                    borderRadius: 3, 
+                    fontWeight: 'bold', 
+                    minWidth: 90,
+                    boxShadow: '0 4px 10px rgba(237,108,2,0.3)',
+                    '&:hover': { bgcolor: '#e65100', transform: 'scale(1.05)' },
+                    transition: 'all 0.2s'
+                  }}
+                    onClick={() => { 
+                      handleOpenMaterialDialog('IN', 'Packing'); 
+                      setSelectedOutLogId(log.id); 
+                      setMaterialQuantity('1');
+                    }}>
+                    RETURN
+                  </Button>
+                </Paper>
+              ));
+            })}
+            
+            {activeOutLogs?.filter((log: any) => log.stage === 'Packing' && (log.quantityProduced - (log.returnedQty || 0)) > 0).length === 0 && (
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <CheckCircleIcon sx={{ fontSize: 48, color: '#a5d6a7', mb: 2, opacity: 0.5 }} />
+                <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#9e9e9e' }}>
+                  All Caught Up!
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#bdbdbd', mt: 1 }}>
+                  No pending packing items found.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Box> {/* End Right Column */}
 
       {/* Global Snackbar for feedback */}
       <Snackbar 
@@ -678,6 +845,7 @@ const WorkerDashboard: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+    </Box>
     </Box>
   );
 };

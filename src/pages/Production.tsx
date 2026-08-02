@@ -7,9 +7,9 @@ import { useGetWorkOrdersQuery, useGetProjectsQuery, useGetMachinesQuery, useGet
 
 const Production: React.FC = () => {
   const [tab, setTab] = useState(0);
-  const { data: workOrders, isLoading: workOrdersLoading, refetch: refetchWorkOrders } = useGetWorkOrdersQuery(undefined, { pollingInterval: 15000 });
-  const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useGetProductionLogsQuery(undefined, { pollingInterval: 15000 });
-  const { data: machineLogs, isLoading: machineLogsLoading } = useGetMachineLogsQuery(undefined, { pollingInterval: 15000 });
+  const { data: workOrders, isLoading: workOrdersLoading, refetch: refetchWorkOrders } = useGetWorkOrdersQuery(undefined);
+  const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useGetProductionLogsQuery(undefined);
+  const { data: machineLogs, isLoading: machineLogsLoading } = useGetMachineLogsQuery(undefined);
   const { data: projects } = useGetProjectsQuery();
   const { data: machines } = useGetMachinesQuery();
   const { data: approvedLogs } = useGetApprovedLogsQuery();

@@ -11,11 +11,18 @@ import Production from './pages/Production';
 import Dispatch from './pages/Dispatch';
 import HR from './pages/HR';
 import Approvals from './pages/Approvals';
+import InOutLedger from './pages/InOutLedger';
+import VendorsList from './pages/VendorsList';
 import Dashboard from './pages/Dashboard';
 import LiveFeed from './pages/LiveFeed';
 import Machines from './pages/Machines';
 import ProjectDetails from './pages/ProjectDetails';
 import LogBook from './pages/LogBook';
+import PieceTracker from './pages/PieceTracker';
+import VendorLedger from './pages/VendorLedger';
+import VendorLedgerDetails from './pages/VendorLedgerDetails';
+import SlabPieceTracker from './pages/SlabPieceTracker';
+import StageDetails from './pages/StageDetails';
 
 import Login from './pages/Login';
 import WorkerDashboard from './pages/WorkerDashboard';
@@ -46,6 +53,18 @@ const router = createBrowserRouter([
         element: <LogBook />
       },
       {
+        path: 'pieces',
+        element: <PieceTracker />
+      },
+      {
+        path: 'vendor-ledger',
+        element: <VendorLedger />
+      },
+      {
+        path: 'vendor-ledger/:vendorName',
+        element: <VendorLedgerDetails />
+      },
+      {
         path: 'crm',
         element: <CRM />
       },
@@ -62,8 +81,28 @@ const router = createBrowserRouter([
         element: <ProjectDetails />
       },
       {
+        path: 'projects/:id/slab/:slabId',
+        element: <SlabPieceTracker />
+      },
+      {
+        path: 'projects/:id/slab/:slabId/stage/:stageName',
+        element: <StageDetails />
+      },
+      {
         path: 'approvals',
         element: <Approvals />
+      },
+      {
+        path: 'in-out-ledger',
+        element: <InOutLedger />
+      },
+      {
+        path: 'vendors',
+        element: <VendorsList />
+      },
+      {
+        path: 'vendors/:id',
+        element: <VendorLedger />
       },
       {
         path: 'accounts',

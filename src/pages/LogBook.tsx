@@ -49,7 +49,7 @@ const LogBook = () => {
   const formattedDateParam = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
   
   const { data: allLogs, isLoading } = useGetMachineLogsQuery();
-  const { data: approvedLogs, isLoading: materialLoading, refetch: refetchApprovedLogs } = useGetApprovedLogsQuery(undefined, { pollingInterval: 10000 });
+  const { data: approvedLogs, isLoading: materialLoading, refetch: refetchApprovedLogs } = useGetApprovedLogsQuery(undefined);
   const [updateMaterialLog, { isLoading: isReturning }] = useUpdateMaterialLogMutation();
   
   const [editMachineLog] = useEditMachineLogMutation();
@@ -275,15 +275,16 @@ const LogBook = () => {
                   <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>PUNCH IN</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>PUNCH OUT</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>QTY</TableCell>
-                  <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>HOURS</TableCell>
+                  <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>EST. TIME</TableCell>
+                  <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>ACT. TIME</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>ACTION</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={8} align="center" sx={{ color: 'text.secondary', py: 5 }}>Loading logs...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} align="center" sx={{ color: 'text.secondary', py: 5 }}>Loading logs...</TableCell></TableRow>
                 ) : (!logs || logs.length === 0) ? (
-                  <TableRow><TableCell colSpan={8} align="center" sx={{ color: 'text.secondary', py: 5 }}>No logs found for this date.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} align="center" sx={{ color: 'text.secondary', py: 5 }}>No logs found for this date.</TableCell></TableRow>
                 ) : (
                   logs.map((log: any) => (
                     <TableRow key={log.id} sx={{ '&:hover': { bgcolor: 'rgba(46, 125, 50, 0.02)' } }}>
@@ -293,7 +294,7 @@ const LogBook = () => {
                       {/* CLIENT — separate bold row */}
                       <TableCell>
                         <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: 'text.primary' }}>
-                          {log.project?.clientName || 'Walk-in'}
+                          {log.project?.clientName ? `${log.project.clientName} (${log.project.name})` : log.project?.name || 'Walk-in'}
                         </Typography>
                         {log.project?.projectId && (
                           <Typography sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'primary.main' }}>
@@ -304,13 +305,8 @@ const LogBook = () => {
                       {/* MACHINE — separate bold row */}
                       <TableCell>
                         <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#5c4033' }}>
-                          {log.machine?.name || '—'}
+                          {log.machine?.name ? log.machine.name.replace(/Machine\s*/i, '').replace(/M\s*/i, '') : '—'}
                         </Typography>
-                        {log.worker?.name && (
-                          <Typography sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' }}>
-                            {log.worker.name}
-                          </Typography>
-                        )}
                       </TableCell>
                       <TableCell>
                         <Typography sx={{ color: '#2E7D32', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -330,11 +326,22 @@ const LogBook = () => {
                         <Typography sx={{ fontWeight: 900, color: 'text.primary' }}>{log.quantityProduced || 0}</Typography>
                         <Typography sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>PCS</Typography>
                       </TableCell>
-                      <TableCell>
-                        <Typography sx={{ fontWeight: 700, color: 'text.primary' }}>
-                          {(((log.endTime ? new Date(log.endTime) : new Date()).getTime() - new Date(log.startTime).getTime()) / (1000 * 60 * 60)).toFixed(2)} hrs
-                        </Typography>
+                      
+                      {/* EST. TIME */}
+                      <TableCell sx={{ color: 'text.primary', fontWeight: 600 }}>
+                        {log.estimatedHours ? `${Number(log.estimatedHours).toFixed(1).replace('.0', '')}h` : '—'}
                       </TableCell>
+                      
+                      {/* ACT. TIME */}
+                      <TableCell sx={{ color: 'text.primary', fontWeight: 600 }}>
+                        {(() => {
+                          const durationMs = (log.endTime ? new Date(log.endTime) : new Date()).getTime() - new Date(log.startTime).getTime();
+                          const actHrs = Math.floor(durationMs / (1000 * 60 * 60));
+                          const actMins = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+                          return `${actHrs}h ${actMins}m`;
+                        })()}
+                      </TableCell>
+                      
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                           <Tooltip title="View Details">

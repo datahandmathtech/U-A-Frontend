@@ -1,30 +1,53 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton } from '@mui/material';
-import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetApprovedLogsQuery } from '../store/apiSlice';
+import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel } from '@mui/material';
+import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetApprovedLogsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useGetActiveOutLogsQuery } from '../store/apiSlice';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import OutputIcon from '@mui/icons-material/Output';
 import InputIcon from '@mui/icons-material/Input';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 
 const Approvals: React.FC = () => {
-  const { data: pendingLogs, isLoading, refetch } = useGetPendingApprovalsQuery(undefined, { pollingInterval: 5000 });
-  const { data: approvedLogs, refetch: refetchApproved } = useGetApprovedLogsQuery(undefined, { pollingInterval: 5000 });
+  const { data: pendingLogs, isLoading, refetch } = useGetPendingApprovalsQuery(undefined);
+  const { data: approvedLogs, refetch: refetchApproved } = useGetApprovedLogsQuery(undefined);
   const { data: projects } = useGetProjectsQuery();
+  const { data: machineLogs } = useGetMachineLogsQuery(undefined);
+  const { data: activeOutLogs } = useGetActiveOutLogsQuery(undefined);
+  const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
+  
+
+  
   const [approveLog, { isLoading: isApproving }] = useApproveMaterialLogMutation();
 
+  const [deleteProductionLog] = useDeleteProductionLogMutation();
+  const [editProductionLog] = useEditProductionLogMutation();
+  const [deleteMachineLog] = useDeleteMachineLogMutation();
+  const [editMachineLog] = useEditMachineLogMutation();
+  
+  const [approveMachineLog] = useApproveMachineLogMutation();
+  const [rejectMachineLog] = useRejectMachineLogMutation();
+
   const [selectedLog, setSelectedLog] = useState<any>(null);
-  const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string}[]>([{projectId: '', qty: 0}]);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [editHistoryDialogOpen, setEditHistoryDialogOpen] = useState(false);
+  const [editingHistoryLog, setEditingHistoryLog] = useState<any>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [detailsLog, setDetailsLog] = useState<any>(null);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+
+  const activeProjectId = editHistoryDialogOpen ? editingHistoryLog?.projectId : detailsDialogOpen ? detailsLog?.projectId : projectSplits[0]?.projectId;
+  const { data: slabs } = useGetSlabsQuery(activeProjectId, { skip: !activeProjectId });
   
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
 
   const handleApproveClick = (log: any) => {
     setSelectedLog(log);
-    setProjectSplits([{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '' }]);
+    setProjectSplits([{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]);
     setApprovalDialogOpen(true);
   };
 
@@ -42,13 +65,14 @@ const Approvals: React.FC = () => {
     try {
       const validSplits = projectSplits.filter(s => s.projectId && s.qty > 0);
       const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
+      const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
       
-      if (totalSplitQty > selectedLog.quantityProduced) {
-        setToast({ open: true, message: 'Total split quantity cannot exceed original quantity.', severity: 'error' });
+      if (!hasPieces && totalSplitQty > selectedLog.quantityProduced) {
+        setToast({ open: true, message: `Total split item count (${totalSplitQty}) cannot exceed original item count (${selectedLog.quantityProduced}).`, severity: 'error' });
         return;
       }
       if (validSplits.length === 0) {
-        setToast({ open: true, message: 'Please select at least one project and enter quantity.', severity: 'error' });
+        setToast({ open: true, message: 'Please select at least one project and enter item count.', severity: 'error' });
         return;
       }
 
@@ -60,12 +84,65 @@ const Approvals: React.FC = () => {
         } 
       }).unwrap();
       
-      setToast({ open: true, message: 'Log Approved successfully', severity: 'success' });
-      setApprovalDialogOpen(false);
-      refetch();
       refetchApproved();
+      setApprovalDialogOpen(false);
+      setProjectSplits([{projectId: '', qty: 0}]);
+      setToast({ open: true, message: 'Approval saved successfully', severity: 'success' });
+      refetch();
     } catch (err: any) {
-      setToast({ open: true, message: err?.data?.message || 'Failed to approve', severity: 'error' });
+      setToast({ open: true, message: err?.data?.message || 'Approval failed', severity: 'error' });
+    }
+  };
+
+    const [selectedStageFilter, setSelectedStageFilter] = useState<string | null>(null);
+
+  const handleDeleteHistoryLog = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this log?")) {
+      try {
+        if (id.includes('-start')) {
+          await deleteMachineLog(id.replace('-start', '')).unwrap();
+        } else {
+          await deleteProductionLog(id).unwrap();
+        }
+        setToast({ open: true, message: 'Log deleted successfully', severity: 'success' });
+        refetchApproved();
+      } catch (err) {
+        setToast({ open: true, message: 'Failed to delete log', severity: 'error' });
+      }
+    }
+  };
+
+  const handleEditHistoryClick = (log: any) => {
+    setEditingHistoryLog({ ...log });
+    setEditHistoryDialogOpen(true);
+  };
+
+  const handleUpdateHistoryLog = async () => {
+    try {
+      if (editingHistoryLog.id && String(editingHistoryLog.id).includes('-start')) {
+        await editMachineLog({
+          id: String(editingHistoryLog.id).replace('-start', ''),
+          data: { piecesProcessed: editingHistoryLog.quantityProduced }
+        }).unwrap();
+      } else {
+        await editProductionLog({ 
+          id: editingHistoryLog.id, 
+          data: { 
+            quantityProduced: editingHistoryLog.quantityProduced, 
+            stage: editingHistoryLog.stage,
+            projectId: editingHistoryLog.projectId,
+            productId: editingHistoryLog.productId,
+            productName: editingHistoryLog.productName,
+            slabId: editingHistoryLog.slabId,
+            pieceIds: editingHistoryLog.pieceIds
+          } 
+        }).unwrap();
+      }
+      setEditHistoryDialogOpen(false);
+      setToast({ open: true, message: 'Log updated successfully', severity: 'success' });
+      refetchApproved();
+    } catch (err) {
+      setToast({ open: true, message: 'Failed to update log', severity: 'error' });
     }
   };
 
@@ -80,82 +157,241 @@ const Approvals: React.FC = () => {
         </Typography>
       </Box>
 
-      {!pendingLogs || pendingLogs.length === 0 ? (
+      {(!pendingLogs) ? (
         <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4 }}>
           <CheckCircleIcon sx={{ fontSize: 60, color: 'success.main', mb: 2 }} />
-          <Typography variant="h6" color="textSecondary">No pending approvals at the moment.</Typography>
+          <Typography variant="h6" color="textSecondary">Loading approvals...</Typography>
         </Paper>
       ) : (
-        <Grid container spacing={3}>
-          {pendingLogs.map((log: any) => (
-            <Grid size={{ xs: 12, md: 6, lg: 4 }} key={log.id}>
-              <Card sx={{ borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', position: 'relative' }}>
-                <Box sx={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
-                  <Chip 
-                    label={log.transactionType === 'OUT' ? 'MATERIAL OUT' : 'MATERIAL IN'} 
-                    color={log.transactionType === 'OUT' ? 'warning' : 'info'} 
-                    size="small" 
-                    sx={{ fontWeight: 'bold', fontSize: '0.7rem' }} 
-                    icon={log.transactionType === 'OUT' ? <OutputIcon /> : <InputIcon />}
-                  />
+        <Box>
+          {(() => {
+            const combinedPendingLogs = (() => {
+              if (!pendingLogs) return [];
+              return (pendingLogs || [])
+                .filter((log: any) => log.stage !== 'Material Tracking')
+                .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            })();
+
+            const stages = [
+              { name: 'Production Work', shortName: 'Production', matchStages: ['Production', 'Production Work'], color: '#E3F2FD', iconColor: 'primary', borderColor: '#BBDEFB' },
+              { name: 'Polishing', shortName: 'Polishing', matchStages: ['Polishing'], color: '#FFF3E0', iconColor: 'warning', borderColor: '#FFE0B2' },
+              { name: 'Packing', shortName: 'Packing', matchStages: ['Packing'], color: '#FCE4EC', iconColor: 'secondary', borderColor: '#F8BBD0' },
+              { name: 'Dispatch', shortName: 'Dispatch', matchStages: ['Dispatch'], color: '#FFEBEE', iconColor: 'error', borderColor: '#FFCDD2' },
+            ];
+
+            const renderLogGrid = (logsToRender: any[]) => (
+              <Grid container spacing={3}>
+                {logsToRender.map((log: any) => (
+                  <Grid size={{ xs: 12, md: 6, lg: 4 }} key={log.id}>
+                    <Card sx={{ borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', position: 'relative', bgcolor: 'white' }}>
+                      <Box sx={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+                        <Chip 
+                          label={log.transactionType === 'OUT' ? 'MATERIAL OUT' : 'MATERIAL IN'} 
+                          color={log.transactionType === 'OUT' ? 'warning' : 'info'} 
+                          size="small" 
+                          sx={{ fontWeight: 'bold', fontSize: '0.7rem' }} 
+                          icon={log.transactionType === 'OUT' ? <OutputIcon /> : <InputIcon />}
+                        />
+                      </Box>
+                      <CardContent sx={{ pt: 4 }}>
+                        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Stage: {log.stage}</span>
+                          <span style={{ color: '#666' }}>Item(s): {log.quantityProduced}</span>
+                        </Typography>
+                        {log.vehicleNumber && (
+                          <Typography variant="body2" sx={{ mb: 1, color: '#1976d2', fontWeight: 'bold' }}>
+                            Vehicle No: {log.vehicleNumber}
+                          </Typography>
+                        )}
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Worker/Vendor:</Typography>
+                          {log.vendorName ? (
+                            <Typography variant="body1" sx={{ color: 'secondary.main', fontWeight: 'bold' }}>{log.vendorName} (Vendor)</Typography>
+                          ) : (
+                            <Typography variant="body1">{log.worker?.name || 'Unknown'}</Typography>
+                          )}
+                        </Box>
+                        <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 2 }}>
+                          Submitted: {new Date(log.createdAt).toLocaleString()}
+                        </Typography>
+
+                        <Box sx={{ display: 'flex', gap: 1, mb: 3, overflowX: 'auto', pb: 1 }}>
+                          {log.startPhotos?.machine && (
+                            <CardMedia 
+                              component="img" 
+                              image={log.startPhotos.machine} 
+                              sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
+                              onClick={() => setPreviewPhoto(log.startPhotos.machine)}
+                            />
+                          )}
+                          {log.startPhotos?.unit && (
+                            <CardMedia 
+                              component="img" 
+                              image={log.startPhotos.unit} 
+                              sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
+                              onClick={() => setPreviewPhoto(log.startPhotos.unit)}
+                            />
+                          )}
+                          {log.startPhotos?.software && (
+                            <CardMedia 
+                              component="img" 
+                              image={log.startPhotos.software} 
+                              sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
+                              onClick={() => setPreviewPhoto(log.startPhotos.software)}
+                            />
+                          )}
+                        </Box>
+
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                          <Button variant="contained" color="success" fullWidth onClick={() => handleApproveClick(log)} startIcon={<CheckCircleIcon />}>
+                            Approve
+                          </Button>
+                          <Button variant="outlined" color="error" fullWidth onClick={() => handleRejectClick(log.id)} startIcon={<CancelIcon />}>
+                            Reject
+                          </Button>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            );
+
+            const summaryRow = (
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
+                {stages.map((stageInfo, index) => {
+                  const stageLogs = combinedPendingLogs.filter((log: any) => stageInfo.matchStages.includes(log.stage));
+                  const isSelected = selectedStageFilter === stageInfo.name;
+                  const count = stageLogs.length;
+                  const inCount = stageLogs.filter((l: any) => l.transactionType === 'IN').length;
+                  const outCount = stageLogs.filter((l: any) => l.transactionType === 'OUT').length;
+                  const otherCount = count - inCount - outCount;
+
+                  return (
+                    <Box 
+                      key={index} 
+                      onClick={() => setSelectedStageFilter(isSelected ? null : stageInfo.name)}
+                      sx={{ 
+                        flex: '1 1 auto', 
+                        minWidth: '140px',
+                        py: 1.5,
+                        px: 2, 
+                        bgcolor: isSelected ? stageInfo.color : '#fff', 
+                        borderRadius: 2, 
+                        border: '1px solid', 
+                        borderColor: isSelected ? `${stageInfo.iconColor}.main` : '#e0e0e0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                        cursor: 'pointer',
+                        boxShadow: isSelected ? `0 4px 12px ${stageInfo.color}` : '0 1px 3px rgba(0,0,0,0.02)',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          bgcolor: stageInfo.color,
+                          borderColor: `${stageInfo.iconColor}.main`
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CheckCircleIcon sx={{ fontSize: '1.2rem', color: isSelected ? `${stageInfo.iconColor}.main` : '#999' }} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: isSelected ? 800 : 600, color: isSelected ? '#222' : '#555' }}>
+                          {stageInfo.shortName}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        {outCount > 0 && <Chip label={`OUT: ${outCount}`} size="small" sx={{ height: 20, fontWeight: 'bold', bgcolor: '#ed6c02', color: '#fff', fontSize: '0.65rem' }} />}
+                        {inCount > 0 && <Chip label={`IN: ${inCount}`} size="small" sx={{ height: 20, fontWeight: 'bold', bgcolor: '#0288d1', color: '#fff', fontSize: '0.65rem' }} />}
+                        {otherCount > 0 && <Chip label={otherCount} size="small" sx={{ height: 20, fontWeight: 'bold', bgcolor: `${stageInfo.iconColor}.main`, color: '#fff' }} />}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            );
+
+            // Detailed Logs Sections
+            const detailedSections = stages.map((stageInfo, index) => {
+              if (selectedStageFilter && selectedStageFilter !== stageInfo.name) return null;
+              
+              const stageLogs = combinedPendingLogs.filter((log: any) => stageInfo.matchStages.includes(log.stage));
+              if (stageLogs.length === 0) return null;
+              return (
+                <Box key={`detail-${index}`} sx={{ mb: 4, p: 3, bgcolor: '#fdfdfd', borderRadius: 3, border: '1px solid #eee' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 3, color: '#333', display: 'flex', alignItems: 'center', gap: 1, borderBottom: '2px solid #eee', pb: 1 }}>
+                    <CheckCircleIcon color={stageInfo.iconColor as any} /> {stageInfo.name} Approvals
+                  </Typography>
+                  
+                  {stageLogs.filter((l: any) => l.transactionType === 'OUT').length > 0 && (
+                    <Box sx={{ mb: 4 }}>
+                       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#ed6c02', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}><OutputIcon fontSize="small"/> Material OUT</Typography>
+                       {renderLogGrid(stageLogs.filter((l: any) => l.transactionType === 'OUT'))}
+                    </Box>
+                  )}
+                  {stageLogs.filter((l: any) => l.transactionType === 'IN').length > 0 && (
+                    <Box sx={{ mb: 4 }}>
+                       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#0288d1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}><InputIcon fontSize="small"/> Material IN</Typography>
+                       {renderLogGrid(stageLogs.filter((l: any) => l.transactionType === 'IN'))}
+                    </Box>
+                  )}
+                  {stageLogs.filter((l: any) => l.transactionType !== 'OUT' && l.transactionType !== 'IN').length > 0 && (
+                    <Box sx={{ mb: 4 }}>
+                       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#555', mb: 2 }}>Other Tasks</Typography>
+                       {renderLogGrid(stageLogs.filter((l: any) => l.transactionType !== 'OUT' && l.transactionType !== 'IN'))}
+                    </Box>
+                  )}
                 </Box>
-                <CardContent sx={{ pt: 4 }}>
-                  <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Stage: {log.stage}</span>
-                    <span style={{ color: '#666' }}>Qty: {log.quantityProduced}</span>
-                  </Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Worker/Vendor:</Typography>
-                    {log.vendorName ? (
-                      <Typography variant="body1" sx={{ color: 'secondary.main', fontWeight: 'bold' }}>{log.vendorName} (Vendor)</Typography>
-                    ) : (
-                      <Typography variant="body1">{log.worker?.name || 'Unknown'}</Typography>
-                    )}
-                  </Box>
-                  <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 2 }}>
-                    Submitted: {new Date(log.createdAt).toLocaleString()}
-                  </Typography>
+              );
+            });
 
-                  <Box sx={{ display: 'flex', gap: 1, mb: 3, overflowX: 'auto', pb: 1 }}>
-                    {log.startPhotos?.machine && (
-                      <CardMedia 
-                        component="img" 
-                        image={log.startPhotos.machine} 
-                        sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
-                        onClick={() => setPreviewPhoto(log.startPhotos.machine)}
-                      />
-                    )}
-                    {log.startPhotos?.unit && (
-                      <CardMedia 
-                        component="img" 
-                        image={log.startPhotos.unit} 
-                        sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
-                        onClick={() => setPreviewPhoto(log.startPhotos.unit)}
-                      />
-                    )}
-                    {log.startPhotos?.software && (
-                      <CardMedia 
-                        component="img" 
-                        image={log.startPhotos.software} 
-                        sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
-                        onClick={() => setPreviewPhoto(log.startPhotos.software)}
-                      />
-                    )}
-                  </Box>
+            const allHandledStages = stages.flatMap(s => s.matchStages);
+            const otherStageLogs = combinedPendingLogs.filter((log: any) => !allHandledStages.includes(log.stage));
 
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="contained" color="success" fullWidth onClick={() => handleApproveClick(log)} startIcon={<CheckCircleIcon />}>
-                      Approve
-                    </Button>
-                    <Button variant="outlined" color="error" fullWidth onClick={() => handleRejectClick(log.id)} startIcon={<CancelIcon />}>
-                      Reject
-                    </Button>
+            return (
+              <>
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                  Filter by stage:
+                </Typography>
+                {summaryRow}
+                
+                {(!selectedStageFilter || selectedStageFilter === 'Other') && otherStageLogs.length > 0 && (
+                  <Box sx={{ mb: 4, p: 3, bgcolor: '#fdfdfd', borderRadius: 3, border: '1px solid #eee' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 3, color: '#333', display: 'flex', alignItems: 'center', gap: 1, borderBottom: '2px solid #eee', pb: 1 }}>
+                      <CheckCircleIcon color="action" /> Other Approvals
+                    </Typography>
+                    
+                    {otherStageLogs.filter((l: any) => l.transactionType === 'OUT').length > 0 && (
+                      <Box sx={{ mb: 4 }}>
+                         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#ed6c02', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}><OutputIcon fontSize="small"/> Material OUT</Typography>
+                         {renderLogGrid(otherStageLogs.filter((l: any) => l.transactionType === 'OUT'))}
+                      </Box>
+                    )}
+                    {otherStageLogs.filter((l: any) => l.transactionType === 'IN').length > 0 && (
+                      <Box sx={{ mb: 4 }}>
+                         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#0288d1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}><InputIcon fontSize="small"/> Material IN</Typography>
+                         {renderLogGrid(otherStageLogs.filter((l: any) => l.transactionType === 'IN'))}
+                      </Box>
+                    )}
+                    {otherStageLogs.filter((l: any) => l.transactionType !== 'OUT' && l.transactionType !== 'IN').length > 0 && (
+                      <Box sx={{ mb: 4 }}>
+                         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#555', mb: 2 }}>Other Tasks</Typography>
+                         {renderLogGrid(otherStageLogs.filter((l: any) => l.transactionType !== 'OUT' && l.transactionType !== 'IN'))}
+                      </Box>
+                    )}
                   </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                )}
+
+                {detailedSections.every(section => section === null) && selectedStageFilter && otherStageLogs.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1, fontStyle: 'italic' }}>
+                    No pending approvals for the selected stage.
+                  </Typography>
+                ) : (
+                  detailedSections
+                )}
+              </>
+            );
+          })()}
+        </Box>
       )}
 
       {/* Recently Approved Section */}
@@ -169,85 +405,139 @@ const Approvals: React.FC = () => {
         </Typography>
       </Box>
 
-      <Paper sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-        <Box sx={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-             <thead style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-              <tr>
-                <th style={{ padding: '16px', borderBottom: '1px solid #eee' }}>Transaction</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #eee' }}>Stage</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #eee' }}>Project</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #eee' }}>Worker</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #eee' }}>Qty</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #eee' }}>Photos</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #eee' }}>Date Approved</th>
-              </tr>
-            </thead>
-            <tbody>
-              {approvedLogs?.length ? approvedLogs.map((log: any) => (
-                <tr key={log.id}>
-                  <td style={{ padding: '16px', borderBottom: '1px solid #eee' }}>
-                    <Chip 
-                      label={log.transactionType === 'OUT' ? 'OUT' : 'IN'} 
-                      color={log.transactionType === 'OUT' ? 'warning' : 'info'} 
-                      size="small" 
-                      sx={{ fontWeight: 'bold' }} 
-                    />
-                  </td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid #eee' }}>{log.stage}</td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid #eee' }}>
-                    {log.project ? <Typography variant="body2" fontWeight="bold" color="primary">{log.project.projectId}</Typography> : '-'}
-                  </td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid #eee' }}>
-                    {log.vendorName ? (
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
-                        {log.vendorName} (Vendor)
-                      </Typography>
-                    ) : (
-                      log.worker?.name || 'Unknown'
-                    )}
-                  </td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid #eee', fontWeight: 'bold' }}>{log.quantityProduced}</td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid #eee' }}>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {log.startPhotos?.machine && (
-                        <img 
-                          src={log.startPhotos.machine} 
-                          alt="Machine" 
-                          style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer', objectFit: 'cover' }} 
-                          onClick={() => setPreviewPhoto(log.startPhotos.machine)}
-                        />
-                      )}
-                      {log.startPhotos?.unit && (
-                        <img 
-                          src={log.startPhotos.unit} 
-                          alt="Unit" 
-                          style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer', objectFit: 'cover' }} 
-                          onClick={() => setPreviewPhoto(log.startPhotos.unit)}
-                        />
-                      )}
-                      {log.startPhotos?.software && (
-                        <img 
-                          src={log.startPhotos.software} 
-                          alt="Software" 
-                          style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer', objectFit: 'cover' }} 
-                          onClick={() => setPreviewPhoto(log.startPhotos.software)}
-                        />
-                      )}
-                      {!log.startPhotos?.machine && !log.startPhotos?.unit && !log.startPhotos?.software && '-'}
-                    </Box>
-                  </td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid #eee', color: '#666' }}>{new Date(log.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#666' }}>No approved logs yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </Box>
-      </Paper>
+      {(() => {
+        const stages = [
+          { name: 'Production Work', shortName: 'Production', matchStages: ['Production', 'Production Work'], color: '#E3F2FD', iconColor: 'primary', borderColor: '#BBDEFB' },
+          { name: 'Material Tracking', shortName: 'Material', matchStages: ['Material Tracking'], color: '#E8F5E9', iconColor: 'success', borderColor: '#C8E6C9' },
+          { name: 'Polishing', shortName: 'Polishing', matchStages: ['Polishing'], color: '#FFF3E0', iconColor: 'warning', borderColor: '#FFE0B2' },
+          { name: 'Packing', shortName: 'Packing', matchStages: ['Packing'], color: '#FCE4EC', iconColor: 'secondary', borderColor: '#F8BBD0' },
+          { name: 'Dispatch', shortName: 'Dispatch', matchStages: ['Dispatch'], color: '#FFEBEE', iconColor: 'error', borderColor: '#FFCDD2' },
+        ];
+
+        const renderHistoryTable = (logsToRender: any[]) => (
+          <Paper sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #eee', mb: 4, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+            <Box sx={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ backgroundColor: '#FAFAFA' }}>
+                  <tr>
+                    <th style={{ padding: '12px 16px', borderBottom: '1px solid #eee', color: '#888', fontSize: '0.75rem', fontWeight: 800 }}>DATE APPROVED</th>
+                    <th style={{ padding: '12px 16px', borderBottom: '1px solid #eee', color: '#888', fontSize: '0.75rem', fontWeight: 800 }}>QTY</th>
+                    <th style={{ padding: '12px 16px', borderBottom: '1px solid #eee', color: '#888', fontSize: '0.75rem', fontWeight: 800 }}>ITEM / PRODUCT</th>
+                    <th style={{ padding: '12px 16px', borderBottom: '1px solid #eee', color: '#888', fontSize: '0.75rem', fontWeight: 800 }}>PROJECT</th>
+                    <th style={{ padding: '12px 16px', borderBottom: '1px solid #eee', color: '#888', fontSize: '0.75rem', fontWeight: 800 }}>WORKER</th>
+                    <th style={{ padding: '12px 16px', borderBottom: '1px solid #eee', color: '#888', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logsToRender.length ? logsToRender.map((log: any) => (
+                    <tr key={log.id} style={{ transition: 'background 0.2s', cursor: 'default' }} onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#fdfdfd')} onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}>
+                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', color: '#666', fontSize: '0.85rem' }}>
+                        {new Date(log.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                        <Typography sx={{ fontWeight: 900, color: '#333' }}>{log.quantityProduced}</Typography>
+                      </td>
+                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                        <Typography sx={{ fontWeight: 800, color: '#1976d2', fontSize: '0.85rem' }}>{log.productName || '—'}</Typography>
+                      </td>
+                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                        {log.project ? <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.9rem' }}>{log.project.projectId || log.project.name}</Typography> : <span style={{ color: '#aaa' }}>—</span>}
+                      </td>
+                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                        <Typography sx={{ fontWeight: 600, color: log.vendorName ? 'secondary.main' : 'text.secondary', fontSize: '0.85rem' }}>
+                          {log.vendorName ? `${log.vendorName} (Vendor)` : (log.worker?.name || '—')}
+                        </Typography>
+                      </td>
+                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', textAlign: 'center' }}>
+                        <IconButton size="small" color="info" onClick={() => { setDetailsLog(log); setDetailsDialogOpen(true); }} sx={{ opacity: 0.7, '&:hover': { opacity: 1, bgcolor: '#e1f5fe' } }}>
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" color="primary" onClick={() => handleEditHistoryClick(log)} sx={{ opacity: 0.7, '&:hover': { opacity: 1, bgcolor: '#e3f2fd' } }}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" color="error" onClick={() => handleDeleteHistoryLog(log.id)} sx={{ opacity: 0.7, '&:hover': { opacity: 1, bgcolor: '#ffebee' } }}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#888', fontStyle: 'italic' }}>No approved logs available in history.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </Box>
+          </Paper>
+        );
+
+        const allHandledStages = stages.flatMap(s => s.matchStages);
+        
+        // Format machine logs as OUT entries for Production Work
+        const formattedMachineLogsMap = new Map();
+        (machineLogs || []).forEach((ml: any) => {
+          const workerName = typeof ml.operator === 'object' && ml.operator !== null ? ml.operator.name : ml.operator || 'Unknown';
+          const projectObj = projects?.find((p: any) => p.id === ml.projectId);
+          const key = `${ml.startTime || ml.createdAt}-${workerName}-${ml.projectId}`;
+          if (!formattedMachineLogsMap.has(key)) {
+            formattedMachineLogsMap.set(key, {
+              ...ml,
+              id: `${ml.id}-start`,
+              stage: 'Production Work',
+              transactionType: 'OUT',
+              createdAt: ml.startTime || ml.createdAt,
+              quantityProduced: ml.piecesProcessed || 1,
+              worker: { name: workerName },
+              project: projectObj || ml.project,
+              productName: ml.pieceNumber || ml.productName || ml.slabId || '—',
+              startPhotos: {
+                machine: ml.machinePhotoUrl,
+                unit: ml.unitPhotoUrl,
+                software: ml.softwarePhotoUrl
+              }
+            });
+          } else {
+            const existing = formattedMachineLogsMap.get(key);
+            existing.quantityProduced += (ml.piecesProcessed || 1);
+          }
+        });
+        const formattedMachineLogs = Array.from(formattedMachineLogsMap.values());
+
+        const combinedHistoryLogs = [...(approvedLogs || [])].sort((a: any, b: any) => {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+        const otherApprovedLogs = combinedHistoryLogs.filter((log: any) => !allHandledStages.includes(log.stage));
+
+        return (
+          <>
+            {stages.map((stageInfo, idx) => {
+              if (selectedStageFilter && selectedStageFilter !== stageInfo.name) return null;
+
+              const stageLogs = combinedHistoryLogs.filter((log: any) => stageInfo.matchStages.includes(log.stage));
+              if (stageLogs.length === 0) return null;
+              
+              return (
+                <Box key={idx}>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: '#4A4A4A', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CheckCircleIcon color={stageInfo.iconColor as any} /> {stageInfo.name} History
+                  </Typography>
+                  {renderHistoryTable(stageLogs)}
+                </Box>
+              );
+            })}
+
+            {(!selectedStageFilter || selectedStageFilter === 'Other') && otherApprovedLogs.length > 0 && (
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: '#4A4A4A', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CheckCircleIcon color="action" /> Other Stage History
+                </Typography>
+                    {renderHistoryTable(otherApprovedLogs)}
+                  </Box>
+                )}
+                </>
+            );
+          })()}
 
       {/* Approval Dialog — Multi Project Selection */}
       <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
@@ -255,13 +545,13 @@ const Approvals: React.FC = () => {
           Approve Material Log
           {selectedLog && (
             <Typography variant="caption" display="block" sx={{ color: 'text.secondary', mt: 0.5 }}>
-              Stage: {selectedLog.stage} • Qty: {selectedLog.quantityProduced}
+              Stage: {selectedLog.stage} • Item(s): {selectedLog.quantityProduced}
             </Typography>
           )}
         </DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Select one or more projects for this material. You can split the quantity across multiple projects.
+            Select one or more projects for this material. You can split the items across multiple projects.
           </Typography>
 
           {/* Project Assignment rows */}
@@ -280,8 +570,12 @@ const Approvals: React.FC = () => {
                     onChange={(e) => {
                       const newSplits = [...projectSplits];
                       newSplits[idx].projectId = e.target.value;
+                      
                       newSplits[idx].productId = '';
                       newSplits[idx].productName = '';
+                      newSplits[idx].slabId = '';
+                      newSplits[idx].pieceIds = [];
+                      
                       setProjectSplits(newSplits);
                     }} 
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
@@ -292,43 +586,131 @@ const Approvals: React.FC = () => {
                   </TextField>
                 </Box>
                 
-                {split.projectId && projectProducts.length > 0 && (
-                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <TextField 
-                      select
-                      label="Select Category (Optional)" 
-                      fullWidth
-                      size="small"
-                      value={split.productId || ''} 
-                      onChange={(e) => {
-                        const newSplits = [...projectSplits];
-                        newSplits[idx].productId = e.target.value;
-                        newSplits[idx].productName = projectProducts.find((p:any) => p.id === e.target.value)?.category || '';
-                        setProjectSplits(newSplits);
-                      }} 
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                    >
-                      <MenuItem value="" disabled>Select Category</MenuItem>
-                      {projectProducts.map((p: any) => (
-                        <MenuItem key={p.id} value={p.id}>{p.category}</MenuItem>
-                      ))}
-                    </TextField>
-                  </Box>
-                )}
-                
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <TextField 
-                    type="number"
-                    label="Quantity"
-                    size="small"
-                    value={split.qty === 0 ? '' : split.qty}
-                    onChange={(e) => {
-                      const newSplits = [...projectSplits];
-                      newSplits[idx].qty = Number(e.target.value);
-                      setProjectSplits(newSplits);
-                    }}
-                    sx={{ width: 120, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  />
+                {/* Dynamically extract slabs for this project */}
+                {(() => {
+                  const projectSlabs = slabs ? slabs.filter((s: any) => {
+                    if (s.projectId !== split.projectId) return false;
+                    
+                    // If slab has pieces, hide it if ALL pieces are already completed for this stage
+                    if (s.pieces && s.pieces.length > 0) {
+                      const eligiblePieces = s.pieces.filter((p: any) => {
+                        const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                        const logStage = selectedLog?.stage?.replace(' Work', '') || '';
+                        const pStageIdx = stages.indexOf(p.stage);
+                        const logStageIdx = stages.indexOf(logStage);
+                        
+                        if (logStageIdx === -1) return true;
+                        if (pStageIdx === logStageIdx && p.status === 'completed') return false;
+                        if (pStageIdx > logStageIdx) return false;
+                        if (pStageIdx < logStageIdx) {
+                          if (pStageIdx === logStageIdx - 1 && p.status === 'completed') return true;
+                          return false;
+                        }
+                        return true;
+                      });
+                      return eligiblePieces.length > 0;
+                    }
+                    
+                    // Keep slabs that have no pieces yet
+                    return true;
+                  }) : [];
+                  if (projectSlabs.length === 0) return null;
+                  
+                  return (
+                    <>
+                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                        <TextField 
+                          select
+                          label="Select Product / Slab" 
+                          fullWidth
+                          size="small"
+                          value={split.slabId || ''} 
+                          onChange={(e) => {
+                            const newSplits = [...projectSplits];
+                            newSplits[idx].slabId = e.target.value;
+                            newSplits[idx].pieceIds = [];
+                            setProjectSplits(newSplits);
+                          }} 
+                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                        >
+                          <MenuItem value="">-- Clear Selection --</MenuItem>
+                          {projectSlabs.map((s: any) => (
+                            <MenuItem key={s.id} value={s.id}>{s.name} {s.size ? `(${s.size})` : ''}</MenuItem>
+                          ))}
+                        </TextField>
+                      </Box>
+                      
+                      {/* Pieces Dropdown */}
+                      {split.slabId && (
+                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                          <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
+                            <InputLabel id={`select-piece-label-${idx}`}>Select Piece(s) (Optional)</InputLabel>
+                            <Select
+                              labelId={`select-piece-label-${idx}`}
+                              multiple
+                              value={split.pieceIds || []}
+                              onChange={(e) => {
+                                const newSplits = [...projectSplits];
+                                const val = e.target.value as string[];
+                                newSplits[idx].pieceIds = val;
+                                newSplits[idx].qty = val.length > 0 ? val.length : newSplits[idx].qty;
+                                
+                                const slab = projectSlabs.find((s: any) => s.id === newSplits[idx].slabId);
+                                if (val.length > 0) {
+                                  const pieceNames = val.map((id: string) => {
+                                    const piece = slab?.pieces?.find((p: any) => p.id === id);
+                                    return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
+                                  });
+                                  newSplits[idx].productName = slab ? `${slab.name} - ${pieceNames.join(', ')}` : pieceNames.join(', ');
+                                } else {
+                                  newSplits[idx].productName = slab?.name || '';
+                                }
+
+                                setProjectSplits(newSplits);
+                              }}
+                              input={<OutlinedInput label="Select Piece(s) (Optional)" />}
+                              renderValue={(selected: any) => {
+                                if (!selected || selected.length === 0) return <em>Select Pieces</em>;
+                                const slab = projectSlabs.find((s: any) => s.id === split.slabId);
+                                return selected.map((id: string) => {
+                                  const piece = slab?.pieces?.find((p: any) => p.id === id);
+                                  return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id;
+                                }).join(', ');
+                              }}
+                            >
+                              {projectSlabs
+                                .find((s: any) => s.id === split.slabId)
+                                ?.pieces?.filter((p: any) => {
+                                  const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                                  const logStage = selectedLog?.stage?.replace(' Work', '') || '';
+                                  const pStageIdx = stages.indexOf(p.stage);
+                                  const logStageIdx = stages.indexOf(logStage);
+                                  
+                                  if (logStageIdx === -1) return true;
+                                  if (pStageIdx === logStageIdx && p.status === 'completed') return false;
+                                  if (pStageIdx > logStageIdx) return false;
+                                  if (pStageIdx < logStageIdx) {
+                                    if (pStageIdx === logStageIdx - 1 && p.status === 'completed') return true;
+                                    return false;
+                                  }
+                                  return true;
+                                })
+                                .map((p: any) => (
+                                <MenuItem key={p.id} value={p.id}>
+                                  <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
+                                  <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber} - ${p.stage}`} sx={{ color: '#ed6c02', fontWeight: 'bold' }} />
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Box>
+                      )}
+                    </>
+                  );
+                })()}
+
+
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'flex-end' }}>
                   <IconButton 
                     color="error" 
                     onClick={() => {
@@ -362,6 +744,317 @@ const Approvals: React.FC = () => {
           >
             {isApproving ? 'Approving...' : 'Confirm Approval'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Details Dialog (IN and OUT combined) */}
+      <Dialog open={detailsDialogOpen} onClose={() => setDetailsDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>
+          Production Log Details
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 3 }}>
+          {detailsLog && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Machine Log Details (OUT) */}
+              {(() => {
+                const ml = machineLogs?.find((m: any) => m.id === detailsLog.parentLogId);
+                if (!ml) return null;
+                const mStart = new Date(ml.startTime);
+                const mEnd = ml.endTime ? new Date(ml.endTime) : new Date();
+                const diffHrs = Math.floor((mEnd.getTime() - mStart.getTime()) / 3600000);
+                const diffMins = Math.floor(((mEnd.getTime() - mStart.getTime()) % 3600000) / 60000);
+                const workerName = typeof ml.operator === 'object' && ml.operator !== null ? ml.operator.name : ml.operator || 'Unknown';
+                
+                return (
+                  <Card variant="outlined" sx={{ bgcolor: '#FFF8E1', borderColor: '#FFE082', borderRadius: 2 }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" sx={{ color: '#F57C00', fontWeight: 'bold', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <OutputIcon fontSize="small" /> MACHINE WORK (OUT)
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid size={6}>
+                          <Typography variant="caption" color="textSecondary">Operator</Typography>
+                          <Typography variant="body2" fontWeight="bold">{workerName}</Typography>
+                        </Grid>
+                        <Grid size={6}>
+                          <Typography variant="caption" color="textSecondary">Time Taken</Typography>
+                          <Typography variant="body2" fontWeight="bold">{diffHrs}h {diffMins}m</Typography>
+                        </Grid>
+                        <Grid size={6}>
+                          <Typography variant="caption" color="textSecondary">Punch In</Typography>
+                          <Typography variant="body2" fontWeight="bold">{mStart.toLocaleString()}</Typography>
+                        </Grid>
+                        <Grid size={6}>
+                          <Typography variant="caption" color="textSecondary">Punch Out</Typography>
+                          <Typography variant="body2" fontWeight="bold">{ml.endTime ? mEnd.toLocaleString() : 'Active'}</Typography>
+                        </Grid>
+                      </Grid>
+
+                      {/* Punch Out Photos Display */}
+                      <Box sx={{ mt: 2, p: 1.5, bgcolor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
+                        <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block', fontWeight: 'bold' }}>PUNCH OUT PHOTOS</Typography>
+                        <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
+                          {ml.endMachinePhotoUrl && (
+                            <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(ml.endMachinePhotoUrl)}>
+                              <img src={ml.endMachinePhotoUrl} alt="Machine Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
+                                <VisibilityIcon sx={{ color: 'white' }} />
+                              </Box>
+                              <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '0.6rem', textAlign: 'center', py: 0.5 }}>Machine</Typography>
+                            </Box>
+                          )}
+                          {ml.endUnitPhotoUrl && (
+                            <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(ml.endUnitPhotoUrl)}>
+                              <img src={ml.endUnitPhotoUrl} alt="Unit Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
+                                <VisibilityIcon sx={{ color: 'white' }} />
+                              </Box>
+                              <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '0.6rem', textAlign: 'center', py: 0.5 }}>Unit</Typography>
+                            </Box>
+                          )}
+                          {ml.endSoftwarePhotoUrl && (
+                            <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(ml.endSoftwarePhotoUrl)}>
+                              <img src={ml.endSoftwarePhotoUrl} alt="Software Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
+                                <VisibilityIcon sx={{ color: 'white' }} />
+                              </Box>
+                              <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '0.6rem', textAlign: 'center', py: 0.5 }}>Software</Typography>
+                            </Box>
+                          )}
+                          {!ml.endMachinePhotoUrl && !ml.endUnitPhotoUrl && !ml.endSoftwarePhotoUrl && (
+                            <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic', p: 1 }}>No photos captured at Punch Out.</Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {/* Approved Production Details (IN) */}
+              <Card variant="outlined" sx={{ bgcolor: '#E1F5FE', borderColor: '#81D4FA', borderRadius: 2 }}>
+                <CardContent>
+                  <Typography variant="subtitle2" sx={{ color: '#0288D1', fontWeight: 'bold', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <InputIcon fontSize="small" /> APPROVED PRODUCTION (IN)
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={12}>
+                      <Typography variant="caption" color="textSecondary">Item / Product</Typography>
+                      <Typography variant="body1" fontWeight="bold" color="primary.main">{detailsLog.productName || '—'}</Typography>
+                    </Grid>
+                    <Grid size={6}>
+                      <Typography variant="caption" color="textSecondary">Quantity Approved</Typography>
+                      <Typography variant="body2" fontWeight="bold">{detailsLog.quantityProduced}</Typography>
+                    </Grid>
+                    <Grid size={6}>
+                      <Typography variant="caption" color="textSecondary">Date Approved</Typography>
+                      <Typography variant="body2" fontWeight="bold">{new Date(detailsLog.createdAt).toLocaleString()}</Typography>
+                    </Grid>
+                    <Grid size={6}>
+                      <Typography variant="caption" color="textSecondary">Stage</Typography>
+                      <Typography variant="body2" fontWeight="bold">{detailsLog.stage}</Typography>
+                    </Grid>
+                    <Grid size={6}>
+                      <Typography variant="caption" color="textSecondary">Vendor/Worker Assigned</Typography>
+                      <Typography variant="body2" fontWeight="bold">{detailsLog.vendorName || detailsLog.worker?.name || '—'}</Typography>
+                    </Grid>
+                  </Grid>
+
+                  {/* Punch In Photos Display */}
+                  <Box sx={{ mt: 3, p: 1.5, bgcolor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
+                    <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: 'block', fontWeight: 'bold' }}>PUNCH IN PHOTOS</Typography>
+                    <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
+                      {detailsLog.startPhotos?.machine && (
+                        <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(detailsLog.startPhotos.machine)}>
+                          <img src={detailsLog.startPhotos.machine} alt="Machine In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
+                            <VisibilityIcon sx={{ color: 'white' }} />
+                          </Box>
+                          <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '0.6rem', textAlign: 'center', py: 0.5 }}>Machine</Typography>
+                        </Box>
+                      )}
+                      {detailsLog.startPhotos?.unit && (
+                        <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(detailsLog.startPhotos.unit)}>
+                          <img src={detailsLog.startPhotos.unit} alt="Unit In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
+                            <VisibilityIcon sx={{ color: 'white' }} />
+                          </Box>
+                          <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '0.6rem', textAlign: 'center', py: 0.5 }}>Unit</Typography>
+                        </Box>
+                      )}
+                      {detailsLog.startPhotos?.software && (
+                        <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(detailsLog.startPhotos.software)}>
+                          <img src={detailsLog.startPhotos.software} alt="Software In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
+                            <VisibilityIcon sx={{ color: 'white' }} />
+                          </Box>
+                          <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '0.6rem', textAlign: 'center', py: 0.5 }}>Software</Typography>
+                        </Box>
+                      )}
+                      {!detailsLog.startPhotos?.machine && !detailsLog.startPhotos?.unit && !detailsLog.startPhotos?.software && (
+                        <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic', p: 1 }}>No photos captured at Punch In.</Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, bgcolor: '#f5f5f5' }}>
+          <Button onClick={() => setDetailsDialogOpen(false)} variant="contained" color="inherit" sx={{ fontWeight: 'bold', borderRadius: 2 }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Edit History Dialog */}
+      <Dialog open={editHistoryDialogOpen} onClose={() => setEditHistoryDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Approved Log</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
+          {editingHistoryLog && (
+            <>
+              <TextField
+                select
+                label="Assign Project (Optional)"
+                fullWidth
+                size="small"
+                value={editingHistoryLog.projectId || ''}
+                onChange={(e) => setEditingHistoryLog({ ...editingHistoryLog, projectId: e.target.value, productId: '', productName: '', slabId: '', pieceIds: [] })}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              >
+                <MenuItem value="" disabled>Select Project</MenuItem>
+                {projects?.map((p: any) => (
+                  <MenuItem key={p.id} value={p.id}>{p.projectId} - {p.clientName}</MenuItem>
+                ))}
+              </TextField>
+
+              {(() => {
+                const projectProducts = editingHistoryLog.projectId ? (projects?.find((p: any) => p.id === editingHistoryLog.projectId)?.products || []) : [];
+                return editingHistoryLog.projectId && projectProducts.length > 0 && (
+                  <TextField
+                    select
+                    label="Select Category (Optional)"
+                    fullWidth
+                    size="small"
+                    value={editingHistoryLog.productId || ''}
+                    onChange={(e) => {
+                      const productName = projectProducts.find((p:any) => p.id === e.target.value)?.category || '';
+                      setEditingHistoryLog({ ...editingHistoryLog, productId: e.target.value, productName });
+                    }}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  >
+                    <MenuItem value="">-- Clear Selection --</MenuItem>
+                    {projectProducts.map((p: any) => (
+                      <MenuItem key={p.id} value={p.id}>Category: {p.category}</MenuItem>
+                    ))}
+                  </TextField>
+                );
+              })()}
+
+              {(() => {
+                const matchedSlabs = editingHistoryLog.projectId && slabs ? slabs.filter((s: any) => s.projectId === editingHistoryLog.projectId && (!editingHistoryLog.productName || s.name.startsWith(editingHistoryLog.productName))) : [];
+                return matchedSlabs.length > 1 && (
+                  <TextField 
+                    select
+                    label="Select Slab (Optional)" 
+                    fullWidth
+                    size="small"
+                    value={editingHistoryLog.slabId || ''} 
+                    onChange={(e) => {
+                      const slab = slabs?.find((s: any) => s.id === e.target.value);
+                      setEditingHistoryLog({ ...editingHistoryLog, slabId: e.target.value, pieceIds: [], productName: slab?.name || '' });
+                    }} 
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  >
+                    <MenuItem value="">-- Clear Selection --</MenuItem>
+                    {matchedSlabs.map((s: any) => (
+                      <MenuItem key={s.id} value={s.id}>Slab: {s.name} {s.size ? `(${s.size})` : ''}</MenuItem>
+                    ))}
+                  </TextField>
+                );
+              })()}
+
+              {editingHistoryLog.slabId && slabs && (
+                <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
+                  <InputLabel id={`edit-select-piece-label`}>Select Piece(s) (Optional)</InputLabel>
+                  <Select
+                    labelId={`edit-select-piece-label`}
+                    multiple
+                    value={editingHistoryLog.pieceIds || []}
+                    onChange={(e) => {
+                      const val = e.target.value as string[];
+                      
+                      const slab = slabs?.find((s: any) => s.id === editingHistoryLog.slabId);
+                      let newProductName = editingHistoryLog.productName;
+                      if (val.length > 0) {
+                        const pieceNames = val.map((id: string) => {
+                          const piece = slab?.pieces?.find((p: any) => p.id === id);
+                          return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
+                        });
+                        newProductName = slab ? `${slab.name} - ${pieceNames.join(', ')}` : pieceNames.join(', ');
+                      } else {
+                        newProductName = slab?.name || '';
+                      }
+                      
+                      setEditingHistoryLog({ 
+                        ...editingHistoryLog, 
+                        pieceIds: val, 
+                        quantityProduced: val.length > 0 ? val.length : editingHistoryLog.quantityProduced,
+                        productName: newProductName
+                      });
+                    }}
+                    input={<OutlinedInput label="Select Piece(s) (Optional)" />}
+                    renderValue={(selected: any) => {
+                      if (!selected || selected.length === 0) return <em>Select Pieces</em>;
+                      const slab = slabs.find((s: any) => s.id === editingHistoryLog.slabId);
+                      return selected.map((id: string) => {
+                        const piece = slab?.pieces?.find((p: any) => p.id === id);
+                        return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id;
+                      }).join(', ');
+                    }}
+                  >
+                    {slabs.find((s: any) => s.id === editingHistoryLog.slabId)?.pieces?.filter((p: any) => {
+                          const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                          const logStage = editingHistoryLog?.stage?.replace(' Work', '') || '';
+                          const pStageIdx = stages.indexOf(p.stage);
+                          const logStageIdx = stages.indexOf(logStage);
+                          if (pStageIdx > logStageIdx) return false;
+                          if (pStageIdx === logStageIdx && p.status === 'completed') return false;
+                          return true;
+                        }).map((p: any) => (
+                      <MenuItem key={p.id} value={p.id}>
+                        <Checkbox checked={(editingHistoryLog.pieceIds || []).indexOf(p.id) > -1} />
+                        <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber} - ${p.stage}`} />
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+
+              <TextField
+                label="Stage"
+                fullWidth
+                size="small"
+                value={editingHistoryLog.stage || ''}
+                onChange={(e) => setEditingHistoryLog({ ...editingHistoryLog, stage: e.target.value })}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
+              <TextField
+                label="Quantity"
+                type="number"
+                fullWidth
+                size="small"
+                value={editingHistoryLog.quantityProduced || 0}
+                onChange={(e) => setEditingHistoryLog({ ...editingHistoryLog, quantityProduced: Number(e.target.value) })}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setEditHistoryDialogOpen(false)} color="inherit">Cancel</Button>
+          <Button variant="contained" onClick={handleUpdateHistoryLog}>Update Log</Button>
         </DialogActions>
       </Dialog>
 

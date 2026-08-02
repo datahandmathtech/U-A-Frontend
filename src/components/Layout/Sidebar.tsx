@@ -13,6 +13,7 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import EngineeringIcon from '@mui/icons-material/Engineering';
 import GroupIcon from '@mui/icons-material/Group';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -23,6 +24,8 @@ interface SidebarProps {
   drawerWidth: number;
 }
 
+import StoreIcon from '@mui/icons-material/Store';
+
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Live Feed', icon: <LiveTvIcon />, path: '/live-feed' },
@@ -30,10 +33,7 @@ const menuItems = [
   { text: 'Enquiries Pipeline', icon: <FilterAltIcon />, path: '/crm' },
   { text: 'Active Work Orders', icon: <WorkIcon />, path: '/projects' },
   { text: 'Approvals', icon: <PendingActionsIcon />, path: '/approvals' },
-  { text: 'Machine Master', icon: <PrecisionManufacturingIcon />, path: '/machines' },
-  { text: 'Production Log', icon: <ReceiptLongIcon />, path: '/production' },
-  { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory' },
-  { text: 'Accounts', icon: <AttachMoneyIcon />, path: '/accounts' },
+  { text: 'In/Out Ledger', icon: <FolderSpecialIcon />, path: '/in-out-ledger' },
   { text: 'HR & Payroll', icon: <GroupsIcon />, path: '/hr' },
 ];
 

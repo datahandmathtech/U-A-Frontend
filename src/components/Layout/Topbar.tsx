@@ -5,6 +5,9 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import { useGetProjectByIdQuery, useUpdateProjectMutation } from '../../store/apiSlice';
 
 interface TopbarProps {
@@ -27,6 +30,39 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
   const projectId = match ? match[2] : '';
 
   const { data: project } = useGetProjectByIdQuery(projectId, { skip: !projectId });
+
+  const getStepIndex = (status: string) => {
+    if (status === 'enquiry') return 0;
+    if (status === 'design_sharing') return 1;
+    if (status === 'quotation') return 2;
+    if (status === 'advance_payment') return 3;
+    if (status === 'shop_drawing') return 4;
+    if (status === 'material_planning') return 5;
+    if (status === 'production') return 6;
+    if (status === 'completed') return 7;
+    return 0;
+  };
+
+  const dbStep = project ? getStepIndex(project.status) : 0;
+
+  const renderMenuItem = (label: string, stepIndex: number, viewParam: number) => {
+    const isCompleted = dbStep > stepIndex;
+    const isCurrent = dbStep === stepIndex;
+    
+    return (
+      <MenuItem onClick={() => { handleMenuClose(); navigate(`/${isProjectActive ? 'projects' : 'crm'}/${projectId}?view=${viewParam}`); }} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.5, pl: 3 }}>
+         {isCompleted ? <CheckCircleIcon color="success" fontSize="small" sx={{ mt: 0.2 }} /> : isCurrent ? <RadioButtonCheckedIcon color="primary" fontSize="small" sx={{ mt: 0.2 }} /> : <RadioButtonUncheckedIcon color="disabled" fontSize="small" sx={{ mt: 0.2 }} />}
+         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="body2" fontWeight={isCurrent ? 'bold' : 'medium'} color={isCompleted || isCurrent ? 'text.primary' : 'text.secondary'}>{label}</Typography>
+            {isCompleted ? (
+              <Typography variant="caption" color="success.main">Completed</Typography>
+            ) : isCurrent ? (
+              <Typography variant="caption" color="primary.main">In Progress</Typography>
+            ) : null}
+         </Box>
+      </MenuItem>
+    );
+  };
   const [updateProject] = useUpdateProjectMutation();
   const isProjectActive = project ? ['shop_drawing', 'material_planning', 'production', 'work_order', 'completed'].includes(project.status) : false;
 
@@ -151,19 +187,11 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                   </IconButton>
                 </MenuItem>
                 <Collapse in={crmOpen} timeout="auto" unmountOnExit>
-                  <Box sx={{ pl: 2 }}>
-                    <MenuItem onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}?view=0`); }}>
-                      <ListItemText primary="View Enquiry Details" slotProps={{ primary: { fontSize: '0.875rem' } }} />
-                    </MenuItem>
-                    <MenuItem onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}?view=1`); }}>
-                      <ListItemText primary="View Reference Design" slotProps={{ primary: { fontSize: '0.875rem' } }} />
-                    </MenuItem>
-                    <MenuItem onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}?view=2`); }}>
-                      <ListItemText primary="View Costing" slotProps={{ primary: { fontSize: '0.875rem' } }} />
-                    </MenuItem>
-                    <MenuItem onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}?view=3`); }}>
-                      <ListItemText primary="View Advance Payment" slotProps={{ primary: { fontSize: '0.875rem' } }} />
-                    </MenuItem>
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    {renderMenuItem("Enquiry Details", 0, 0)}
+                    {renderMenuItem("Reference Design", 1, 1)}
+                    {renderMenuItem("Costing & Quotation", 2, 2)}
+                    {renderMenuItem("Advance Payment", 3, 3)}
                   </Box>
                 </Collapse>
 
@@ -182,22 +210,14 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                       </IconButton>
                     </MenuItem>
                     <Collapse in={projectOpen} timeout="auto" unmountOnExit>
-                      <Box sx={{ pl: 2 }}>
-                        <MenuItem onClick={handleOpenDateDialog}>
-                          <ListItemText primary="Project Start & End Dates" slotProps={{ primary: { fontSize: '0.875rem' } }} />
+                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        <MenuItem onClick={handleOpenDateDialog} sx={{ pl: 3, py: 1.5 }}>
+                          <ListItemText primary="Project Start & End Dates" slotProps={{ primary: { fontSize: '0.875rem', fontWeight: 'medium' } }} />
                         </MenuItem>
-                        <MenuItem onClick={() => { handleMenuClose(); navigate(`/projects/${projectId}?view=4`); }}>
-                          <ListItemText primary="Shop Drawing & Approval" slotProps={{ primary: { fontSize: '0.875rem' } }} />
-                        </MenuItem>
-                        <MenuItem onClick={() => { handleMenuClose(); navigate(`/projects/${projectId}?view=5`); }}>
-                          <ListItemText primary="Material Planning" slotProps={{ primary: { fontSize: '0.875rem' } }} />
-                        </MenuItem>
-                        <MenuItem onClick={() => { handleMenuClose(); navigate(`/projects/${projectId}?view=6`); }}>
-                          <ListItemText primary="Production" slotProps={{ primary: { fontSize: '0.875rem' } }} />
-                        </MenuItem>
-                        <MenuItem onClick={() => { handleMenuClose(); navigate(`/projects/${projectId}?view=7`); }}>
-                          <ListItemText primary="Work Order Active" slotProps={{ primary: { fontSize: '0.875rem' } }} />
-                        </MenuItem>
+                        {renderMenuItem("Shop Drawing & Approval", 4, 4)}
+                        {renderMenuItem("Material Planning", 5, 5)}
+                        {renderMenuItem("Production", 6, 6)}
+                        {renderMenuItem("Work Order Active", 7, 7)}
                       </Box>
                     </Collapse>
                   </>
