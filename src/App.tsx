@@ -2,6 +2,7 @@ import React from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import { Box, Typography } from '@mui/material';
+import NotFound from './pages/NotFound';
 
 import CRM from './pages/CRM';
 import Projects from './pages/Projects';
@@ -29,16 +30,9 @@ import WorkerDashboard from './pages/WorkerDashboard';
 
 const router = createBrowserRouter([
   {
-    path: '/login',
-    element: <Login />
-  },
-  {
-    path: '/worker',
-    element: <WorkerDashboard />
-  },
-  {
     path: '/',
     element: <Layout />,
+    errorElement: <NotFound />,
     children: [
       {
         index: true,
@@ -127,8 +121,20 @@ const router = createBrowserRouter([
       {
         path: 'hr',
         element: <HR />
+      },
+      {
+        path: '*',
+        element: <NotFound />
       }
     ]
+  },
+  {
+    path: '/login',
+    element: <Login />
+  },
+  {
+    path: '/worker',
+    element: <WorkerDashboard />
   }
 ]);
 
