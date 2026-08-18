@@ -698,10 +698,16 @@ const WorkerDashboard: React.FC = () => {
               color={materialType === 'OUT' ? 'warning' : 'info'} 
               onClick={handleMaterialSubmit}
               disabled={
-                (materialType === 'OUT' && assigneeType === 'self' && !materialStage) || 
-                (assigneeType === 'vendor' && materialType === 'OUT' && vendorRows.some(r => !r.vendorId || !r.qty)) || 
-                (!materialQuantity && !(assigneeType === 'vendor' && materialType === 'OUT')) || 
-                !materialPhotos.machine || 
+                // OUT with vendor: need vendorId and qty in every row
+                (materialType === 'OUT' && assigneeType === 'vendor' && vendorRows.some(r => !r.vendorId || !r.qty)) ||
+                // OUT with self: need materialStage
+                (materialType === 'OUT' && assigneeType === 'self' && !materialStage) ||
+                // OUT with worker: need quantity and stage
+                (materialType === 'OUT' && assigneeType === 'worker' && (!materialQuantity || !materialStage)) ||
+                // IN: need quantity (except vendor OUT handled above)
+                (materialType === 'IN' && !materialQuantity && !selectedOutLogId) ||
+                // Always need the mandatory photo
+                !materialPhotos.machine ||
                 creatingMaterial
               }
               sx={{ fontWeight: 'bold' }}

@@ -167,7 +167,8 @@ const StageDetails = () => {
   const handleEditPieceSave = async () => {
     if (!editingPiece) return;
     try {
-      await updatePiece({ id: editingPiece.id, ...editingPiece }).unwrap();
+      const { id, ...data } = editingPiece;
+      await updatePiece({ id, data }).unwrap();
       refetchSlabs();
       setEditingPiece(null);
     } catch (err) {
