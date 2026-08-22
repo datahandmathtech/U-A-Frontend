@@ -93,7 +93,7 @@ export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
   doc.save(`WorkOrder_${project.projectId}.pdf`);
 };
 
-export const generateQuotationPDF = (project: any, products: any[], quoteDetails: any) => {
+export const generateQuotationPDF = (project: any, products: any[], quoteDetails: any, globalCosts?: any, terms?: string[]) => {
   const doc = new jsPDF();
   
   // Header
@@ -223,28 +223,58 @@ export const generateQuotationPDF = (project: any, products: any[], quoteDetails
 
   // Grand Total Summary Box
   doc.setFillColor(247, 243, 235); // Light Gold/Cream background
-  doc.rect(20, currentY, 170, 30, 'F');
+  doc.rect(20, currentY, 170, 40, 'F');
   
   doc.setFontSize(11);
   doc.setTextColor(50, 50, 50);
   doc.text(`Total Products Amount: Rs. ${productsTotal.toLocaleString('en-IN')}`, 25, currentY + 10);
   doc.text(`Total Additional Costs: Rs. ${additionalTotal.toLocaleString('en-IN')}`, 25, currentY + 18);
   
+  let globalCostTotal = 0;
+  if (globalCosts?.packageCostEnabled) globalCostTotal += Number(globalCosts.packageCost || 0);
+  if (globalCosts?.transportCostEnabled) globalCostTotal += Number(globalCosts.transportCost || 0);
+  
+  if (globalCostTotal > 0) {
+    doc.text(`Global Costs (Package/Transport): Rs. ${globalCostTotal.toLocaleString('en-IN')}`, 25, currentY + 26);
+  }
+  
+  const finalGrandTotal = grandTotal + globalCostTotal;
+
   doc.setFontSize(13);
   doc.setTextColor(179, 139, 54); // Gold
   doc.setFont("helvetica", "bold");
-  doc.text(`Estimated Grand Total: Rs. ${grandTotal.toLocaleString('en-IN')}`, 25, currentY + 26);
+  doc.text(`Estimated Grand Total: Rs. ${finalGrandTotal.toLocaleString('en-IN')}`, 25, currentY + (globalCostTotal > 0 ? 36 : 28));
   doc.setFont("helvetica", "normal");
+  
+  currentY += 50;
+
+  if (terms && terms.length > 0) {
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Terms and Conditions:", 20, currentY);
+    currentY += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    terms.forEach((term, index) => {
+      // Split text if it's too long
+      const lines = doc.splitTextToSize(`${index + 1}. ${term}`, 170);
+      doc.text(lines, 20, currentY);
+      currentY += (lines.length * 5);
+    });
+    currentY += 5;
+  }
   
   // Footer signature
   doc.setFontSize(11);
   doc.setTextColor(0, 0, 0);
-  doc.text("Authorized Signature", 140, currentY + 50);
-  doc.line(140, currentY + 52, 185, currentY + 52);
+  doc.text("Authorized Signature", 140, currentY + 20);
+  doc.line(140, currentY + 22, 185, currentY + 22);
   
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
-  doc.text("This is a computer generated quote.", 105, 280, { align: "center" });
+  // Place it near the bottom of the page
+  const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+  doc.text("This is a computer generated quote.", 105, pageHeight - 10, { align: "center" });
 
   doc.save(`Quotation_${project.projectId}.pdf`);
 };

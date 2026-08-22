@@ -354,6 +354,10 @@ export const apiSlice = createApi({
       query: () => '/production/active-out-logs',
       providesTags: ['Production']
     }),
+    getRejectedLogs: builder.query<any[], void>({
+      query: () => '/production/rejected-logs',
+      providesTags: ['Production']
+    }),
     getProjectProductionLogs: builder.query<any[], string>({
       query: (projectId) => `/production/project/${projectId}`,
       providesTags: ['Production']
@@ -408,6 +412,14 @@ export const apiSlice = createApi({
         'Inventory'
       ]
     }),
+    getQuotationTerms: builder.query<any, void>({
+      query: () => '/quotations/terms',
+      providesTags: ['Quotation']
+    }),
+    addQuotationTerm: builder.mutation<any, { text: string }>({
+      query: (body) => ({ url: '/quotations/terms', method: 'POST', body }),
+      invalidatesTags: ['Quotation']
+    }),
     createQuotation: builder.mutation<any, Partial<any>>({
       query: (body) => ({
         url: '/quotations',
@@ -439,6 +451,13 @@ export const apiSlice = createApi({
     editProductionLog: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({ url: `/production/${id}`, method: 'PUT', body: data }),
       invalidatesTags: ['Production']
+    }),
+    addManualAttendance: builder.mutation<any, { userId: string, checkIn: string, checkOut?: string, date?: string }>({
+      query: (data) => ({
+        url: '/hr/attendance/manual',
+        method: 'POST',
+        body: data,
+      }),
     }),
   }),
 });
@@ -484,6 +503,7 @@ export const {
   useUpdateSlabMutation,
   useDeleteSlabMutation,
   useSyncSlabsMutation,
+  useAddManualAttendanceMutation,
   useUpdatePieceMutation,
   useDeletePieceMutation,
   useCreatePieceLogMutation,
@@ -512,6 +532,8 @@ export const {
   useUpdateProjectMutation,
   useGetProjectMaterialsQuery,
   useReserveProjectMaterialMutation,
+  useGetQuotationTermsQuery,
+  useAddQuotationTermMutation,
   useCreateQuotationMutation,
   useGetProjectProductionLogsQuery,
   useDeleteProjectMutation,
@@ -520,6 +542,7 @@ export const {
   useApproveMaterialLogMutation,
   useGetApprovedLogsQuery,
   useGetActiveOutLogsQuery,
+  useGetRejectedLogsQuery,
   useUpdateQuotationMutation,
   useUpdateMaterialLogMutation,
   useUpdateReturnQtyMutation,

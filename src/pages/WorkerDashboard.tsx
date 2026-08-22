@@ -54,6 +54,13 @@ const ImageUploadBox = ({ label, previewUrl, onClick }: { label: string, preview
 
 const WorkerDashboard: React.FC = () => {
   const user = useSelector((state: any) => state.auth.user);
+  const isAuthenticated = useSelector((state: any) => state.auth.isAuthenticated);
+  
+  if (!isAuthenticated) {
+    window.location.href = '/login';
+    return null;
+  }
+
   const { data: machines, isLoading: machinesLoading } = useGetMachinesQuery();
   const { data: activeSession, isLoading: sessionLoading, refetch } = useGetActiveSessionQuery();
   
@@ -302,8 +309,8 @@ const WorkerDashboard: React.FC = () => {
   };
 
   const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
+    localStorage.removeItem('token');
+    window.location.reload();
   };
 
   if (sessionLoading || machinesLoading) return <Box sx={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
@@ -411,67 +418,6 @@ const WorkerDashboard: React.FC = () => {
             sx={{ borderRadius: 4, py: 2, fontSize: '1.2rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(211,47,47,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 12px 28px rgba(211,47,47,0.4)' } }}
           >
             END MACHINE
-          </Button>
-        </Box>
-
-        {/* Action Buttons for Material Tracking */}
-        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <InventoryIcon /> Step 3: Material Tracking
-        </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Move raw materials around. (No admin approval required)</Typography>
-        <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
-          <Button variant="contained" color="warning" size="large" fullWidth startIcon={<OutputIcon />}
-            onClick={() => handleOpenMaterialDialog('OUT', 'Material Tracking')}
-            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(237,108,2,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
-          >
-            MATERIAL OUT
-          </Button>
-          <Button variant="contained" color="info" size="large" fullWidth startIcon={<InputIcon />}
-            onClick={() => handleOpenMaterialDialog('IN', 'Material Tracking')}
-            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(2,136,209,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
-          >
-            MATERIAL IN
-          </Button>
-        </Box>
-
-        {/* Polishing */}
-        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
-          ✨ Step 4: Polishing
-        </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Polishing IN requires admin approval.</Typography>
-        <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
-          <Button variant="contained" color="info" size="large" fullWidth startIcon={<InputIcon />}
-            onClick={() => handleOpenMaterialDialog('IN', 'Polishing')}
-            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(2,136,209,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
-          >
-            POLISHING IN
-          </Button>
-        </Box>
-
-        {/* Packing */}
-        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
-          📦 Step 5: Packing
-        </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Send material for packing.</Typography>
-        <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
-          <Button variant="contained" color="warning" size="large" fullWidth startIcon={<OutputIcon />}
-            onClick={() => handleOpenMaterialDialog('OUT', 'Packing')}
-            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(237,108,2,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
-          >
-            PACKING OUT
-          </Button>
-        </Box>
-
-        {/* Dispatch */}
-        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
-          🚚 Step 6: Dispatch
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
-          <Button variant="contained" color="warning" size="large" fullWidth startIcon={<OutputIcon />}
-            onClick={() => handleOpenMaterialDialog('OUT', 'Dispatch')}
-            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(237,108,2,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
-          >
-            DISPATCH OUT
           </Button>
         </Box>
 
@@ -595,233 +541,7 @@ const WorkerDashboard: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Dialog: Material Tracking */}
-        <Dialog open={materialDialogOpen} onClose={() => setMaterialDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, bgcolor: materialType === 'OUT' ? 'warning.light' : 'info.light', color: materialType === 'OUT' ? 'warning.dark' : 'info.dark' }}>
-            {materialType === 'OUT' ? 'OUT (Take)' : 'IN (Return)'} - {materialStage}
-          </DialogTitle>
-          <DialogContent dividers>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-              Select the stage of work, enter quantity, and capture 3 photos. Admin approval is required.
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {dialogOrigin === 'Material Tracking' && (
-                <>
-                  <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <>
-                            {vendorRows.map((row, index) => (
-                              <Paper key={index} elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <Typography variant="subtitle2" fontWeight="bold">Assignment {index + 1}</Typography>
-                                  {vendorRows.length > 1 && (
-                                    <IconButton size="small" color="error" onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))}>
-                                      <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                  )}
-                                </Box>
-                                <TextField 
-                                  select
-                                  label="Select Vendor" 
-                                  fullWidth 
-                                  value={row.vendorId} 
-                                  onChange={(e) => {
-                                    const vName = vendorsList?.find((v:any) => v.id === e.target.value)?.name || '';
-                                    setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], vendorId: e.target.value, vendorName: vName }; return arr; });
-                                  }}
-                                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                                >
-                                  {vendorsList?.map((v: any) => (
-                                    <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
-                                  ))}
-                                </TextField>
-                                <Box sx={{ display: 'flex', gap: 2 }}>
-                                  <TextField 
-                                    select
-                                    label="Work Stage" 
-                                    fullWidth 
-                                    value={row.stage} 
-                                    onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], stage: e.target.value }; return arr; })} 
-                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                                  >
-                                    <MenuItem value="Production">Production</MenuItem>
-                                    <MenuItem value="Polishing">Polishing</MenuItem>
-                                    <MenuItem value="Packing">Packing</MenuItem>
-                                    <MenuItem value="Dispatch">Dispatch</MenuItem>
-                                  </TextField>
-                                  <TextField 
-                                    fullWidth 
-                                    label="Quantity" 
-                                    type="number"
-                                    value={row.qty}
-                                    onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
-                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                                  />
-                                </Box>
-                              </Paper>
-                            ))}
-                            <Button startIcon={<AddIcon />} onClick={() => setVendorRows(prev => [...prev, { vendorId: '', vendorName: '', stage: 'Production', qty: '' }])} sx={{ alignSelf: 'flex-start' }}>
-                              Add Another Vendor
-                            </Button>
-                          </>
-                  </Box>
-                </>
-              )}
-
-
-
-
-
-              {!(materialType === 'IN' && materialStage === 'Polishing') && !(materialType === 'OUT' && materialStage === 'Packing') && (
-                <TextField 
-                  fullWidth 
-                  label="Vehicle Number (Optional)" 
-                  value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value.substring(0, 10).toUpperCase())}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                />
-              )}
-
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>3. Upload Mandatory Photo</Typography>
-                <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
-                  <ImageUploadBox label="PHOTO" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
-                </Box>
-              </Box>
-
-            </Box>
-          </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setMaterialDialogOpen(false)} color="inherit">Cancel</Button>
-            <Button 
-              variant="contained" 
-              color={materialType === 'OUT' ? 'warning' : 'info'} 
-              onClick={handleMaterialSubmit}
-              disabled={
-                // OUT with vendor: need vendorId and qty in every row
-                (materialType === 'OUT' && assigneeType === 'vendor' && vendorRows.some(r => !r.vendorId || !r.qty)) ||
-                // OUT with self: need materialStage
-                (materialType === 'OUT' && assigneeType === 'self' && !materialStage) ||
-                // OUT with worker: need quantity and stage
-                (materialType === 'OUT' && assigneeType === 'worker' && (!materialQuantity || !materialStage)) ||
-                // IN: need quantity (except vendor OUT handled above)
-                (materialType === 'IN' && !materialQuantity && !selectedOutLogId) ||
-                // Always need the mandatory photo
-                !materialPhotos.machine ||
-                creatingMaterial
-              }
-              sx={{ fontWeight: 'bold' }}
-            >
-              {creatingMaterial ? 'Submitting...' : 'Submit to Admin'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
       </Box> {/* End Left Column */}
-
-      {/* Right Column: Pending Items */}
-      <Box sx={{ width: { md: 420 }, shrink: 0 }}>
-        <Paper elevation={0} sx={{ 
-          position: 'sticky', top: 20, 
-          borderRadius: 4, 
-          overflow: 'hidden',
-          bgcolor: '#ffffff',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.08)',
-          border: '1px solid #f0f0f0'
-        }}>
-          {/* Header */}
-          <Box sx={{ 
-            bgcolor: '#fff3e0', 
-            p: 3, 
-            borderBottom: '1px solid #ffe0b2' 
-          }}>
-            <Typography variant="h6" sx={{ fontWeight: '900', color: '#e65100', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              📥 PENDING PACKING
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 1, fontWeight: 500, color: '#ef6c00' }}>
-              Select items below to return them one by one.
-            </Typography>
-          </Box>
-
-          {/* List Content */}
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 2.5, 
-            maxHeight: 'calc(100vh - 160px)', 
-            overflowY: 'auto', 
-            p: 3,
-            bgcolor: '#fafafa'
-          }}>
-            {activeOutLogs?.filter((log: any) => log.stage === 'Packing' && (log.quantityProduced - (log.returnedQty || 0)) > 0).flatMap((log: any) => {
-              const pending = (log.quantityProduced || 0) - (log.returnedQty || 0);
-              return Array.from({ length: pending }).map((_, index) => (
-                <Paper key={`${log.id}-${index}`} elevation={0} sx={{ 
-                  p: 2.5, 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  borderRadius: 3, 
-                  border: '1px solid #ffcc80',
-                  borderLeft: '6px solid #ed6c02', 
-                  bgcolor: '#ffffff',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(237,108,2,0.1)',
-                  '&:hover': { 
-                    transform: 'translateY(-3px)',
-                    boxShadow: '0 6px 16px rgba(237,108,2,0.2)'
-                  }
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    {(log.startPhotos?.machine || log.startPhotos?.unit) && (
-                      <Box 
-                        component="img" 
-                        src={log.startPhotos?.machine || log.startPhotos?.unit} 
-                        sx={{ width: 48, height: 48, borderRadius: 2, objectFit: 'cover', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }} 
-                      />
-                    )}
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: '800', color: '#424242' }}>
-                        📦 Item {index + 1} <span style={{ color: '#9e9e9e', fontSize: '0.9em', fontWeight: '500' }}>of {pending}</span>
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#757575', display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, fontWeight: 500 }}>
-                        <AccessTimeIcon sx={{ fontSize: 14 }} /> {new Date(log.createdAt).toLocaleDateString()}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Button variant="contained" color="warning" size="medium" sx={{ 
-                    borderRadius: 3, 
-                    fontWeight: 'bold', 
-                    minWidth: 90,
-                    boxShadow: '0 4px 10px rgba(237,108,2,0.3)',
-                    '&:hover': { bgcolor: '#e65100', transform: 'scale(1.05)' },
-                    transition: 'all 0.2s'
-                  }}
-                    onClick={() => { 
-                      handleOpenMaterialDialog('IN', 'Packing'); 
-                      setSelectedOutLogId(log.id); 
-                      setMaterialQuantity('1');
-                    }}>
-                    RETURN
-                  </Button>
-                </Paper>
-              ));
-            })}
-            
-            {activeOutLogs?.filter((log: any) => log.stage === 'Packing' && (log.quantityProduced - (log.returnedQty || 0)) > 0).length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 6 }}>
-                <CheckCircleIcon sx={{ fontSize: 48, color: '#a5d6a7', mb: 2, opacity: 0.5 }} />
-                <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#9e9e9e' }}>
-                  All Caught Up!
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#bdbdbd', mt: 1 }}>
-                  No pending packing items found.
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        </Paper>
-      </Box> {/* End Right Column */}
 
       {/* Global Snackbar for feedback */}
       <Snackbar 

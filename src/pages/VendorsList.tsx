@@ -47,7 +47,11 @@ const VendorsList = ({ hideHeader, selectedMonth, selectedFY }: { hideHeader?: b
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this vendor?")) {
-      await deleteVendor(id);
+      try {
+        await deleteVendor(id).unwrap();
+      } catch (err) {
+        console.error("Failed to delete vendor", err);
+      }
     }
   };
 
@@ -76,11 +80,10 @@ const VendorsList = ({ hideHeader, selectedMonth, selectedFY }: { hideHeader?: b
           <TableHead>
             <TableRow sx={{ bgcolor: 'background.default' }}>
               <TableCell>Vendor Name</TableCell>
-              <TableCell>Contact</TableCell>
-
-              <TableCell align="center">Total Pieces OUT (FY)</TableCell>
-              <TableCell align="center">Total Pieces IN (FY)</TableCell>
-              <TableCell align="center">Pending Balance</TableCell>
+              <TableCell align="center">Opening Balance</TableCell>
+              <TableCell align="center">Month OUT</TableCell>
+              <TableCell align="center">Month IN</TableCell>
+              <TableCell align="center">Closing Balance</TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -88,8 +91,7 @@ const VendorsList = ({ hideHeader, selectedMonth, selectedFY }: { hideHeader?: b
             {filteredVendors.map((v: any) => (
               <TableRow key={v.id} hover onClick={() => navigate(`/vendors/${v.id}`)} sx={{ cursor: 'pointer' }}>
                 <TableCell sx={{ fontWeight: 'bold' }}>{v.name}</TableCell>
-                <TableCell>{v.contact}</TableCell>
-
+                <TableCell align="center" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>{v.openingBalance || 0}</TableCell>
                 <TableCell align="center" sx={{ color: 'error.main', fontWeight: 'bold' }}>{v.totalOut}</TableCell>
                 <TableCell align="center" sx={{ color: 'success.main', fontWeight: 'bold' }}>{v.totalIn}</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{v.balance}</TableCell>

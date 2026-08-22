@@ -27,6 +27,7 @@ import StageDetails from './pages/StageDetails';
 
 import Login from './pages/Login';
 import WorkerDashboard from './pages/WorkerDashboard';
+import ManagerDashboard from './pages/ManagerDashboard';
 
 const router = createBrowserRouter([
   {
@@ -135,10 +136,14 @@ const router = createBrowserRouter([
   {
     path: '/worker',
     element: <WorkerDashboard />
+  },
+  {
+    path: '/manager',
+    element: <ManagerDashboard />
   }
 ]);
 
-function App() {
+const App: React.FC = () => {
   return <RouterProvider router={router} />;
 }
 

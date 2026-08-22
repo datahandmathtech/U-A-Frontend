@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, Tabs, Tab, Collapse } from '@mui/material';
+import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -26,7 +26,8 @@ import {
   useGetInventoryQuery, useGetCategoriesQuery, useCreateCategoryMutation, useDeleteCategoryMutation,
   useGetUnitsQuery, useCreateUnitMutation, useDeleteUnitMutation,
   useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation,
-  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useAddPiecesMutation, useSyncSlabsMutation
+  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useAddPiecesMutation, useSyncSlabsMutation,
+  useGetQuotationTermsQuery, useAddQuotationTermMutation
 } from '../store/apiSlice';
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
 
@@ -45,35 +46,78 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
       ? `${matchedProduct.length || 0}L × ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
       : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : ''));
 
-  const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+  const [updateSlab] = useUpdateSlabMutation();
+  const { data: productionLogs } = useGetProjectProductionLogsQuery(projectId as string, { skip: !projectId });
+  const ALL_STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'];
+  const requiredStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+
+  const handleToggleStage = async (stageKey: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    let newRequired;
+    if (requiredStages.includes(stageKey)) {
+      newRequired = requiredStages.filter((s: string) => s !== stageKey);
+    } else {
+      newRequired = [...requiredStages, stageKey];
+    }
+    try {
+      await updateSlab({ id: slab.id, data: { requiredStages: newRequired } }).unwrap();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const getStageStatus = (stageName: string) => {
-    if (!slab.pieces || slab.pieces.length === 0) return 'Not Started';
-    const stageIdx = STAGES.indexOf(stageName);
+    if (stageName === 'Polishing' && !requiredStages.some((s: string) => s.startsWith('Polishing'))) return 'N/A';
+    if (stageName !== 'Polishing' && !requiredStages.includes(stageName)) return 'N/A';
     
-    let allPiecesPassed = true;
-    let anyPiecePassed = false;
-    
-    for (const p of slab.pieces) {
-      const pStageIdx = STAGES.indexOf(p.stage);
-      const isPassed = pStageIdx > stageIdx || (p.stage === stageName && p.status === 'completed');
+    if (slab.pieces && slab.pieces.length > 0) {
+      const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const stageIdx = STAGES.indexOf(stageName);
       
-      if (!isPassed) {
-        allPiecesPassed = false;
-      } else {
-        anyPiecePassed = true;
+      let allPiecesPassed = true;
+      let anyPiecePassed = false;
+      
+      for (const p of slab.pieces) {
+        const pStageIdx = STAGES.indexOf(p.stage);
+        const isPassed = pStageIdx > stageIdx || (p.stage === stageName && p.status === 'completed');
+        
+        if (!isPassed) {
+          allPiecesPassed = false;
+        } else {
+          anyPiecePassed = true;
+        }
       }
+      
+      if (allPiecesPassed && slab.pieces.length > 0) return 'Completed';
+      if (anyPiecePassed) return 'Under Process';
+      return 'Not Started';
     }
-    
-    if (allPiecesPassed && slab.pieces.length > 0) return 'Completed';
-    if (anyPiecePassed) return 'Under Process';
+
+    const targetQty = matchedProduct ? matchedProduct.qty : 0;
+    if (targetQty > 0 && productionLogs) {
+      const stageLogs = productionLogs.filter((log: any) => 
+        log.transactionType === 'IN' && 
+        log.approvalStatus === 'approved' &&
+        log.stage.includes(stageName) &&
+        (log.productName === slab.name || slab.name.startsWith(log.productName))
+      );
+      
+      const sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+      
+      if (sumQty >= targetQty) return 'Completed';
+      if (sumQty > 0) return 'Under Process';
+    }
+
     return 'Not Started';
   };
 
-  const getStageColor = (status: string) => {
-    if (status === 'Completed') return 'success';
-    if (status === 'Under Process') return 'warning';
-    return 'default';
+  const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+
+  const renderStatusIcon = (status: string) => {
+    if (status === 'N/A') return <CircleIcon sx={{ fontSize: 16, color: '#e0e0e0' }} />;
+    if (status === 'Completed') return <CheckCircleIcon sx={{ fontSize: 18, color: '#4caf50' }} />;
+    if (status === 'Under Process') return <CircleIcon sx={{ fontSize: 16, color: '#ffb300' }} />;
+    return <CircleIcon sx={{ fontSize: 16, color: '#d1c4e9' }} />;
   };
 
   return (
@@ -86,24 +130,44 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
       </TableCell>
       {STAGES.map(stage => {
         const status = getStageStatus(stage);
-        let icon;
-        if (status === 'Completed') {
-           icon = <CheckCircleIcon sx={{ fontSize: 18, color: '#4caf50' }} />;
-        } else if (status === 'Under Process') {
-           icon = <CircleIcon sx={{ fontSize: 16, color: '#ffb300' }} />;
-        } else {
-           icon = <CircleIcon sx={{ fontSize: 16, color: '#d1c4e9' }} />;
-        }
+        const icon = renderStatusIcon(status);
+        const isNA = status === 'N/A';
         
         return (
-          <TableCell key={stage}>
-            <Box 
-              onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)}
-              sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
-            >
-              {icon}
-              <Typography variant="body2" sx={{ color: '#444' }}>{status}</Typography>
-            </Box>
+          <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
+            {stage === 'Polishing' ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Checkbox size="small" checked={requiredStages.includes('Polishing - Honed')} onClick={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
+                  <Typography variant="caption">Honed</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Checkbox size="small" checked={requiredStages.includes('Polishing - Mirror')} onClick={(e) => handleToggleStage('Polishing - Mirror', e)} sx={{ p: 0 }} />
+                  <Typography variant="caption">Mirror</Typography>
+                </Box>
+                <Box 
+                  onClick={!isNA ? () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`) : undefined}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: !isNA ? 'pointer' : 'default', '&:hover': !isNA ? { opacity: 0.7 } : {} }}
+                >
+                  {icon}
+                  <Typography variant="body2" sx={{ color: isNA ? '#999' : '#444' }}>{status}</Typography>
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Checkbox size="small" checked={requiredStages.includes(stage)} onClick={(e) => handleToggleStage(stage, e)} sx={{ p: 0 }} />
+                  <Typography variant="caption">{stage}</Typography>
+                </Box>
+                <Box 
+                  onClick={!isNA ? () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`) : undefined}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: !isNA ? 'pointer' : 'default', '&:hover': !isNA ? { opacity: 0.7 } : {} }}
+                >
+                  {icon}
+                  <Typography variant="body2" sx={{ color: isNA ? '#999' : '#444' }}>{status}</Typography>
+                </Box>
+              </Box>
+            )}
           </TableCell>
         );
       })}
@@ -126,6 +190,8 @@ const ProjectDetails: React.FC = () => {
   const [updateProject] = useUpdateProjectMutation();
   const [createQuotation] = useCreateQuotationMutation();
   const [updateQuotation] = useUpdateQuotationMutation();
+  const { data: quotationTerms = [], refetch: refetchTerms } = useGetQuotationTermsQuery();
+  const [addQuotationTerm] = useAddQuotationTermMutation();
   const [createInvoice, { isLoading: isCreatingInvoice }] = useCreateInvoiceMutation();
   const [uploadFiles] = useUploadFilesMutation();
   const [addDrawing] = useAddDrawingMutation();
@@ -167,6 +233,9 @@ const ProjectDetails: React.FC = () => {
   const [editSlabDialogOpen, setEditSlabDialogOpen] = useState(false);
   const [editingSlabId, setEditingSlabId] = useState<string | null>(null);
   const [slabForm, setSlabForm] = useState({ name: '', size: '', cost: 0, inventoryId: '' });
+  const [materialSource, setMaterialSource] = useState('unnati');
+  const [clientSlabs, setClientSlabs] = useState([{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
+  const [isReservingClientMaterial, setIsReservingClientMaterial] = useState(false);
 
   const handleCreateSlab = async () => {
     try {
@@ -320,6 +389,12 @@ const ProjectDetails: React.FC = () => {
   React.useEffect(() => {
     localStorage.setItem(`gstPercentDraft_${id}`, gstPercent.toString());
   }, [gstPercent, id]);
+
+  const [packageCostEnabled, setPackageCostEnabled] = useState(false);
+  const [transportCostEnabled, setTransportCostEnabled] = useState(false);
+  const [packageCost, setPackageCost] = useState<number>(0);
+  const [transportCost, setTransportCost] = useState<number>(0);
+  const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
 
   const { data: categories = [] } = useGetCategoriesQuery();
   const [createCategory] = useCreateCategoryMutation();
@@ -657,7 +732,7 @@ const ProjectDetails: React.FC = () => {
       await handleNextStage('shop_drawing');
       setViewingStepOverride(null);
       setSnackbarMessage("Payment recorded! Proceeding to Active Work Orders.");
-      navigate('/active-work-orders');
+      navigate('/crm');
     } catch (err) {
       console.error(err);
     }
@@ -851,20 +926,20 @@ const ProjectDetails: React.FC = () => {
                 </Box>
 
                 <Divider sx={{ my: 4 }} />
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                  <Button variant="outlined" size="large" onClick={() => {
-                    setSnackbarMessage('Enquiry Details progress saved!');
-                    if (viewingStepOverride !== null) setViewingStepOverride(null);
-                  }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                    {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
-                  </Button>
-                  <Button variant="contained" size="large" onClick={() => {
-                    if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    else handleNextStage('design_sharing');
-                  }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                    {viewingStepOverride !== null ? 'Back to Active Step' : 'Proceed to Reference Image'}
-                  </Button>
-                </Box>
+                {viewingStepOverride === null && (
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                    <Button variant="outlined" size="large" onClick={() => {
+                      setSnackbarMessage('Enquiry Details progress saved!');
+                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
+                      Save Progress
+                    </Button>
+                    <Button variant="contained" size="large" onClick={() => {
+                      handleNextStage('design_sharing');
+                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
+                      Proceed to Reference Image
+                    </Button>
+                  </Box>
+                )}
               </Paper>
             )}
 
@@ -1019,7 +1094,12 @@ const ProjectDetails: React.FC = () => {
             {/* STEP 2: QUOTATION & COSTING */}
             {stepToRender === 2 && (
               <Paper elevation={0} sx={{ p: 5, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-                <Typography variant="h5" fontWeight="bold" mb={4} color="text.primary">Quotation & Costing Builder</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+                  <Typography variant="h5" fontWeight="bold" color="text.primary">Quotation & Costing Builder</Typography>
+                  <Button variant="contained" color="secondary" size="large" onClick={() => generateQuotationPDF(project, products, quoteDetails, { packageCostEnabled, transportCostEnabled, packageCost, transportCost }, selectedTerms)}>
+                    Download PDF
+                  </Button>
+                </Box>
                 
                 <Box sx={{ mb: 4, p: 3, border: '1px solid #E0E0E0', borderRadius: 3, bgcolor: '#FAFAFA' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -1099,36 +1179,118 @@ const ProjectDetails: React.FC = () => {
                       </TableBody>
                     </Table>
                   </TableContainer>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', mt: 3, gap: 1 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', mt: 3, gap: 1, width: '100%' }}>
                     {(() => {
                       const totalProductsAmount = products.reduce((acc, p) => acc + p.amount, 0);
-                      const gstAmount = (totalProductsAmount * gstPercent) / 100;
-                      const finalBill = totalProductsAmount + gstAmount;
+                      
+                      let additionalTotal = 0;
+                      if (Array.isArray(quoteDetails)) {
+                        additionalTotal = quoteDetails.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+                      } else if (typeof quoteDetails === 'object') {
+                        Object.values(quoteDetails).forEach((costs: any) => {
+                          if (Array.isArray(costs)) {
+                            additionalTotal += costs.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+                          }
+                        });
+                      }
+
+                      let globalCostTotal = 0;
+                      if (packageCostEnabled) globalCostTotal += Number(packageCost || 0);
+                      if (transportCostEnabled) globalCostTotal += Number(transportCost || 0);
+
+                      const subTotal = totalProductsAmount + additionalTotal + globalCostTotal;
+                      const gstAmount = (subTotal * gstPercent) / 100;
+                      const finalBill = subTotal + gstAmount;
 
                       return (
-                        <>
-                          <Typography variant="subtitle1" fontWeight="bold" color="text.secondary">Total Products Amount: ₹{totalProductsAmount.toLocaleString('en-IN')}</Typography>
+                        <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'flex-start', mt: 2, gap: 4, flexDirection: { xs: 'column', md: 'row' } }}>
                           
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
-                            <Typography variant="subtitle1" fontWeight="bold">GST (%):</Typography>
-                            <Select
+                          {/* Terms and Conditions (Left Side) */}
+                          <Box sx={{ flex: 1, minWidth: '300px' }}>
+                            <Typography variant="subtitle2" color="text.secondary" mb={1} fontWeight="bold">Terms and Conditions</Typography>
+                            <Autocomplete
+                              multiple
+                              freeSolo
                               size="small"
-                              value={gstPercent}
-                              onChange={(e) => setGstPercent(Number(e.target.value))}
-                              sx={{ width: 100, height: 32, borderRadius: 2 }}
-                            >
-                              <MenuItem value={0}>0%</MenuItem>
-                              <MenuItem value={5}>5%</MenuItem>
-                              <MenuItem value={12}>12%</MenuItem>
-                              <MenuItem value={18}>18%</MenuItem>
-                              <MenuItem value={28}>28%</MenuItem>
-                            </Select>
-                            <Typography variant="subtitle1" fontWeight="bold" color="error.main">+ ₹{gstAmount.toLocaleString('en-IN')}</Typography>
+                              options={quotationTerms.map((t: any) => t.text)}
+                              value={selectedTerms}
+                              onChange={(event, newValue) => {
+                                setSelectedTerms(newValue);
+                                const newTerms = newValue.filter((val) => !quotationTerms.find((t: any) => t.text === val));
+                                newTerms.forEach(term => addQuotationTerm({ text: term }));
+                              }}
+                              renderInput={(params) => (
+                                <TextField {...params} variant="outlined" placeholder="Select or type conditions..." sx={{ bgcolor: '#FAFAFA' }} />
+                              )}
+                            />
                           </Box>
 
-                          <Divider sx={{ width: '300px', my: 1.5 }} />
-                          <Typography variant="h5" fontWeight="bold" color="primary.main">Grand Total: ₹{finalBill.toLocaleString('en-IN')}</Typography>
-                        </>
+                          {/* Totals Summary (Right Side) */}
+                          <Box sx={{ width: '400px', bgcolor: '#FAFAFA', p: 3, borderRadius: 3, border: '1px solid #E0E0E0', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            <Typography variant="h6" fontWeight="bold" color="text.primary" mb={1} sx={{ borderBottom: '1px solid #E0E0E0', pb: 1 }}>Quotation Summary</Typography>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">Total Products Amount</Typography>
+                              <Typography variant="body2" fontWeight="bold">₹{totalProductsAmount.toLocaleString('en-IN')}</Typography>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">Total Additional Cost</Typography>
+                              <Typography variant="body2" fontWeight="bold">₹{additionalTotal.toLocaleString('en-IN')}</Typography>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Checkbox size="small" checked={packageCostEnabled} onChange={(e) => setPackageCostEnabled(e.target.checked)} sx={{ p: 0 }} />
+                                <Typography variant="body2" color="text.secondary">Package Cost</Typography>
+                              </Box>
+                              {packageCostEnabled ? (
+                                <TextField size="small" type="number" value={packageCost === 0 ? '' : packageCost} onChange={(e) => setPackageCost(Number(e.target.value))} sx={{ width: 100 }} placeholder="₹0" variant="standard" />
+                              ) : <Typography variant="body2" fontWeight="bold" color="text.secondary">-</Typography>}
+                            </Box>
+
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Checkbox size="small" checked={transportCostEnabled} onChange={(e) => setTransportCostEnabled(e.target.checked)} sx={{ p: 0 }} />
+                                <Typography variant="body2" color="text.secondary">Transport Cost</Typography>
+                              </Box>
+                              {transportCostEnabled ? (
+                                <TextField size="small" type="number" value={transportCost === 0 ? '' : transportCost} onChange={(e) => setTransportCost(Number(e.target.value))} sx={{ width: 100 }} placeholder="₹0" variant="standard" />
+                              ) : <Typography variant="body2" fontWeight="bold" color="text.secondary">-</Typography>}
+                            </Box>
+
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="body2" color="text.secondary">GST</Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Select
+                                  size="small"
+                                  variant="standard"
+                                  value={gstPercent}
+                                  onChange={(e) => setGstPercent(Number(e.target.value))}
+                                  sx={{ width: 75 }}
+                                  disableUnderline
+                                >
+                                  <MenuItem value={0}>0%</MenuItem>
+                                  <MenuItem value={5}>5%</MenuItem>
+                                  <MenuItem value={12}>12%</MenuItem>
+                                  <MenuItem value={18}>18%</MenuItem>
+                                  <MenuItem value={28}>28%</MenuItem>
+                                </Select>
+                                <Typography variant="body2" fontWeight="bold" color="error.main" sx={{ width: 80, textAlign: 'right' }}>
+                                  + ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            <Divider sx={{ my: 1 }} />
+                            
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="h6" fontWeight="bold" color="text.primary">Grand Total</Typography>
+                              <Typography variant="h6" fontWeight="bold" color="primary.main">₹{finalBill.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</Typography>
+                            </Box>
+                            
+                          </Box>
+                        </Box>
                       )
                     })()}
                   </Box>
@@ -1197,9 +1359,6 @@ const ProjectDetails: React.FC = () => {
                       setSnackbarMessage('Quotation progress saved!');
                     }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
                       {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
-                    </Button>
-                    <Button variant="outlined" size="large" onClick={() => generateQuotationPDF(project, products, quoteDetails)} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      Download PDF
                     </Button>
                     <Button variant="contained" size="large" onClick={async () => {
                       if (viewingStepOverride !== null) {
@@ -1467,25 +1626,111 @@ const ProjectDetails: React.FC = () => {
 
                 <Box sx={{ p: 3, border: '1px dashed #B38B36', borderRadius: 3, bgcolor: '#FFFDF5', mb: 4 }}>
                   <Typography variant="subtitle1" fontWeight="bold" color="#B38B36" mb={2}>Reserve New Material</Typography>
-                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Select from Inventory</InputLabel>
-                      <Select label="Select from Inventory" defaultValue="" value="">
-                        {inventoryItems && inventoryItems.map((item: any) => (
-                          <MenuItem key={item.id} value={item.id} onClick={() => {
-                            setSelectedInventoryItem(item);
-                            setReserveQty('');
-                            setReserveDialogOpen(true);
-                          }}>
-                            {item.itemName} (Block: {item.blockNumber || 'N/A'}) - {item.quantity} {item.unit} available
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <Button variant="outlined" sx={{ whiteSpace: 'nowrap' }} onClick={() => setSnackbarMessage('Navigate to Global Inventory (from sidebar) to add new stock first.')}>
-                      + Add to Global Inventory
-                    </Button>
-                  </Box>
+                  <FormControl component="fieldset" sx={{ mb: 3 }}>
+                    <RadioGroup row value={materialSource} onChange={(e) => setMaterialSource(e.target.value)}>
+                      <FormControlLabel value="unnati" control={<Radio />} label="Unnati Material" />
+                      <FormControlLabel value="client" control={<Radio />} label="Client Material" />
+                    </RadioGroup>
+                  </FormControl>
+
+                  {materialSource === 'unnati' && (
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Select from Inventory</InputLabel>
+                        <Select label="Select from Inventory" defaultValue="" value="">
+                          {inventoryItems && inventoryItems.map((item: any) => (
+                            <MenuItem key={item.id} value={item.id} onClick={() => {
+                              setSelectedInventoryItem(item);
+                              setReserveQty('');
+                              setReserveDialogOpen(true);
+                            }}>
+                              {item.itemName} (Block: {item.blockNumber || 'N/A'}) - {item.quantity} {item.unit} available
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <Button variant="outlined" sx={{ whiteSpace: 'nowrap' }} onClick={() => setSnackbarMessage('Navigate to Global Inventory (from sidebar) to add new stock first.')}>
+                        + Add to Global Inventory
+                      </Button>
+                    </Box>
+                  )}
+
+                  {materialSource === 'client' && (
+                    <Box>
+                      <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Material Name</TableCell>
+                              <TableCell>Block No</TableCell>
+                              <TableCell>Length</TableCell>
+                              <TableCell>Width</TableCell>
+                              <TableCell>Thickness MM</TableCell>
+                              <TableCell>Total Sq.Ft</TableCell>
+                              <TableCell></TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {clientSlabs.map((row, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell><TextField size="small" value={row.materialName} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].materialName = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell><TextField size="small" value={row.blockNo} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].blockNo = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell><TextField size="small" type="number" value={row.length} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].length = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell><TextField size="small" type="number" value={row.width} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].width = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell><TextField size="small" type="number" value={row.thickness} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].thickness = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell>{(Number(row.length || 0) * Number(row.width || 0)).toFixed(2)}</TableCell>
+                                <TableCell>
+                                  <IconButton color="error" size="small" onClick={() => {
+                                    const newSlabs = clientSlabs.filter((_, i) => i !== idx);
+                                    setClientSlabs(newSlabs.length ? newSlabs : [{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
+                                  }}><DeleteIcon fontSize="small" /></IconButton>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button variant="outlined" onClick={() => setClientSlabs([...clientSlabs, { materialName: '', blockNo: '', length: '', width: '', thickness: '' }])}>
+                          + Add Slab
+                        </Button>
+                        <Button variant="contained" disabled={isReservingClientMaterial} onClick={async () => {
+                          setIsReservingClientMaterial(true);
+                          try {
+                            const token = localStorage.getItem('token');
+                            for (const row of clientSlabs) {
+                              if (!row.materialName || !row.length || !row.width) continue;
+                              const qty = Number(row.length) * Number(row.width);
+                              
+                              const res = await fetch('/api/inventory', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                body: JSON.stringify({
+                                  type: 'slab', jobWorkType: 'client', itemName: row.materialName, blockNumber: row.blockNo, 
+                                  length: Number(row.length), width: Number(row.width), thickness: Number(row.thickness),
+                                  quantity: qty, unit: 'sq_ft', supplier: project?.clientName
+                                })
+                              });
+                              if (!res.ok) throw new Error('Failed to create inventory item');
+                              const newItem = await res.json();
+                              
+                              await reserveMaterial({ projectId: id as string, inventoryId: newItem.id, quantity: qty, cost: 0 }).unwrap();
+                            }
+                            setSnackbarMessage('Client materials reserved successfully!');
+                            setClientSlabs([{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
+                            refetchMaterials();
+                          } catch (err) {
+                            console.error(err);
+                            setSnackbarMessage('Error reserving client materials.');
+                          } finally {
+                            setIsReservingClientMaterial(false);
+                          }
+                        }}>
+                          {isReservingClientMaterial ? 'Reserving...' : 'Reserve Client Materials'}
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1985,15 +2230,16 @@ const ProjectDetails: React.FC = () => {
                     onInputChange={(e, newInputValue) => handleUpdateEditingProduct(index, 'category', newInputValue)}
                     renderInput={(params) => <TextField {...params} label="Category / Item Name" size="small" />}
                     renderOption={(props, option) => {
+                      const { key, ...restProps } = props as any;
                       if (option.isNew) {
                         return (
-                          <li {...props} style={{ color: '#B38B36', fontWeight: 'bold' }}>
+                          <li key={key} {...restProps} style={{ color: '#B38B36', fontWeight: 'bold' }}>
                             {option.name}
                           </li>
                         );
                       }
                       return (
-                        <li {...props} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <li key={key} {...restProps} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                           <span>{option.name}</span>
                           <IconButton 
                             size="small" 
@@ -2055,15 +2301,16 @@ const ProjectDetails: React.FC = () => {
                     onInputChange={(e, newInputValue) => handleUpdateEditingProduct(index, 'unit', newInputValue)}
                     renderInput={(params) => <TextField {...params} label="Unit" size="small" />}
                     renderOption={(props, option) => {
+                      const { key, ...restProps } = props as any;
                       if (option.isNew) {
                         return (
-                          <li {...props} style={{ color: '#B38B36', fontWeight: 'bold' }}>
+                          <li key={key} {...restProps} style={{ color: '#B38B36', fontWeight: 'bold' }}>
                             {option.name}
                           </li>
                         );
                       }
                       return (
-                        <li {...props} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <li key={key} {...restProps} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                           <span>{option.name}</span>
                           <IconButton 
                             size="small" 

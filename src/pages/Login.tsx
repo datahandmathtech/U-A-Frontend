@@ -19,7 +19,9 @@ const Login: React.FC = () => {
       dispatch(setCredentials({ user: response.user, token: response.token }));
       
       // Redirect based on role
-      if (response.user.role === 'employee' || response.user.role === 'worker') {
+      if (response.user.role === 'manager') {
+        navigate('/manager');
+      } else if (response.user.role === 'employee' || response.user.role === 'worker') {
         navigate('/worker');
       } else {
         navigate('/');

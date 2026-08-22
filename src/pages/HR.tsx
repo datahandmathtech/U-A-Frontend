@@ -3,7 +3,7 @@ import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableConta
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useGetAttendanceQuery, useGetStaffSalaryQuery, useRegisterUserMutation, useGetStaffListQuery, useDeleteStaffMutation, useEditStaffMutation } from '../store/apiSlice';
+import { useGetAttendanceQuery, useGetStaffSalaryQuery, useRegisterUserMutation, useGetStaffListQuery, useDeleteStaffMutation, useEditStaffMutation, useAddManualAttendanceMutation } from '../store/apiSlice';
 import EditIcon from '@mui/icons-material/Edit';
 
 const HR: React.FC = () => {
@@ -19,6 +19,22 @@ const HR: React.FC = () => {
   const [editStaff] = useEditStaffMutation();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingStaffData, setEditingStaffData] = useState<any>(null);
+  const [addManualAttendance, { isLoading: addingManualAtt }] = useAddManualAttendanceMutation();
+  const [manualAttDialogOpen, setManualAttDialogOpen] = useState(false);
+  const [manualAttData, setManualAttData] = useState({ userId: '', checkIn: '', checkOut: '' });
+
+  const handleManualAttSubmit = async () => {
+    try {
+      await addManualAttendance(manualAttData).unwrap();
+      setSuccessMsg('Manual attendance added successfully!');
+      setManualAttDialogOpen(false);
+      setManualAttData({ userId: '', checkIn: '', checkOut: '' });
+      refetchStaff();
+    } catch (err) {
+      console.error(err);
+      alert('Error adding manual attendance');
+    }
+  };
 
   const handleCheckIn = async () => {
     try {
@@ -97,9 +113,14 @@ const HR: React.FC = () => {
       {tab === 0 && (
         <>
         <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 2, maxWidth: 600 }}>
-          <Typography variant="h6" mb={3} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PersonAddIcon /> Create New Staff
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PersonAddIcon /> Create New Staff
+            </Typography>
+            <Button variant="outlined" color="primary" onClick={() => setManualAttDialogOpen(true)}>
+              + Manual Attendance
+            </Button>
+          </Box>
           
           {successMsg && <Alert severity="success" sx={{ mb: 3 }}>{successMsg}</Alert>}
           
@@ -129,6 +150,7 @@ const HR: React.FC = () => {
               >
                 <MenuItem value="worker">Worker</MenuItem>
                 <MenuItem value="employee">Employee</MenuItem>
+                <MenuItem value="manager">Manager</MenuItem>
                 <MenuItem value="admin">Admin</MenuItem>
               </TextField>
               <TextField 
@@ -226,6 +248,7 @@ const HR: React.FC = () => {
                   >
                     <MenuItem value="worker">Worker</MenuItem>
                     <MenuItem value="employee">Employee</MenuItem>
+                    <MenuItem value="manager">Manager</MenuItem>
                     <MenuItem value="admin">Admin</MenuItem>
                   </TextField>
                   <TextField 
@@ -239,6 +262,36 @@ const HR: React.FC = () => {
           <DialogActions>
             <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleUpdateStaff} variant="contained" color="primary">Save Changes</Button>
+          </DialogActions>
+        </Dialog>
+        {/* Manual Attendance Dialog */}
+        <Dialog open={manualAttDialogOpen} onClose={() => setManualAttDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Manual Attendance (Admin)</DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
+              <TextField 
+                label="Staff Member" fullWidth select required
+                value={manualAttData.userId} onChange={(e) => setManualAttData({...manualAttData, userId: e.target.value})}
+              >
+                {staffList?.map((s: any) => (
+                  <MenuItem key={s.id} value={s.id}>{s.name} ({s.role})</MenuItem>
+                ))}
+              </TextField>
+              <TextField 
+                label="Check-In Time (e.g. 2026-08-15T09:00)" fullWidth required type="datetime-local" InputLabelProps={{ shrink: true }}
+                value={manualAttData.checkIn} onChange={(e) => setManualAttData({...manualAttData, checkIn: e.target.value})}
+              />
+              <TextField 
+                label="Check-Out Time (Optional)" fullWidth type="datetime-local" InputLabelProps={{ shrink: true }}
+                value={manualAttData.checkOut} onChange={(e) => setManualAttData({...manualAttData, checkOut: e.target.value})}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setManualAttDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleManualAttSubmit} variant="contained" color="primary" disabled={!manualAttData.userId || !manualAttData.checkIn || addingManualAtt}>
+              {addingManualAtt ? 'Saving...' : 'Save Attendance'}
+            </Button>
           </DialogActions>
         </Dialog>
         </>

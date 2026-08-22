@@ -12,15 +12,37 @@ import AddIcon from '@mui/icons-material/Add';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import HistoryIcon from '@mui/icons-material/History';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation } from '../store/apiSlice';
+import EditIcon from '@mui/icons-material/Edit';
+import { useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetVendorsQuery } from '../store/apiSlice';
 
 const InOutLedger: React.FC = () => {
-  const { data: activeOutLogsData, isLoading: outLogsLoading } = useGetActiveOutLogsQuery(undefined);
-  const { data: pendingLogs, isLoading: pendingLoading, refetch } = useGetPendingApprovalsQuery(undefined);
+  const { data: activeOutLogsData, isLoading: outLogsLoading, refetch } = useGetActiveOutLogsQuery(undefined);
+  const { data: pendingLogs, isLoading: pendingLoading } = useGetPendingApprovalsQuery(undefined);
   const { data: approvedLogsData, isLoading: approvedLoading } = useGetApprovedLogsQuery(undefined);
   const { data: projects } = useGetProjectsQuery();
   const [approveLog, { isLoading: isApproving }] = useApproveMaterialLogMutation();
   const [deleteProductionLog] = useDeleteProductionLogMutation();
+
+  const { data: vendorsData } = useGetVendorsQuery({});
+  const [createMaterialLog] = useCreateMaterialLogMutation();
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({ vendorId: '', transactionType: 'OUT', stage: 'Production', quantity: '', vehicleNumber: '' });
+  
+  const handleManualEntrySubmit = async () => {
+    try {
+      await createMaterialLog({
+        ...manualForm,
+        quantityProduced: Number(manualForm.quantity),
+        assigneeType: 'vendor'
+      }).unwrap();
+      setToast({ open: true, message: 'Log created successfully', severity: 'success' });
+      setManualEntryOpen(false);
+      setManualForm({ vendorId: '', transactionType: 'OUT', stage: 'Production', quantity: '', vehicleNumber: '' });
+      refetch();
+    } catch (err: any) {
+      setToast({ open: true, message: err?.data?.message || 'Failed to create log', severity: 'error' });
+    }
+  };
 
   const activeOutLogs = (activeOutLogsData || []).filter((log: any) => !!log.transactionType);
   const pendingMaterialLogs = (pendingLogs || []).filter((log: any) => !!log.transactionType);
@@ -195,34 +217,25 @@ const InOutLedger: React.FC = () => {
               </TableCell>
 
               <TableCell sx={{ borderBottom: 'none' }}>
-                <Chip 
-                  label={log.approvalStatus} 
-                  size="small" 
-                  color={log.approvalStatus === 'approved' ? 'success' : (log.approvalStatus === 'rejected' ? 'error' : 'warning')} 
-                  sx={{ fontWeight: 'bold' }}
-                />
+                <IconButton onClick={() => setPreviewPhoto(log.photoUrl || log.startPhotos?.machine || 'no-photo')} size="small" color="primary">
+                  <VisibilityIcon />
+                </IconButton>
               </TableCell>
 
               <TableCell sx={{ borderBottom: 'none' }}>
-                {log.approvalStatus === 'pending' ? (
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  {log.approvalStatus === 'pending' && (
                     <Button variant="contained" color="success" size="small" onClick={() => handleApproveClick(log)} sx={{ minWidth: 0, p: 0.5 }}>
                       <CheckCircleIcon fontSize="small" />
                     </Button>
-                    <Button variant="outlined" color="error" size="small" onClick={() => handleRejectClick(log.id)} sx={{ minWidth: 0, p: 0.5 }}>
-                      <CancelIcon fontSize="small" />
-                    </Button>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button variant="outlined" color="primary" size="small" onClick={() => setPreviewPhoto(log.startPhotos?.machine || null)} sx={{ minWidth: 0, p: 0.5 }} disabled={!log.startPhotos?.machine}>
-                      <VisibilityIcon fontSize="small" />
-                    </Button>
-                    <Button variant="outlined" color="error" size="small" onClick={() => handleDeleteLog(log.id)} sx={{ minWidth: 0, p: 0.5 }}>
-                      <DeleteIcon fontSize="small" />
-                    </Button>
-                  </Box>
-                )}
+                  )}
+                  <IconButton onClick={() => {}} size="small" color="primary">
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton onClick={() => handleDeleteLog(log.id)} size="small" color="error">
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               </TableCell>
             </TableRow>
           ))}
@@ -241,6 +254,9 @@ const InOutLedger: React.FC = () => {
           <Typography variant="body1" color="textSecondary" sx={{ ml: 6 }}>Track material sent to vendors and stock returned after processing</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setManualEntryOpen(true)}>
+            + Manual Entry
+          </Button>
           <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#fff' }}>
             <Select value={selectedFY} onChange={(e) => setSelectedFY(e.target.value)}>
               {fyOptions.map(fy => (
@@ -424,6 +440,43 @@ const InOutLedger: React.FC = () => {
         <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', p: 2 }} onClick={() => setPreviewPhoto(null)}>
           {previewPhoto ? <img src={previewPhoto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} /> : null}
         </Box>
+      </Dialog>
+
+      <Dialog open={manualEntryOpen} onClose={() => setManualEntryOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Manual IN/OUT Entry</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Vendor</InputLabel>
+              <Select label="Vendor" value={manualForm.vendorId} onChange={(e) => setManualForm({...manualForm, vendorId: e.target.value})}>
+                {vendorsData?.map((v: any) => (
+                  <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Type</InputLabel>
+              <Select label="Type" value={manualForm.transactionType} onChange={(e) => setManualForm({...manualForm, transactionType: e.target.value})}>
+                <MenuItem value="OUT">OUT (Sent to Vendor)</MenuItem>
+                <MenuItem value="IN">IN (Received from Vendor)</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Stage</InputLabel>
+              <Select label="Stage" value={manualForm.stage} onChange={(e) => setManualForm({...manualForm, stage: e.target.value})}>
+                <MenuItem value="Production">Production</MenuItem>
+                <MenuItem value="Polishing">Polishing</MenuItem>
+                <MenuItem value="Packing">Packing</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField size="small" label="Quantity" type="number" value={manualForm.quantity} onChange={(e) => setManualForm({...manualForm, quantity: e.target.value})} fullWidth />
+            <TextField size="small" label="Vehicle No (Optional)" value={manualForm.vehicleNumber} onChange={(e) => setManualForm({...manualForm, vehicleNumber: e.target.value})} fullWidth />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setManualEntryOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleManualEntrySubmit} disabled={!manualForm.vendorId || !manualForm.quantity}>Submit Entry</Button>
+        </DialogActions>
       </Dialog>
 
       <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast({ ...toast, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>

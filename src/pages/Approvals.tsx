@@ -39,6 +39,9 @@ const Approvals: React.FC = () => {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [detailsLog, setDetailsLog] = useState<any>(null);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectLogId, setRejectLogId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const activeProjectId = editHistoryDialogOpen ? editingHistoryLog?.projectId : detailsDialogOpen ? detailsLog?.projectId : projectSplits[0]?.projectId;
   const { data: slabs } = useGetSlabsQuery(activeProjectId, { skip: !activeProjectId });
@@ -51,28 +54,45 @@ const Approvals: React.FC = () => {
     setApprovalDialogOpen(true);
   };
 
-  const handleRejectClick = async (logId: string) => {
+  const handleRejectClick = (logId: string) => {
+    setRejectLogId(logId);
+    setRejectReason('');
+    setRejectDialogOpen(true);
+  };
+
+  const submitReject = async () => {
+    if (!rejectLogId) return;
     try {
-      await approveLog({ id: logId, data: { approvalStatus: 'rejected' } }).unwrap();
+      await approveLog({ id: rejectLogId, data: { approvalStatus: 'rejected_admin', remarks: rejectReason } }).unwrap();
       setToast({ open: true, message: 'Log Rejected successfully', severity: 'success' });
       refetch();
     } catch (err: any) {
       setToast({ open: true, message: err?.data?.message || 'Failed to reject', severity: 'error' });
+    } finally {
+      setRejectDialogOpen(false);
+      setRejectLogId(null);
     }
   };
 
   const submitApproval = async () => {
     try {
       const validSplits = projectSplits.filter(s => s.projectId && s.qty > 0);
-      const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
-      const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
       
-      if (!hasPieces && totalSplitQty > selectedLog.quantityProduced) {
-        setToast({ open: true, message: `Total split item count (${totalSplitQty}) cannot exceed original item count (${selectedLog.quantityProduced}).`, severity: 'error' });
-        return;
-      }
       if (validSplits.length === 0) {
         setToast({ open: true, message: 'Please select at least one project and enter item count.', severity: 'error' });
+        return;
+      }
+
+      if (validSplits.some(s => !s.slabId)) {
+        setToast({ open: true, message: 'Please select a Product / Slab for all assignments so it appears in the pipeline.', severity: 'error' });
+        return;
+      }
+
+      const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
+      const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
+
+      if (!hasPieces && totalSplitQty > selectedLog.quantityProduced) {
+        setToast({ open: true, message: `Total split item count (${totalSplitQty}) cannot exceed original item count (${selectedLog.quantityProduced}).`, severity: 'error' });
         return;
       }
 
@@ -621,14 +641,21 @@ const Approvals: React.FC = () => {
                       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                         <TextField 
                           select
-                          label="Select Product / Slab" 
+                          label="Select Product / Slab *" 
                           fullWidth
                           size="small"
                           value={split.slabId || ''} 
                           onChange={(e) => {
                             const newSplits = [...projectSplits];
-                            newSplits[idx].slabId = e.target.value;
+                            const selectedSlabId = e.target.value;
+                            newSplits[idx].slabId = selectedSlabId;
                             newSplits[idx].pieceIds = [];
+                            
+                            const slab = projectSlabs.find((s: any) => s.id === selectedSlabId);
+                            if (slab) {
+                              newSplits[idx].productName = slab.name;
+                            }
+                            
                             setProjectSplits(newSplits);
                           }} 
                           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
@@ -641,7 +668,7 @@ const Approvals: React.FC = () => {
                       </Box>
                       
                       {/* Pieces Dropdown */}
-                      {split.slabId && (
+                      {split.slabId && projectSlabs.find((s: any) => s.id === split.slabId)?.pieces?.length > 0 && (
                         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                           <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
                             <InputLabel id={`select-piece-label-${idx}`}>Select Piece(s) (Optional)</InputLabel>
@@ -975,7 +1002,7 @@ const Approvals: React.FC = () => {
                 );
               })()}
 
-              {editingHistoryLog.slabId && slabs && (
+              {editingHistoryLog.slabId && slabs && slabs.find((s: any) => s.id === editingHistoryLog.slabId)?.pieces?.length > 0 && (
                 <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
                   <InputLabel id={`edit-select-piece-label`}>Select Piece(s) (Optional)</InputLabel>
                   <Select
@@ -1065,6 +1092,32 @@ const Approvals: React.FC = () => {
             <img src={previewPhoto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} />
           ) : null}
         </Box>
+      </Dialog>
+
+      {/* Reject Dialog */}
+      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Reject Log</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Please enter the reason for rejecting this log. This will be visible to the worker/manager.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            rows={3}
+            variant="outlined"
+            label="Rejection Remarks"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button onClick={() => setRejectDialogOpen(false)} color="inherit">Cancel</Button>
+          <Button onClick={submitReject} variant="contained" color="error" disabled={!rejectReason.trim()}>
+            Reject Log
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast({ ...toast, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
