@@ -9,6 +9,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { IconButton } from '@mui/material';
@@ -23,6 +24,7 @@ const CRM: React.FC = () => {
   const [uploadFiles, { isLoading: isUploading }] = useUploadFilesMutation();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   
   // Camera States
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -353,6 +355,16 @@ const CRM: React.FC = () => {
                   </TableCell>
                   <TableCell>{new Date(enq.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}</TableCell>
                   <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                    {enq.customerPhoto && (
+                      <IconButton 
+                        color="info" 
+                        onClick={() => setPreviewPhoto(enq.customerPhoto.split(',').filter(Boolean)[0])} 
+                        size="small" 
+                        sx={{ mr: 1 }}
+                      >
+                        <VisibilityIcon fontSize="small" />
+                      </IconButton>
+                    )}
                     <IconButton color="primary" onClick={() => handleOpenEdit(enq)} size="small" sx={{ mr: 1 }}>
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -589,6 +601,21 @@ const CRM: React.FC = () => {
           >
             Capture Photo
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Photo Dialog */}
+      <Dialog open={!!previewPhoto} onClose={() => setPreviewPhoto(null)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          View Photo
+          <IconButton onClick={() => setPreviewPhoto(null)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ display: 'flex', justifyContent: 'center', p: 0 }}>
+          {previewPhoto && (
+            <img src={previewPhoto} alt="Preview" style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain' }} />
+          )}
         </DialogContent>
       </Dialog>
     </Box>
