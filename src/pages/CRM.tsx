@@ -435,7 +435,10 @@ const CRM: React.FC = () => {
               fullWidth 
               value={formData.createdAt} 
               onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-              slotProps={{ inputLabel: { shrink: true } }}
+              slotProps={{ 
+                inputLabel: { shrink: true },
+                htmlInput: { max: new Date().toISOString().split('T')[0] }
+              }}
             />
             <Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, fontWeight: 'bold' }}>Client Photos</Typography>
