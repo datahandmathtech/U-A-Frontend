@@ -1939,11 +1939,10 @@ const ProjectDetails: React.FC = () => {
           </Box>
         </Box> {/* End of LEFT MAIN COLUMN */}
 
-        {/* RIGHT SIDEBAR TIMELINE */}
-        {stepToRender !== 6 && (
+        {/* RIGHT SIDEBAR (Costs Category for Step 2) */}
+        {stepToRender === 2 && (
           <Box sx={{ width: { xs: '100%', md: 350 }, flexShrink: 0, position: 'sticky', top: 24 }}>
 
-          {stepToRender === 2 && (
             <Paper elevation={0} sx={{ p: 4, mt: 10, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
               <Typography variant="h6" fontWeight="bold" color="text.primary" mb={1}>Costs Category</Typography>
               <Typography variant="body2" color="text.secondary" mb={3}>Select a category to view and edit its cost estimation.</Typography>
@@ -1997,7 +1996,6 @@ const ProjectDetails: React.FC = () => {
                 )}
               </Box>
             </Paper>
-          )}
 
         </Box>
         )}
