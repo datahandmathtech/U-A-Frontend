@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useGetInventoryQuery } from '../store/apiSlice';
@@ -50,7 +50,7 @@ const Inventory: React.FC = () => {
     
     return Object.entries(grouped).map(([blockNo, blockItems]: [string, any]) => {
       const totalPieces = blockItems.length;
-      const totalQty = blockItems.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0);
+      const totalQty = blockItems.reduce((sum: number, i: any) => sum + (i.inCurrentFY || i.quantity || 0), 0);
       const first = blockItems[0];
       return {
         blockNo,
