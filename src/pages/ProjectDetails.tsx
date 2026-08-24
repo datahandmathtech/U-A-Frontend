@@ -1914,13 +1914,22 @@ const ProjectDetails: React.FC = () => {
                  </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                  {viewingStepOverride !== null && (
+                  {viewingStepOverride !== null ? (
                     <Button variant="contained" color="success" size="large" onClick={() => {
                       setViewingStepOverride(null);
-                    }} sx={{ px: 5, py: 1.5, borderRadius: 2, fontWeight: 'bold', fontSize: '1.1rem' }}>
+                    }} sx={{ px: 5, py: 1.5, borderRadius: 2, bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' }, fontWeight: 'bold', fontSize: '1.1rem' }}>
                       Back to Active Step
                     </Button>
-                  )}
+                  ) : !isPlanningMode ? (
+                    <Button variant="contained" color="success" size="large" onClick={async () => {
+                       await updateProject({ id: id as string, data: { status: 'work_order' } }).unwrap();
+                       setActiveStep(7);
+                       setViewingStepOverride(null);
+                       refetch();
+                    }} sx={{ px: 5, py: 1.5, borderRadius: 2, bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' }, fontWeight: 'bold', fontSize: '1.1rem' }}>
+                      Finalize & Send to Dispatch
+                    </Button>
+                  ) : null}
                 </Box>
               </Box>
             )}
