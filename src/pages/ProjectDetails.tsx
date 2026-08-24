@@ -52,7 +52,7 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
   const ALL_STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'];
   const requiredStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
 
-  const handleToggleStage = async (stageKey: string, e: React.MouseEvent) => {
+  const handleToggleStage = async (stageKey: string, e: React.MouseEvent | React.ChangeEvent) => {
     e.stopPropagation();
     let newRequired;
     if (requiredStages.includes(stageKey)) {
@@ -142,11 +142,11 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
                 {isPending ? (
                   <>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Checkbox size="small" checked={requiredStages.includes('Polishing - Honed')} onClick={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
+                      <Checkbox size="small" checked={requiredStages.includes('Polishing - Honed')} onChange={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
                       <Typography variant="caption">Honed</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Checkbox size="small" checked={requiredStages.includes('Polishing - Mirror')} onClick={(e) => handleToggleStage('Polishing - Mirror', e)} sx={{ p: 0 }} />
+                      <Checkbox size="small" checked={requiredStages.includes('Polishing - Mirror')} onChange={(e) => handleToggleStage('Polishing - Mirror', e)} sx={{ p: 0 }} />
                       <Typography variant="caption">Mirror</Typography>
                     </Box>
                   </>
@@ -169,7 +169,7 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {isPending ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Checkbox size="small" checked={requiredStages.includes(stage)} onClick={(e) => handleToggleStage(stage, e)} sx={{ p: 0 }} />
+                    <Checkbox size="small" checked={requiredStages.includes(stage)} onChange={(e) => handleToggleStage(stage, e)} sx={{ p: 0 }} />
                     <Typography variant="caption">{stage}</Typography>
                   </Box>
                 ) : (
@@ -192,12 +192,19 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
         );
       })}
       <TableCell align="center" sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
-        {slab.status === 'pending' && (
+        {slab.status === 'pending' ? (
           <Button variant="contained" size="small" color="success" onClick={async (e) => {
             e.stopPropagation();
             await updateSlab({ id: slab.id, data: { status: 'active' } });
           }}>
             Start Work
+          </Button>
+        ) : (
+          <Button variant="outlined" size="small" onClick={async (e) => {
+            e.stopPropagation();
+            await updateSlab({ id: slab.id, data: { status: 'pending' } });
+          }}>
+            Edit Stages
           </Button>
         )}
         <Box>
