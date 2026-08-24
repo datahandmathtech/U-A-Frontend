@@ -38,20 +38,17 @@ const crmSteps = ['Enquiry Details', 'Reference Image', 'Quotation & Costing', '
 const projectSteps = ['Shop Drawing & Approval', 'Material Planning', 'Production', 'Work Order Active'];
 const steps = [...crmSteps, ...projectSteps];
 
-const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[] }) => {
+const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[] }) => {
   const { id: projectId } = useParams();
-  const navigate = useNavigate();
 
   const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
   const dimensionStr = slab.size
-    ? slab.size.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')
+    ? slab.size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1')
     : (matchedProduct 
-      ? `${matchedProduct.length || 0}L × ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
-      : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : ''));
+      ? `${matchedProduct.length || 0}L A- ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
+      : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1') : ''));
 
   const [updateSlab] = useUpdateSlabMutation();
-  const { data: productionLogs } = useGetProjectProductionLogsQuery(projectId as string, { skip: !projectId });
-  const ALL_STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'];
   const requiredStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
 
   const handleToggleStage = async (stageKey: string, e: React.MouseEvent | React.ChangeEvent) => {
@@ -69,31 +66,81 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
     }
   };
 
+  const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+  const isLocked = slab.status !== 'pending';
+
+  return (
+    <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
+      <TableCell sx={{ color: '#444' }}>
+        <Typography variant="body2">{slab.name}</Typography>
+      </TableCell>
+      <TableCell sx={{ color: '#666' }}>
+        <Typography variant="body2">{dimensionStr}</Typography>
+      </TableCell>
+      {STAGES.map(stage => (
+        <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
+          {stage === 'Polishing' ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Checkbox size="small" disabled={isLocked} checked={requiredStages.includes('Polishing - Honed')} onChange={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
+                <Typography variant="caption">Honed</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Checkbox size="small" disabled={isLocked} checked={requiredStages.includes('Polishing - Mirror')} onChange={(e) => handleToggleStage('Polishing - Mirror', e)} sx={{ p: 0 }} />
+                <Typography variant="caption">Mirror</Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Checkbox size="small" disabled={isLocked} checked={requiredStages.includes(stage)} onChange={(e) => handleToggleStage(stage, e)} sx={{ p: 0 }} />
+              <Typography variant="caption">{stage}</Typography>
+            </Box>
+          )}
+        </TableCell>
+      ))}
+      <TableCell align="center" sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+        {isLocked ? (
+           <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'bold' }}>Active</Typography>
+        ) : (
+           <Typography variant="caption" sx={{ color: 'text.secondary' }}>Pending</Typography>
+        )}
+        <Box>
+          <IconButton color="primary" size="small" disabled={isLocked} onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
+          <IconButton color="error" size="small" onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}><DeleteIcon fontSize="small" /></IconButton>
+        </Box>
+      </TableCell>
+    </TableRow>
+  );
+};
+
+const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLogs }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[], productionLogs: any[] }) => {
+  const navigate = useNavigate();
+  const { id: projectId } = useParams();
+
+  const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
+  const dimensionStr = slab.size
+    ? slab.size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1')
+    : (matchedProduct 
+      ? `${matchedProduct.length || 0}L A- ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
+      : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1') : ''));
+
+  const requiredStages = slab.requiredStages || [];
+
   const getStageStatus = (stageName: string) => {
-    if (stageName === 'Polishing' && !requiredStages.some((s: string) => s.startsWith('Polishing'))) return 'N/A';
-    if (stageName !== 'Polishing' && !requiredStages.includes(stageName)) return 'N/A';
-    
     if (slab.pieces && slab.pieces.length > 0) {
-      const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'];
       const stageIdx = STAGES.indexOf(stageName);
-      
       let allPiecesPassed = true;
       let anyPiecePassed = false;
-      
       for (const p of slab.pieces) {
         const pStageIdx = STAGES.indexOf(p.stage);
         const isPassed = pStageIdx > stageIdx || (p.stage === stageName && p.status === 'completed');
-        
-        if (!isPassed) {
-          allPiecesPassed = false;
-        } else {
-          anyPiecePassed = true;
-        }
+        if (!isPassed) allPiecesPassed = false;
+        else anyPiecePassed = true;
       }
-      
       if (allPiecesPassed && slab.pieces.length > 0) return 'Completed';
-      if (anyPiecePassed) return 'Under Process';
-      return 'Not Started';
+      if (anyPiecePassed) return 'In Progress';
+      return 'Pending';
     }
 
     const targetQty = matchedProduct ? matchedProduct.qty : 0;
@@ -101,26 +148,14 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
       const stageLogs = productionLogs.filter((log: any) => 
         log.transactionType === 'IN' && 
         log.approvalStatus === 'approved' &&
-        log.stage.includes(stageName) &&
+        log.stage.includes(stageName.split(' ')[0]) &&
         (log.productName === slab.name || slab.name.startsWith(log.productName))
       );
-      
       const sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
-      
       if (sumQty >= targetQty) return 'Completed';
-      if (sumQty > 0) return 'Under Process';
+      if (sumQty > 0) return 'In Progress';
     }
-
-    return 'Not Started';
-  };
-
-  const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-
-  const renderStatusIcon = (status: string) => {
-    if (status === 'N/A') return <CircleIcon sx={{ fontSize: 16, color: '#e0e0e0' }} />;
-    if (status === 'Completed') return <CheckCircleIcon sx={{ fontSize: 18, color: '#4caf50' }} />;
-    if (status === 'Under Process') return <CircleIcon sx={{ fontSize: 16, color: '#ffb300' }} />;
-    return <CircleIcon sx={{ fontSize: 16, color: '#d1c4e9' }} />;
+    return 'Pending';
   };
 
   return (
@@ -131,88 +166,28 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
       <TableCell sx={{ color: '#666' }}>
         <Typography variant="body2">{dimensionStr}</Typography>
       </TableCell>
-      {STAGES.map(stage => {
-        const status = getStageStatus(stage);
-        const icon = renderStatusIcon(status);
-        const isNA = status === 'N/A';
-        const isPending = slab.status === 'pending';
-        
-        return (
-          <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
-            {stage === 'Polishing' ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {isPending ? (
-                  <>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Checkbox size="small" checked={requiredStages.includes('Polishing - Honed')} onChange={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
-                      <Typography variant="caption">Honed</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Checkbox size="small" checked={requiredStages.includes('Polishing - Mirror')} onChange={(e) => handleToggleStage('Polishing - Mirror', e)} sx={{ p: 0 }} />
-                      <Typography variant="caption">Mirror</Typography>
-                    </Box>
-                  </>
-                ) : (
-                  !isNA && (
-                    <Box 
-                      onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
-                    >
-                      {icon}
-                      <Typography variant="body2" sx={{ color: '#444' }}>{status}</Typography>
-                    </Box>
-                  )
-                )}
-                {!isPending && isNA && (
-                   <Typography variant="body2" sx={{ color: '#999' }}>N/A</Typography>
-                )}
-              </Box>
-            ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {isPending ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Checkbox size="small" checked={requiredStages.includes(stage)} onChange={(e) => handleToggleStage(stage, e)} sx={{ p: 0 }} />
-                    <Typography variant="caption">{stage}</Typography>
-                  </Box>
-                ) : (
-                  !isNA && (
-                    <Box 
-                      onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
-                    >
-                      {icon}
-                      <Typography variant="body2" sx={{ color: '#444' }}>{status}</Typography>
-                    </Box>
-                  )
-                )}
-                {!isPending && isNA && (
-                   <Typography variant="body2" sx={{ color: '#999' }}>N/A</Typography>
-                )}
-              </Box>
-            )}
-          </TableCell>
-        );
-      })}
-      <TableCell align="center" sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
-        {slab.status === 'pending' ? (
-          <Button variant="contained" size="small" color="success" onClick={async (e) => {
-            e.stopPropagation();
-            await updateSlab({ id: slab.id, data: { status: 'active' } });
-          }}>
-            Start Work
-          </Button>
-        ) : (
-          <Button variant="outlined" size="small" onClick={async (e) => {
-            e.stopPropagation();
-            await updateSlab({ id: slab.id, data: { status: 'pending' } });
-          }}>
-            Edit Stages
-          </Button>
-        )}
-        <Box>
-          <IconButton color="primary" size="small" onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
-          <IconButton color="error" size="small" onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}><DeleteIcon fontSize="small" /></IconButton>
-        </Box>
+      <TableCell sx={{ py: 3 }}>
+        <Stepper alternativeLabel>
+          {requiredStages.map((stage: string) => {
+            const status = getStageStatus(stage);
+            const isCompleted = status === 'Completed';
+            const isActive = status === 'In Progress';
+            return (
+              <Step key={stage} active={isActive} completed={isCompleted}>
+                <StepLabel 
+                  StepIconProps={{ sx: { color: isCompleted ? 'success.main' : isActive ? 'warning.main' : 'grey.300', cursor: 'pointer' } }}
+                  onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.split(' ')[0].toLowerCase()}`)}
+                  sx={{ cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
+                >
+                  {stage}
+                </StepLabel>
+              </Step>
+            );
+          })}
+        </Stepper>
+      </TableCell>
+      <TableCell align="center">
+        <IconButton color="primary" size="small" onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
       </TableCell>
     </TableRow>
   );
@@ -271,11 +246,13 @@ const ProjectDetails: React.FC = () => {
   const [slabDialogOpen, setSlabDialogOpen] = useState(false);
   const [editSlabDialogOpen, setEditSlabDialogOpen] = useState(false);
   const [editingSlabId, setEditingSlabId] = useState<string | null>(null);
-  const [slabForm, setSlabForm] = useState({ name: '', size: '', cost: 0, inventoryId: '' });
+  const [slabForm, setSlabForm] = useState({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
   const [materialSource, setMaterialSource] = useState('unnati');
   const [clientSlabs, setClientSlabs] = useState([{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
   const [clientMaterialUnit, setClientMaterialUnit] = useState<'inch' | 'feet'>('inch');
   const [isReservingClientMaterial, setIsReservingClientMaterial] = useState(false);
+
+  const isPlanningMode = projectSlabs?.some((s: any) => s.status === 'pending') || !projectSlabs || projectSlabs.length === 0;
 
   const handleStartAllWork = async () => {
     try {
@@ -297,9 +274,9 @@ const ProjectDetails: React.FC = () => {
 
   const handleCreateSlab = async () => {
     try {
-      await createSlab({ projectId: id, ...slabForm, status: 'pending', requiredStages: [] }).unwrap();
+      await createSlab({ projectId: id, ...slabForm, status: 'pending' }).unwrap();
       setSlabDialogOpen(false);
-      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '' });
+      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
       refetchSlabs();
       setSnackbarMessage('Slab added successfully!');
     } catch (error) {
@@ -310,7 +287,13 @@ const ProjectDetails: React.FC = () => {
 
   const handleEditSlabClick = (slab: any) => {
     setEditingSlabId(slab.id);
-    setSlabForm({ name: slab.name, size: slab.size || '', cost: slab.cost || 0, inventoryId: slab.inventoryId || '' });
+    setSlabForm({ 
+      name: slab.name, 
+      size: slab.size || '', 
+      cost: slab.cost || 0, 
+      inventoryId: slab.inventoryId || '',
+      requiredStages: slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch']
+    });
     setEditSlabDialogOpen(true);
   };
 
@@ -318,7 +301,7 @@ const ProjectDetails: React.FC = () => {
     try {
       await updateSlab({ id: editingSlabId as string, data: slabForm }).unwrap();
       setEditSlabDialogOpen(false);
-      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '' });
+      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
       setEditingSlabId(null);
       refetchSlabs();
       setSnackbarMessage('Slab updated successfully!');
@@ -1851,27 +1834,40 @@ const ProjectDetails: React.FC = () => {
                       <Button variant="contained" onClick={() => setSlabDialogOpen(true)}>
                         + Add Custom Slab
                       </Button>
-                      <Button variant="contained" color="success" onClick={handleStartAllWork}>
-                        Start All Work
-                      </Button>
+                      {isPlanningMode && (
+                        <Button variant="contained" color="success" onClick={handleStartAllWork}>
+                          Finalize & Send to Production
+                        </Button>
+                      )}
                     </Box>
                   </Box>
                   <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4, overflow: 'hidden' }}>
                     <Table>
                       <TableHead sx={{ bgcolor: '#FDFBF7' }}>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Product Name</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Size</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Dispatch</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }} align="center">Action</TableCell>
-                        </TableRow>
+                        {isPlanningMode ? (
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Product Name</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Size</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Dispatch</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }} align="center">Action</TableCell>
+                          </TableRow>
+                        ) : (
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '20%' }}>Product Name</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '15%' }}>Size</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '55%', textAlign: 'center' }}>Progress Tracking</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '10%' }} align="center">Action</TableCell>
+                          </TableRow>
+                        )}
                       </TableHead>
                       <TableBody>
                         {projectSlabs?.map((slab: any, idx: number) => (
-                          <SlabRowGroup key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} />
+                          isPlanningMode 
+                            ? <SlabPlanningRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} />
+                            : <SlabTrackingRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} productionLogs={productionLogs || []} />
                         ))}
                         {(!projectSlabs || projectSlabs.length === 0) && (
                            <TableRow><TableCell colSpan={9} align="center" sx={{ py: 5, color: 'text.secondary' }}>No slabs created yet.</TableCell></TableRow>
@@ -2756,6 +2752,30 @@ const ProjectDetails: React.FC = () => {
             )}
           </TextField>
           <TextField label="Grid Layout / Size (e.g. 5x2)" value={slabForm.size} onChange={(e) => setSlabForm({ ...slabForm, size: e.target.value })} fullWidth />
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>Required Production Stages:</Typography>
+            <Grid container spacing={1}>
+              {['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(stage => (
+                <Grid item xs={6} sm={4} key={stage}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox 
+                        size="small"
+                        checked={slabForm.requiredStages?.includes(stage) || false} 
+                        onChange={(e) => {
+                          const newStages = e.target.checked 
+                            ? [...(slabForm.requiredStages || []), stage]
+                            : (slabForm.requiredStages || []).filter(s => s !== stage);
+                          setSlabForm({ ...slabForm, requiredStages: newStages });
+                        }} 
+                      />
+                    }
+                    label={<Typography variant="body2">{stage}</Typography>}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setEditSlabDialogOpen(false)} color="inherit">Cancel</Button>
