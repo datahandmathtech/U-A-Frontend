@@ -1758,7 +1758,7 @@ const ProjectDetails: React.FC = () => {
                               if (!res.ok) throw new Error('Failed to create inventory item');
                               const newItem = await res.json();
                               
-                              await reserveMaterial({ projectId: id as string, inventoryId: newItem.id, quantity: qty, cost: 0 }).unwrap();
+                              await reserveMaterial({ projectId: id as string, data: { inventoryId: newItem.id, quantity: qty, cost: 0 } }).unwrap();
                             }
                             setSnackbarMessage('Client materials reserved successfully!');
                             setClientSlabs([{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
