@@ -32,6 +32,7 @@ const menuItems = [
   { text: 'Log Book', icon: <MenuBookIcon />, path: '/log-book' },
   { text: 'Enquiries Pipeline', icon: <FilterAltIcon />, path: '/crm' },
   { text: 'Active Work Orders', icon: <WorkIcon />, path: '/projects' },
+  { text: 'Machine Master', icon: <PrecisionManufacturingIcon />, path: '/machines' },
   { text: 'Approvals', icon: <PendingActionsIcon />, path: '/approvals' },
   { text: 'In/Out Ledger', icon: <FolderSpecialIcon />, path: '/in-out-ledger' },
   { text: 'HR & Payroll', icon: <GroupsIcon />, path: '/hr' },
