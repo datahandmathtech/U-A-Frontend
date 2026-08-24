@@ -1,6 +1,23 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Helper to convert image URL to base64
+const getBase64ImageFromUrl = async (imageUrl) => {
+  try {
+    const res = await fetch(imageUrl);
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.error('Error fetching image:', err);
+    return null;
+  }
+};
+
 export const generateReceiptPDF = (project: any, advanceAmount: number) => {
   const doc = new jsPDF();
   
@@ -20,21 +37,21 @@ export const generateReceiptPDF = (project: any, advanceAmount: number) => {
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
   doc.text("ADVANCE PAYMENT RECEIPT", 105, 45, { align: "center" });
-
+  
   // Details
   doc.setFontSize(12);
-  doc.text(`Receipt Date: ${new Date().toLocaleDateString('en-GB')}`, 20, 60);
-  doc.text(`Project ID: ${project.projectId}`, 140, 60);
+  doc.text(\Receipt Date: \\, 20, 60);
+  doc.text(\Project ID: \\, 140, 60);
   
-  doc.text(`Received From: ${project.clientName || 'N/A'}`, 20, 70);
-  doc.text(`Contact: ${project.clientContact || 'N/A'}`, 20, 80);
+  doc.text(\Received From: \\, 20, 70);
+  doc.text(\Contact: \\, 20, 80);
 
   // Table
   autoTable(doc, {
     startY: 95,
     head: [['Description', 'Amount']],
     body: [
-      [`Advance payment for Project: ${project.name}`, `Rs. ${advanceAmount.toLocaleString('en-IN')}`]
+      [\Advance payment for Project: \\, \Rs. \\]
     ],
     theme: 'grid',
     headStyles: { fillColor: [26, 28, 41] }, // Dark header
@@ -52,7 +69,7 @@ export const generateReceiptPDF = (project: any, advanceAmount: number) => {
   doc.text("This is an auto-generated receipt.", 105, 280, { align: "center" });
 
   // Download
-  doc.save(`Receipt_${project.projectId}.pdf`);
+  doc.save(\Receipt_\.pdf\);
 };
 
 export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
@@ -67,12 +84,12 @@ export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
 
   doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
-  doc.text(`Date Issued: ${new Date().toLocaleDateString('en-GB')}`, 20, 45);
-  doc.text(`Work Order Ref: WO-${project.projectId.replace('PRJ-', '')}`, 140, 45);
+  doc.text(\Date Issued: \\, 20, 45);
+  doc.text(\Work Order Ref: WO-\\, 140, 45);
 
-  doc.text(`Client Name: ${project.clientName || 'N/A'}`, 20, 60);
-  doc.text(`Project Name: ${project.name}`, 20, 70);
-  doc.text(`Advance Received: Rs. ${advanceAmount.toLocaleString('en-IN')}`, 20, 80);
+  doc.text(\Client Name: \\, 20, 60);
+  doc.text(\Project Name: \\, 20, 70);
+  doc.text(\Advance Received: Rs. \\, 20, 80);
 
   autoTable(doc, {
     startY: 95,
@@ -90,10 +107,10 @@ export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
   doc.text("Production Manager", 140, (doc as any).lastAutoTable.finalY + 40);
   doc.line(140, (doc as any).lastAutoTable.finalY + 42, 185, (doc as any).lastAutoTable.finalY + 42);
 
-  doc.save(`WorkOrder_${project.projectId}.pdf`);
+  doc.save(\WorkOrder_\.pdf\);
 };
 
-export const generateQuotationPDF = (project: any, products: any[], quoteDetails: any, globalCosts?: any, terms?: string[]) => {
+export const generateQuotationPDF = async (project: any, products: any[], quoteDetails: any, globalCosts?: any, terms?: string[], gstPercent: number = 0) => {
   const doc = new jsPDF();
   
   // Header
@@ -115,166 +132,167 @@ export const generateQuotationPDF = (project: any, products: any[], quoteDetails
 
   // Details
   doc.setFontSize(11);
-  doc.text(`Quotation Date: ${new Date().toLocaleDateString('en-GB')}`, 20, 60);
-  doc.text(`Project ID: ${project.projectId}`, 140, 60);
+  doc.text(\Quotation Date: \\, 20, 60);
+  doc.text(\Project ID: \\, 140, 60);
   
-  doc.text(`Client Name: ${project.clientName || 'N/A'}`, 20, 70);
-  doc.text(`Project Name: ${project.name}`, 140, 70);
-  doc.text(`Contact: ${project.clientContact || 'N/A'}`, 20, 80);
+  doc.text(\Client Name: \\, 20, 70);
+  doc.text(\Project Name: \\, 140, 70);
+  doc.text(\Contact: \\, 20, 80);
 
   // Products Table
   const tableBody = products.map(p => {
     const dimensionsStr = p.unit !== 'Pieces' 
-      ? `${p.length || 0} x ${p.width || 0} x ${p.breadth || 0}`
+      ? \\ x \\
       : '-';
+    const mm = p.unit !== 'Pieces' ? \\\ : '-';
+    const sqFt = p.unit === 'Sq. Ft' ? \\\ : '-';
+
     return [
       p.category || 'N/A',
       p.unit || 'N/A',
       dimensionsStr,
+      mm,
+      sqFt,
       p.qty || 0,
-      `Rs. ${(p.rate || 0).toLocaleString('en-IN')}`,
-      `Rs. ${(p.amount || 0).toLocaleString('en-IN')}`
+      \Rs. \\,
+      \Rs. \\
     ];
   });
 
   autoTable(doc, {
     startY: 90,
-    head: [['Category', 'Unit', 'Dimensions (L x W x B)', 'Qty', 'Rate', 'Amount']],
+    head: [['Category', 'Unit', 'Dimensions (L x W)', 'MM', 'Sq. Ft', 'Qty', 'Rate', 'Amount']],
     body: tableBody,
     theme: 'grid',
     headStyles: { fillColor: [26, 28, 41] }, // Dark header
     styles: { fontSize: 10, cellPadding: 3 }
   });
 
-  // Calculate totals
-  const productsTotal = products.reduce((acc, p) => acc + (p.amount || 0), 0);
-  
-  // Additional Costs
-  const additionalItems: [string, string][] = [];
-  let additionalTotal = 0;
-
-  if (Array.isArray(quoteDetails)) {
-    quoteDetails.forEach((item: any) => {
-      if (item.amount) {
-        additionalItems.push([item.name || 'N/A', `Rs. ${Number(item.amount).toLocaleString('en-IN')}`]);
-      }
-    });
-    additionalTotal = quoteDetails.reduce((acc, item) => acc + Number(item.amount || 0), 0);
-  } else if (quoteDetails && typeof quoteDetails === 'object' && quoteDetails.materialCost === undefined) {
-    // New per-category Record format
-    Object.keys(quoteDetails).forEach(productId => {
-       const product = products.find(p => p.id === productId);
-       const categoryName = product ? product.category : 'Unknown Category';
-       const costs = quoteDetails[productId];
-       if (Array.isArray(costs)) {
-          let hasCosts = false;
-          costs.forEach((item: any) => {
-             if (item.amount) {
-                if (!hasCosts) {
-                   additionalItems.push([`[ ${categoryName} ]`, '']);
-                   hasCosts = true;
-                }
-                additionalItems.push([`  - ${item.name || 'N/A'}`, `Rs. ${Number(item.amount).toLocaleString('en-IN')}`]);
-                additionalTotal += Number(item.amount);
-             }
-          });
-       }
-    });
-  } else if (quoteDetails) {
-    if (quoteDetails.materialCost) additionalItems.push(['Material Cost', `Rs. ${quoteDetails.materialCost.toLocaleString('en-IN')}`]);
-    if (quoteDetails.cncCost) additionalItems.push(['CNC Cutting Cost', `Rs. ${quoteDetails.cncCost.toLocaleString('en-IN')}`]);
-    if (quoteDetails.handCarvingCost) additionalItems.push(['Hand Carving Cost', `Rs. ${quoteDetails.handCarvingCost.toLocaleString('en-IN')}`]);
-    if (quoteDetails.inlayCost) additionalItems.push(['Inlay Cost', `Rs. ${quoteDetails.inlayCost.toLocaleString('en-IN')}`]);
-    if (quoteDetails.polishingCost) additionalItems.push(['Polishing Cost', `Rs. ${quoteDetails.polishingCost.toLocaleString('en-IN')}`]);
-    if (quoteDetails.packingCost) additionalItems.push(['Packing Cost', `Rs. ${quoteDetails.packingCost.toLocaleString('en-IN')}`]);
-    if (quoteDetails.transportCost) additionalItems.push(['Transport Cost', `Rs. ${quoteDetails.transportCost.toLocaleString('en-IN')}`]);
-    if (quoteDetails.installationCost) additionalItems.push(['Installation Cost', `Rs. ${quoteDetails.installationCost.toLocaleString('en-IN')}`]);
-
-    additionalTotal = (quoteDetails.materialCost || 0) + 
-      (quoteDetails.cncCost || 0) + 
-      (quoteDetails.handCarvingCost || 0) + 
-      (quoteDetails.inlayCost || 0) + 
-      (quoteDetails.polishingCost || 0) + 
-      (quoteDetails.packingCost || 0) + 
-      (quoteDetails.transportCost || 0) + 
-      (quoteDetails.installationCost || 0);
-  }
-
-  const grandTotal = productsTotal + additionalTotal;
-
   let currentY = (doc as any).lastAutoTable.finalY + 10;
 
-  // Render Additional Costs table if they exist
-  if (additionalItems.length > 0) {
-    doc.setFontSize(12);
-    doc.text("Additional Costs Breakdown:", 20, currentY);
-    
-    autoTable(doc, {
-      startY: currentY + 4,
-      head: [['Cost Component', 'Amount']],
-      body: additionalItems,
-      theme: 'grid',
-      headStyles: { fillColor: [179, 139, 54] },
-      styles: { fontSize: 10, cellPadding: 3 }
-    });
-    
-    currentY = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // Grand Total Summary Box
-  doc.setFillColor(247, 243, 235); // Light Gold/Cream background
-  doc.rect(20, currentY, 170, 40, 'F');
-  
-  doc.setFontSize(11);
-  doc.setTextColor(50, 50, 50);
-  doc.text(`Total Products Amount: Rs. ${productsTotal.toLocaleString('en-IN')}`, 25, currentY + 10);
-  doc.text(`Total Additional Costs: Rs. ${additionalTotal.toLocaleString('en-IN')}`, 25, currentY + 18);
-  
+  // Calculate totals
+  const productsTotal = products.reduce((acc, p) => acc + (p.amount || 0), 0);
   let globalCostTotal = 0;
   if (globalCosts?.packageCostEnabled) globalCostTotal += Number(globalCosts.packageCost || 0);
   if (globalCosts?.transportCostEnabled) globalCostTotal += Number(globalCosts.transportCost || 0);
   
-  if (globalCostTotal > 0) {
-    doc.text(`Global Costs (Package/Transport): Rs. ${globalCostTotal.toLocaleString('en-IN')}`, 25, currentY + 26);
+  const subTotal = productsTotal + globalCostTotal;
+  const gstAmount = (subTotal * gstPercent) / 100;
+  const finalGrandTotal = subTotal + gstAmount;
+
+  // Grand Total Summary Box
+  doc.setFillColor(247, 243, 235); // Light Gold/Cream background
+  doc.rect(20, currentY, 170, 50, 'F');
+  
+  doc.setFontSize(11);
+  doc.setTextColor(50, 50, 50);
+  doc.text(\Total Products Amount: Rs. \\, 25, currentY + 10);
+  
+  let boxYOffset = 18;
+  if (globalCosts?.transportCostEnabled && globalCosts?.transportCost > 0) {
+    doc.text(\Installation Cost: Rs. \\, 25, currentY + boxYOffset);
+    boxYOffset += 8;
+  }
+  if (globalCosts?.packageCostEnabled && globalCosts?.packageCost > 0) {
+    doc.text(\Packing Charges: Rs. \\, 25, currentY + boxYOffset);
+    boxYOffset += 8;
   }
   
-  const finalGrandTotal = grandTotal + globalCostTotal;
-
-  doc.setFontSize(13);
-  doc.setTextColor(179, 139, 54); // Gold
-  doc.setFont("helvetica", "bold");
-  doc.text(`Estimated Grand Total: Rs. ${finalGrandTotal.toLocaleString('en-IN')}`, 25, currentY + (globalCostTotal > 0 ? 36 : 28));
-  doc.setFont("helvetica", "normal");
+  doc.text(\GST (\%): Rs. \\, 25, currentY + boxYOffset);
+  boxYOffset += 8;
   
-  currentY += 50;
+  doc.setFontSize(12);
+  doc.setTextColor(179, 139, 54);
+  doc.setFont(undefined, 'bold');
+  doc.text(\Estimated Grand Total: Rs. \\, 25, currentY + boxYOffset);
+  doc.setFont(undefined, 'normal');
 
+  currentY += 60;
+
+  // Render Product Photos
+  const photosWithCategories = products
+    .filter(p => p.photo)
+    .map(p => ({ category: p.category, photos: p.photo.split(',').filter(Boolean) }))
+    .filter(p => p.photos.length > 0);
+
+  if (photosWithCategories.length > 0) {
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Product Reference Designs", 20, currentY);
+    currentY += 10;
+
+    for (const item of photosWithCategories) {
+      if (currentY > 250) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.setFontSize(12);
+      doc.text(item.category || 'Product', 20, currentY);
+      currentY += 5;
+
+      let startX = 20;
+      for (const photoUrl of item.photos) {
+        if (startX > 150) {
+          startX = 20;
+          currentY += 45;
+        }
+        if (currentY > 250) {
+          doc.addPage();
+          currentY = 20;
+          startX = 20;
+        }
+
+        const base64Img = await getBase64ImageFromUrl(photoUrl);
+        if (base64Img) {
+          try {
+            doc.addImage(base64Img as string, 'JPEG', startX, currentY, 40, 40);
+          } catch(e) {}
+        }
+        startX += 45;
+      }
+      currentY += 50;
+    }
+  }
+
+  // Terms and Conditions
   if (terms && terms.length > 0) {
+    if (currentY > 250) {
+      doc.addPage();
+      currentY = 20;
+    }
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
-    doc.text("Terms and Conditions:", 20, currentY);
-    currentY += 8;
+    doc.text("Terms and Conditions", 20, currentY);
+    currentY += 10;
+    
     doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
+    doc.setTextColor(80, 80, 80);
     terms.forEach((term, index) => {
-      // Split text if it's too long
-      const lines = doc.splitTextToSize(`${index + 1}. ${term}`, 170);
-      doc.text(lines, 20, currentY);
-      currentY += (lines.length * 5);
+      const splitTerm = doc.splitTextToSize(\\. \\, 170);
+      if (currentY + (splitTerm.length * 5) > 280) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.text(splitTerm, 20, currentY);
+      currentY += splitTerm.length * 5 + 2;
     });
-    currentY += 5;
   }
-  
-  // Footer signature
-  doc.setFontSize(11);
-  doc.setTextColor(0, 0, 0);
-  doc.text("Authorized Signature", 140, currentY + 20);
-  doc.line(140, currentY + 22, 185, currentY + 22);
-  
-  doc.setFontSize(9);
-  doc.setTextColor(150, 150, 150);
-  // Place it near the bottom of the page
-  const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
-  doc.text("This is a computer generated quote.", 105, pageHeight - 10, { align: "center" });
 
-  doc.save(`Quotation_${project.projectId}.pdf`);
+  // Footer Signature
+  if (currentY > 250) {
+    doc.addPage();
+    currentY = 20;
+  }
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.text("Authorized Signature", 140, currentY + 30);
+  doc.setLineWidth(0.5);
+  doc.line(140, currentY + 32, 185, currentY + 32);
+
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text("This is a computer generated quote.", 105, 290, { align: "center" });
+
+  // Download
+  doc.save(\Quotation_\.pdf\);
 };

@@ -165,7 +165,7 @@ const CRM: React.FC = () => {
   // Status mapping
   const stageNames: Record<string, string> = {
     'enquiry': 'Enquiry',
-    'design_sharing': 'Enquiry Details', // When on step 2, show step 1 as current
+    'design_sharing': 'Reference Image', // When on step 2, show step 1 as current
     'quotation': 'Quotation Sharing', // When on step 3, show step 2
     'advance_payment': 'Quotation & Costing' // When on step 4, show step 3
   };
@@ -276,7 +276,7 @@ const CRM: React.FC = () => {
         >
           <MenuItem value="All">All Stages</MenuItem>
           <MenuItem value="enquiry">Enquiry</MenuItem>
-          <MenuItem value="design_sharing">Enquiry Details</MenuItem>
+          <MenuItem value="design_sharing">Reference Image</MenuItem>
           <MenuItem value="quotation">Quotation Sharing</MenuItem>
           <MenuItem value="advance_payment">Quotation & Costing</MenuItem>
         </Select>
@@ -376,10 +376,10 @@ const CRM: React.FC = () => {
                         <VisibilityIcon fontSize="small" />
                       </IconButton>
                     )}
-                    <IconButton color="primary" onClick={() => handleOpenEdit(enq)} size="small" sx={{ mr: 1 }}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton color="error" onClick={() => handleDelete(enq.id)} size="small">
+                    <IconButton color="error" onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(enq.id);
+                    }} size="small">
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </TableCell>

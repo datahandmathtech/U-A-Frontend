@@ -1108,7 +1108,7 @@ const ProjectDetails: React.FC = () => {
               <Paper elevation={0} sx={{ p: 5, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
                   <Typography variant="h5" fontWeight="bold" color="text.primary">Quotation & Costing Builder</Typography>
-                  <Button variant="contained" color="secondary" size="large" onClick={() => generateQuotationPDF(project, products, quoteDetails, { packageCostEnabled, transportCostEnabled, packageCost, transportCost }, selectedTerms)}>
+                  <Button variant="contained" color="secondary" size="large" onClick={() => generateQuotationPDF(project, products, quoteDetails, { packageCostEnabled, transportCostEnabled, packageCost, transportCost }, selectedTerms, gstPercent)}>
                     Download PDF
                   </Button>
                 </Box>
@@ -1254,7 +1254,7 @@ const ProjectDetails: React.FC = () => {
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <Checkbox size="small" checked={packageCostEnabled} onChange={(e) => setPackageCostEnabled(e.target.checked)} sx={{ p: 0 }} />
-                                <Typography variant="body2" color="text.secondary">Package Cost</Typography>
+                                <Typography variant="body2" color="text.secondary">Packing Charges</Typography>
                               </Box>
                               {packageCostEnabled ? (
                                 <TextField size="small" type="number" value={packageCost === 0 ? '' : packageCost} onChange={(e) => setPackageCost(Number(e.target.value))} sx={{ width: 100 }} placeholder="₹0" variant="standard" />
@@ -1264,7 +1264,7 @@ const ProjectDetails: React.FC = () => {
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <Checkbox size="small" checked={transportCostEnabled} onChange={(e) => setTransportCostEnabled(e.target.checked)} sx={{ p: 0 }} />
-                                <Typography variant="body2" color="text.secondary">Transport Cost</Typography>
+                                <Typography variant="body2" color="text.secondary">Installation Cost</Typography>
                               </Box>
                               {transportCostEnabled ? (
                                 <TextField size="small" type="number" value={transportCost === 0 ? '' : transportCost} onChange={(e) => setTransportCost(Number(e.target.value))} sx={{ width: 100 }} placeholder="₹0" variant="standard" />
