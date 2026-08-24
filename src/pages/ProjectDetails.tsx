@@ -272,6 +272,7 @@ const ProjectDetails: React.FC = () => {
   const [slabForm, setSlabForm] = useState({ name: '', size: '', cost: 0, inventoryId: '' });
   const [materialSource, setMaterialSource] = useState('unnati');
   const [clientSlabs, setClientSlabs] = useState([{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
+  const [clientMaterialUnit, setClientMaterialUnit] = useState<'inch' | 'feet'>('inch');
   const [isReservingClientMaterial, setIsReservingClientMaterial] = useState(false);
 
   const handleCreateSlab = async () => {
@@ -1685,36 +1686,49 @@ const ProjectDetails: React.FC = () => {
 
                   {materialSource === 'client' && (
                     <Box>
+                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="body2" fontWeight="bold">Measurement Unit:</Typography>
+                        <RadioGroup row value={clientMaterialUnit} onChange={(e) => setClientMaterialUnit(e.target.value as 'inch' | 'feet')}>
+                          <FormControlLabel value="inch" control={<Radio size="small" />} label="Inches" />
+                          <FormControlLabel value="feet" control={<Radio size="small" />} label="Square Feet" />
+                        </RadioGroup>
+                      </Box>
                       <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
                         <Table size="small">
                           <TableHead>
                             <TableRow>
                               <TableCell>Material Name</TableCell>
                               <TableCell>Block No</TableCell>
-                              <TableCell>Length</TableCell>
-                              <TableCell>Width</TableCell>
+                              <TableCell>Length ({clientMaterialUnit === 'inch' ? 'in' : 'ft'})</TableCell>
+                              <TableCell>Width ({clientMaterialUnit === 'inch' ? 'in' : 'ft'})</TableCell>
                               <TableCell>Thickness MM</TableCell>
                               <TableCell>Total Sq.Ft</TableCell>
                               <TableCell></TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
-                            {clientSlabs.map((row, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell><TextField size="small" value={row.materialName} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].materialName = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell><TextField size="small" value={row.blockNo} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].blockNo = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell><TextField size="small" type="number" value={row.length} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].length = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell><TextField size="small" type="number" value={row.width} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].width = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell><TextField size="small" type="number" value={row.thickness} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].thickness = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell>{(Number(row.length || 0) * Number(row.width || 0)).toFixed(2)}</TableCell>
-                                <TableCell>
-                                  <IconButton color="error" size="small" onClick={() => {
-                                    const newSlabs = clientSlabs.filter((_, i) => i !== idx);
-                                    setClientSlabs(newSlabs.length ? newSlabs : [{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
-                                  }}><DeleteIcon fontSize="small" /></IconButton>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {clientSlabs.map((row, idx) => {
+                              const len = Number(row.length || 0);
+                              const wid = Number(row.width || 0);
+                              const sqFt = clientMaterialUnit === 'inch' ? (len * wid) / 144 : (len * wid);
+                              
+                              return (
+                                <TableRow key={idx}>
+                                  <TableCell><TextField size="small" value={row.materialName} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].materialName = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                  <TableCell><TextField size="small" value={row.blockNo} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].blockNo = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                  <TableCell><TextField size="small" type="number" value={row.length} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].length = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                  <TableCell><TextField size="small" type="number" value={row.width} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].width = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                  <TableCell><TextField size="small" type="number" value={row.thickness} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].thickness = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                  <TableCell>{sqFt.toFixed(2)}</TableCell>
+                                  <TableCell>
+                                    <IconButton color="error" size="small" onClick={() => {
+                                      const newSlabs = clientSlabs.filter((_, i) => i !== idx);
+                                      setClientSlabs(newSlabs.length ? newSlabs : [{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
+                                    }}><DeleteIcon fontSize="small" /></IconButton>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </TableContainer>
@@ -1728,14 +1742,16 @@ const ProjectDetails: React.FC = () => {
                             const token = localStorage.getItem('token');
                             for (const row of clientSlabs) {
                               if (!row.materialName || !row.length || !row.width) continue;
-                              const qty = Number(row.length) * Number(row.width);
+                              const len = Number(row.length || 0);
+                              const wid = Number(row.width || 0);
+                              const qty = clientMaterialUnit === 'inch' ? (len * wid) / 144 : (len * wid);
                               
                               const res = await fetch('/api/inventory', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                                 body: JSON.stringify({
                                   type: 'slab', jobWorkType: 'client', itemName: row.materialName, blockNumber: row.blockNo, 
-                                  length: Number(row.length), width: Number(row.width), thickness: Number(row.thickness),
+                                  length: len, width: wid, thickness: Number(row.thickness),
                                   quantity: qty, unit: 'sq_ft', supplier: project?.clientName
                                 })
                               });
