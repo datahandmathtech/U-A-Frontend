@@ -24,11 +24,11 @@ export const generateReceiptPDF = (project: any, advanceAmount: number) => {
   // Header
   doc.setFontSize(22);
   doc.setTextColor(179, 139, 54); // #B38B36 (Gold)
-  doc.text("UNNATI ARTS", 105, 20, { align: "center" });
+  doc.text('UNNATI ARTS', 105, 20, { align: 'center' });
   
   doc.setFontSize(10);
   doc.setTextColor(100, 100, 100);
-  doc.text("Fine Stone Craftsmanship", 105, 26, { align: "center" });
+  doc.text('Fine Stone Craftsmanship', 105, 26, { align: 'center' });
   
   doc.setLineWidth(0.5);
   doc.line(20, 30, 190, 30);
@@ -36,22 +36,22 @@ export const generateReceiptPDF = (project: any, advanceAmount: number) => {
   // Title
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
-  doc.text("ADVANCE PAYMENT RECEIPT", 105, 45, { align: "center" });
+  doc.text('ADVANCE PAYMENT RECEIPT', 105, 45, { align: 'center' });
   
   // Details
   doc.setFontSize(12);
-  doc.text(\Receipt Date: \\, 20, 60);
-  doc.text(\Project ID: \\, 140, 60);
+  doc.text('Receipt Date: ' + new Date().toLocaleDateString('en-GB'), 20, 60);
+  doc.text('Project ID: ' + project.projectId, 140, 60);
   
-  doc.text(\Received From: \\, 20, 70);
-  doc.text(\Contact: \\, 20, 80);
+  doc.text('Received From: ' + (project.clientName || 'N/A'), 20, 70);
+  doc.text('Contact: ' + (project.clientContact || 'N/A'), 20, 80);
 
   // Table
   autoTable(doc, {
     startY: 95,
     head: [['Description', 'Amount']],
     body: [
-      [\Advance payment for Project: \\, \Rs. \\]
+      ['Advance payment for Project: ' + project.name, 'Rs. ' + advanceAmount.toLocaleString('en-IN')]
     ],
     theme: 'grid',
     headStyles: { fillColor: [26, 28, 41] }, // Dark header
@@ -60,16 +60,16 @@ export const generateReceiptPDF = (project: any, advanceAmount: number) => {
 
   // Footer
   const finalY = (doc as any).lastAutoTable.finalY + 30;
-  doc.text("Authorized Signatory", 140, finalY);
+  doc.text('Authorized Signatory', 140, finalY);
   doc.setLineWidth(0.5);
   doc.line(140, finalY + 2, 185, finalY + 2);
   
   doc.setFontSize(10);
   doc.setTextColor(150, 150, 150);
-  doc.text("This is an auto-generated receipt.", 105, 280, { align: "center" });
+  doc.text('This is an auto-generated receipt.', 105, 280, { align: 'center' });
 
   // Download
-  doc.save(\Receipt_\.pdf\);
+  doc.save('Receipt_' + project.projectId + '.pdf');
 };
 
 export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
@@ -77,19 +77,19 @@ export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
   
   doc.setFontSize(22);
   doc.setTextColor(179, 139, 54);
-  doc.text("UNNATI ARTS - WORK ORDER", 105, 20, { align: "center" });
+  doc.text('UNNATI ARTS - WORK ORDER', 105, 20, { align: 'center' });
   
   doc.setLineWidth(0.5);
   doc.line(20, 30, 190, 30);
 
   doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
-  doc.text(\Date Issued: \\, 20, 45);
-  doc.text(\Work Order Ref: WO-\\, 140, 45);
+  doc.text('Date Issued: ' + new Date().toLocaleDateString('en-GB'), 20, 45);
+  doc.text('Work Order Ref: WO-' + project.projectId.replace('PRJ-', ''), 140, 45);
 
-  doc.text(\Client Name: \\, 20, 60);
-  doc.text(\Project Name: \\, 20, 70);
-  doc.text(\Advance Received: Rs. \\, 20, 80);
+  doc.text('Client Name: ' + (project.clientName || 'N/A'), 20, 60);
+  doc.text('Project Name: ' + project.name, 20, 70);
+  doc.text('Advance Received: Rs. ' + advanceAmount.toLocaleString('en-IN'), 20, 80);
 
   autoTable(doc, {
     startY: 95,
@@ -104,10 +104,10 @@ export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
     headStyles: { fillColor: [179, 139, 54] },
   });
 
-  doc.text("Production Manager", 140, (doc as any).lastAutoTable.finalY + 40);
+  doc.text('Production Manager', 140, (doc as any).lastAutoTable.finalY + 40);
   doc.line(140, (doc as any).lastAutoTable.finalY + 42, 185, (doc as any).lastAutoTable.finalY + 42);
 
-  doc.save(\WorkOrder_\.pdf\);
+  doc.save('WorkOrder_' + project.projectId + '.pdf');
 };
 
 export const generateQuotationPDF = async (project: any, products: any[], quoteDetails: any, globalCosts?: any, terms?: string[], gstPercent: number = 0) => {
@@ -116,11 +116,11 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   // Header
   doc.setFontSize(22);
   doc.setTextColor(179, 139, 54); // Gold #B38B36
-  doc.text("UNNATI ARTS", 105, 20, { align: "center" });
+  doc.text('UNNATI ARTS', 105, 20, { align: 'center' });
   
   doc.setFontSize(10);
   doc.setTextColor(100, 100, 100);
-  doc.text("Fine Stone Craftsmanship & Custom Designs", 105, 26, { align: "center" });
+  doc.text('Fine Stone Craftsmanship & Custom Designs', 105, 26, { align: 'center' });
   
   doc.setLineWidth(0.5);
   doc.line(20, 30, 190, 30);
@@ -128,24 +128,24 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   // Title
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
-  doc.text("PRODUCT ESTIMATION & QUOTATION", 105, 45, { align: "center" });
+  doc.text('PRODUCT ESTIMATION & QUOTATION', 105, 45, { align: 'center' });
 
   // Details
   doc.setFontSize(11);
-  doc.text(\Quotation Date: \\, 20, 60);
-  doc.text(\Project ID: \\, 140, 60);
+  doc.text('Quotation Date: ' + new Date().toLocaleDateString('en-GB'), 20, 60);
+  doc.text('Project ID: ' + project.projectId, 140, 60);
   
-  doc.text(\Client Name: \\, 20, 70);
-  doc.text(\Project Name: \\, 140, 70);
-  doc.text(\Contact: \\, 20, 80);
+  doc.text('Client Name: ' + (project.clientName || 'N/A'), 20, 70);
+  doc.text('Project Name: ' + project.name, 140, 70);
+  doc.text('Contact: ' + (project.clientContact || 'N/A'), 20, 80);
 
   // Products Table
   const tableBody = products.map(p => {
     const dimensionsStr = p.unit !== 'Pieces' 
-      ? \\ x \\
+      ? (p.length || 0) + ' x ' + (p.width || 0)
       : '-';
-    const mm = p.unit !== 'Pieces' ? \\\ : '-';
-    const sqFt = p.unit === 'Sq. Ft' ? \\\ : '-';
+    const mm = p.unit !== 'Pieces' ? String(p.breadth || 0) : '-';
+    const sqFt = p.unit === 'Sq. Ft' ? String((p.length || 0) * (p.width || 0)) : '-';
 
     return [
       p.category || 'N/A',
@@ -154,8 +154,8 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
       mm,
       sqFt,
       p.qty || 0,
-      \Rs. \\,
-      \Rs. \\
+      'Rs. ' + (p.rate || 0).toLocaleString('en-IN'),
+      'Rs. ' + (p.amount || 0).toLocaleString('en-IN')
     ];
   });
 
@@ -186,25 +186,25 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   
   doc.setFontSize(11);
   doc.setTextColor(50, 50, 50);
-  doc.text(\Total Products Amount: Rs. \\, 25, currentY + 10);
+  doc.text('Total Products Amount: Rs. ' + productsTotal.toLocaleString('en-IN'), 25, currentY + 10);
   
   let boxYOffset = 18;
   if (globalCosts?.transportCostEnabled && globalCosts?.transportCost > 0) {
-    doc.text(\Installation Cost: Rs. \\, 25, currentY + boxYOffset);
+    doc.text('Installation Cost: Rs. ' + Number(globalCosts.transportCost).toLocaleString('en-IN'), 25, currentY + boxYOffset);
     boxYOffset += 8;
   }
   if (globalCosts?.packageCostEnabled && globalCosts?.packageCost > 0) {
-    doc.text(\Packing Charges: Rs. \\, 25, currentY + boxYOffset);
+    doc.text('Packing Charges: Rs. ' + Number(globalCosts.packageCost).toLocaleString('en-IN'), 25, currentY + boxYOffset);
     boxYOffset += 8;
   }
   
-  doc.text(\GST (\%): Rs. \\, 25, currentY + boxYOffset);
+  doc.text('GST (' + gstPercent + '%): Rs. ' + gstAmount.toLocaleString('en-IN'), 25, currentY + boxYOffset);
   boxYOffset += 8;
   
   doc.setFontSize(12);
   doc.setTextColor(179, 139, 54);
   doc.setFont(undefined, 'bold');
-  doc.text(\Estimated Grand Total: Rs. \\, 25, currentY + boxYOffset);
+  doc.text('Estimated Grand Total: Rs. ' + finalGrandTotal.toLocaleString('en-IN'), 25, currentY + boxYOffset);
   doc.setFont(undefined, 'normal');
 
   currentY += 60;
@@ -218,7 +218,7 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   if (photosWithCategories.length > 0) {
     doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
-    doc.text("Product Reference Designs", 20, currentY);
+    doc.text('Product Reference Designs', 20, currentY);
     currentY += 10;
 
     for (const item of photosWithCategories) {
@@ -262,13 +262,13 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
     }
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
-    doc.text("Terms and Conditions", 20, currentY);
+    doc.text('Terms and Conditions', 20, currentY);
     currentY += 10;
     
     doc.setFontSize(10);
     doc.setTextColor(80, 80, 80);
     terms.forEach((term, index) => {
-      const splitTerm = doc.splitTextToSize(\\. \\, 170);
+      const splitTerm = doc.splitTextToSize(String(index + 1) + '. ' + term, 170);
       if (currentY + (splitTerm.length * 5) > 280) {
         doc.addPage();
         currentY = 20;
@@ -285,14 +285,14 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   }
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(12);
-  doc.text("Authorized Signature", 140, currentY + 30);
+  doc.text('Authorized Signature', 140, currentY + 30);
   doc.setLineWidth(0.5);
   doc.line(140, currentY + 32, 185, currentY + 32);
 
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text("This is a computer generated quote.", 105, 290, { align: "center" });
+  doc.text('This is a computer generated quote.', 105, 290, { align: 'center' });
 
   // Download
-  doc.save(\Quotation_\.pdf\);
+  doc.save('Quotation_' + project.projectId + '.pdf');
 };
