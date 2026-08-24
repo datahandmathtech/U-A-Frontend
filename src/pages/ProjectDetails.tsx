@@ -38,7 +38,7 @@ const crmSteps = ['Enquiry Details', 'Reference Image', 'Quotation & Costing', '
 const projectSteps = ['Shop Drawing & Approval', 'Material Planning', 'Production', 'Work Order Active'];
 const steps = [...crmSteps, ...projectSteps];
 
-const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[] }) => {
+const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumns }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[], activeColumns: string[] }) => {
   const { id: projectId } = useParams();
 
   const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
@@ -77,7 +77,7 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products }: { slab: an
       <TableCell sx={{ color: '#666' }}>
         <Typography variant="body2">{dimensionStr}</Typography>
       </TableCell>
-      {STAGES.map(stage => (
+      {STAGES.filter(stage => activeColumns.includes(stage)).map(stage => (
         <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
           {stage === 'Polishing' ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -113,7 +113,7 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products }: { slab: an
   );
 };
 
-const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLogs }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[], productionLogs: any[] }) => {
+const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLogs, activeColumns }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[], productionLogs: any[], activeColumns: string[] }) => {
   const navigate = useNavigate();
   const { id: projectId } = useParams();
 
@@ -174,7 +174,7 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
       <TableCell sx={{ color: '#666' }}>
         <Typography variant="body2">{dimensionStr}</Typography>
       </TableCell>
-      {STAGES.map(stage => {
+      {STAGES.filter(stage => activeColumns.includes(stage)).map(stage => {
         if (stage === 'Polishing') {
           const hasHoned = requiredStages.includes('Polishing - Honed');
           const hasMirror = requiredStages.includes('Polishing - Mirror');
@@ -289,6 +289,15 @@ const ProjectDetails: React.FC = () => {
   const [isReservingClientMaterial, setIsReservingClientMaterial] = useState(false);
 
   const isPlanningMode = projectSlabs?.some((s: any) => s.status === 'pending') || !projectSlabs || projectSlabs.length === 0;
+
+  const globalRequiredStages = new Set<string>();
+  if (!isPlanningMode && projectSlabs) {
+    projectSlabs.forEach((s: any) => {
+      (s.requiredStages || []).forEach((stage: string) => globalRequiredStages.add(stage.split(' ')[0]));
+    });
+  }
+  const ALL_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+  const activeColumns = isPlanningMode ? ALL_STAGES : ALL_STAGES.filter(s => globalRequiredStages.has(s));
 
   const handleStartAllWork = async () => {
     try {
@@ -1883,18 +1892,18 @@ const ProjectDetails: React.FC = () => {
                         <TableRow>
                           <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Product Name</TableCell>
                           <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Size</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Dispatch</TableCell>
+                          {activeColumns.includes('Production') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>}
+                          {activeColumns.includes('Polishing') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>}
+                          {activeColumns.includes('Packing') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>}
+                          {activeColumns.includes('Dispatch') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Dispatch</TableCell>}
                           <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }} align="center">Action</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {projectSlabs?.map((slab: any, idx: number) => (
                           isPlanningMode 
-                            ? <SlabPlanningRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} />
-                            : <SlabTrackingRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} productionLogs={productionLogs || []} />
+                            ? <SlabPlanningRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} activeColumns={activeColumns} />
+                            : <SlabTrackingRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} productionLogs={productionLogs || []} activeColumns={activeColumns} />
                         ))}
                         {(!projectSlabs || projectSlabs.length === 0) && (
                            <TableRow><TableCell colSpan={9} align="center" sx={{ py: 5, color: 'text.secondary' }}>No slabs created yet.</TableCell></TableRow>
