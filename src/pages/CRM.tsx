@@ -164,7 +164,7 @@ const CRM: React.FC = () => {
 
   // Status mapping
   const stageNames: Record<string, string> = {
-    'enquiry': 'Enquiry (Pending)',
+    'enquiry': 'Enquiry',
     'design_sharing': 'Enquiry Details', // When on step 2, show step 1 as current
     'quotation': 'Quotation Sharing', // When on step 3, show step 2
     'advance_payment': 'Quotation & Costing' // When on step 4, show step 3
@@ -172,6 +172,17 @@ const CRM: React.FC = () => {
 
   // Filter logic
   let enquiries = projects?.filter((p: any) => !['shop_drawing', 'material_planning', 'production', 'work_order', 'completed'].includes(p.status)) || [];
+    
+  if (selectedFY !== 'All') {
+    enquiries = enquiries.filter((p: any) => {
+      const date = new Date(p.createdAt);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1; // 1-12
+      const fyStartYear = month >= 4 ? year : year - 1;
+      const fyString = `FY ${fyStartYear}-${String(fyStartYear + 1).slice(-2)}`;
+      return fyString === selectedFY;
+    });
+  }
   
   if (selectedMonth !== 'All') {
     enquiries = enquiries.filter((p: any) => {
@@ -264,7 +275,7 @@ const CRM: React.FC = () => {
           )}
         >
           <MenuItem value="All">All Stages</MenuItem>
-          <MenuItem value="enquiry">Enquiry (Pending)</MenuItem>
+          <MenuItem value="enquiry">Enquiry</MenuItem>
           <MenuItem value="design_sharing">Enquiry Details</MenuItem>
           <MenuItem value="quotation">Quotation Sharing</MenuItem>
           <MenuItem value="advance_payment">Quotation & Costing</MenuItem>

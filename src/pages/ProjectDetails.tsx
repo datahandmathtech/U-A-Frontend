@@ -17,6 +17,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import AddIcon from '@mui/icons-material/Add';
 import CircleIcon from '@mui/icons-material/Circle';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { 
   useGetProjectByIdQuery, useUpdateProjectMutation, useCreateQuotationMutation, 
   useCreateInvoiceMutation, useUploadFilesMutation, useGetDrawingsQuery, 
@@ -795,16 +796,41 @@ const ProjectDetails: React.FC = () => {
     ? viewingStepOverride 
     : (isCrmView ? Math.min(3, activeStep) : Math.max(4, activeStep));
 
+  const handleGoBackStep = () => {
+    if (viewingStepOverride !== null) {
+      setViewingStepOverride(null);
+      return;
+    }
+    const currentStepVal = isCrmView ? Math.min(3, activeStep) : Math.max(4, activeStep);
+    
+    if (currentStepVal === 0) navigate(-1);
+    else if (currentStepVal === 1) handleNextStage('enquiry');
+    else if (currentStepVal === 2) handleNextStage('design_sharing');
+    else if (currentStepVal === 3) handleNextStage('quotation');
+    else if (currentStepVal === 4) handleNextStage('advance_payment');
+    else if (currentStepVal === 5) handleNextStage('shop_drawing');
+    else if (currentStepVal === 6) handleNextStage('material_planning');
+  };
+
   return (
     <Box sx={{ width: '100%', px: { xs: 2, md: 4 } }}>
-      <Button 
-        startIcon={<ArrowBackIcon />} 
-        onClick={() => navigate(-1)} 
-        sx={{ mb: 3, color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'transparent' } }}
-        disableRipple
-      >
-        Back to Pipeline
-      </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Button 
+          startIcon={<ArrowBackIcon />} 
+          onClick={handleGoBackStep} 
+          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'transparent' } }}
+          disableRipple
+        >
+          Back
+        </Button>
+        <IconButton 
+          onClick={() => navigate('/crm')} 
+          title="Back to Pipeline"
+          sx={{ bgcolor: '#FFFDF5', color: '#B38B36', border: '1px solid #E8E1D5', '&:hover': { bgcolor: '#F0E6D2' } }}
+        >
+          <FilterListIcon />
+        </IconButton>
+      </Box>
 
       
       <Box sx={{ display: 'flex', gap: 4, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'flex-start' }}>
@@ -928,11 +954,7 @@ const ProjectDetails: React.FC = () => {
                 <Divider sx={{ my: 4 }} />
                 {viewingStepOverride === null && (
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                    <Button variant="outlined" size="large" onClick={() => {
-                      setSnackbarMessage('Enquiry Details progress saved!');
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      Save Progress
-                    </Button>
+                    
                     <Button variant="contained" size="large" onClick={() => {
                       handleNextStage('design_sharing');
                     }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
@@ -1069,17 +1091,7 @@ const ProjectDetails: React.FC = () => {
                     Back
                   </Button>
                   <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="outlined" size="large" onClick={async () => {
-                      try {
-                         await updateProject({ id: id as string, data: { startDate: designFinalizedDate ? new Date(designFinalizedDate).toISOString() : null } }).unwrap();
-                         setSnackbarMessage('Progress saved successfully!');
-                         if (viewingStepOverride !== null) setViewingStepOverride(null);
-                      } catch(e) {
-                         setSnackbarMessage('Failed to save progress.');
-                      }
-                    }} disabled={isUploading} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
-                    </Button>
+                    
                     <Button variant="contained" size="large" onClick={() => {
                        if (viewingStepOverride !== null) setViewingStepOverride(null);
                        else handleFreezeDesign();
@@ -1353,13 +1365,7 @@ const ProjectDetails: React.FC = () => {
                     Back
                   </Button>
                   <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="outlined" size="large" onClick={() => {
-                      // Triggering a save draft (localStorage) which is already handled via useEffect,
-                      // or we can just notify user.
-                      setSnackbarMessage('Quotation progress saved!');
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
-                    </Button>
+                    
                     <Button variant="contained" size="large" onClick={async () => {
                       if (viewingStepOverride !== null) {
                          setViewingStepOverride(null);
@@ -1427,16 +1433,7 @@ const ProjectDetails: React.FC = () => {
                     Back
                   </Button>
                   <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="outlined" size="large" onClick={async () => {
-                        // Saving payment details locally in state. Actual invoice generation happens on proceed.
-                        localStorage.setItem(`paymentDraft_${id}`, JSON.stringify({
-                          advancePayment, paymentDate, paymentMethod
-                        }));
-                        setSnackbarMessage('Payment progress saved!');
-                        if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
-                    </Button>
+                    
                     <Button variant="contained" color="success" size="large" onClick={() => {
                        if (viewingStepOverride !== null) setViewingStepOverride(null);
                        else handleAdvancePayment();
@@ -1563,12 +1560,7 @@ const ProjectDetails: React.FC = () => {
                     Back
                   </Button>
                   <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="outlined" size="large" onClick={() => {
-                       setSnackbarMessage('Shop Drawing progress saved!');
-                       if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
-                    </Button>
+                    
                     <Button variant="contained" color="success" size="large" onClick={async () => {
                       if (viewingStepOverride !== null) {
                          setViewingStepOverride(null);
@@ -1741,12 +1733,7 @@ const ProjectDetails: React.FC = () => {
                     Back
                   </Button>
                   <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="outlined" size="large" onClick={() => {
-                       setSnackbarMessage('Material Planning progress saved!');
-                       if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
-                    </Button>
+                    
                     <Button variant="contained" size="large" onClick={async () => {
                       if (viewingStepOverride !== null) {
                          setViewingStepOverride(null);
@@ -1801,12 +1788,7 @@ const ProjectDetails: React.FC = () => {
                  </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                  <Button variant="outlined" size="large" onClick={() => {
-                     setSnackbarMessage('Work Order progress saved!');
-                     if (viewingStepOverride !== null) setViewingStepOverride(null);
-                  }} sx={{ px: 5, py: 1.5, borderRadius: 2, fontWeight: 'bold', fontSize: '1.1rem' }}>
-                    {viewingStepOverride !== null ? 'Save Changes' : 'Save Progress'}
-                  </Button>
+                  
                   <Button variant="contained" color="success" size="large" onClick={async () => {
                     if (viewingStepOverride !== null) {
                        setViewingStepOverride(null);
