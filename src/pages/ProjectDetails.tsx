@@ -1879,9 +1879,6 @@ const ProjectDetails: React.FC = () => {
                       }}>
                         Sync with Quotation
                       </Button>
-                      <Button variant="contained" onClick={() => setSlabDialogOpen(true)}>
-                        + Add Custom Slab
-                      </Button>
                       {isPlanningMode && (
                         <Button variant="contained" color="success" onClick={handleStartAllWork}>
                           Finalize & Send to Production
@@ -1917,19 +1914,13 @@ const ProjectDetails: React.FC = () => {
                  </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                  
-                  <Button variant="contained" color="success" size="large" onClick={async () => {
-                    if (viewingStepOverride !== null) {
-                       setViewingStepOverride(null);
-                    } else {
-                       await updateProject({ id: id as string, data: { status: 'work_order' } }).unwrap();
-                       setActiveStep(7);
-                       setViewingStepOverride(null);
-                       refetch();
-                    }
-                  }} sx={{ px: 5, py: 1.5, borderRadius: 2, bgcolor: viewingStepOverride !== null ? 'primary.main' : '#2E7D32', '&:hover': { bgcolor: viewingStepOverride !== null ? 'primary.dark' : '#1B5E20' }, fontWeight: 'bold', fontSize: '1.1rem' }}>
-                    {viewingStepOverride !== null ? 'Back to Active Step' : 'Finalize & Send to Dispatch'}
-                  </Button>
+                  {viewingStepOverride !== null && (
+                    <Button variant="contained" color="success" size="large" onClick={() => {
+                      setViewingStepOverride(null);
+                    }} sx={{ px: 5, py: 1.5, borderRadius: 2, fontWeight: 'bold', fontSize: '1.1rem' }}>
+                      Back to Active Step
+                    </Button>
+                  )}
                 </Box>
               </Box>
             )}
