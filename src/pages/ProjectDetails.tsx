@@ -1712,120 +1712,99 @@ const ProjectDetails: React.FC = () => {
                       <FormControlLabel value="client" control={<Radio />} label="Client Material" />
                     </RadioGroup>
                   </FormControl>
-
-                  {materialSource === 'unnati' && (
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                      <FormControl fullWidth size="small">
-                        <InputLabel>Select from Inventory</InputLabel>
-                        <Select label="Select from Inventory" defaultValue="" value="">
-                          {inventoryItems && inventoryItems.map((item: any) => (
-                            <MenuItem key={item.id} value={item.id} onClick={() => {
-                              setSelectedInventoryItem(item);
-                              setReserveQty('');
-                              setReserveDialogOpen(true);
-                            }}>
-                              {item.itemName} (Block: {item.blockNumber || 'N/A'}) - {item.quantity} {item.unit} available
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      <Button variant="outlined" sx={{ whiteSpace: 'nowrap' }} onClick={() => setSnackbarMessage('Navigate to Global Inventory (from sidebar) to add new stock first.')}>
-                        + Add to Global Inventory
+                  <Box>
+                    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography variant="body2" fontWeight="bold">Measurement Unit:</Typography>
+                      <RadioGroup row value={clientMaterialUnit} onChange={(e) => setClientMaterialUnit(e.target.value as 'inch' | 'feet')}>
+                        <FormControlLabel value="inch" control={<Radio size="small" />} label="Inches" />
+                        <FormControlLabel value="feet" control={<Radio size="small" />} label="Square Feet" />
+                      </RadioGroup>
+                    </Box>
+                    <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Material Name</TableCell>
+                            <TableCell>Block No</TableCell>
+                            <TableCell>Length ({clientMaterialUnit === 'inch' ? 'in' : 'ft'})</TableCell>
+                            <TableCell>Width ({clientMaterialUnit === 'inch' ? 'in' : 'ft'})</TableCell>
+                            <TableCell>Thickness MM</TableCell>
+                            <TableCell>Total Sq.Ft</TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {clientSlabs.map((row, idx) => {
+                            const len = Number(row.length || 0);
+                            const wid = Number(row.width || 0);
+                            const sqFt = clientMaterialUnit === 'inch' ? (len * wid) / 144 : (len * wid);
+                            
+                            return (
+                              <TableRow key={idx}>
+                                <TableCell><TextField size="small" value={row.materialName} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].materialName = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell><TextField size="small" value={row.blockNo} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].blockNo = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell><TextField size="small" type="number" value={row.length} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].length = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell><TextField size="small" type="number" value={row.width} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].width = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell><TextField size="small" type="number" value={row.thickness} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].thickness = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
+                                <TableCell>{sqFt.toFixed(2)}</TableCell>
+                                <TableCell>
+                                  <IconButton color="error" size="small" onClick={() => {
+                                    const newSlabs = clientSlabs.filter((_, i) => i !== idx);
+                                    setClientSlabs(newSlabs.length ? newSlabs : [{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
+                                  }}><DeleteIcon fontSize="small" /></IconButton>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <Button variant="outlined" onClick={() => setClientSlabs([...clientSlabs, { materialName: '', blockNo: '', length: '', width: '', thickness: '' }])}>
+                        + Add Slab
+                      </Button>
+                      <Button variant="contained" disabled={isReservingClientMaterial} onClick={async () => {
+                        setIsReservingClientMaterial(true);
+                        try {
+                          const token = localStorage.getItem('token');
+                          for (const row of clientSlabs) {
+                            if (!row.materialName || !row.length || !row.width) continue;
+                            const len = Number(row.length || 0);
+                            const wid = Number(row.width || 0);
+                            const qty = clientMaterialUnit === 'inch' ? (len * wid) / 144 : (len * wid);
+                            
+                            const res = await fetch('/api/inventory', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                              body: JSON.stringify({
+                                type: 'slab', 
+                                jobWorkType: materialSource === 'unnati' ? 'standard' : 'client', 
+                                itemName: row.materialName, 
+                                blockNumber: row.blockNo, 
+                                length: len, width: wid, thickness: Number(row.thickness),
+                                quantity: qty, unit: 'sq_ft', 
+                                supplier: materialSource === 'unnati' ? 'Unnati Arts' : project?.clientName
+                              })
+                            });
+                            if (!res.ok) throw new Error('Failed to create inventory item');
+                            const newItem = await res.json();
+                            
+                            await reserveMaterial({ projectId: id as string, data: { inventoryId: newItem.id, quantity: qty, cost: 0 } }).unwrap();
+                          }
+                          setSnackbarMessage(`${materialSource === 'unnati' ? 'Unnati' : 'Client'} materials reserved successfully!`);
+                          setClientSlabs([{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
+                          refetchMaterials();
+                        } catch (err) {
+                          console.error(err);
+                          setSnackbarMessage('Error reserving materials.');
+                        } finally {
+                          setIsReservingClientMaterial(false);
+                        }
+                      }}>
+                        {isReservingClientMaterial ? 'Reserving...' : 'Reserve Materials'}
                       </Button>
                     </Box>
-                  )}
-
-                  {materialSource === 'client' && (
-                    <Box>
-                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="body2" fontWeight="bold">Measurement Unit:</Typography>
-                        <RadioGroup row value={clientMaterialUnit} onChange={(e) => setClientMaterialUnit(e.target.value as 'inch' | 'feet')}>
-                          <FormControlLabel value="inch" control={<Radio size="small" />} label="Inches" />
-                          <FormControlLabel value="feet" control={<Radio size="small" />} label="Square Feet" />
-                        </RadioGroup>
-                      </Box>
-                      <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>Material Name</TableCell>
-                              <TableCell>Block No</TableCell>
-                              <TableCell>Length ({clientMaterialUnit === 'inch' ? 'in' : 'ft'})</TableCell>
-                              <TableCell>Width ({clientMaterialUnit === 'inch' ? 'in' : 'ft'})</TableCell>
-                              <TableCell>Thickness MM</TableCell>
-                              <TableCell>Total Sq.Ft</TableCell>
-                              <TableCell></TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {clientSlabs.map((row, idx) => {
-                              const len = Number(row.length || 0);
-                              const wid = Number(row.width || 0);
-                              const sqFt = clientMaterialUnit === 'inch' ? (len * wid) / 144 : (len * wid);
-                              
-                              return (
-                                <TableRow key={idx}>
-                                  <TableCell><TextField size="small" value={row.materialName} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].materialName = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                  <TableCell><TextField size="small" value={row.blockNo} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].blockNo = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                  <TableCell><TextField size="small" type="number" value={row.length} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].length = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                  <TableCell><TextField size="small" type="number" value={row.width} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].width = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                  <TableCell><TextField size="small" type="number" value={row.thickness} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].thickness = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                  <TableCell>{sqFt.toFixed(2)}</TableCell>
-                                  <TableCell>
-                                    <IconButton color="error" size="small" onClick={() => {
-                                      const newSlabs = clientSlabs.filter((_, i) => i !== idx);
-                                      setClientSlabs(newSlabs.length ? newSlabs : [{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
-                                    }}><DeleteIcon fontSize="small" /></IconButton>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        <Button variant="outlined" onClick={() => setClientSlabs([...clientSlabs, { materialName: '', blockNo: '', length: '', width: '', thickness: '' }])}>
-                          + Add Slab
-                        </Button>
-                        <Button variant="contained" disabled={isReservingClientMaterial} onClick={async () => {
-                          setIsReservingClientMaterial(true);
-                          try {
-                            const token = localStorage.getItem('token');
-                            for (const row of clientSlabs) {
-                              if (!row.materialName || !row.length || !row.width) continue;
-                              const len = Number(row.length || 0);
-                              const wid = Number(row.width || 0);
-                              const qty = clientMaterialUnit === 'inch' ? (len * wid) / 144 : (len * wid);
-                              
-                              const res = await fetch('/api/inventory', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                                body: JSON.stringify({
-                                  type: 'slab', jobWorkType: 'client', itemName: row.materialName, blockNumber: row.blockNo, 
-                                  length: len, width: wid, thickness: Number(row.thickness),
-                                  quantity: qty, unit: 'sq_ft', supplier: project?.clientName
-                                })
-                              });
-                              if (!res.ok) throw new Error('Failed to create inventory item');
-                              const newItem = await res.json();
-                              
-                              await reserveMaterial({ projectId: id as string, data: { inventoryId: newItem.id, quantity: qty, cost: 0 } }).unwrap();
-                            }
-                            setSnackbarMessage('Client materials reserved successfully!');
-                            setClientSlabs([{ materialName: '', blockNo: '', length: '', width: '', thickness: '' }]);
-                            refetchMaterials();
-                          } catch (err) {
-                            console.error(err);
-                            setSnackbarMessage('Error reserving client materials.');
-                          } finally {
-                            setIsReservingClientMaterial(false);
-                          }
-                        }}>
-                          {isReservingClientMaterial ? 'Reserving...' : 'Reserve Client Materials'}
-                        </Button>
-                      </Box>
-                    </Box>
-                  )}
+                  </Box>
                 </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
