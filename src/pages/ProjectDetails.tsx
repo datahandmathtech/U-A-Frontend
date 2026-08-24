@@ -133,48 +133,77 @@ const SlabRowGroup = ({ slab, index, onEdit, onDelete, products }: { slab: any, 
         const status = getStageStatus(stage);
         const icon = renderStatusIcon(status);
         const isNA = status === 'N/A';
+        const isPending = slab.status === 'pending';
         
         return (
           <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
             {stage === 'Polishing' ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Checkbox size="small" checked={requiredStages.includes('Polishing - Honed')} onClick={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
-                  <Typography variant="caption">Honed</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Checkbox size="small" checked={requiredStages.includes('Polishing - Mirror')} onClick={(e) => handleToggleStage('Polishing - Mirror', e)} sx={{ p: 0 }} />
-                  <Typography variant="caption">Mirror</Typography>
-                </Box>
-                <Box 
-                  onClick={!isNA ? () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`) : undefined}
-                  sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: !isNA ? 'pointer' : 'default', '&:hover': !isNA ? { opacity: 0.7 } : {} }}
-                >
-                  {icon}
-                  <Typography variant="body2" sx={{ color: isNA ? '#999' : '#444' }}>{status}</Typography>
-                </Box>
+                {isPending ? (
+                  <>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Checkbox size="small" checked={requiredStages.includes('Polishing - Honed')} onClick={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
+                      <Typography variant="caption">Honed</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Checkbox size="small" checked={requiredStages.includes('Polishing - Mirror')} onClick={(e) => handleToggleStage('Polishing - Mirror', e)} sx={{ p: 0 }} />
+                      <Typography variant="caption">Mirror</Typography>
+                    </Box>
+                  </>
+                ) : (
+                  !isNA && (
+                    <Box 
+                      onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
+                    >
+                      {icon}
+                      <Typography variant="body2" sx={{ color: '#444' }}>{status}</Typography>
+                    </Box>
+                  )
+                )}
+                {!isPending && isNA && (
+                   <Typography variant="body2" sx={{ color: '#999' }}>N/A</Typography>
+                )}
               </Box>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Checkbox size="small" checked={requiredStages.includes(stage)} onClick={(e) => handleToggleStage(stage, e)} sx={{ p: 0 }} />
-                  <Typography variant="caption">{stage}</Typography>
-                </Box>
-                <Box 
-                  onClick={!isNA ? () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`) : undefined}
-                  sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: !isNA ? 'pointer' : 'default', '&:hover': !isNA ? { opacity: 0.7 } : {} }}
-                >
-                  {icon}
-                  <Typography variant="body2" sx={{ color: isNA ? '#999' : '#444' }}>{status}</Typography>
-                </Box>
+                {isPending ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Checkbox size="small" checked={requiredStages.includes(stage)} onClick={(e) => handleToggleStage(stage, e)} sx={{ p: 0 }} />
+                    <Typography variant="caption">{stage}</Typography>
+                  </Box>
+                ) : (
+                  !isNA && (
+                    <Box 
+                      onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
+                    >
+                      {icon}
+                      <Typography variant="body2" sx={{ color: '#444' }}>{status}</Typography>
+                    </Box>
+                  )
+                )}
+                {!isPending && isNA && (
+                   <Typography variant="body2" sx={{ color: '#999' }}>N/A</Typography>
+                )}
               </Box>
             )}
           </TableCell>
         );
       })}
-      <TableCell align="center">
-        <IconButton color="primary" size="small" onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
-        <IconButton color="error" size="small" onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}><DeleteIcon fontSize="small" /></IconButton>
+      <TableCell align="center" sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+        {slab.status === 'pending' && (
+          <Button variant="contained" size="small" color="success" onClick={async (e) => {
+            e.stopPropagation();
+            await updateSlab({ id: slab.id, data: { status: 'active' } });
+          }}>
+            Start Work
+          </Button>
+        )}
+        <Box>
+          <IconButton color="primary" size="small" onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
+          <IconButton color="error" size="small" onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}><DeleteIcon fontSize="small" /></IconButton>
+        </Box>
       </TableCell>
     </TableRow>
   );
@@ -240,7 +269,7 @@ const ProjectDetails: React.FC = () => {
 
   const handleCreateSlab = async () => {
     try {
-      await createSlab({ projectId: id, ...slabForm }).unwrap();
+      await createSlab({ projectId: id, ...slabForm, status: 'pending', requiredStages: [] }).unwrap();
       setSlabDialogOpen(false);
       setSlabForm({ name: '', size: '', cost: 0, inventoryId: '' });
       refetchSlabs();
