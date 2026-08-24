@@ -277,6 +277,24 @@ const ProjectDetails: React.FC = () => {
   const [clientMaterialUnit, setClientMaterialUnit] = useState<'inch' | 'feet'>('inch');
   const [isReservingClientMaterial, setIsReservingClientMaterial] = useState(false);
 
+  const handleStartAllWork = async () => {
+    try {
+      const pendingSlabs = projectSlabs?.filter((s: any) => s.status === 'pending') || [];
+      if (pendingSlabs.length === 0) {
+        setSnackbarMessage('No pending slabs to start.');
+        return;
+      }
+      for (const slab of pendingSlabs) {
+        await updateSlab({ id: slab.id, data: { status: 'active' } }).unwrap();
+      }
+      refetchSlabs();
+      setSnackbarMessage(`Started work for ${pendingSlabs.length} slabs!`);
+    } catch (error) {
+      console.error(error);
+      setSnackbarMessage('Error starting work.');
+    }
+  };
+
   const handleCreateSlab = async () => {
     try {
       await createSlab({ projectId: id, ...slabForm, status: 'pending', requiredStages: [] }).unwrap();
@@ -1832,6 +1850,9 @@ const ProjectDetails: React.FC = () => {
                       </Button>
                       <Button variant="contained" onClick={() => setSlabDialogOpen(true)}>
                         + Add Custom Slab
+                      </Button>
+                      <Button variant="contained" color="success" onClick={handleStartAllWork}>
+                        Start All Work
                       </Button>
                     </Box>
                   </Box>
