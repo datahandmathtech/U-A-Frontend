@@ -1821,7 +1821,7 @@ const ProjectDetails: React.FC = () => {
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       <Button variant="outlined" startIcon={<SyncIcon />} onClick={async () => {
                         try {
-                          await syncSlabs({ projectId: id }).unwrap();
+                          await syncSlabs(id as string).unwrap();
                           refetchSlabs();
                           setSnackbarMessage('Synced successfully with Quotation!');
                         } catch(err) {
