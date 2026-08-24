@@ -54,10 +54,13 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumn
   const handleToggleStage = async (stageKey: string, e: React.MouseEvent | React.ChangeEvent) => {
     e.stopPropagation();
     let newRequired;
-    if (requiredStages.includes(stageKey)) {
-      newRequired = requiredStages.filter((s: string) => s !== stageKey);
+    const isCurrentlyChecked = requiredStages.includes(stageKey) || (stageKey === 'Polishing - Honed' && requiredStages.includes('Polishing'));
+    
+    if (isCurrentlyChecked) {
+      newRequired = requiredStages.filter((s: string) => s !== stageKey && s !== 'Polishing');
     } else {
-      newRequired = [...requiredStages, stageKey];
+      // If we are adding a stage, make sure we remove the legacy 'Polishing' string to keep it clean
+      newRequired = [...requiredStages.filter((s: string) => s !== 'Polishing'), stageKey];
     }
     try {
       await updateSlab({ id: slab.id, data: { requiredStages: newRequired } }).unwrap();
@@ -82,7 +85,7 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumn
           {stage === 'Polishing' ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Checkbox size="small" disabled={isLocked} checked={requiredStages.includes('Polishing - Honed')} onChange={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
+                <Checkbox size="small" disabled={isLocked} checked={requiredStages.includes('Polishing - Honed') || requiredStages.includes('Polishing')} onChange={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
                 <Typography variant="caption">Honed</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -176,7 +179,7 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
       </TableCell>
       {STAGES.filter(stage => activeColumns.includes(stage)).map(stage => {
         if (stage === 'Polishing') {
-          const hasHoned = requiredStages.includes('Polishing - Honed');
+          const hasHoned = requiredStages.includes('Polishing - Honed') || requiredStages.includes('Polishing');
           const hasMirror = requiredStages.includes('Polishing - Mirror');
           if (!hasHoned && !hasMirror) return <TableCell key={stage}></TableCell>;
           return (
@@ -2797,11 +2800,14 @@ const ProjectDetails: React.FC = () => {
                     control={
                       <Checkbox 
                         size="small"
-                        checked={slabForm.requiredStages?.includes(stage) || false} 
+                        checked={slabForm.requiredStages?.includes(stage) || (stage === 'Polishing - Honed' && slabForm.requiredStages?.includes('Polishing')) || false} 
                         onChange={(e) => {
-                          const newStages = e.target.checked 
-                            ? [...(slabForm.requiredStages || []), stage]
-                            : (slabForm.requiredStages || []).filter(s => s !== stage);
+                          let newStages;
+                          if (e.target.checked) {
+                            newStages = [...(slabForm.requiredStages || []).filter(s => s !== 'Polishing'), stage];
+                          } else {
+                            newStages = (slabForm.requiredStages || []).filter(s => s !== stage && s !== 'Polishing');
+                          }
                           setSlabForm({ ...slabForm, requiredStages: newStages });
                         }} 
                       />
