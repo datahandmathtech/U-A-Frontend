@@ -158,6 +158,14 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
     return 'Pending';
   };
 
+  const renderStatusIcon = (status: string) => {
+    if (status === 'Completed') return <CheckCircleIcon sx={{ fontSize: 18, color: '#4caf50' }} />;
+    if (status === 'In Progress') return <CircleIcon sx={{ fontSize: 16, color: '#ffb300' }} />;
+    return <CircleIcon sx={{ fontSize: 16, color: '#d1c4e9' }} />;
+  };
+
+  const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+
   return (
     <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
       <TableCell sx={{ color: '#444' }}>
@@ -166,27 +174,55 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
       <TableCell sx={{ color: '#666' }}>
         <Typography variant="body2">{dimensionStr}</Typography>
       </TableCell>
-      <TableCell sx={{ py: 3 }}>
-        <Stepper alternativeLabel>
-          {requiredStages.map((stage: string) => {
-            const status = getStageStatus(stage);
-            const isCompleted = status === 'Completed';
-            const isActive = status === 'In Progress';
-            return (
-              <Step key={stage} active={isActive} completed={isCompleted}>
-                <StepLabel 
-                  StepIconProps={{ sx: { color: isCompleted ? 'success.main' : isActive ? 'warning.main' : 'grey.300', cursor: 'pointer' } }}
-                  onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.split(' ')[0].toLowerCase()}`)}
-                  sx={{ cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
-                >
-                  {stage}
-                </StepLabel>
-              </Step>
-            );
-          })}
-        </Stepper>
-      </TableCell>
+      {STAGES.map(stage => {
+        if (stage === 'Polishing') {
+          const hasHoned = requiredStages.includes('Polishing - Honed');
+          const hasMirror = requiredStages.includes('Polishing - Mirror');
+          if (!hasHoned && !hasMirror) return <TableCell key={stage}></TableCell>;
+          return (
+            <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {hasHoned && (
+                  <Box 
+                    onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/polishing`)}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
+                  >
+                    {renderStatusIcon(getStageStatus('Polishing - Honed'))}
+                    <Typography variant="body2" sx={{ color: '#444' }}>Honed</Typography>
+                  </Box>
+                )}
+                {hasMirror && (
+                  <Box 
+                    onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/polishing`)}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
+                  >
+                    {renderStatusIcon(getStageStatus('Polishing - Mirror'))}
+                    <Typography variant="body2" sx={{ color: '#444' }}>Mirror</Typography>
+                  </Box>
+                )}
+              </Box>
+            </TableCell>
+          );
+        }
+
+        const isRequired = requiredStages.includes(stage);
+        if (!isRequired) return <TableCell key={stage}></TableCell>;
+
+        const status = getStageStatus(stage);
+        return (
+          <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
+            <Box 
+              onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)}
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
+            >
+              {renderStatusIcon(status)}
+              <Typography variant="body2" sx={{ color: '#444' }}>{status}</Typography>
+            </Box>
+          </TableCell>
+        );
+      })}
       <TableCell align="center">
+        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'bold', display: 'block', mb: 1 }}>Active</Typography>
         <IconButton color="primary" size="small" onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
       </TableCell>
     </TableRow>
@@ -1844,24 +1880,15 @@ const ProjectDetails: React.FC = () => {
                   <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4, overflow: 'hidden' }}>
                     <Table>
                       <TableHead sx={{ bgcolor: '#FDFBF7' }}>
-                        {isPlanningMode ? (
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Product Name</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Size</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Dispatch</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }} align="center">Action</TableCell>
-                          </TableRow>
-                        ) : (
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '20%' }}>Product Name</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '15%' }}>Size</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '55%', textAlign: 'center' }}>Progress Tracking</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2, width: '10%' }} align="center">Action</TableCell>
-                          </TableRow>
-                        )}
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Product Name</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Size</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Dispatch</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }} align="center">Action</TableCell>
+                        </TableRow>
                       </TableHead>
                       <TableBody>
                         {projectSlabs?.map((slab: any, idx: number) => (
