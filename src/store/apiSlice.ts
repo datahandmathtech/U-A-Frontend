@@ -128,8 +128,8 @@ export const apiSlice = createApi({
         body,
       }),
     }),
-    getInventory: builder.query<any[], void>({
-      query: () => '/inventory',
+    getInventory: builder.query<any[], string | void>({
+      query: (fyYear) => fyYear ? `/inventory?fyYear=${fyYear}` : '/inventory',
       providesTags: ['Inventory']
     }),
     createInventory: builder.mutation<any, Partial<any>>({

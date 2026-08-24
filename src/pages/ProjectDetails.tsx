@@ -1778,7 +1778,7 @@ const ProjectDetails: React.FC = () => {
                               headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                               body: JSON.stringify({
                                 type: 'slab', 
-                                jobWorkType: materialSource === 'unnati' ? 'standard' : 'client', 
+                                jobWorkType: materialSource === 'unnati' ? 'company' : 'client', 
                                 itemName: row.materialName, 
                                 blockNumber: row.blockNo, 
                                 length: len, width: wid, thickness: Number(row.thickness),
