@@ -16,6 +16,8 @@ import ImageIcon from '@mui/icons-material/Image';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import AddIcon from '@mui/icons-material/Add';
+import SyncIcon from '@mui/icons-material/Sync';
+import DownloadIcon from '@mui/icons-material/Download';
 import CircleIcon from '@mui/icons-material/Circle';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { 
@@ -1814,6 +1816,25 @@ const ProjectDetails: React.FC = () => {
 
                 {/* Machine Usage */}
                  <Box sx={{ mb: 6 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" fontWeight="bold">Slabs & Products Tracking</Typography>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <Button variant="outlined" startIcon={<SyncIcon />} onClick={async () => {
+                        try {
+                          await syncSlabs({ projectId: id }).unwrap();
+                          refetchSlabs();
+                          setSnackbarMessage('Synced successfully with Quotation!');
+                        } catch(err) {
+                          setSnackbarMessage('Error syncing slabs.');
+                        }
+                      }}>
+                        Sync with Quotation
+                      </Button>
+                      <Button variant="contained" onClick={() => setSlabDialogOpen(true)}>
+                        + Add Custom Slab
+                      </Button>
+                    </Box>
+                  </Box>
                   <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4, overflow: 'hidden' }}>
                     <Table>
                       <TableHead sx={{ bgcolor: '#FDFBF7' }}>
