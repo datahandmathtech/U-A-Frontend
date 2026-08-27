@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, IconButton, TextField, 
   Switch, FormControlLabel, Breadcrumbs, Link, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  ToggleButton, ToggleButtonGroup, Tooltip
+  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, Select, MenuItem
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -18,7 +18,8 @@ import {
   useGetMachineLogsQuery,
   useAddPiecesMutation,
   useUpdatePieceMutation,
-  useDeletePieceMutation
+  useDeletePieceMutation,
+  useGetProjectMaterialsQuery
 } from '../store/apiSlice';
 
 const StageDetails = () => {
@@ -29,6 +30,8 @@ const StageDetails = () => {
   const { data: slabs, refetch: refetchSlabs } = useGetSlabsQuery(projectId as string, { skip: !projectId });
   const { data: productionLogs } = useGetProjectProductionLogsQuery(projectId as string, { skip: !projectId });
   const { data: machineLogs } = useGetMachineLogsQuery();
+  const { data: projectMaterials } = useGetProjectMaterialsQuery(projectId as string, { skip: !projectId });
+
   const [addPieces] = useAddPiecesMutation();
   const [updatePiece] = useUpdatePieceMutation();
   const [deletePiece] = useDeletePieceMutation();
@@ -90,17 +93,17 @@ const StageDetails = () => {
         length: p.l,
         width: p.w,
       }));
-      
       await addPieces({ 
         slabId: slab.id, 
         data: { 
           count: piecesData.length, 
-          piecesArray: formattedPieces 
+          piecesArray: formattedPieces
         } 
       }).unwrap();
 
       refetchSlabs();
       setPiecesData([]);
+      setCutPiecesOption(null);
     } catch (error) {
       console.error(error);
       alert('Failed to save pieces');
@@ -135,7 +138,7 @@ const StageDetails = () => {
         slabId: slab.id, 
         data: { 
           count: 1, 
-          piecesArray: formattedPieces 
+          piecesArray: formattedPieces
         } 
       }).unwrap();
 
@@ -334,6 +337,8 @@ const StageDetails = () => {
           </Tooltip>
         )}
       </Box>
+
+
 
       {cutPiecesOption === 'no' && stageFormatted === 'Production' && (
         <Paper elevation={0} sx={{ p: 3, mb: 4, borderRadius: 4, border: '1px dashed #ccc', bgcolor: '#fff' }}>

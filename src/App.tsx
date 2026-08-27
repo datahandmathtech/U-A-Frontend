@@ -24,6 +24,7 @@ import VendorLedger from './pages/VendorLedger';
 import VendorLedgerDetails from './pages/VendorLedgerDetails';
 import SlabPieceTracker from './pages/SlabPieceTracker';
 import StageDetails from './pages/StageDetails';
+import WasteLedger from './pages/WasteLedger';
 
 import Login from './pages/Login';
 import WorkerDashboard from './pages/WorkerDashboard';
@@ -58,6 +59,10 @@ const router = createBrowserRouter([
       {
         path: 'vendor-ledger/:vendorName',
         element: <VendorLedgerDetails />
+      },
+      {
+        path: 'waste-ledger',
+        element: <WasteLedger />
       },
       {
         path: 'crm',

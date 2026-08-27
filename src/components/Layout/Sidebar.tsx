@@ -26,6 +26,8 @@ interface SidebarProps {
 
 import StoreIcon from '@mui/icons-material/Store';
 
+import RecyclingIcon from '@mui/icons-material/Recycling';
+
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Live Feed', icon: <LiveTvIcon />, path: '/live-feed' },
@@ -36,6 +38,7 @@ const menuItems = [
   { text: 'Machine Master', icon: <PrecisionManufacturingIcon />, path: '/machines' },
   { text: 'Approvals', icon: <PendingActionsIcon />, path: '/approvals' },
   { text: 'In/Out Ledger', icon: <FolderSpecialIcon />, path: '/in-out-ledger' },
+  { text: 'Waste Ledger', icon: <RecyclingIcon />, path: '/waste-ledger' },
   { text: 'HR & Payroll', icon: <GroupsIcon />, path: '/hr' },
 ];
 

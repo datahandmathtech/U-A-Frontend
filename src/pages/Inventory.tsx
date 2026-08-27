@@ -1,15 +1,41 @@
 import React, { useState, useMemo } from 'react';
-import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton } from '@mui/material';
+import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useGetInventoryQuery } from '../store/apiSlice';
+import { useGetInventoryQuery, useGetInventoryLogsQuery } from '../store/apiSlice';
+
+const MONTHS = [
+  { value: 3, label: 'April' },
+  { value: 4, label: 'May' },
+  { value: 5, label: 'June' },
+  { value: 6, label: 'July' },
+  { value: 7, label: 'August' },
+  { value: 8, label: 'September' },
+  { value: 9, label: 'October' },
+  { value: 10, label: 'November' },
+  { value: 11, label: 'December' },
+  { value: 0, label: 'January' },
+  { value: 1, label: 'February' },
+  { value: 2, label: 'March' }
+];
 
 const Inventory: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
+  
+  // Default to current FY and current Month
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const currentFY = currentMonth >= 3 ? `${currentYear}-${currentYear + 1}` : `${currentYear - 1}-${currentYear}`;
+  
+  const [selectedFY, setSelectedFY] = useState<string>(currentFY);
+  const [selectedMonth, setSelectedMonth] = useState<number | ''>(''); 
+
   const { data: inventory, isLoading } = useGetInventoryQuery();
   
   // Dialog state
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
   const [supplierItems, setSupplierItems] = useState<any[]>([]);
+
+  const { data: supplierLogs, isLoading: isLoadingLogs } = useGetInventoryLogsQuery(selectedSupplier || '', { skip: !selectedSupplier });
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -17,19 +43,38 @@ const Inventory: React.FC = () => {
 
   const groupedBySupplier = useMemo(() => {
     if (!inventory) return {};
-    const filtered = inventory.filter((item: any) => 
+    let filtered = inventory.filter((item: any) => 
       activeTab === 0 ? item.jobWorkType === 'company' : item.jobWorkType === 'client'
     );
+
+    // Apply FY and Month filter
+    if (selectedFY && selectedMonth !== '') {
+      const startYear = parseInt(selectedFY.split('-')[0]);
+      const endYear = parseInt(selectedFY.split('-')[1]);
+      
+      // Determine the actual calendar year for the selected month
+      // April (3) to Dec (11) fall in the startYear. Jan (0) to March (2) fall in endYear.
+      const actualYear = selectedMonth >= 3 ? startYear : endYear;
+
+      filtered = filtered.filter((item: any) => {
+        const itemDate = new Date(item.createdAt);
+        return itemDate.getFullYear() === actualYear && itemDate.getMonth() === selectedMonth;
+      });
+    }
+
     return filtered.reduce((acc: any, item: any) => {
       const sup = item.supplier || 'Unknown';
       if (!acc[sup]) acc[sup] = [];
       acc[sup].push(item);
       return acc;
     }, {});
-  }, [inventory, activeTab]);
+  }, [inventory, activeTab, selectedFY, selectedMonth]);
 
   const handleRowClick = (supplier: string, items: any[]) => {
     setSelectedSupplier(supplier);
+    
+    // Also filter the items inside the dialog based on the selected FY and Month, just like the outer table!
+    // Actually, the items passed here are already filtered by groupedBySupplier, so they will only contain the filtered items.
     setSupplierItems(items);
   };
 
@@ -38,38 +83,41 @@ const Inventory: React.FC = () => {
     setSupplierItems([]);
   };
 
-  // Group items inside the dialog by block number
-  const blocksForDialog = useMemo(() => {
-    if (!supplierItems.length) return [];
-    const grouped = supplierItems.reduce((acc: any, item: any) => {
-      const blockNo = item.blockNumber || 'No Block';
-      if (!acc[blockNo]) acc[blockNo] = [];
-      acc[blockNo].push(item);
-      return acc;
-    }, {});
-    
-    return Object.entries(grouped).map(([blockNo, blockItems]: [string, any]) => {
-      const totalPieces = blockItems.length;
-      const totalQty = blockItems.reduce((sum: number, i: any) => sum + (i.inCurrentFY || i.quantity || 0), 0);
-      const first = blockItems[0];
-      return {
-        blockNo,
-        totalPieces,
-        totalQty,
-        unit: first.unit,
-        length: first.length,
-        width: first.width,
-        thickness: first.thickness,
-        date: first.createdAt
-      };
-    });
-  }, [supplierItems]);
-
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Inventory Management</Typography>
-        <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>View Unnati Materials and Client Materials.</Typography>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Inventory Management</Typography>
+          <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>View Unnati Materials and Client Materials.</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#FFF' }}>
+            <InputLabel>Financial Year</InputLabel>
+            <Select
+              value={selectedFY}
+              label="Financial Year"
+              onChange={(e) => setSelectedFY(e.target.value)}
+            >
+              <MenuItem value="2024-2025">2024-2025</MenuItem>
+              <MenuItem value="2025-2026">2025-2026</MenuItem>
+              <MenuItem value="2026-2027">2026-2027</MenuItem>
+              <MenuItem value="2027-2028">2027-2028</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#FFF' }}>
+            <InputLabel>Month</InputLabel>
+            <Select
+              value={selectedMonth}
+              label="Month"
+              onChange={(e) => setSelectedMonth(e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              <MenuItem value=""><em>All Months</em></MenuItem>
+              {MONTHS.map((m) => (
+                <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
       </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
@@ -83,7 +131,7 @@ const Inventory: React.FC = () => {
         <Typography variant="h6" sx={{ color: 'text.secondary' }}>Loading inventory...</Typography>
       ) : Object.keys(groupedBySupplier).length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, bgcolor: '#FAFAFA', border: '2px dashed #E0E0E0' }}>
-          <Typography variant="h5" color="text.secondary">No materials found.</Typography>
+          <Typography variant="h5" color="text.secondary">No materials found for the selected filter.</Typography>
         </Paper>
       ) : (
         <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 4, overflow: 'hidden' }}>
@@ -91,12 +139,12 @@ const Inventory: React.FC = () => {
             <TableHead sx={{ bgcolor: '#F5F5F5' }}>
               <TableRow>
                 <TableCell sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.1rem' }}>Date</Typography>
-                </TableCell>
-                <TableCell sx={{ py: 2.5 }}>
                   <Typography fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
                     {activeTab === 0 ? 'Vendor Name' : 'Client Name'}
                   </Typography>
+                </TableCell>
+                <TableCell sx={{ py: 2.5 }}>
+                  <Typography fontWeight="bold" sx={{ fontSize: '1.1rem' }}>Date (Latest)</Typography>
                 </TableCell>
                 <TableCell sx={{ py: 2.5 }}>
                   <Typography fontWeight="bold" sx={{ fontSize: '1.1rem' }}>Total Blocks</Typography>
@@ -108,13 +156,11 @@ const Inventory: React.FC = () => {
             </TableHead>
             <TableBody>
               {Object.entries(groupedBySupplier).map(([supplier, items]: [string, any]) => {
-                // Determine the latest date for this supplier
                 const latestDate = items.reduce((latest: Date, item: any) => {
                   const itemDate = new Date(item.createdAt);
                   return itemDate > latest ? itemDate : latest;
                 }, new Date(0));
                 
-                // Count unique blocks
                 const uniqueBlocks = new Set(items.map((i: any) => i.blockNumber || 'No Block')).size;
 
                 return (
@@ -125,13 +171,13 @@ const Inventory: React.FC = () => {
                     sx={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
                   >
                     <TableCell sx={{ py: 3 }}>
-                      <Typography sx={{ fontSize: '1.05rem', color: '#555' }}>
-                        {latestDate.toLocaleDateString('en-GB')}
+                      <Typography fontWeight="bold" color="primary.main" sx={{ fontSize: '1.2rem' }}>
+                        {supplier}
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 3 }}>
-                      <Typography fontWeight="bold" color="primary.main" sx={{ fontSize: '1.2rem' }}>
-                        {supplier}
+                      <Typography sx={{ fontSize: '1.05rem', color: '#555' }}>
+                        {latestDate.toLocaleDateString('en-GB')}
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 3 }}>
@@ -152,11 +198,11 @@ const Inventory: React.FC = () => {
         </TableContainer>
       )}
 
-      {/* Details Dialog / Page Modal */}
+      {/* Details Dialog */}
       <Dialog 
         open={Boolean(selectedSupplier)} 
         onClose={handleCloseDialog}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{ sx: { borderRadius: 4, minHeight: '60vh', bgcolor: '#FAFAFA' } }}
       >
@@ -166,7 +212,7 @@ const Inventory: React.FC = () => {
               {selectedSupplier}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Material Details Overview
+              Material Ledger (In / Out History)
             </Typography>
           </Box>
           <IconButton onClick={handleCloseDialog} size="large" sx={{ bgcolor: '#F5F5F5' }}>
@@ -174,46 +220,67 @@ const Inventory: React.FC = () => {
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 4 }}>
-          <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 3 }}>
-            <Table size="medium">
-              <TableHead>
-                <TableRow sx={{ bgcolor: '#F5F5F5' }}>
-                  <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Date</strong></TableCell>
-                  <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Block No</strong></TableCell>
-                  <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>L x W x T</strong></TableCell>
-                  <TableCell align="center" sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Total Pieces</strong></TableCell>
-                  <TableCell align="right" sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Total Quantity</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {blocksForDialog.map((block: any, idx: number) => (
-                  <TableRow key={idx} sx={{ '&:last-child td': { borderBottom: 0 } }}>
-                    <TableCell sx={{ py: 2.5 }}>
-                      <Typography sx={{ fontSize: '1.05rem', color: '#555' }}>
-                        {new Date(block.date).toLocaleDateString('en-GB')}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 2.5 }}>
-                      <Typography fontWeight="bold" sx={{ fontSize: '1.1rem' }}>{block.blockNo}</Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 2.5 }}>
-                      <Typography sx={{ fontSize: '1.05rem' }}>
-                        {[block.length, block.width, block.thickness].filter(Boolean).join(' x ') || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center" sx={{ py: 2.5 }}>
-                      <Typography fontWeight="500" sx={{ fontSize: '1.1rem' }}>{block.totalPieces}</Typography>
-                    </TableCell>
-                    <TableCell align="right" sx={{ py: 2.5 }}>
-                      <Typography fontWeight="bold" sx={{ fontSize: '1.15rem', color: 'success.main' }}>
-                        {block.totalQty?.toFixed(2)} {block.unit}
-                      </Typography>
-                    </TableCell>
+          {isLoadingLogs ? (
+            <Typography align="center" sx={{ mt: 5 }}>Loading ledger...</Typography>
+          ) : (
+            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 3 }}>
+              <Table size="medium">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#F5F5F5' }}>
+                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Date</strong></TableCell>
+                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Material Name</strong></TableCell>
+                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Block No</strong></TableCell>
+                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>L x W x T</strong></TableCell>
+                    <TableCell align="center" sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>IN (+)</strong></TableCell>
+                    <TableCell align="center" sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>OUT (-)</strong></TableCell>
+                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Remarks</strong></TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {supplierLogs?.map((log: any, idx: number) => {
+                    const item = log.inventory || {};
+                    return (
+                      <TableRow key={log.id || idx} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                        <TableCell sx={{ py: 2.5 }}>
+                          <Typography sx={{ fontSize: '1.05rem', color: '#555' }}>
+                            {new Date(log.createdAt).toLocaleDateString('en-GB')}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2.5 }}>
+                          <Typography fontWeight="500" sx={{ fontSize: '1.05rem' }}>{item.itemName || '-'}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2.5 }}>
+                          <Typography fontWeight="bold" sx={{ fontSize: '1.1rem' }}>{item.blockNumber || '-'}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2.5 }}>
+                          <Typography sx={{ fontSize: '1.05rem' }}>
+                            {[item.length, item.width, item.thickness].filter(Boolean).join(' x ') || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center" sx={{ py: 2.5 }}>
+                          {log.type === 'IN' ? (
+                            <Typography fontWeight="bold" sx={{ fontSize: '1.15rem', color: 'success.main' }}>
+                              + {log.quantity.toFixed(2)} {item.unit}
+                            </Typography>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell align="center" sx={{ py: 2.5 }}>
+                          {log.type === 'OUT' ? (
+                            <Typography fontWeight="bold" sx={{ fontSize: '1.15rem', color: 'error.main' }}>
+                              - {log.quantity.toFixed(2)} {item.unit}
+                            </Typography>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell sx={{ py: 2.5 }}>
+                          <Typography sx={{ fontSize: '1.05rem', color: '#666' }}>{log.remarks || '-'}</Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 3, bgcolor: '#FFF', borderTop: '1px solid #E0E0E0' }}>
           <Button variant="outlined" size="large" onClick={handleCloseDialog} sx={{ borderRadius: 2, px: 4 }}>
@@ -221,7 +288,6 @@ const Inventory: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
     </Box>
   );
 };

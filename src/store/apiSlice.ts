@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { logout } from './authSlice';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://datahandmathtech-u-a-backend.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const baseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
@@ -26,7 +26,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor'],
+  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste'],
   endpoints: (builder) => ({
     // VENDOR ENDPOINTS
     getVendors: builder.query<any[], { month?: string, fy?: string } | void>({
@@ -401,6 +401,10 @@ export const apiSlice = createApi({
       query: (projectId) => `/projects/${projectId}/materials`,
       providesTags: (_result, _error, id) => [{ type: 'Project', id: `${id}_MATERIALS` }]
     }),
+    deleteProjectMaterial: builder.mutation<any, { projectId: string; materialId: string }>({
+      query: ({ projectId, materialId }) => ({ url: `/projects/${projectId}/materials/${materialId}`, method: 'DELETE' }),
+      invalidatesTags: ['Project', 'Inventory']
+    }),
     reserveProjectMaterial: builder.mutation<any, { projectId: string; data: any }>({
       query: ({ projectId, data }) => ({
         url: `/projects/${projectId}/materials`,
@@ -459,10 +463,26 @@ export const apiSlice = createApi({
         body: data,
       }),
     }),
+    getWasteMaterials: builder.query<any, { month?: string; year?: string }>({
+      query: (params) => {
+        let url = '/waste';
+        if (params?.month && params?.year) {
+          url += `?month=${params.month}&year=${params.year}`;
+        }
+        return url;
+      },
+      providesTags: ['Waste']
+    }),
+    getInventoryLogs: builder.query<any[], string>({
+      query: (supplier) => `/inventory/logs/${encodeURIComponent(supplier)}`,
+      providesTags: ['Inventory']
+    }),
   }),
 });
 
 export const {
+  useGetWasteMaterialsQuery,
+  useGetInventoryLogsQuery,
   useGetVendorsQuery,
   useGetVendorLedgerQuery,
   useCreateVendorMutation,
@@ -532,6 +552,7 @@ export const {
   useUpdateProjectMutation,
   useGetProjectMaterialsQuery,
   useReserveProjectMaterialMutation,
+  useDeleteProjectMaterialMutation,
   useGetQuotationTermsQuery,
   useAddQuotationTermMutation,
   useCreateQuotationMutation,
