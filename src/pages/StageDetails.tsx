@@ -309,13 +309,16 @@ const StageDetails = () => {
             <ArrowBackIcon />
           </IconButton>
           <Box>
-            <Typography variant="h4" fontWeight="900" color="#222">
-              {stageFormatted} Details
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h4" fontWeight="900" color="#222">
+                {stageFormatted} Details
+              </Typography>
+              {slab.size && <Chip label={slab.size} size="medium" sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5' }} />}
+            </Box>
             <Breadcrumbs sx={{ mt: 1 }}>
               <Link color="inherit" sx={{ cursor: 'pointer' }} onClick={() => navigate('/projects')}>Projects</Link>
               <Link color="inherit" sx={{ cursor: 'pointer' }} onClick={() => navigate(`/projects/${projectId}`)}>{project?.name}</Link>
-              <Typography color="text.primary" fontWeight="bold">{slab.name} <span style={{color: '#666', fontWeight: 'normal'}}>| {slab.size || ''}</span></Typography>
+              <Typography color="text.primary">{slab.name}</Typography>
             </Breadcrumbs>
           </Box>
         </Box>
