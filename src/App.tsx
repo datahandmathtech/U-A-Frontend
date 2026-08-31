@@ -114,6 +114,10 @@ const router = createBrowserRouter([
         element: <Inventory />
       },
       {
+        path: 'inventory/ledger/:supplier',
+        element: <InventoryLedger />
+      },
+      {
         path: 'production',
         element: <Production />
       },
