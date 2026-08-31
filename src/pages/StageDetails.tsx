@@ -115,23 +115,26 @@ const StageDetails = () => {
   const handleProcessSingleFullSlab = async () => {
     setIsSaving(true);
     try {
-      const latestQuote = project?.quotations?.[0];
-      const matchedProduct = latestQuote?.products?.find((p: any) => p.category === slab.name);
-      
-      const totalL = matchedProduct?.length ? parseFloat(String(matchedProduct.length)) : 0;
-      const totalW = matchedProduct?.width ? parseFloat(String(matchedProduct.width)) : 0;
-      
       const existingPieces = slab.pieces || [];
       let maxNum = 0;
       if (existingPieces.length > 0) {
         maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
       }
+      
+      let parsedL = 0;
+      let parsedW = 0;
+      if (slab.size) {
+        const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/);
+        const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/);
+        if (lMatch) parsedL = parseFloat(lMatch[1]);
+        if (wMatch) parsedW = parseFloat(wMatch[1]);
+      }
 
       const formattedPieces = [{
         name: `${slab.name} ${maxNum + 1} (Full Slab)`,
-        size: `${totalL}L x ${totalW}W`,
-        length: totalL,
-        width: totalW,
+        size: slab.size || 'Full Slab',
+        length: parsedL,
+        width: parsedW,
       }];
       
       await addPieces({ 
@@ -312,7 +315,7 @@ const StageDetails = () => {
             <Breadcrumbs sx={{ mt: 1 }}>
               <Link color="inherit" sx={{ cursor: 'pointer' }} onClick={() => navigate('/projects')}>Projects</Link>
               <Link color="inherit" sx={{ cursor: 'pointer' }} onClick={() => navigate(`/projects/${projectId}`)}>{project?.name}</Link>
-              <Typography color="text.primary">{slab.name}</Typography>
+              <Typography color="text.primary" fontWeight="bold">{slab.name} <span style={{color: '#666', fontWeight: 'normal'}}>| {slab.size || ''}</span></Typography>
             </Breadcrumbs>
           </Box>
         </Box>
