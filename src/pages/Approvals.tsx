@@ -701,7 +701,7 @@ const Approvals: React.FC = () => {
                                 const slab = projectSlabs.find((s: any) => s.id === split.slabId);
                                 return selected.map((id: string) => {
                                   const piece = slab?.pieces?.find((p: any) => p.id === id);
-                                  return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id;
+                                  return piece ? `${(piece.productName || `Piece ${piece.pieceNumber}`).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${piece.size ? `(${piece.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}` : id;
                                 }).join(', ');
                               }}
                             >
@@ -1037,7 +1037,7 @@ const Approvals: React.FC = () => {
                       const slab = slabs.find((s: any) => s.id === editingHistoryLog.slabId);
                       return selected.map((id: string) => {
                         const piece = slab?.pieces?.find((p: any) => p.id === id);
-                        return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id;
+                        return piece ? `${(piece.productName || `Piece ${piece.pieceNumber}`).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${piece.size ? `(${piece.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}` : id;
                       }).join(', ');
                     }}
                   >
@@ -1052,7 +1052,7 @@ const Approvals: React.FC = () => {
                         }).map((p: any) => (
                       <MenuItem key={p.id} value={p.id}>
                         <Checkbox checked={(editingHistoryLog.pieceIds || []).indexOf(p.id) > -1} />
-                        <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber} - ${p.stage}`} />
+                        <ListItemText primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''} - ${p.stage}`} />
                       </MenuItem>
                     ))}
                   </Select>

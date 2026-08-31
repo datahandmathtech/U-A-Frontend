@@ -131,7 +131,7 @@ const StageDetails = () => {
       }
 
       const formattedPieces = [{
-        name: `${slab.name} ${maxNum + 1} (Full Slab)`,
+        name: `${slab.name}.${maxNum + 1} (Full Slab)`,
         size: slab.size || 'Full Slab',
         length: parsedL,
         width: parsedW,
@@ -447,7 +447,7 @@ const StageDetails = () => {
                     const lastPieceNum = piecesData[piecesData.length - 1]?.pieceNumber || maxNum;
                     setPiecesData([...piecesData, { 
                       pieceNumber: lastPieceNum + 1,
-                      name: `${slab.name} ${lastPieceNum + 1} (Cut Piece)`,
+                      name: `${slab.name}.${lastPieceNum + 1} (Cut Piece)`,
                       l: 0, w: 0 
                     }]);
                   }}>
@@ -475,7 +475,7 @@ const StageDetails = () => {
                         
                         const newPieces = Array.from({ length: count }).map((_, idx) => ({
                           pieceNumber: lastPieceNum + idx + 1,
-                          name: `${slab.name} ${lastPieceNum + idx + 1} (Cut Piece)`,
+                          name: `${slab.name}.${lastPieceNum + idx + 1} (Cut Piece)`,
                           l: 0, w: 0
                         }));
                         setPiecesData([...piecesData, ...newPieces]);
