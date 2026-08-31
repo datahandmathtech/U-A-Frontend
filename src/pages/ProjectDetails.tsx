@@ -1931,7 +1931,7 @@ const ProjectDetails: React.FC = () => {
                       <TableHead sx={{ bgcolor: '#FDFBF7' }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Product Name</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Size</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Original Size</TableCell>
                           {activeColumns.includes('Production') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>}
                           {activeColumns.includes('Polishing') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>}
                           {activeColumns.includes('Packing') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>}
