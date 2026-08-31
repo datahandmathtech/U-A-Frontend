@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useGetInventoryQuery, useGetInventoryLogsQuery } from '../store/apiSlice';
@@ -19,6 +20,7 @@ const MONTHS = [
 ];
 
 const Inventory: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   
   // Default to current FY and current Month
@@ -71,11 +73,7 @@ const Inventory: React.FC = () => {
   }, [inventory, activeTab, selectedFY, selectedMonth]);
 
   const handleRowClick = (supplier: string, items: any[]) => {
-    setSelectedSupplier(supplier);
-    
-    // Also filter the items inside the dialog based on the selected FY and Month, just like the outer table!
-    // Actually, the items passed here are already filtered by groupedBySupplier, so they will only contain the filtered items.
-    setSupplierItems(items);
+    navigate(`/inventory/ledger/${encodeURIComponent(supplier)}`);
   };
 
   const handleCloseDialog = () => {
