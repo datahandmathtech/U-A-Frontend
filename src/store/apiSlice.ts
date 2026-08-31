@@ -374,9 +374,14 @@ export const apiSlice = createApi({
       query: () => '/hr/attendance',
       providesTags: ['Attendance']
     }),
-    getDashboardSummary: builder.query<any, void>({
-      query: () => '/dashboard/summary',
-      providesTags: ['Project', 'Lead', 'Invoice'] // Invalidate/refetch when these change
+    getDashboardSummary: builder.query<any, { fy?: string, month?: number | string }>({
+      query: (params) => {
+        const queryParams = new URLSearchParams();
+        if (params.fy) queryParams.append('fy', params.fy);
+        if (params.month !== undefined && params.month !== '') queryParams.append('month', String(params.month));
+        return `/dashboard/summary?${queryParams.toString()}`;
+      },
+      providesTags: ['Project', 'Lead', 'Invoice']
     }),
     getProjectById: builder.query<any, string>({
       query: (id) => `/projects/${id}`,

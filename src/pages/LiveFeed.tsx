@@ -138,13 +138,6 @@ const LiveFeed: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Summary Metrics */}
-      <Grid container spacing={3} sx={{ mb: 5 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <SummaryCard icon={GroupsIcon} value={activeStaffCount} label="Active Workers" gradient="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" colorHint="#fff" />
-        </Grid>
-      </Grid>
-
       {/* Grid of Cards */}
       <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: '#444' }}>{formatDMY(selectedDate) === formatDMY(new Date()) ? "Today's Status" : "Status for " + formatDMY(selectedDate)}</Typography>
       <Grid container spacing={3}>
@@ -159,128 +152,95 @@ const LiveFeed: React.FC = () => {
             
             return (
               <Grid size={{ xs: 12, md: 6, lg: 4 }} key={machine.id}>
-                  <Paper 
+                <Paper 
                   onClick={() => {
                     if (log) {
                       setSelectedLog(log);
                       if (log.projectId) setSelectedProject(log.projectId);
                       else setSelectedProject('');
-                      
-                      // We don't prefill product here because we need the fullProject to load its products
-                      // The user will just re-select it if it was null, or it will be populated later
                       setSelectedProduct(null);
                     }
                   }}
-                  elevation={0}
+                  elevation={log ? 2 : 0}
                   sx={{ 
-                    p: 3.5, 
-                    borderRadius: 5, 
+                    p: 3, 
+                    borderRadius: 3, 
                     border: '1px solid',
-                    borderColor: !log ? 'rgba(0,0,0,0.05)' : (isCompleted ? 'rgba(25, 118, 210, 0.2)' : 'rgba(46, 125, 50, 0.2)'),
-                    bgcolor: '#fff',
+                    borderColor: !log ? 'grey.300' : (isCompleted ? 'primary.light' : (isPending ? 'warning.light' : 'success.light')),
+                    bgcolor: !log ? 'grey.50' : '#fff',
                     cursor: log ? 'pointer' : 'default',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transition: 'all 0.2s',
                     position: 'relative',
                     overflow: 'hidden',
-                    boxShadow: !log ? 'none' : (isCompleted ? '0 4px 12px rgba(25, 118, 210, 0.05)' : '0 12px 32px rgba(46, 125, 50, 0.08)'),
-                    opacity: !log ? 0.6 : 1,
-                    filter: !log ? 'grayscale(100%)' : 'none',
                     '&:hover': log ? { 
-                      transform: 'translateY(-6px)', 
-                      borderColor: isCompleted ? 'primary.main' : 'success.main', 
-                      boxShadow: isCompleted ? '0 12px 32px rgba(25, 118, 210, 0.1)' : '0 20px 40px rgba(46, 125, 50, 0.15)',
+                      transform: 'translateY(-2px)', 
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                      borderColor: isCompleted ? 'primary.main' : (isPending ? 'warning.main' : 'success.main')
                     } : {}
                   }}
                 >
-                  {/* Status Glow Line at Top instead of Left */}
                   <Box sx={{ 
-                    position: 'absolute', left: 0, top: 0, right: 0, height: 4, 
-                    background: !log ? 'grey.300' : (isCompleted ? 'primary.main' : (isPending ? 'warning.main' : 'linear-gradient(90deg, #2e7d32, #4caf50)'))
+                    position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, 
+                    bgcolor: !log ? 'grey.300' : (isCompleted ? 'primary.main' : (isPending ? 'warning.main' : 'success.main'))
                   }} />
 
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2, pl: 2 }}>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                       <Avatar sx={{ 
-                        background: !log ? 'grey.300' : (isCompleted ? 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)' : 'linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)'), 
-                        color: '#fff', width: 56, height: 56,
-                        boxShadow: log && !isCompleted ? '0 8px 16px rgba(46, 125, 50, 0.25)' : '0 4px 10px rgba(25, 118, 210, 0.2)'
+                        bgcolor: !log ? 'grey.400' : (isCompleted ? 'primary.light' : 'success.light'), 
+                        color: !log ? '#fff' : (isCompleted ? 'primary.dark' : 'success.dark'), 
+                        width: 48, height: 48
                       }}>
-                        <PrecisionManufacturingIcon sx={{ fontSize: 28 }} />
+                        <PrecisionManufacturingIcon />
                       </Avatar>
                       <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.2, color: !log ? 'text.secondary' : '#1a1a1a' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: !log ? 'text.secondary' : 'text.primary' }}>
                           {machine.name}
                         </Typography>
                         {log?.project && (
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 'bold', display: 'block', mt: 0.5 }}>
-                            Client: {log.project.clientName || 'Walk-in / General'}
+                          <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 'medium' }}>
+                            {log.project.clientName || 'General'}
                           </Typography>
                         )}
                       </Box>
                     </Box>
                     <Chip 
-                      label={!log ? 'NO ACTIVITY' : (isCompleted ? 'COMPLETED' : (isPending ? 'PENDING' : 'IN PROGRESS'))} 
+                      label={!log ? 'IDLE' : (isCompleted ? 'COMPLETED' : (isPending ? 'PENDING' : 'ACTIVE'))} 
                       size="small" 
                       color={!log ? 'default' : (isCompleted ? 'primary' : (isPending ? 'warning' : 'success'))}
-                      variant={(!log || isCompleted) ? "outlined" : "filled"}
-                      sx={{ fontWeight: 800, fontSize: '0.65rem', letterSpacing: 0.8, borderRadius: 2, height: 24 }} 
+                      sx={{ fontWeight: 'bold', borderRadius: 1 }} 
                     />
                   </Box>
 
-                  <Box sx={{ 
-                    background: !log ? 'rgba(0,0,0,0.02)' : (isCompleted ? 'linear-gradient(135deg, rgba(25, 118, 210, 0.04) 0%, rgba(25, 118, 210, 0.01) 100%)' : 'linear-gradient(135deg, rgba(46, 125, 50, 0.04) 0%, rgba(46, 125, 50, 0.01) 100%)'), 
-                    p: 2.5, 
-                    borderRadius: 3, 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    border: '1px solid',
-                    borderColor: !log ? 'transparent' : (isCompleted ? 'rgba(25, 118, 210, 0.1)' : 'rgba(46, 125, 50, 0.1)')
-                  }}>
+                  <Box sx={{ pl: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 3 }}>
                     <Box>
-                      {log?.project && (
+                      {log?.project ? (
                         <>
-                          <Typography component="div" variant="body2" sx={{ fontWeight: 800, color: isCompleted ? '#1565c0' : '#1b5e20' }}>
-                            Project: {log.project.projectId}
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {log.project.projectId}
                           </Typography>
-                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary', fontWeight: 600 }}>
-                            Name: {log.project.name}
+                          <Typography variant="caption" color="textSecondary">
+                            {log.project.name}
                           </Typography>
                         </>
-                      )}
-                      {!log?.project && (
-                        <Typography variant="body2" color="textSecondary">
-                          No active project
-                        </Typography>
+                      ) : (
+                        <Typography variant="body2" color="textSecondary">No active project</Typography>
                       )}
                     </Box>
-                    <Box sx={{ textAlign: 'right', borderLeft: '2px solid', borderColor: !log ? 'rgba(0,0,0,0.05)' : (isCompleted ? 'rgba(25, 118, 210, 0.15)' : 'rgba(46, 125, 50, 0.15)'), pl: 2.5 }}>
+                    <Box sx={{ textAlign: 'right' }}>
                       {log ? (
-                        (() => {
-                          const logStartDate = new Date(log.startTime);
-                          const isSameDay = logStartDate.getDate() === selectedDate.getDate() && 
-                                            logStartDate.getMonth() === selectedDate.getMonth() && 
-                                            logStartDate.getFullYear() === selectedDate.getFullYear();
-                          const timeString = logStartDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                          const displayTime = isSameDay ? timeString : `${formatDMY(logStartDate)}, ${timeString}`;
-                          
-                          return (
-                            <>
-                              <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1, color: isCompleted ? '#1976d2' : '#2e7d32' }}>
-                                {displayTime}
-                              </Typography>
-                              {isCompleted && log.endTime && (
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, display: 'block', mt: 0.5, letterSpacing: 0.5 }}>
-                                  Ended: {new Date(log.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                </Typography>
-                              )}
-                            </>
-                          );
-                        })()
+                        <>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: isCompleted ? 'primary.main' : 'success.main' }}>
+                            Started: {new Date(log.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </Typography>
+                          {isCompleted && log.endTime && (
+                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                              Ended: {new Date(log.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </Typography>
+                          )}
+                        </>
                       ) : (
-                        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 'bold' }}>
-                          -
-                        </Typography>
+                        <Typography variant="caption" color="textDisabled">--:--</Typography>
                       )}
                     </Box>
                   </Box>

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Typography, Paper, Button, Grid, Chip } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Typography, Paper, Button, Grid, Chip, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import AssuredWorkloadIcon from '@mui/icons-material/AssuredWorkload';
@@ -29,7 +29,14 @@ const DashboardCard = ({ icon: Icon, title, value, colorHint = 'primary.main', b
 );
 
 const Dashboard: React.FC = () => {
-  const { data: summary, isLoading } = useGetDashboardSummaryQuery();
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth(); // 0-11
+  const currentFY = currentMonth >= 3 ? `${currentYear}-${currentYear + 1}` : `${currentYear - 1}-${currentYear}`;
+
+  const [selectedFY, setSelectedFY] = useState<string>(currentFY);
+  const [selectedMonth, setSelectedMonth] = useState<number | ''>(''); 
+
+  const { data: summary, isLoading } = useGetDashboardSummaryQuery({ fy: selectedFY, month: selectedMonth });
   const navigate = useNavigate();
 
   const handleOpenLiveFeed = () => {
@@ -52,42 +59,50 @@ const Dashboard: React.FC = () => {
   if (isLoading) return <Typography>Loading Dashboard...</Typography>;
 
   return (
-    <Box>
-      {/* Top Banner - LogKaro Style */}
-      <Paper sx={{ 
-        bgcolor: '#2A2A2A', // Dark charcoal to contrast with cream
-        color: '#FFFFFF', 
-        borderRadius: 4, 
-        p: 3, 
-        mb: 4, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 2
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1.5, borderRadius: 3 }}>
-            <ShieldIcon sx={{ color: 'primary.main', fontSize: 40 }} />
-          </Box>
-          <Box>
-            <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 'bold', letterSpacing: 1.5, display: 'block', lineHeight: 1 }}>
-              UNNATI ARTS ERP
-            </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 'bold', mt: 0.5 }}>
-              Executive Dashboard
-            </Typography>
-          </Box>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Dashboard</Typography>
+          <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>Overview of business performance.</Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button variant="contained" color="secondary" startIcon={<LiveTvIcon />} onClick={handleOpenLiveFeed} sx={{ borderRadius: 8 }}>
-            Live Feed
-          </Button>
-          <Button variant="contained" color="primary" startIcon={<PictureAsPdfIcon />} onClick={() => handleExport('pdf')} sx={{ borderRadius: 8 }}>
-            Export Report
-          </Button>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#FFF' }}>
+            <InputLabel>Financial Year</InputLabel>
+            <Select
+              value={selectedFY}
+              label="Financial Year"
+              onChange={(e) => setSelectedFY(e.target.value)}
+            >
+              <MenuItem value="2024-2025">2024-2025</MenuItem>
+              <MenuItem value="2025-2026">2025-2026</MenuItem>
+              <MenuItem value="2026-2027">2026-2027</MenuItem>
+              <MenuItem value="2027-2028">2027-2028</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#FFF' }}>
+            <InputLabel>Month</InputLabel>
+            <Select
+              value={selectedMonth}
+              label="Month"
+              onChange={(e) => setSelectedMonth(e.target.value as number | '')}
+            >
+              <MenuItem value="">All Year</MenuItem>
+              <MenuItem value={3}>April</MenuItem>
+              <MenuItem value={4}>May</MenuItem>
+              <MenuItem value={5}>June</MenuItem>
+              <MenuItem value={6}>July</MenuItem>
+              <MenuItem value={7}>August</MenuItem>
+              <MenuItem value={8}>September</MenuItem>
+              <MenuItem value={9}>October</MenuItem>
+              <MenuItem value={10}>November</MenuItem>
+              <MenuItem value={11}>December</MenuItem>
+              <MenuItem value={0}>January</MenuItem>
+              <MenuItem value={1}>February</MenuItem>
+              <MenuItem value={2}>March</MenuItem>
+            </Select>
+          </FormControl>
         </Box>
-      </Paper>
+      </Box>
 
       <Grid container spacing={3} sx={{ mb: 5 }}>
         <Grid xs={12} sm={6} md={3}>
