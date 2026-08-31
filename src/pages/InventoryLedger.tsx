@@ -44,7 +44,7 @@ const InventoryLedger = () => {
       refetch();
     } catch (error) {
       console.error(error);
-      alert('Error deducting stock');
+      alert(`Error: ${error?.data?.message || 'Could not deduct stock'}`);
     }
   };
 
