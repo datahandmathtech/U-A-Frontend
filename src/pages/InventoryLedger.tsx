@@ -130,7 +130,7 @@ const InventoryLedger = () => {
           <TextField
             label="Date"
             type="date"
-            InputLabelProps={{ shrink: true }}
+            slotProps={{ inputLabel: { shrink: true } }}
             value={deductForm.date}
             onChange={(e) => setDeductForm({ ...deductForm, date: e.target.value })}
             fullWidth
