@@ -18,7 +18,7 @@ const InventoryLedger = () => {
   const [deductInventory] = useDeductInventoryMutation();
 
   const [openDeduct, setOpenDeduct] = useState(false);
-  const [deductForm, setDeductForm] = useState({ inventoryId: '', usedQuantity: '', wasteQuantity: '', projectName: '', date: new Date().toISOString().substring(0,10) });
+  const [deductForm, setDeductForm] = useState({ inventoryId: '', productName: '', length: '', width: '', pieces: '1', date: new Date().toISOString().substring(0,10) });
 
   const supplierItems = inventoryItems?.filter((i: any) => i.supplier === decodedSupplier) || [];
   const sortedSupplierItems = [...supplierItems].sort((a: any, b: any) => {
@@ -29,15 +29,17 @@ const InventoryLedger = () => {
 
   const handleDeductSubmit = async () => {
     try {
+      const usedArea = (Number(deductForm.length) || 0) * (Number(deductForm.width) || 0) * (Number(deductForm.pieces) || 1);
+      
       await deductInventory({
         inventoryId: deductForm.inventoryId,
-        usedQuantity: Number(deductForm.usedQuantity) || 0,
-        wasteQuantity: Number(deductForm.wasteQuantity) || 0,
-        projectName: deductForm.projectName,
+        usedQuantity: usedArea,
+        wasteQuantity: 0,
+        projectName: `${deductForm.productName} (${deductForm.pieces}Pcs x ${deductForm.length}L x ${deductForm.width}W)`,
         date: deductForm.date
       }).unwrap();
       setOpenDeduct(false);
-      setDeductForm({ inventoryId: '', usedQuantity: '', wasteQuantity: '', projectName: '', date: new Date().toISOString().substring(0,10) });
+      setDeductForm({ inventoryId: '', productName: '', length: '', width: '', pieces: '1', date: new Date().toISOString().substring(0,10) });
       refetch();
     } catch (error) {
       console.error(error);
@@ -147,30 +149,41 @@ const InventoryLedger = () => {
             </Select>
           </FormControl>
           
-          <TextField 
-            label="Project Name / Vendor Name" 
-            placeholder="e.g. Ramesh Project"
-            value={deductForm.projectName}
-            onChange={(e) => setDeductForm({ ...deductForm, projectName: e.target.value })}
-            fullWidth
+          <Autocomplete
+            freeSolo
+            options={['Wall Cladding', 'Kitchen Top', 'Flooring', 'Staircase', 'Vanity', 'Table Top']}
+            value={deductForm.productName}
+            onChange={(e, newValue) => setDeductForm({ ...deductForm, productName: newValue || '' })}
+            onInputChange={(e, newInputValue) => setDeductForm({ ...deductForm, productName: newInputValue })}
+            renderInput={(params) => <TextField {...params} label="Product Name / Slabs (e.g. Wall Cladding)" />}
           />
 
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField 
-              label="Used Quantity" 
+              label="Pieces" 
               type="number"
-              value={deductForm.usedQuantity}
-              onChange={(e) => setDeductForm({ ...deductForm, usedQuantity: e.target.value })}
+              value={deductForm.pieces}
+              onChange={(e) => setDeductForm({ ...deductForm, pieces: e.target.value })}
               fullWidth
             />
             <TextField 
-              label="Waste Quantity" 
+              label="Length (L)" 
               type="number"
-              value={deductForm.wasteQuantity}
-              onChange={(e) => setDeductForm({ ...deductForm, wasteQuantity: e.target.value })}
+              value={deductForm.length}
+              onChange={(e) => setDeductForm({ ...deductForm, length: e.target.value })}
+              fullWidth
+            />
+            <TextField 
+              label="Width (W)" 
+              type="number"
+              value={deductForm.width}
+              onChange={(e) => setDeductForm({ ...deductForm, width: e.target.value })}
               fullWidth
             />
           </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'right', fontWeight: 'bold' }}>
+            Total Used: {((Number(deductForm.length) || 0) * (Number(deductForm.width) || 0) * (Number(deductForm.pieces) || 1)).toFixed(2)} Sq.Ft
+          </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenDeduct(false)} color="inherit">Cancel</Button>
@@ -178,7 +191,7 @@ const InventoryLedger = () => {
             variant="contained" 
             color="error" 
             onClick={handleDeductSubmit}
-            disabled={!deductForm.inventoryId || (!deductForm.usedQuantity && !deductForm.wasteQuantity)}
+            disabled={!deductForm.inventoryId || (!(Number(deductForm.length) > 0 && Number(deductForm.width) > 0))}
           >
             Confirm Deduction
           </Button>
