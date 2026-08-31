@@ -6,7 +6,7 @@ import {
   MenuItem, Select, InputLabel, FormControl, Autocomplete
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useGetInventoryLogsQuery, useGetInventoryQuery, useDeductInventoryMutation } from '../store/apiSlice';
+import { useGetInventoryLogsQuery, useGetInventoryQuery, useDeductInventoryMutation, useGetAllSlabNamesQuery } from '../store/apiSlice';
 
 const InventoryLedger = () => {
   const { supplier } = useParams();
@@ -16,9 +16,10 @@ const InventoryLedger = () => {
   const { data: logs, isLoading: isLoadingLogs, refetch } = useGetInventoryLogsQuery(decodedSupplier);
   const { data: inventoryItems } = useGetInventoryQuery();
   const [deductInventory] = useDeductInventoryMutation();
+  const { data: slabNames } = useGetAllSlabNamesQuery();
 
   const [openDeduct, setOpenDeduct] = useState(false);
-  const [deductForm, setDeductForm] = useState({ inventoryId: '', productName: '', length: '', width: '', pieces: '1', date: new Date().toISOString().substring(0,10) });
+  const [deductForm, setDeductForm] = useState({ inventoryId: '', productName: '', length: '', width: '', date: new Date().toISOString().substring(0,10) });
 
   const supplierItems = inventoryItems?.filter((i: any) => i.supplier === decodedSupplier) || [];
   const sortedSupplierItems = [...supplierItems].sort((a: any, b: any) => {
@@ -29,17 +30,17 @@ const InventoryLedger = () => {
 
   const handleDeductSubmit = async () => {
     try {
-      const usedArea = (Number(deductForm.length) || 0) * (Number(deductForm.width) || 0) * (Number(deductForm.pieces) || 1);
+      const usedArea = (Number(deductForm.length) || 0) * (Number(deductForm.width) || 0);
       
       await deductInventory({
         inventoryId: deductForm.inventoryId,
         usedQuantity: usedArea,
         wasteQuantity: 0,
-        projectName: `${deductForm.productName} (${deductForm.pieces}Pcs x ${deductForm.length}L x ${deductForm.width}W)`,
+        projectName: `${deductForm.productName} (${deductForm.length}L x ${deductForm.width}W)`,
         date: deductForm.date
       }).unwrap();
       setOpenDeduct(false);
-      setDeductForm({ inventoryId: '', productName: '', length: '', width: '', pieces: '1', date: new Date().toISOString().substring(0,10) });
+      setDeductForm({ inventoryId: '', productName: '', length: '', width: '', date: new Date().toISOString().substring(0,10) });
       refetch();
     } catch (error) {
       console.error(error);
@@ -151,7 +152,7 @@ const InventoryLedger = () => {
           
           <Autocomplete
             freeSolo
-            options={['Wall Cladding', 'Kitchen Top', 'Flooring', 'Staircase', 'Vanity', 'Table Top']}
+            options={slabNames || []}
             value={deductForm.productName}
             onChange={(e, newValue) => setDeductForm({ ...deductForm, productName: newValue || '' })}
             onInputChange={(e, newInputValue) => setDeductForm({ ...deductForm, productName: newInputValue })}
@@ -159,13 +160,7 @@ const InventoryLedger = () => {
           />
 
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField 
-              label="Pieces" 
-              type="number"
-              value={deductForm.pieces}
-              onChange={(e) => setDeductForm({ ...deductForm, pieces: e.target.value })}
-              fullWidth
-            />
+            
             <TextField 
               label="Length (L)" 
               type="number"
@@ -182,7 +177,7 @@ const InventoryLedger = () => {
             />
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'right', fontWeight: 'bold' }}>
-            Total Used: {((Number(deductForm.length) || 0) * (Number(deductForm.width) || 0) * (Number(deductForm.pieces) || 1)).toFixed(2)} Sq.Ft
+            Total Used: {((Number(deductForm.length) || 0) * (Number(deductForm.width) || 0)).toFixed(2)} Sq.Ft
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

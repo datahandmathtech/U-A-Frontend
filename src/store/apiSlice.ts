@@ -132,7 +132,7 @@ export const apiSlice = createApi({
       query: (fyYear) => fyYear ? `/inventory?fyYear=${fyYear}` : '/inventory',
       providesTags: ['Inventory']
     }),
-    deductInventory: builder.mutation<any, { inventoryId: string, quantity: number, isWaste: boolean }>({
+    deductInventory: builder.mutation<any, { inventoryId: string, usedQuantity: number, wasteQuantity: number, projectName: string, date: string }>({
       query: (body) => ({ url: '/inventory/deduct', method: 'POST', body }),
       invalidatesTags: ['Inventory', 'Waste']
     }),
@@ -289,6 +289,10 @@ export const apiSlice = createApi({
     createProductionLog: builder.mutation<any, Partial<any>>({
       query: (body) => ({ url: '/production', method: 'POST', body }),
       invalidatesTags: ['Production']
+    }),
+    getAllSlabNames: builder.query<string[], void>({
+      query: () => '/slabs/all-names',
+      providesTags: ['Production']
     }),
     getSlabs: builder.query<any[], string>({
       query: (projectId) => `/slabs/project/${projectId}`,
@@ -527,6 +531,7 @@ export const {
   useMachineClockInMutation,
   useMachineClockOutMutation,
   useGetSlabsQuery,
+  useGetAllSlabNamesQuery,
   useGetAllPiecesQuery,
   useAddPiecesMutation,
   useCreateSlabMutation,
