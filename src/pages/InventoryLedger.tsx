@@ -38,6 +38,20 @@ const InventoryLedger = () => {
     }
   };
 
+  const sortedLogs = React.useMemo(() => {
+    if (!logs) return [];
+    return [...logs].sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt).toDateString();
+      const dateB = new Date(b.createdAt).toDateString();
+      if (dateA === dateB) {
+        const numA = parseInt(a.inventory?.blockNumber || '0') || 0;
+        const numB = parseInt(b.inventory?.blockNumber || '0') || 0;
+        return numA - numB;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [logs]);
+
   return (
     <Box sx={{ p: 4, maxWidth: 1200, margin: '0 auto' }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/inventory')} sx={{ mb: 3 }}>
@@ -73,7 +87,7 @@ const InventoryLedger = () => {
               {logs?.length === 0 ? (
                 <TableRow><TableCell colSpan={6} align="center">No logs found.</TableCell></TableRow>
               ) : (
-                logs?.map((log: any) => (
+                sortedLogs.map((log: any) => (
                   <TableRow key={log.id} hover>
                     <TableCell>{new Date(log.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>{log.inventory?.itemName || 'N/A'}</TableCell>
