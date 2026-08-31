@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Checkbox, FormControlLabel,
-  MenuItem, Select, InputLabel, FormControl
+  MenuItem, Select, InputLabel, FormControl, Autocomplete
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useGetInventoryLogsQuery, useGetInventoryQuery, useDeductInventoryMutation } from '../store/apiSlice';
