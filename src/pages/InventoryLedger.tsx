@@ -24,26 +24,54 @@ const InventoryLedger = () => {
 
   
   const [openEdit, setOpenEdit] = useState(false);
-  const [editForm, setEditForm] = useState({ id: '', date: '', remarks: '', quantity: '' });
+  const [editForm, setEditForm] = useState({ id: '', date: '', productName: '', length: '', width: '' });
 
-  const handleEditClick = (log: any) => {
+    const handleEditClick = (log: any) => {
+    let pName = log.remarks || '';
+    let l = '';
+    let w = '';
+    
+    // Parse "ProductName (10L x 7.5W)"
+    const match = pName.match(/(.*)\s*\((.*)L x (.*)W\)/);
+    if (match) {
+       pName = match[1].trim();
+       l = match[2];
+       w = match[3];
+    } else if (pName === 'Initial stock addition') {
+       pName = 'Initial stock addition';
+    }
+
     setEditForm({
       id: log.id,
       date: new Date(log.createdAt).toISOString().substring(0, 10),
-      remarks: log.remarks || '',
-      quantity: log.quantity.toString()
+      productName: pName,
+      length: l,
+      width: w
     });
     setOpenEdit(true);
   };
 
-  const handleEditSubmit = async () => {
+    const handleEditSubmit = async () => {
     try {
+      const usedArea = (Number(editForm.length) || 0) * (Number(editForm.width) || 0);
+      let newRemarks = editForm.productName;
+      let newQty = usedArea;
+
+      if (editForm.productName !== 'Initial stock addition' && editForm.length && editForm.width) {
+        newRemarks = `${editForm.productName} (${editForm.length}L x ${editForm.width}W)`;
+      } else if (editForm.productName === 'Initial stock addition') {
+        // If it's an IN log, we might not have L and W, so we'll just keep old qty unless they entered L and W?
+        // Wait, if it's IN, they probably shouldn't edit the L and W here, it's just Initial stock addition.
+        // Let's just let them save. But how do we get qty for IN?
+        // Actually, for Initial Stock, let's just use whatever they put in L and W if they filled it, else we need the original qty.
+      }
+
       await updateLog({
         id: editForm.id,
         data: {
           date: editForm.date,
-          remarks: editForm.remarks,
-          quantity: Number(editForm.quantity)
+          remarks: newRemarks,
+          quantity: newQty > 0 ? newQty : undefined // if they didn't provide L/W (e.g. for Initial stock), it won't override qty
         }
       }).unwrap();
       setOpenEdit(false);
@@ -191,19 +219,36 @@ const InventoryLedger = () => {
             onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
             fullWidth
           />
-          <TextField 
-            label="Remarks / Project" 
-            value={editForm.remarks}
-            onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })}
-            fullWidth
+          
+          <Autocomplete
+            freeSolo
+            options={slabNames || []}
+            value={editForm.productName}
+            onChange={(e, newValue) => setEditForm({ ...editForm, productName: newValue || '' })}
+            onInputChange={(e, newInputValue) => setEditForm({ ...editForm, productName: newInputValue })}
+            renderInput={(params) => <TextField {...params} label="Product Name / Remarks" />}
           />
-          <TextField 
-            label="Quantity" 
-            type="number"
-            value={editForm.quantity}
-            onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
-            fullWidth
-          />
+
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField 
+              label="Length (L)" 
+              type="number"
+              value={editForm.length}
+              onChange={(e) => setEditForm({ ...editForm, length: e.target.value })}
+              fullWidth
+            />
+            <TextField 
+              label="Width (W)" 
+              type="number"
+              value={editForm.width}
+              onChange={(e) => setEditForm({ ...editForm, width: e.target.value })}
+              fullWidth
+            />
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'right', fontWeight: 'bold' }}>
+            Total Sq.Ft: {((Number(editForm.length) || 0) * (Number(editForm.width) || 0)).toFixed(2)}
+          </Typography>
+
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenEdit(false)} color="inherit">Cancel</Button>
