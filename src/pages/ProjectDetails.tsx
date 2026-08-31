@@ -1679,151 +1679,81 @@ const ProjectDetails: React.FC = () => {
 
                 <Box sx={{ mb: 4 }}>
                   <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', border: '1px solid #E0E0E0' }}>
-                    <Tabs 
-                      value={reservedMaterialTab} 
-                      onChange={(e, val) => setReservedMaterialTab(val)}
-                      variant="fullWidth"
-                      sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#FAFAFA' }}
-                    >
-                      <Tab label="Unnati Materials" sx={{ fontWeight: 'bold' }} />
-                      <Tab label="Client Materials" sx={{ fontWeight: 'bold' }} />
-                    </Tabs>
-                    
-                    {/* Unnati Materials Tab */}
-                    <Box sx={{ display: reservedMaterialTab === 0 ? 'block' : 'none' }}>
-                      <TableContainer>
-                        <Table size="small">
-                          <TableHead sx={{ bgcolor: '#FFFDF5' }}>
-                            <TableRow>
-                              <TableCell><strong>Material Name</strong></TableCell>
-                              <TableCell><strong>Block No.</strong></TableCell>
-                              <TableCell><strong>L x W x T</strong></TableCell>
-                              <TableCell><strong>Qty</strong></TableCell>
-                              <TableCell align="center"><strong>Actions</strong></TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {projectMaterials?.filter((pm: any) => pm.inventory.jobWorkType === 'company').length > 0 ? projectMaterials.filter((pm: any) => pm.inventory.jobWorkType === 'company').map((pm: any) => (
-                              <TableRow key={pm.id} hover>
-                                <TableCell>{pm.inventory.itemName}</TableCell>
-                                <TableCell>{pm.inventory.blockNumber || '-'}</TableCell>
-                                <TableCell>{[pm.inventory.length, pm.inventory.width, pm.inventory.thickness].filter(Boolean).join(' x ') || '-'}</TableCell>
-                                <TableCell>{pm.quantity} {pm.inventory.unit}</TableCell>
-                                <TableCell align="center">
-                                  <IconButton color="primary" size="small" onClick={async () => {
-                                    if (isEditingRef.current) return;
-                                    isEditingRef.current = true;
-                                    try {
-                                      setClientSlabs([{
-                                        materialName: pm.inventory.itemName || '', blockNo: pm.inventory.blockNumber || '', length: pm.inventory.length || '', width: pm.inventory.width || '', thickness: pm.inventory.thickness || '', unit: 'inch',
-                                        isUnnati: true,
-                                        unnatiId: pm.inventoryId || '',
-                                        unnatiQty: pm.quantity || ''
-                                      }]);
-                                      await deleteProjectMaterial({ projectId: id as string, materialId: pm.id }).unwrap();
-                                      setSnackbarMessage('Material moved to edit mode. Please update and reserve again.');
-                                      refetchMaterials();
-                                    } catch (err) {
-                                      console.error(err);
-                                      setSnackbarMessage('Error editing material.');
-                                    } finally {
-                                      isEditingRef.current = false;
-                                    }
-                                  }}><EditIcon fontSize="small" /></IconButton>
-                                  <IconButton color="error" size="small" onClick={async () => {
-                                    if (window.confirm('Are you sure you want to delete this reserved material?')) {
-                                      try {
-                                        await deleteProjectMaterial({ projectId: id as string, materialId: pm.id }).unwrap();
-                                        setSnackbarMessage('Material deleted successfully');
-                                        refetchMaterials();
-                                      } catch (err) {
-                                        console.error(err);
-                                        setSnackbarMessage('Error deleting material.');
-                                      }
-                                    }
-                                  }}><DeleteIcon fontSize="small" /></IconButton>
-                                </TableCell>
-                              </TableRow>
-                            )) : (
-                              <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>No Unnati materials reserved.</TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </Box>
-
-                    {/* Client Materials Tab */}
-                    <Box sx={{ display: reservedMaterialTab === 1 ? 'block' : 'none' }}>
-                      <TableContainer>
-                        <Table size="small">
-                          <TableHead sx={{ bgcolor: '#F5FBFF' }}>
-                            <TableRow>
-                              <TableCell><strong>Material Name</strong></TableCell>
-                              <TableCell><strong>Block No.</strong></TableCell>
-                              <TableCell><strong>L x W x T</strong></TableCell>
-                              <TableCell><strong>Qty</strong></TableCell>
-                              <TableCell align="center"><strong>Actions</strong></TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {projectMaterials?.filter((pm: any) => pm.inventory.jobWorkType === 'client').length > 0 ? projectMaterials.filter((pm: any) => pm.inventory.jobWorkType === 'client').map((pm: any) => (
-                              <TableRow key={pm.id} hover>
-                                <TableCell>{pm.inventory.itemName}</TableCell>
-                                <TableCell>{pm.inventory.blockNumber || '-'}</TableCell>
-                                <TableCell>{[pm.inventory.length, pm.inventory.width, pm.inventory.thickness].filter(Boolean).join(' x ') || '-'}</TableCell>
-                                <TableCell>{pm.quantity} {pm.inventory.unit}</TableCell>
-                                <TableCell align="center">
-                                  <IconButton color="primary" size="small" onClick={async () => {
-                                    if (isEditingRef.current) return;
-                                    isEditingRef.current = true;
-                                    try {
-                                      setClientSlabs([{
-                                        materialName: pm.inventory.itemName || '',
-                                        blockNo: pm.inventory.blockNumber || '',
-                                        unit: 'inch',
-                                        length: pm.inventory.length || '',
-                                        width: pm.inventory.width || '',
-                                        thickness: pm.inventory.thickness || '',
-                                        isUnnati: false,
-                                        unnatiId: '',
-                                        unnatiQty: pm.quantity || ''
-                                      }]);
-                                      await deleteProjectMaterial({ projectId: id as string, materialId: pm.id }).unwrap();
-                                      setSnackbarMessage('Material moved to edit mode. Please update and reserve again.');
-                                      refetchMaterials();
-                                    } catch (err) {
-                                      console.error(err);
-                                      setSnackbarMessage('Error editing material.');
-                                    } finally {
-                                      isEditingRef.current = false;
-                                    }
-                                  }}><EditIcon fontSize="small" /></IconButton>
-                                  <IconButton color="error" size="small" onClick={async () => {
-                                    if (window.confirm('Are you sure you want to delete this reserved material?')) {
-                                      try {
-                                        await deleteProjectMaterial({ projectId: id as string, materialId: pm.id }).unwrap();
-                                        setSnackbarMessage('Material deleted successfully');
-                                        refetchMaterials();
-                                      } catch (err) {
-                                        console.error(err);
-                                        setSnackbarMessage('Error deleting material.');
-                                      }
-                                    }
-                                  }}><DeleteIcon fontSize="small" /></IconButton>
-                                </TableCell>
-                              </TableRow>
-                            )) : (
-                              <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>No Client materials reserved.</TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </Box>
-                  </Paper>
+                    <TableContainer>
+  <Table size="small">
+    <TableHead sx={{ bgcolor: '#FFFDF5' }}>
+      <TableRow>
+        <TableCell><strong>Source</strong></TableCell>
+        <TableCell><strong>Material Name</strong></TableCell>
+        <TableCell><strong>Block No.</strong></TableCell>
+        <TableCell><strong>L x W x T</strong></TableCell>
+        <TableCell><strong>Qty</strong></TableCell>
+        <TableCell align="center"><strong>Actions</strong></TableCell>
+      </TableRow>
+    </TableHead>
+    <TableBody>
+      {projectMaterials && projectMaterials.length > 0 ? projectMaterials.map((pm: any) => (
+        <TableRow key={pm.id} hover>
+          <TableCell>
+            {pm.inventory.jobWorkType === 'client' ? (
+              <Chip label="Client" size="small" color="info" variant="outlined" />
+            ) : (
+              <Chip label="Unnati" size="small" color="success" variant="outlined" />
+            )}
+          </TableCell>
+          <TableCell>{pm.inventory.itemName}</TableCell>
+          <TableCell>{pm.inventory.blockNumber || '-'}</TableCell>
+          <TableCell>{[pm.inventory.length, pm.inventory.width, pm.inventory.thickness].filter(Boolean).join(' x ') || '-'}</TableCell>
+          <TableCell>{pm.quantity} {pm.inventory.unit}</TableCell>
+          <TableCell align="center">
+            <IconButton color="primary" size="small" onClick={async () => {
+              if (isEditingRef.current) return;
+              isEditingRef.current = true;
+              try {
+                setClientSlabs([{
+                  materialName: pm.inventory.itemName || '',
+                  blockNo: pm.inventory.blockNumber || '',
+                  unit: 'inch',
+                  length: pm.inventory.length || '',
+                  width: pm.inventory.width || '',
+                  thickness: pm.inventory.thickness || '',
+                  isUnnati: pm.inventory.jobWorkType !== 'client',
+                  unnatiId: '',
+                  unnatiQty: pm.quantity || ''
+                }]);
+                await deleteProjectMaterial({ projectId: id as string, materialId: pm.id }).unwrap();
+                setSnackbarMessage('Material moved to edit mode. Please update and reserve again.');
+                refetchMaterials();
+              } catch (err) {
+                console.error(err);
+                setSnackbarMessage('Error editing material.');
+              } finally {
+                isEditingRef.current = false;
+              }
+            }}><EditIcon fontSize="small" /></IconButton>
+            <IconButton color="error" size="small" onClick={async () => {
+              if (window.confirm('Are you sure you want to delete this reserved material?')) {
+                try {
+                  await deleteProjectMaterial({ projectId: id as string, materialId: pm.id }).unwrap();
+                  setSnackbarMessage('Material deleted successfully');
+                  refetchMaterials();
+                } catch (err) {
+                  console.error(err);
+                  setSnackbarMessage('Error deleting material.');
+                }
+              }
+            }}><DeleteIcon fontSize="small" /></IconButton>
+          </TableCell>
+        </TableRow>
+      )) : (
+        <TableRow>
+          <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>No materials reserved yet.</TableCell>
+        </TableRow>
+      )}
+    </TableBody>
+  </Table>
+</TableContainer>
+</Paper>
                 </Box>
 
                 <Box sx={{ p: 3, border: '1px dashed #B38B36', borderRadius: 3, bgcolor: '#FFFDF5', mb: 4 }}>
