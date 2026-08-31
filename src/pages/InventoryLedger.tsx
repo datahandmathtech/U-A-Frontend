@@ -162,6 +162,14 @@ const InventoryLedger = () => {
                     <TableCell sx={{ color: 'error.main', fontWeight: log.type === 'OUT' ? 'bold' : 'normal' }}>
                       {log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${log.inventory?.unit || ''}` : '-'}
                     </TableCell>
+                    <TableCell align="center">
+                      <IconButton size="small" color="primary" onClick={() => handleEditClick(log)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" color="error" onClick={() => handleDelete(log.id)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
