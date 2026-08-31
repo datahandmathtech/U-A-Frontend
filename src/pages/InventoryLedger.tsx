@@ -18,7 +18,7 @@ const InventoryLedger = () => {
   const [deductInventory] = useDeductInventoryMutation();
 
   const [openDeduct, setOpenDeduct] = useState(false);
-  const [deductForm, setDeductForm] = useState({ inventoryId: '', quantity: '', isWaste: false });
+  const [deductForm, setDeductForm] = useState({ inventoryId: '', usedQuantity: '', wasteQuantity: '', projectName: '', date: new Date().toISOString().substring(0,10) });
 
   const supplierItems = inventoryItems?.filter((i: any) => i.supplier === decodedSupplier) || [];
 
@@ -26,11 +26,13 @@ const InventoryLedger = () => {
     try {
       await deductInventory({
         inventoryId: deductForm.inventoryId,
-        quantity: Number(deductForm.quantity),
-        isWaste: deductForm.isWaste
+        usedQuantity: Number(deductForm.usedQuantity) || 0,
+        wasteQuantity: Number(deductForm.wasteQuantity) || 0,
+        projectName: deductForm.projectName,
+        date: deductForm.date
       }).unwrap();
       setOpenDeduct(false);
-      setDeductForm({ inventoryId: '', quantity: '', isWaste: false });
+      setDeductForm({ inventoryId: '', usedQuantity: '', wasteQuantity: '', projectName: '', date: new Date().toISOString().substring(0,10) });
       refetch();
     } catch (error) {
       console.error(error);
@@ -77,6 +79,7 @@ const InventoryLedger = () => {
               <TableRow sx={{ bgcolor: '#F5F5F5' }}>
                 <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Material Name</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Project / Remarks</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Block No</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>L x W x T</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', color: 'green' }}>IN (+)</TableCell>
@@ -91,6 +94,7 @@ const InventoryLedger = () => {
                   <TableRow key={log.id} hover>
                     <TableCell>{new Date(log.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>{log.inventory?.itemName || 'N/A'}</TableCell>
+                    <TableCell sx={{ color: 'text.secondary' }}>{log.remarks || '-'}</TableCell>
                     <TableCell>{log.inventory?.blockNumber || 'N/A'}</TableCell>
                     <TableCell>
                       {log.inventory?.type !== 'consumable' 
@@ -115,6 +119,14 @@ const InventoryLedger = () => {
       <Dialog open={openDeduct} onClose={() => setOpenDeduct(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold' }}>Deduct Stock / Record Waste</DialogTitle>
         <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+          <TextField
+            label="Date"
+            type="date"
+            InputLabelProps={{ shrink: true }}
+            value={deductForm.date}
+            onChange={(e) => setDeductForm({ ...deductForm, date: e.target.value })}
+            fullWidth
+          />
           <FormControl fullWidth>
             <InputLabel>Select Material / Block</InputLabel>
             <Select
@@ -131,22 +143,29 @@ const InventoryLedger = () => {
           </FormControl>
           
           <TextField 
-            label="Quantity to Deduct" 
-            type="number"
-            value={deductForm.quantity}
-            onChange={(e) => setDeductForm({ ...deductForm, quantity: e.target.value })}
+            label="Project Name / Vendor Name" 
+            placeholder="e.g. Ramesh Project"
+            value={deductForm.projectName}
+            onChange={(e) => setDeductForm({ ...deductForm, projectName: e.target.value })}
             fullWidth
           />
 
-          <FormControlLabel
-            control={
-              <Checkbox 
-                checked={deductForm.isWaste}
-                onChange={(e) => setDeductForm({ ...deductForm, isWaste: e.target.checked })}
-              />
-            }
-            label="Send to Waste Ledger"
-          />
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField 
+              label="Used Quantity" 
+              type="number"
+              value={deductForm.usedQuantity}
+              onChange={(e) => setDeductForm({ ...deductForm, usedQuantity: e.target.value })}
+              fullWidth
+            />
+            <TextField 
+              label="Waste Quantity" 
+              type="number"
+              value={deductForm.wasteQuantity}
+              onChange={(e) => setDeductForm({ ...deductForm, wasteQuantity: e.target.value })}
+              fullWidth
+            />
+          </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenDeduct(false)} color="inherit">Cancel</Button>
@@ -154,7 +173,7 @@ const InventoryLedger = () => {
             variant="contained" 
             color="error" 
             onClick={handleDeductSubmit}
-            disabled={!deductForm.inventoryId || !deductForm.quantity}
+            disabled={!deductForm.inventoryId || (!deductForm.usedQuantity && !deductForm.wasteQuantity)}
           >
             Confirm Deduction
           </Button>
