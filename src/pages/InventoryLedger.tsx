@@ -21,6 +21,11 @@ const InventoryLedger = () => {
   const [deductForm, setDeductForm] = useState({ inventoryId: '', usedQuantity: '', wasteQuantity: '', projectName: '', date: new Date().toISOString().substring(0,10) });
 
   const supplierItems = inventoryItems?.filter((i: any) => i.supplier === decodedSupplier) || [];
+  const sortedSupplierItems = [...supplierItems].sort((a: any, b: any) => {
+    const numA = parseInt(a.blockNumber || '0') || 0;
+    const numB = parseInt(b.blockNumber || '0') || 0;
+    return numA - numB;
+  });
 
   const handleDeductSubmit = async () => {
     try {
@@ -134,7 +139,7 @@ const InventoryLedger = () => {
               value={deductForm.inventoryId}
               onChange={(e) => setDeductForm({ ...deductForm, inventoryId: e.target.value })}
             >
-              {supplierItems.map((item: any) => (
+              {sortedSupplierItems.map((item: any) => (
                 <MenuItem key={item.id} value={item.id}>
                   {item.itemName} (Block: {item.blockNumber || 'N/A'}) - Available: {item.quantity.toFixed(2)} {item.unit}
                 </MenuItem>
