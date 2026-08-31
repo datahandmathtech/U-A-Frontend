@@ -132,6 +132,10 @@ export const apiSlice = createApi({
       query: (fyYear) => fyYear ? `/inventory?fyYear=${fyYear}` : '/inventory',
       providesTags: ['Inventory']
     }),
+    deductInventory: builder.mutation<any, { inventoryId: string, quantity: number, isWaste: boolean }>({
+      query: (body) => ({ url: '/inventory/deduct', method: 'POST', body }),
+      invalidatesTags: ['Inventory', 'Waste']
+    }),
     createInventory: builder.mutation<any, Partial<any>>({
       query: (body) => ({ url: '/inventory', method: 'POST', body }),
       invalidatesTags: ['Inventory']
@@ -507,6 +511,7 @@ export const {
   useUploadFilesMutation,
   useGetInventoryQuery,
   useCreateInventoryMutation,
+  useDeductInventoryMutation,
   useGetProductionLogsQuery,
   useCreateProductionLogMutation,
   useUpdateProductionLogMutation,

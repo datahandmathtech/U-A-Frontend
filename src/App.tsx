@@ -8,6 +8,7 @@ import CRM from './pages/CRM';
 import Projects from './pages/Projects';
 import Accounts from './pages/Accounts';
 import Inventory from './pages/Inventory';
+import InventoryLedger from './pages/InventoryLedger';
 import Production from './pages/Production';
 import Dispatch from './pages/Dispatch';
 import HR from './pages/HR';

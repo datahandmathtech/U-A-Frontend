@@ -61,14 +61,14 @@ const WasteLedger = () => {
                 <TableRow key={wm.id} hover>
                   <TableCell>{new Date(wm.addedAt).toLocaleDateString()}</TableCell>
                   <TableCell>
-                    <Typography fontWeight="bold" color="primary">{wm.project?.name || 'Unknown'}</Typography>
+                    <Typography fontWeight="bold" color="primary">{wm.project?.name || 'Direct Deduction'}</Typography>
                   </TableCell>
                   <TableCell>
                     <Typography>{wm.inventory?.itemName || 'Unknown'}</Typography>
                     <Typography variant="caption" color="text.secondary">{wm.inventory?.supplier}</Typography>
                   </TableCell>
-                  <TableCell>{wm.quantity} Sq.Ft</TableCell>
-                  <TableCell>{wm.usedQuantity || 0} Sq.Ft</TableCell>
+                  <TableCell>{wm.quantity ? `${wm.quantity} Sq.Ft` : 'N/A'}</TableCell>
+                  <TableCell>{wm.quantity ? `${wm.usedQuantity || 0} Sq.Ft` : 'N/A'}</TableCell>
                   <TableCell>
                     <Chip 
                       label={`${wm.wasteQuantity} Sq.Ft`} 
