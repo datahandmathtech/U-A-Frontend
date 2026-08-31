@@ -132,6 +132,14 @@ export const apiSlice = createApi({
       query: (fyYear) => fyYear ? `/inventory?fyYear=${fyYear}` : '/inventory',
       providesTags: ['Inventory']
     }),
+    updateInventoryLog: builder.mutation<any, { id: string, data: any }>({
+      query: ({ id, data }) => ({ url: `/inventory/logs/${id}`, method: 'PUT', body: data }),
+      invalidatesTags: ['Inventory']
+    }),
+    deleteInventoryLog: builder.mutation<any, string>({
+      query: (id) => ({ url: `/inventory/logs/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Inventory']
+    }),
     deductInventory: builder.mutation<any, { inventoryId: string, usedQuantity: number, wasteQuantity: number, projectName: string, date: string }>({
       query: (body) => ({ url: '/inventory/deduct', method: 'POST', body }),
       invalidatesTags: ['Inventory', 'Waste']
@@ -516,6 +524,8 @@ export const {
   useGetInventoryQuery,
   useCreateInventoryMutation,
   useDeductInventoryMutation,
+  useUpdateInventoryLogMutation,
+  useDeleteInventoryLogMutation,
   useGetProductionLogsQuery,
   useCreateProductionLogMutation,
   useUpdateProductionLogMutation,

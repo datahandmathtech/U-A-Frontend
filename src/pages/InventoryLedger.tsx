@@ -6,7 +6,9 @@ import {
   MenuItem, Select, InputLabel, FormControl, Autocomplete
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useGetInventoryLogsQuery, useGetInventoryQuery, useDeductInventoryMutation, useGetAllSlabNamesQuery } from '../store/apiSlice';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import { useGetInventoryLogsQuery, useGetInventoryQuery, useDeductInventoryMutation, useGetAllSlabNamesQuery, useUpdateInventoryLogMutation, useDeleteInventoryLogMutation } from '../store/apiSlice';
 
 const InventoryLedger = () => {
   const { supplier } = useParams();
@@ -16,7 +18,51 @@ const InventoryLedger = () => {
   const { data: logs, isLoading: isLoadingLogs, refetch } = useGetInventoryLogsQuery(decodedSupplier);
   const { data: inventoryItems } = useGetInventoryQuery();
   const [deductInventory] = useDeductInventoryMutation();
+  const [updateLog] = useUpdateInventoryLogMutation();
+  const [deleteLog] = useDeleteInventoryLogMutation();
   const { data: slabNames } = useGetAllSlabNamesQuery();
+
+  
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editForm, setEditForm] = useState({ id: '', date: '', remarks: '', quantity: '' });
+
+  const handleEditClick = (log: any) => {
+    setEditForm({
+      id: log.id,
+      date: new Date(log.createdAt).toISOString().substring(0, 10),
+      remarks: log.remarks || '',
+      quantity: log.quantity.toString()
+    });
+    setOpenEdit(true);
+  };
+
+  const handleEditSubmit = async () => {
+    try {
+      await updateLog({
+        id: editForm.id,
+        data: {
+          date: editForm.date,
+          remarks: editForm.remarks,
+          quantity: Number(editForm.quantity)
+        }
+      }).unwrap();
+      setOpenEdit(false);
+      refetch();
+    } catch (error: any) {
+      alert(`Error: ${error?.data?.message || 'Could not update log'}`);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this entry? This will restore/remove the stock from the block.')) {
+      try {
+        await deleteLog(id).unwrap();
+        refetch();
+      } catch (error: any) {
+        alert('Error deleting log');
+      }
+    }
+  };
 
   const [openDeduct, setOpenDeduct] = useState(false);
   const [deductForm, setDeductForm] = useState({ inventoryId: '', productName: '', length: '', width: '', date: new Date().toISOString().substring(0,10) });
@@ -92,6 +138,7 @@ const InventoryLedger = () => {
                 <TableCell sx={{ fontWeight: 'bold' }}>L x W x T</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', color: 'green' }}>IN (+)</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', color: 'error.main' }}>OUT (-)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', align: 'center' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -122,6 +169,41 @@ const InventoryLedger = () => {
           </Table>
         </TableContainer>
       )}
+
+
+      {/* Edit Log Dialog */}
+      <Dialog open={openEdit} onClose={() => setOpenEdit(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Entry</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+          <TextField
+            label="Date"
+            type="date"
+            slotProps={{ inputLabel: { shrink: true } }}
+            value={editForm.date}
+            onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+            fullWidth
+          />
+          <TextField 
+            label="Remarks / Project" 
+            value={editForm.remarks}
+            onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })}
+            fullWidth
+          />
+          <TextField 
+            label="Quantity" 
+            type="number"
+            value={editForm.quantity}
+            onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenEdit(false)} color="inherit">Cancel</Button>
+          <Button variant="contained" color="primary" onClick={handleEditSubmit}>
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Deduct Stock Dialog */}
       <Dialog open={openDeduct} onClose={() => setOpenDeduct(false)} maxWidth="sm" fullWidth>
