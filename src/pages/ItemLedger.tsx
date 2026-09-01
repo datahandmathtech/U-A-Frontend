@@ -5,9 +5,6 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useDeductInventoryMutation, useUpdateInventoryLogMutation, useDeleteInventoryLogMutation, useGetAllSlabNamesQuery } from '../store/apiSlice';
-import { useQuery } from '@reduxQuery'; // We will just use fetch manually or add it to apiSlice
-
-// We need to fetch item logs. We'll use a standard React component with fetch since we haven't exported it from apiSlice properly yet.
 import { useEffect } from 'react';
 
 const ItemLedger = () => {
@@ -32,8 +29,8 @@ const ItemLedger = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(\`http://localhost:5000/api/inventory/item-logs/\${itemId}\`, {
-        headers: { 'Authorization': \`Bearer \${token}\` }
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/inventory/item-logs/${itemId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
       setLogs(data);
@@ -59,7 +56,7 @@ const ItemLedger = () => {
         inventoryId: itemId as string,
         usedQuantity: usedArea,
         wasteQuantity: 0,
-        projectName: \`\${deductForm.productName} (\${deductForm.length}L x \${deductForm.width}W)\`,
+        projectName: `${deductForm.productName} (${deductForm.length}L x ${deductForm.width}W)`,
         date: deductForm.date
       }).unwrap();
       setOpenDeduct(false);
@@ -72,7 +69,7 @@ const ItemLedger = () => {
 
   const handleEditClick = (log: any) => {
     let l = '', w = '';
-    const match = log.remarks?.match(/(.*?)\\s*\\((.*?)L x (.*?)W\\)/);
+    const match = log.remarks?.match(/(.*?)\s*\((.*?)L x (.*?)W\)/);
     if (match) {
       l = match[2];
       w = match[3];
@@ -92,7 +89,7 @@ const ItemLedger = () => {
       const usedArea = (Number(editForm.length) || 0) * (Number(editForm.width) || 0);
       let remarks = editForm.productName;
       if (editForm.length && editForm.width) {
-        remarks = \`\${editForm.productName} (\${editForm.length}L x \${editForm.width}W)\`;
+        remarks = `${editForm.productName} (${editForm.length}L x ${editForm.width}W)`;
       }
       
       await updateLog({
@@ -175,10 +172,10 @@ const ItemLedger = () => {
                   <TableCell>{new Date(log.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell sx={{ color: 'text.secondary' }}>{log.remarks || '-'}</TableCell>
                   <TableCell sx={{ color: 'green', fontWeight: log.type === 'IN' ? 'bold' : 'normal' }}>
-                    {log.type === 'IN' ? \`+ \${log.quantity.toFixed(2)} \${inventory?.unit || ''}\` : '-'}
+                    {log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : '-'}
                   </TableCell>
                   <TableCell sx={{ color: 'error.main', fontWeight: log.type === 'OUT' ? 'bold' : 'normal' }}>
-                    {log.type === 'OUT' ? \`- \${log.quantity.toFixed(2)} \${inventory?.unit || ''}\` : '-'}
+                    {log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : '-'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
                     {log.balance.toFixed(2)} {inventory?.unit || ''}
