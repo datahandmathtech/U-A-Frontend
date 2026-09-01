@@ -52,38 +52,61 @@ const InventoryLedger = () => {
     }));
     
     const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+    
+    // Auto-size columns for Summary
+    const wscolsSummary = [
+      {wch: 12}, // Date
+      {wch: 20}, // Material Name
+      {wch: 10}, // Block No
+      {wch: 20}, // L x W x T
+      {wch: 15}, // Procure
+      {wch: 15}, // Used
+      {wch: 15}  // Balance
+    ];
+    summaryWs['!cols'] = wscolsSummary;
+    
     XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
     // 2. Create a separate sheet for EACH block
     inventoryStats.forEach((item: any) => {
       let currentBalance = 0;
       
-      const ledgerData = item.itemLogs.map((log: any) => {
+      const blockDataAoA = [
+        [`Material: ${item.itemName} | Block: ${item.blockNumber || 'N/A'} | Size: ${item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A'}`],
+        [],
+        ['Date', 'Project / Remarks', 'Available / IN (+)', 'OUT (-)', 'Balance']
+      ];
+      
+      item.itemLogs.forEach((log: any) => {
         const previousBalance = currentBalance;
         if (log.type === 'IN') currentBalance += Number(log.quantity);
         else currentBalance -= Number(log.quantity);
         
-        return {
-          'Date': new Date(log.createdAt).toLocaleDateString(),
-          'Project / Remarks': log.remarks || '-',
-          'Available / IN (+)': log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${item.unit}` : `${previousBalance.toFixed(2)} ${item.unit}`,
-          'OUT (-)': log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${item.unit}` : '-',
-          'Balance': `${currentBalance.toFixed(2)} ${item.unit}`
-        };
+        blockDataAoA.push([
+          new Date(log.createdAt).toLocaleDateString(),
+          log.remarks || '-',
+          log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${item.unit}` : `${previousBalance.toFixed(2)} ${item.unit}`,
+          log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${item.unit}` : '-',
+          `${currentBalance.toFixed(2)} ${item.unit}`
+        ]);
       });
+
+      const blockWs = XLSX.utils.aoa_to_sheet(blockDataAoA);
+      
+      // Auto-size columns for Block Details
+      const wscolsBlock = [
+        {wch: 12}, // Date
+        {wch: 40}, // Remarks
+        {wch: 20}, // IN
+        {wch: 15}, // OUT
+        {wch: 20}  // Balance
+      ];
+      blockWs['!cols'] = wscolsBlock;
 
       const sheetName = `Block ${item.blockNumber || item.itemName.substring(0, 10)}`;
       
       // Ensure sheet name is unique and < 31 chars (Excel limit)
       let finalSheetName = sheetName.replace(/[\\/*?:\[\]]/g, '').substring(0, 31);
-      
-      const blockWs = XLSX.utils.json_to_sheet(ledgerData);
-      
-      // Add a header row describing the block
-      XLSX.utils.sheet_add_aoa(blockWs, [[`Material: ${item.itemName} | Block: ${item.blockNumber || 'N/A'} | Size: ${item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A'}`]], { origin: "A1" });
-      
-      // Push the data down by 2 rows to make space for the title
-      XLSX.utils.sheet_add_json(blockWs, ledgerData, { origin: "A3" });
       
       try {
         XLSX.utils.book_append_sheet(wb, blockWs, finalSheetName);
