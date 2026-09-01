@@ -3,6 +3,7 @@ import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, Ta
 import { useParams, useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useGetInventoryQuery, useGetInventoryLogsQuery } from '../store/apiSlice';
 
 const InventoryLedger = () => {
@@ -34,6 +35,26 @@ const InventoryLedger = () => {
     };
   }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  const handleExportCSV = () => {
+    const headers = ['Date', 'Material Name', 'Block No', 'L x W x T', 'Procure', 'Used', 'Balance'];
+    const rows = inventoryStats.map((item: any) => [
+      new Date(item.createdAt).toLocaleDateString(),
+      item.itemName || '',
+      item.blockNumber || '',
+      item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A',
+      `${item.procure.toFixed(2)} ${item.unit}`,
+      `${item.used.toFixed(2)} ${item.unit}`,
+      `${item.balance.toFixed(2)} ${item.unit}`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(e => e.map(s => `"${s}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${decodedSupplier}_Inventory_Summary.csv`;
+    link.click();
+  };
+
   return (
     <Box sx={{ p: 4, maxWidth: 1200, margin: '0 auto' }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/inventory')} sx={{ mb: 2, color: '#b8860b' }}>
@@ -45,6 +66,9 @@ const InventoryLedger = () => {
           <Typography variant="h4" sx={{ color: '#333', mb: 1 }}>{decodedSupplier}</Typography>
           <Typography variant="subtitle1" color="text.secondary">Inventory Items Summary</Typography>
         </Box>
+        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} color="primary" sx={{ fontWeight: 'bold' }}>
+          Export Excel
+        </Button>
       </Box>
 
       <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
@@ -72,7 +96,7 @@ const InventoryLedger = () => {
                   <TableCell>{item.blockNumber || 'N/A'}</TableCell>
                   <TableCell>
                     {item.type !== 'consumable' 
-                      ? \`\${item.length || 0} x \${item.width || 0} x \${item.thickness || 0}\`
+                      ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}`
                       : 'N/A'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
