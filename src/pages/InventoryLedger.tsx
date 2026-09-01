@@ -5,6 +5,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
 import { useGetInventoryQuery, useGetInventoryLogsQuery } from '../store/apiSlice';
+import * as XLSX from 'xlsx';
 
 const InventoryLedger = () => {
   const { supplier } = useParams<{ supplier: string }>();
@@ -36,39 +37,64 @@ const InventoryLedger = () => {
     };
   }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const handleExportCSV = () => {
-    let csvContent = `Supplier:,${decodedSupplier}\n\n`;
+  const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new();
 
+    // 1. Create Summary Sheet
+    const summaryData = inventoryStats.map((item: any) => ({
+      'Date': new Date(item.createdAt).toLocaleDateString(),
+      'Material Name': item.itemName || '',
+      'Block No': item.blockNumber || 'N/A',
+      'L x W x T': item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A',
+      'Procure': `${item.procure.toFixed(2)} ${item.unit}`,
+      'Used': `${item.used.toFixed(2)} ${item.unit}`,
+      'Balance': `${item.balance.toFixed(2)} ${item.unit}`
+    }));
+    
+    const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
+
+    // 2. Create a separate sheet for EACH block
     inventoryStats.forEach((item: any) => {
-      csvContent += `Block No:,${item.blockNumber || 'N/A'},Material:,${item.itemName}\n`;
-      csvContent += `Size:,${item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A'}\n`;
-      csvContent += `Procure:,${item.procure.toFixed(2)} ${item.unit},Used:,${item.used.toFixed(2)} ${item.unit},Balance:,${item.balance.toFixed(2)} ${item.unit}\n`;
-      csvContent += `\n`;
-      
-      csvContent += `Date,Project / Remarks,Available / IN (+),OUT (-),Balance\n`;
-      
       let currentBalance = 0;
-      item.itemLogs.forEach((log: any) => {
+      
+      const ledgerData = item.itemLogs.map((log: any) => {
         const previousBalance = currentBalance;
         if (log.type === 'IN') currentBalance += Number(log.quantity);
         else currentBalance -= Number(log.quantity);
         
-        const date = new Date(log.createdAt).toLocaleDateString();
-        const remarks = `"${(log.remarks || '-').replace(/"/g, '""')}"`;
-        const available = log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${item.unit}` : `${previousBalance.toFixed(2)} ${item.unit}`;
-        const out = log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${item.unit}` : '-';
-        const balance = `${currentBalance.toFixed(2)} ${item.unit}`;
-        
-        csvContent += `${date},${remarks},${available},${out},${balance}\n`;
+        return {
+          'Date': new Date(log.createdAt).toLocaleDateString(),
+          'Project / Remarks': log.remarks || '-',
+          'Available / IN (+)': log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${item.unit}` : `${previousBalance.toFixed(2)} ${item.unit}`,
+          'OUT (-)': log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${item.unit}` : '-',
+          'Balance': `${currentBalance.toFixed(2)} ${item.unit}`
+        };
       });
-      csvContent += `\n--------------------------------------------------\n\n`;
+
+      const sheetName = `Block ${item.blockNumber || item.itemName.substring(0, 10)}`;
+      
+      // Ensure sheet name is unique and < 31 chars (Excel limit)
+      let finalSheetName = sheetName.replace(/[\\/*?:\[\]]/g, '').substring(0, 31);
+      
+      const blockWs = XLSX.utils.json_to_sheet(ledgerData);
+      
+      // Add a header row describing the block
+      XLSX.utils.sheet_add_aoa(blockWs, [[`Material: ${item.itemName} | Block: ${item.blockNumber || 'N/A'} | Size: ${item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A'}`]], { origin: "A1" });
+      
+      // Push the data down by 2 rows to make space for the title
+      XLSX.utils.sheet_add_json(blockWs, ledgerData, { origin: "A3" });
+      
+      try {
+        XLSX.utils.book_append_sheet(wb, blockWs, finalSheetName);
+      } catch (e) {
+        // Fallback if duplicate sheet name
+        XLSX.utils.book_append_sheet(wb, blockWs, `Item ${item.id.substring(0,5)}`);
+      }
     });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${decodedSupplier}_Full_Ledger.csv`;
-    link.click();
+    // Write file
+    XLSX.writeFile(wb, `${decodedSupplier}_Full_Ledger.xlsx`);
   };
 
   return (
@@ -82,7 +108,7 @@ const InventoryLedger = () => {
           <Typography variant="h4" sx={{ color: '#333', mb: 1 }}>{decodedSupplier}</Typography>
           <Typography variant="subtitle1" color="text.secondary">Inventory Items Summary</Typography>
         </Box>
-        <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportCSV} color="primary" sx={{ fontWeight: 'bold' }}>
+        <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportExcel} color="primary" sx={{ fontWeight: 'bold' }}>
           Export Excel (All Data)
         </Button>
       </Box>
