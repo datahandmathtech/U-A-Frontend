@@ -13,7 +13,8 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import HistoryIcon from '@mui/icons-material/History';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
-import { useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetVendorsQuery } from '../store/apiSlice';
+import { useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetVendorsQuery, useGetStaffListQuery, useUpdateProductionLogMutation } from '../store/apiSlice';
+import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 
 const InOutLedger: React.FC = () => {
   const { data: activeOutLogsData, isLoading: outLogsLoading, refetch } = useGetActiveOutLogsQuery(undefined);
@@ -24,23 +25,33 @@ const InOutLedger: React.FC = () => {
   const [deleteProductionLog] = useDeleteProductionLogMutation();
 
   const { data: vendorsData } = useGetVendorsQuery({});
+  const { data: staffData } = useGetStaffListQuery();
   const [createMaterialLog] = useCreateMaterialLogMutation();
+  const [updateProductionLog] = useUpdateProductionLogMutation();
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
-  const [manualForm, setManualForm] = useState({ vendorId: '', transactionType: 'OUT', stage: 'Production', quantity: '', vehicleNumber: '' });
+  const [editLogOpen, setEditLogOpen] = useState(false);
+  const [selectedEditLog, setSelectedEditLog] = useState<any>(null);
   
-  const handleManualEntrySubmit = async () => {
+  const handleManualEntrySubmit = async (data: any) => {
     try {
-      await createMaterialLog({
-        ...manualForm,
-        quantityProduced: Number(manualForm.quantity),
-        assigneeType: 'vendor'
-      }).unwrap();
-      setToast({ open: true, message: 'Log created successfully', severity: 'success' });
+      if (editLogOpen && selectedEditLog) {
+        await updateProductionLog({ id: selectedEditLog.id, data }).unwrap();
+        setToast({ open: true, message: 'Log updated successfully', severity: 'success' });
+      } else {
+        await createMaterialLog({
+          ...data,
+          source: 'admin_manual',
+          startPhotos: { unit: data.photoUrl, machine: data.photoUrl, software: data.photoUrl },
+          vendors: data.transactionType === 'OUT' && data.assigneeType === 'vendor' ? [{ vendorId: data.vendorId, vendorName: data.vendorName, qty: data.quantityProduced }] : undefined,
+        }).unwrap();
+        setToast({ open: true, message: 'Log created successfully', severity: 'success' });
+      }
       setManualEntryOpen(false);
-      setManualForm({ vendorId: '', transactionType: 'OUT', stage: 'Production', quantity: '', vehicleNumber: '' });
+      setEditLogOpen(false);
+      setSelectedEditLog(null);
       refetch();
     } catch (err: any) {
-      setToast({ open: true, message: err?.data?.message || 'Failed to create log', severity: 'error' });
+      setToast({ open: true, message: err?.data?.message || 'Failed to save log', severity: 'error' });
     }
   };
 
@@ -229,7 +240,7 @@ const InOutLedger: React.FC = () => {
                       <CheckCircleIcon fontSize="small" />
                     </Button>
                   )}
-                  <IconButton onClick={() => {}} size="small" color="primary">
+                  <IconButton onClick={() => { setSelectedEditLog(log); setEditLogOpen(true); }} size="small" color="primary">
                     <EditIcon fontSize="small" />
                   </IconButton>
                   <IconButton onClick={() => handleDeleteLog(log.id)} size="small" color="error">
@@ -442,42 +453,15 @@ const InOutLedger: React.FC = () => {
         </Box>
       </Dialog>
 
-      <Dialog open={manualEntryOpen} onClose={() => setManualEntryOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Manual IN/OUT Entry</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Vendor</InputLabel>
-              <Select label="Vendor" value={manualForm.vendorId} onChange={(e) => setManualForm({...manualForm, vendorId: e.target.value})}>
-                {vendorsData?.map((v: any) => (
-                  <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth size="small">
-              <InputLabel>Type</InputLabel>
-              <Select label="Type" value={manualForm.transactionType} onChange={(e) => setManualForm({...manualForm, transactionType: e.target.value})}>
-                <MenuItem value="OUT">OUT (Sent to Vendor)</MenuItem>
-                <MenuItem value="IN">IN (Received from Vendor)</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth size="small">
-              <InputLabel>Stage</InputLabel>
-              <Select label="Stage" value={manualForm.stage} onChange={(e) => setManualForm({...manualForm, stage: e.target.value})}>
-                <MenuItem value="Production">Production</MenuItem>
-                <MenuItem value="Polishing">Polishing</MenuItem>
-                <MenuItem value="Packing">Packing</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField size="small" label="Quantity" type="number" value={manualForm.quantity} onChange={(e) => setManualForm({...manualForm, quantity: e.target.value})} fullWidth />
-            <TextField size="small" label="Vehicle No (Optional)" value={manualForm.vehicleNumber} onChange={(e) => setManualForm({...manualForm, vehicleNumber: e.target.value})} fullWidth />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setManualEntryOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleManualEntrySubmit} disabled={!manualForm.vendorId || !manualForm.quantity}>Submit Entry</Button>
-        </DialogActions>
-      </Dialog>
+      <ManagerStyleEntryDialog
+        open={manualEntryOpen || editLogOpen}
+        isEditMode={editLogOpen}
+        onClose={() => { setManualEntryOpen(false); setEditLogOpen(false); setSelectedEditLog(null); }}
+        onSave={handleManualEntrySubmit}
+        vendors={vendorsData}
+        staff={staffData}
+        initialData={selectedEditLog}
+      />
 
       <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast({ ...toast, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={() => setToast({ ...toast, open: false })} severity={toast.severity} sx={{ width: '100%' }} variant="filled">

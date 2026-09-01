@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  IconButton, Button, Breadcrumbs, Link, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem
+  IconButton, Button, Breadcrumbs, Link, Dialog
 } from '@mui/material';
-import { Edit as EditIcon, Delete as DeleteIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { Edit as EditIcon, Delete as DeleteIcon, ArrowBack as ArrowBackIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGetVendorLedgerQuery, useGetVendorsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetActiveOutLogsQuery } from '../store/apiSlice';
+import { useGetVendorLedgerQuery, useGetVendorsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetActiveOutLogsQuery, useUpdateProductionLogMutation } from '../store/apiSlice';
+import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 
 const VendorLedger = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,58 +20,38 @@ const VendorLedger = () => {
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [deleteProductionLog] = useDeleteProductionLogMutation();
   const [createMaterialLog] = useCreateMaterialLogMutation();
+  const [updateProductionLog] = useUpdateProductionLogMutation();
 
-  // Manual Entry State
   const [openManual, setOpenManual] = useState(false);
-  const [manualType, setManualType] = useState<'OUT' | 'IN'>('OUT');
-  const [manualStage, setManualStage] = useState('Production');
-  const [manualQty, setManualQty] = useState('');
-  const [manualProductName, setManualProductName] = useState('');
-  const [selectedOutLogId, setSelectedOutLogId] = useState('');
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
 
-  const handleManualSubmit = async () => {
-    if (!manualQty) {
-      alert("Please enter quantity");
-      return;
-    }
-    if (manualType === 'IN' && !selectedOutLogId) {
-      alert("Please select a pending item to return");
-      return;
-    }
-    
+  const handleManualSubmit = async (data: any) => {
     try {
-      await createMaterialLog({
-        stage: manualStage,
-        quantityProduced: manualQty,
-        transactionType: manualType,
-        vendors: manualType === 'OUT' ? [{ vendorId: vendor?.id, vendorName: vendor?.name, qty: manualQty }] : undefined,
-        vendorId: manualType === 'IN' ? vendor?.id : undefined,
-        vendorName: manualType === 'IN' ? vendor?.name : undefined,
-        parentLogId: manualType === 'IN' ? selectedOutLogId : undefined,
-        productName: manualProductName,
-        source: 'admin_manual', // bypass approval
-        startPhotos: { unit: '', machine: '', software: '' }
-      }).unwrap();
-      
+      if (openEdit && selectedEntry) {
+        await updateProductionLog({
+          id: selectedEntry.id,
+          data
+        }).unwrap();
+      } else {
+        await createMaterialLog({
+          ...data,
+          vendors: data.transactionType === 'OUT' ? [{ vendorId: data.vendorId, vendorName: data.vendorName, qty: data.quantityProduced }] : undefined,
+          source: 'admin_manual',
+          startPhotos: { unit: data.photoUrl, machine: data.photoUrl, software: data.photoUrl }
+        }).unwrap();
+      }
       setOpenManual(false);
-      setManualQty('');
-      setManualProductName('');
-      setSelectedOutLogId('');
+      setOpenEdit(false);
+      setSelectedEntry(null);
     } catch (error) {
       console.error("Failed to add manual entry", error);
-      alert("Failed to add entry");
+      alert("Failed to save entry");
     }
   };
 
   const handleEditClick = (entry: any) => {
     setSelectedEntry(entry);
     setOpenEdit(true);
-  };
-
-  const handleEditSave = async () => {
-    // TODO: Connect to updateProductionLog mutation
-    alert("Edit functionality will be connected to Production API");
-    setOpenEdit(false);
   };
 
   const handleDelete = async (entryId: string) => {
@@ -95,7 +76,7 @@ const VendorLedger = () => {
           </Link>
           <Typography color="text.primary">{vendor?.name}</Typography>
         </Breadcrumbs>
-        <Button variant="contained" color="primary" onClick={() => setOpenManual(true)}>
+        <Button variant="contained" color="primary" onClick={() => { setSelectedEntry(null); setOpenManual(true); }}>
           + Add Manual Entry
         </Button>
       </Box>
@@ -124,18 +105,19 @@ const VendorLedger = () => {
               
               return (
                 <TableRow key={entry.id} hover sx={{ bgcolor: isOut ? '#fff5f5' : '#f5fff5' }}>
-                  <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(entry.createdAt || entry.date).toLocaleDateString()}</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: '#444' }}>
                     {entry.stage}
+                    {entry.productName && <Typography variant="caption" display="block" color="text.secondary">{entry.productName}</Typography>}
                   </TableCell>
-                  <TableCell>{entry.vehicleNumber}</TableCell>
+                  <TableCell>{entry.vehicleNumber || '-'}</TableCell>
                   
                   <TableCell align="center" sx={{ color: '#d32f2f', fontWeight: 'bold' }}>
-                    {entry.piecesOut > 0 ? entry.piecesOut : '-'}
+                    {entry.quantityProduced && isOut ? entry.quantityProduced : (entry.piecesOut > 0 ? entry.piecesOut : '-')}
                   </TableCell>
                   
                   <TableCell align="center" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>
-                    {entry.piecesIn > 0 ? entry.piecesIn : '-'}
+                    {entry.quantityProduced && !isOut ? entry.quantityProduced : (entry.piecesIn > 0 ? entry.piecesIn : '-')}
                   </TableCell>
                   
                   <TableCell align="center">
@@ -153,9 +135,16 @@ const VendorLedger = () => {
                   </TableCell>
 
                   <TableCell align="center">
-                    <Typography variant="body2" sx={{ fontWeight: '900', color: isOut ? '#d32f2f' : '#2e7d32', bgcolor: isOut ? '#ffebee' : '#e8f5e9', display: 'inline-block', px: 1.5, py: 0.5, borderRadius: 1 }}>
-                      {isOut ? 'OUT (-)' : 'IN (+)'}
-                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: '900', color: isOut ? '#d32f2f' : '#2e7d32', bgcolor: isOut ? '#ffebee' : '#e8f5e9', display: 'inline-block', px: 1.5, py: 0.5, borderRadius: 1 }}>
+                        {isOut ? 'OUT (-)' : 'IN (+)'}
+                      </Typography>
+                      {(entry.photoUrl || entry.startPhotos?.unit || entry.startPhotos?.machine) && (
+                         <IconButton onClick={() => setPreviewPhoto(entry.photoUrl || entry.startPhotos?.unit || entry.startPhotos?.machine)} size="small" color="primary">
+                           <VisibilityIcon fontSize="small" />
+                         </IconButton>
+                      )}
+                    </Box>
                   </TableCell>
 
                   <TableCell align="center">
@@ -171,8 +160,8 @@ const VendorLedger = () => {
             })}
             {ledger.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                  No transactions found in this financial year.
+                <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                  No transactions found.
                 </TableCell>
               </TableRow>
             )}
@@ -180,100 +169,22 @@ const VendorLedger = () => {
         </Table>
       </TableContainer>
 
-      {/* Edit Dialog */}
-      <Dialog open={openEdit} onClose={() => setOpenEdit(false)}>
-        <DialogTitle>Edit Ledger Entry</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField 
-              label="Pieces OUT (DR)" 
-              type="number" 
-              fullWidth 
-              value={selectedEntry?.piecesOut || 0}
-              onChange={(e) => setSelectedEntry({...selectedEntry, piecesOut: Number(e.target.value)})}
-            />
-            <TextField 
-              label="Pieces IN (CR)" 
-              type="number" 
-              fullWidth 
-              value={selectedEntry?.piecesIn || 0}
-              onChange={(e) => setSelectedEntry({...selectedEntry, piecesIn: Number(e.target.value)})}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenEdit(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleEditSave}>Save Changes</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Manual Add / Edit Dialog using new Component */}
+      <ManagerStyleEntryDialog 
+        open={openManual || openEdit}
+        isEditMode={openEdit}
+        onClose={() => { setOpenManual(false); setOpenEdit(false); setSelectedEntry(null); }}
+        onSave={handleManualSubmit}
+        defaultVendorId={vendor?.id}
+        initialData={selectedEntry}
+        vendors={vendors}
+      />
 
-      <Dialog open={openManual} onClose={() => setOpenManual(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Manual Ledger Entry</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField
-              select
-              label="Transaction Type"
-              fullWidth
-              value={manualType}
-              onChange={(e) => setManualType(e.target.value as 'OUT' | 'IN')}
-            >
-              <MenuItem value="OUT">Material OUT (To Vendor)</MenuItem>
-              <MenuItem value="IN">Material IN (From Vendor)</MenuItem>
-            </TextField>
-
-            <TextField
-              select
-              label="Work Stage"
-              fullWidth
-              value={manualStage}
-              onChange={(e) => setManualStage(e.target.value)}
-            >
-              <MenuItem value="Production">Production</MenuItem>
-              <MenuItem value="Polishing">Polishing</MenuItem>
-              <MenuItem value="Packing">Packing</MenuItem>
-              <MenuItem value="Dispatch">Dispatch</MenuItem>
-            </TextField>
-
-            {manualType === 'IN' && (
-              <TextField 
-                select
-                label="Select Pending Item to Return (Material OUT Log)" 
-                fullWidth 
-                value={selectedOutLogId} 
-                onChange={(e) => setSelectedOutLogId(e.target.value)} 
-              >
-                {activeOutLogs?.filter((log: any) => log.vendorId === vendor?.id && log.stage === manualStage).map((log: any) => {
-                  const pending = (log.quantityProduced || 0) - (log.returnedQty || 0);
-                  return (
-                    <MenuItem key={log.id} value={log.id}>
-                      {log.stage} - {pending > 0 ? pending : log.quantityProduced} pcs pending
-                    </MenuItem>
-                  );
-                })}
-              </TextField>
-            )}
-
-            <TextField
-              label="Quantity (Pieces)"
-              type="number"
-              fullWidth
-              value={manualQty}
-              onChange={(e) => setManualQty(e.target.value)}
-            />
-
-            <TextField
-              label="Product / Notes (Optional)"
-              fullWidth
-              value={manualProductName}
-              onChange={(e) => setManualProductName(e.target.value)}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenManual(false)}>Cancel</Button>
-          <Button variant="contained" color="primary" onClick={handleManualSubmit}>Submit Entry</Button>
-        </DialogActions>
+      {/* Photo Preview Dialog */}
+      <Dialog open={!!previewPhoto} onClose={() => setPreviewPhoto(null)} maxWidth="lg" fullWidth PaperProps={{ style: { backgroundColor: 'transparent', boxShadow: 'none' } } as any}>
+        <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', p: 2 }} onClick={() => setPreviewPhoto(null)}>
+          {previewPhoto && previewPhoto !== 'no-photo' ? <img src={previewPhoto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} /> : <Typography sx={{color: 'white'}}>No photo available</Typography>}
+        </Box>
       </Dialog>
     </Box>
   );
