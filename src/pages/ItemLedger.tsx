@@ -122,16 +122,18 @@ const ItemLedger = () => {
   if (isLoading) return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
 
   // Compute Balance dynamically
-  let runningBalance = 0;
+  let currentBalance = 0;
   const ledgerRows = logs.map(log => {
+    const previousBalance = currentBalance;
     if (log.type === 'IN') {
-      runningBalance += Number(log.quantity);
+      currentBalance += Number(log.quantity);
     } else {
-      runningBalance -= Number(log.quantity);
+      currentBalance -= Number(log.quantity);
     }
     return {
       ...log,
-      balance: runningBalance
+      previousBalance,
+      balance: currentBalance
     };
   });
 
@@ -157,7 +159,7 @@ const ItemLedger = () => {
             <TableRow sx={{ bgcolor: '#f8f9fa' }}>
               <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Project / Remarks</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: 'green' }}>IN (+)</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: 'green' }}>Available / IN (+)</TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: 'error.main' }}>OUT (-)</TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>Balance</TableCell>
               <TableCell sx={{ fontWeight: 'bold', align: 'center' }}>Actions</TableCell>
@@ -172,7 +174,7 @@ const ItemLedger = () => {
                   <TableCell>{new Date(log.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell sx={{ color: 'text.secondary' }}>{log.remarks || '-'}</TableCell>
                   <TableCell sx={{ color: 'green', fontWeight: log.type === 'IN' ? 'bold' : 'normal' }}>
-                    {log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : '-'}
+                    {log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : `${log.previousBalance.toFixed(2)} ${inventory?.unit || ''}`}
                   </TableCell>
                   <TableCell sx={{ color: 'error.main', fontWeight: log.type === 'OUT' ? 'bold' : 'normal' }}>
                     {log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : '-'}
