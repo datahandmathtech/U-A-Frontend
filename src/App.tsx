@@ -120,7 +120,7 @@ const router = createBrowserRouter([
         },
         {
           path: 'inventory/item/:itemId',
-        element: <InventoryLedger />
+          element: <ItemLedger />
       },
       {
         path: 'production',
