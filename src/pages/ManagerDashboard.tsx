@@ -412,15 +412,15 @@ const ManagerDashboard: React.FC = () => {
         transactionType: materialType,
         startPhotos: materialPhotos,
         workerId: !isStageCompletion && assigneeType === 'worker' ? selectedStaffId : (!isStageCompletion && assigneeType === 'self' ? (user?.id || user?._id) : undefined),
-        vendors: isStageCompletion && simpleAssigneeType === 'vendor' ? vendorRows : (!isStageCompletion ? vendorRows : []),
-        vendorName: isStageCompletion && simpleAssigneeType === 'client' ? customClientName : undefined,
+        vendors: !isStageCompletion ? vendorRows : [],
+        vendorName: undefined,
         vehicleNumber: vehicleNumber || undefined,
         parentLogId: materialType === 'IN' && !isStageCompletion ? selectedOutLogId : undefined,
         source: 'Material Tracking',
         requiresMachine: isStageCompletion ? false : (materialType === 'OUT' ? requiresMachine : undefined),
-        projectId: materialType === 'OUT' && !isStageCompletion ? (selectedProjectId || undefined) : undefined,
-        productId: materialType === 'OUT' && !isStageCompletion ? (selectedProductId || undefined) : undefined,
-        productName: materialType === 'OUT' && !isStageCompletion ? (productName || undefined) : undefined,
+        projectId: materialType === 'OUT' ? (selectedProjectId || undefined) : undefined,
+        productId: materialType === 'OUT' ? (selectedProductId || undefined) : undefined,
+        productName: materialType === 'OUT' ? (productName || undefined) : undefined,
       }).unwrap();
       showToast(
         materialType === 'OUT' 
@@ -588,41 +588,22 @@ const ManagerDashboard: React.FC = () => {
                   <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {dialogOrigin !== 'Material Tracking' ? (
                       <>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Done By / Sent To:</Typography>
-                        <RadioGroup row value={simpleAssigneeType} onChange={(e) => setSimpleAssigneeType(e.target.value as any)}>
-                          <FormControlLabel value="client" control={<Radio />} label="Client" />
-                          <FormControlLabel value="vendor" control={<Radio />} label="Vendor" />
-                        </RadioGroup>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Select Client</Typography>
+                        
+                        <TextField 
+                          select
+                          label="Select Client (Fetched from Admin)" 
+                          fullWidth 
+                          value={selectedProjectId}
+                          onChange={(e) => setSelectedProjectId(e.target.value)}
+                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                        >
+                          <MenuItem value="" disabled>-- Select Client --</MenuItem>
+                          {projectsData?.map((p: any) => (
+                            <MenuItem key={p.id} value={p.id}>{p.clientName} ({p.name})</MenuItem>
+                          ))}
+                        </TextField>
 
-                        {simpleAssigneeType === 'client' && (
-                          <TextField 
-                            label="Client Name" 
-                            fullWidth 
-                            value={customClientName}
-                            onChange={(e) => setCustomClientName(e.target.value)}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                          />
-                        )}
-
-                        {simpleAssigneeType === 'vendor' && (
-                          <TextField 
-                            select
-                            label="Select Vendor" 
-                            fullWidth 
-                            value={vendorRows[0]?.vendorId || ''} 
-                            onChange={(e) => {
-                              const vId = e.target.value;
-                              const vName = vendorsList?.find((v:any) => v.id === vId)?.name || '';
-                              setVendorRows([{ vendorId: vId, vendorName: vName, stage: materialStage, qty: '1' }]);
-                            }}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                          >
-                            <MenuItem value="" disabled>-- Select Vendor --</MenuItem>
-                            {vendorsList?.map((v: any) => (
-                              <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
-                            ))}
-                          </TextField>
-                        )}
                       </>
                     ) : (
                       <>
@@ -835,8 +816,7 @@ const ManagerDashboard: React.FC = () => {
               disabled={
                 dialogOrigin !== 'Material Tracking' 
                 ? (
-                  (simpleAssigneeType === 'client' && !customClientName.trim()) ||
-                  (simpleAssigneeType === 'vendor' && !vendorRows[0]?.vendorId) ||
+                  !selectedProjectId ||
                   !materialPhotos.machine || 
                   !materialPhotos.endPhoto || 
                   creatingMaterial
