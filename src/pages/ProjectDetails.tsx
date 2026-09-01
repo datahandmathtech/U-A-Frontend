@@ -131,16 +131,27 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
 
   const getStageStatus = (stageName: string) => {
     if (slab.pieces && slab.pieces.length > 0) {
-      const STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'];
-      const stageIdx = STAGES.indexOf(stageName);
+      const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      
+      const normalizedStageName = stageName.split(' - ')[0];
+      const stageIdx = BASE_STAGES.indexOf(normalizedStageName);
+      
       let allPiecesPassed = true;
       let anyPiecePassed = false;
+      
       for (const p of slab.pieces) {
-        const pStageIdx = STAGES.indexOf(p.stage);
-        const isPassed = pStageIdx > stageIdx || (p.stage === stageName && p.status === 'completed');
-        if (!isPassed) allPiecesPassed = false;
-        else anyPiecePassed = true;
+        const normalizedPieceStage = p.stage.split(' - ')[0];
+        const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
+        
+        const isPassed = pStageIdx > stageIdx || (normalizedPieceStage === normalizedStageName && p.status === 'completed');
+        
+        if (!isPassed) {
+          allPiecesPassed = false;
+        } else {
+          anyPiecePassed = true;
+        }
       }
+      
       if (allPiecesPassed && slab.pieces.length > 0) return 'Completed';
       if (anyPiecePassed) return 'In Progress';
       return 'Pending';
