@@ -8,6 +8,7 @@ import CRM from './pages/CRM';
 import Projects from './pages/Projects';
 import Accounts from './pages/Accounts';
 import Inventory from './pages/Inventory';
+import ItemLedger from './pages/ItemLedger';
 import InventoryLedger from './pages/InventoryLedger';
 import Production from './pages/Production';
 import Dispatch from './pages/Dispatch';
@@ -115,6 +116,10 @@ const router = createBrowserRouter([
       },
       {
         path: 'inventory/ledger/:supplier',
+          element: <InventoryLedger />
+        },
+        {
+          path: 'inventory/item/:itemId',
         element: <InventoryLedger />
       },
       {
