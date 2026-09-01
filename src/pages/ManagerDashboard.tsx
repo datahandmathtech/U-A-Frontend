@@ -798,9 +798,15 @@ const ManagerDashboard: React.FC = () => {
                   {materialType === 'OUT' ? (dialogOrigin === 'Material Tracking' ? '4.' : '2.') : '3.'} Upload Photos
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
-                  <ImageUploadBox label="START PHOTO (Mandatory)" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
-                  {materialType === 'OUT' && !requiresMachine && (
-                    <ImageUploadBox label="FINAL PHOTO (Mandatory)" previewUrl={materialPhotos.endPhoto} onClick={() => startCamera('mat_endPhoto')} />
+                  {dialogOrigin !== 'Material Tracking' ? (
+                    <ImageUploadBox label="PHOTO (Mandatory)" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
+                  ) : (
+                    <>
+                      <ImageUploadBox label="START PHOTO (Mandatory)" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
+                      {materialType === 'OUT' && !requiresMachine && (
+                        <ImageUploadBox label="FINAL PHOTO (Mandatory)" previewUrl={materialPhotos.endPhoto} onClick={() => startCamera('mat_endPhoto')} />
+                      )}
+                    </>
                   )}
                 </Box>
               </Box>
@@ -818,7 +824,6 @@ const ManagerDashboard: React.FC = () => {
                 ? (
                   !selectedProjectId ||
                   !materialPhotos.machine || 
-                  !materialPhotos.endPhoto || 
                   creatingMaterial
                 )
                 : (
