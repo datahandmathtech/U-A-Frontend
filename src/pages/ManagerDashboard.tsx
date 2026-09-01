@@ -354,19 +354,25 @@ const ManagerDashboard: React.FC = () => {
   };
 
   const handleOpenMaterialDialog = (type: 'OUT' | 'IN', stageName: string) => {
-    setMaterialType(type);
+    // If not Material Tracking, we want it to act exactly like Machine OFF
+    const isStageCompletion = stageName !== 'Material Tracking';
+    
+    setMaterialType(isStageCompletion ? 'OUT' : type);
     setDialogOrigin(stageName);
     setMaterialStage(stageName);
     setMaterialQuantity('');
     setMaterialPhotos({ machine: '', unit: '', software: '' });
-    setAssigneeType('vendor');
+    setAssigneeType(isStageCompletion ? 'self' : 'vendor');
+    setRequiresMachine(isStageCompletion ? false : true);
     setSelectedStaffId('');
     setSelectedVendors([]);
     setVendorRows([{ vendorId: '', vendorName: '', stage: 'Production', qty: '' }]);
     setVehicleNumber('');
+    setSelectedProjectId('');
+    setSelectedProductId('');
 
     setSelectedOutLogId('');
-    if (type === 'IN') {
+    if (type === 'IN' && !isStageCompletion) {
       refetchActiveOutLogs();
     }
     setMaterialDialogOpen(true);
@@ -385,6 +391,15 @@ const ManagerDashboard: React.FC = () => {
     }
 
     try {
+      let productName = '';
+      if (selectedProjectId && selectedProductId) {
+        const selectedProject = projectsData?.find((p: any) => p.id === selectedProjectId);
+        if (selectedProject && selectedProject.quotations && selectedProject.quotations.length > 0) {
+          const prod = selectedProject.quotations[0].products?.find((p: any) => p.id === selectedProductId);
+          if (prod) productName = prod.name;
+        }
+      }
+
       await createMaterialLog({
         stage: materialStage,
         quantityProduced: materialQuantity,
@@ -396,6 +411,9 @@ const ManagerDashboard: React.FC = () => {
         parentLogId: materialType === 'IN' ? selectedOutLogId : undefined,
         source: 'Material Tracking',
         requiresMachine: materialType === 'OUT' ? requiresMachine : undefined,
+        projectId: materialType === 'OUT' ? (selectedProjectId || undefined) : undefined,
+        productId: materialType === 'OUT' ? (selectedProductId || undefined) : undefined,
+        productName: materialType === 'OUT' ? (productName || undefined) : undefined,
       }).unwrap();
       showToast(
         materialType === 'OUT' 
@@ -466,13 +484,13 @@ const ManagerDashboard: React.FC = () => {
         <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
           ✨ Step 4: Polishing
         </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Polishing IN requires admin approval.</Typography>
+        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Complete polishing work for a specific stone.</Typography>
         <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
-          <Button variant="contained" color="info" size="large" fullWidth startIcon={<InputIcon />}
-            onClick={() => handleOpenMaterialDialog('IN', 'Polishing')}
-            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(2,136,209,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
+          <Button variant="contained" color="success" size="large" fullWidth startIcon={<CheckCircleIcon />}
+            onClick={() => handleOpenMaterialDialog('OUT', 'Polishing')}
+            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(46,125,50,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
           >
-            POLISHING IN
+            MARK POLISHING DONE
           </Button>
         </Box>
 
@@ -480,13 +498,13 @@ const ManagerDashboard: React.FC = () => {
         <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
           📦 Step 5: Packing
         </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Send material for packing.</Typography>
+        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Complete packing work for a specific stone.</Typography>
         <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
-          <Button variant="contained" color="warning" size="large" fullWidth startIcon={<OutputIcon />}
+          <Button variant="contained" color="success" size="large" fullWidth startIcon={<CheckCircleIcon />}
             onClick={() => handleOpenMaterialDialog('OUT', 'Packing')}
-            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(237,108,2,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
+            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(46,125,50,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
           >
-            PACKING OUT
+            MARK PACKING DONE
           </Button>
         </Box>
 
@@ -494,19 +512,20 @@ const ManagerDashboard: React.FC = () => {
         <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, mt: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
           🚚 Step 6: Dispatch
         </Typography>
+        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>Complete dispatch work for a specific stone.</Typography>
         <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
-          <Button variant="contained" color="warning" size="large" fullWidth startIcon={<OutputIcon />}
+          <Button variant="contained" color="success" size="large" fullWidth startIcon={<CheckCircleIcon />}
             onClick={() => handleOpenMaterialDialog('OUT', 'Dispatch')}
-            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(237,108,2,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
+            sx={{ borderRadius: 4, py: 2, fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 24px rgba(46,125,50,0.3)', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)' } }}
           >
-            DISPATCH OUT
+            MARK DISPATCH DONE
           </Button>
         </Box>
 
         {/* Dialog: Material Tracking */}
         <Dialog open={materialDialogOpen} onClose={() => setMaterialDialogOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, bgcolor: materialType === 'OUT' ? 'warning.light' : 'info.light', color: materialType === 'OUT' ? 'warning.dark' : 'info.dark' }}>
-            {materialType === 'OUT' ? 'OUT (Take)' : 'IN (Return)'} - {materialStage}
+            {dialogOrigin === 'Material Tracking' ? (materialType === 'OUT' ? 'OUT (Take)' : 'IN (Return)') : 'Complete Stage'} - {materialStage}
           </DialogTitle>
           <DialogContent dividers>
             <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
@@ -536,7 +555,7 @@ const ManagerDashboard: React.FC = () => {
                     <MenuItem value="" disabled>-- Select Pending Assignment --</MenuItem>
                     {activeOutLogs?.filter((log: any) => dialogOrigin === 'Material Tracking' || log.stage === materialStage).map((log: any) => (
                       <MenuItem key={log.id} value={log.id}>
-                        {log.stage} - {log.quantityProduced - (log.returnedQty || 0)} qty pending ({log.worker?.name || log.vendorName})
+                        {log.project?.name || 'No Client'} | {log.productName || 'Unknown Stone'} | {log.stage} - {log.quantityProduced - (log.returnedQty || 0)} qty pending ({log.worker?.name || log.vendorName})
                       </MenuItem>
                     ))}
                   </TextField>
@@ -560,14 +579,54 @@ const ManagerDashboard: React.FC = () => {
               {materialType === 'OUT' && (
                 <>
                   <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Who is taking this material?</Typography>
-                    <RadioGroup row value={assigneeType} onChange={(e) => setAssigneeType(e.target.value as any)}>
-                      <FormControlLabel value="vendor" control={<Radio />} label="Vendor" />
-                      <FormControlLabel value="worker" control={<Radio />} label="Staff/Worker" />
-                      <FormControlLabel value="self" control={<Radio />} label="Self (Me)" />
-                    </RadioGroup>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Select Client & Stone</Typography>
+                    <TextField 
+                      select
+                      label="Select Project / Client" 
+                      fullWidth 
+                      value={selectedProjectId}
+                      onChange={(e) => {
+                        setSelectedProjectId(e.target.value);
+                        setSelectedProductId('');
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                    >
+                      <MenuItem value="" disabled>-- Select Project --</MenuItem>
+                      {projectsData?.map((p: any) => (
+                        <MenuItem key={p.id} value={p.id}>{p.name} ({p.clientName})</MenuItem>
+                      ))}
+                    </TextField>
 
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 2 }}>2. Fill Details</Typography>
+                    {selectedProjectId && (
+                      <TextField 
+                        select
+                        label="Select Stone / Product" 
+                        fullWidth 
+                        value={selectedProductId}
+                        onChange={(e) => setSelectedProductId(e.target.value)}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      >
+                        <MenuItem value="" disabled>-- Select Stone --</MenuItem>
+                        {projectsData?.find((p: any) => p.id === selectedProjectId)?.quotations?.[0]?.products?.map((prod: any) => (
+                          <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+
+                    {dialogOrigin === 'Material Tracking' && (
+                      <>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Who is taking this material?</Typography>
+                        <RadioGroup row value={assigneeType} onChange={(e) => setAssigneeType(e.target.value as any)}>
+                          <FormControlLabel value="vendor" control={<Radio />} label="Vendor" />
+                          <FormControlLabel value="worker" control={<Radio />} label="Staff/Worker" />
+                          <FormControlLabel value="self" control={<Radio />} label="Self (Me)" />
+                        </RadioGroup>
+                      </>
+                    )}
+
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: dialogOrigin === 'Material Tracking' ? 2 : 1 }}>
+                      {dialogOrigin === 'Material Tracking' ? '3.' : '2.'} Fill Details
+                    </Typography>
                     {assigneeType === 'vendor' && (
                       <>
                         {vendorRows.map((row, index) => (
@@ -709,7 +768,9 @@ const ManagerDashboard: React.FC = () => {
               )}
 
               <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>3. Upload Photos</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>
+                  {materialType === 'OUT' ? (dialogOrigin === 'Material Tracking' ? '4.' : '3.') : '3.'} Upload Photos
+                </Typography>
                 <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
                   <ImageUploadBox label="START PHOTO (Mandatory)" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
                   {materialType === 'OUT' && !requiresMachine && (
