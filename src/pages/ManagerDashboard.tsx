@@ -783,7 +783,7 @@ const ManagerDashboard: React.FC = () => {
                 </>
               )}
 
-              {!(materialType === 'IN' && materialStage === 'Polishing') && !(materialType === 'OUT' && materialStage === 'Packing') && (
+              {dialogOrigin === 'Material Tracking' && !(materialType === 'IN' && materialStage === 'Polishing') && !(materialType === 'OUT' && materialStage === 'Packing') && (
                 <TextField 
                   fullWidth 
                   label="Vehicle Number (Optional)" 
