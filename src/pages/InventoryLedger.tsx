@@ -72,8 +72,6 @@ const InventoryLedger = () => {
       let currentBalance = 0;
       
       const blockDataAoA = [
-        [`Material: ${item.itemName} | Block: ${item.blockNumber || 'N/A'} | Size: ${item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A'}`],
-        [],
         ['Date', 'Project / Remarks', 'Available / IN (+)', 'OUT (-)', 'Balance']
       ];
       
