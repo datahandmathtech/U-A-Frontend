@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, ArrowBack as ArrowBackIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGetVendorLedgerQuery, useGetVendorsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetActiveOutLogsQuery, useUpdateProductionLogMutation } from '../store/apiSlice';
+import { useGetVendorLedgerQuery, useGetVendorsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetActiveOutLogsQuery, useUpdateProductionLogMutation, useGetProjectsQuery } from '../store/apiSlice';
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 
 const VendorLedger = () => {
@@ -13,6 +13,7 @@ const VendorLedger = () => {
   const navigate = useNavigate();
   const { data: ledger = [], isLoading } = useGetVendorLedgerQuery(id || '');
   const { data: vendors = [] } = useGetVendorsQuery();
+  const { data: projects = [] } = useGetProjectsQuery();
   const { data: activeOutLogs = [] } = useGetActiveOutLogsQuery();
   const vendor = vendors.find(v => v.id === id);
 
@@ -178,6 +179,7 @@ const VendorLedger = () => {
         defaultVendorId={vendor?.id}
         initialData={selectedEntry}
         vendors={vendors}
+        projects={projects}
       />
 
       {/* Photo Preview Dialog */}

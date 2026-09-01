@@ -460,6 +460,7 @@ const InOutLedger: React.FC = () => {
         onSave={handleManualEntrySubmit}
         vendors={vendorsData}
         staff={staffData}
+        projects={projects}
         initialData={selectedEditLog}
       />
 

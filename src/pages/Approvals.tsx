@@ -570,34 +570,36 @@ const Approvals: React.FC = () => {
           )}
         </DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Select one or more projects for this material. You can split the items across multiple projects.
-          </Typography>
-
-          {/* Project Assignment rows */}
-          {projectSplits.map((split, idx) => {
-            const selectedProjectObj = projects?.find((p: any) => p.id === split.projectId);
-            const projectProducts = selectedProjectObj?.products || [];
-            return (
-              <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 2, p: 2, bgcolor: '#F9F9F9', borderRadius: 2, border: '1px solid #eee' }}>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <TextField 
-                    select
-                    label="Select Project" 
-                    fullWidth
-                    size="small"
-                    value={split.projectId} 
-                    onChange={(e) => {
-                      const newSplits = [...projectSplits];
-                      newSplits[idx].projectId = e.target.value;
-                      
-                      newSplits[idx].productId = '';
-                      newSplits[idx].productName = '';
-                      newSplits[idx].slabId = '';
-                      newSplits[idx].pieceIds = [];
-                      
-                      setProjectSplits(newSplits);
-                    }} 
+          {(!selectedLog?.stage.includes('Production') && selectedLog?.transactionType === 'OUT') ? (
+            <>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                Select one or more projects for this material. You can split the items across multiple projects.
+              </Typography>
+    
+              {/* Project Assignment rows */}
+              {projectSplits.map((split, idx) => {
+                const selectedProjectObj = projects?.find((p: any) => p.id === split.projectId);
+                const projectProducts = selectedProjectObj?.products || [];
+                return (
+                  <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 2, p: 2, bgcolor: '#F9F9F9', borderRadius: 2, border: '1px solid #eee' }}>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <TextField 
+                        select
+                        label="Select Project" 
+                        fullWidth
+                        size="small"
+                        value={split.projectId} 
+                        onChange={(e) => {
+                          const newSplits = [...projectSplits];
+                          newSplits[idx].projectId = e.target.value;
+                          
+                          newSplits[idx].productId = '';
+                          newSplits[idx].productName = '';
+                          newSplits[idx].slabId = '';
+                          newSplits[idx].pieceIds = [];
+                          
+                          setProjectSplits(newSplits);
+                        }} 
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                   >
                     {projects?.map((p: any) => (
@@ -759,16 +761,22 @@ const Approvals: React.FC = () => {
           >
             Add Project Split
           </Button>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setApprovalDialogOpen(false)} color="inherit">Cancel</Button>
-          <Button 
-            variant="contained" 
-            color="success" 
-            onClick={submitApproval}
-            disabled={!projectSplits.some(s => s.projectId && s.qty > 0) || isApproving}
-            sx={{ fontWeight: 'bold' }}
-          >
+            </>
+          ) : (
+            <Typography variant="body1" sx={{ color: '#444' }}>
+              Are you sure you want to approve this log?
+            </Typography>
+          )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setApprovalDialogOpen(false)} color="inherit">Cancel</Button>
+            <Button 
+              variant="contained" 
+              color="success" 
+              onClick={submitApproval}
+              disabled={(!selectedLog?.stage.includes('Production') && selectedLog?.transactionType === 'OUT') ? !projectSplits.some(s => s.projectId && s.qty > 0) || isApproving : isApproving}
+              sx={{ fontWeight: 'bold' }}
+            >
             {isApproving ? 'Approving...' : 'Confirm Approval'}
           </Button>
         </DialogActions>

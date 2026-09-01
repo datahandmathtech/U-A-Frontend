@@ -44,11 +44,12 @@ interface ManagerStyleEntryDialogProps {
   initialData?: any;
   vendors?: any[];
   staff?: any[];
+  projects?: any[];
   defaultVendorId?: string;
   isEditMode?: boolean;
 }
 
-const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open, onClose, onSave, initialData, vendors = [], staff = [], defaultVendorId, isEditMode }) => {
+const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open, onClose, onSave, initialData, vendors = [], staff = [], projects = [], defaultVendorId, isEditMode }) => {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().substring(0, 10),
     transactionType: 'OUT',
@@ -58,7 +59,9 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
     quantity: '',
     vehicleNumber: '',
     productName: '',
-    photoUrl: ''
+    photoUrl: '',
+    projectId: '',
+    productId: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -74,7 +77,9 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         quantity: initialData.quantityProduced || initialData.piecesOut || initialData.piecesIn || '',
         vehicleNumber: initialData.vehicleNumber || '',
         productName: initialData.productName || '',
-        photoUrl: initialData.photoUrl || initialData.startPhotos?.unit || initialData.startPhotos?.machine || ''
+        photoUrl: initialData.photoUrl || initialData.startPhotos?.unit || initialData.startPhotos?.machine || '',
+        projectId: initialData.projectId || '',
+        productId: initialData.productId || ''
       });
     } else if (open && !initialData) {
       setFormData({
@@ -86,7 +91,9 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         quantity: '',
         vehicleNumber: '',
         productName: '',
-        photoUrl: ''
+        photoUrl: '',
+        projectId: '',
+        productId: ''
       });
     }
   }, [open, initialData, defaultVendorId]);
@@ -107,7 +114,9 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         vehicleNumber: formData.vehicleNumber,
         productName: formData.productName,
         photoUrl: formData.photoUrl,
-        assigneeType: formData.assigneeType
+        assigneeType: formData.assigneeType,
+        projectId: formData.projectId || undefined,
+        productId: formData.productId || undefined
       };
 
       if (formData.assigneeType === 'vendor') {
@@ -230,6 +239,44 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
               onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
             />
           </Box>
+
+          <TextField
+            select
+            label="Select Project / Client (Optional)"
+            fullWidth
+            value={formData.projectId}
+            onChange={(e) => {
+              setFormData({ ...formData, projectId: e.target.value, productId: '' });
+            }}
+          >
+            <MenuItem value="">-- Select Project --</MenuItem>
+            {projects.map((p: any) => (
+              <MenuItem key={p.id} value={p.id}>{p.name} ({p.clientName})</MenuItem>
+            ))}
+          </TextField>
+
+          {formData.projectId && (
+            <TextField
+              select
+              label="Select Stone / Product (Optional)"
+              fullWidth
+              value={formData.productId}
+              onChange={(e) => {
+                const proj = projects.find(p => p.id === formData.projectId);
+                const prod = proj?.quotations?.[0]?.products?.find((x: any) => x.id === e.target.value);
+                setFormData({ 
+                  ...formData, 
+                  productId: e.target.value, 
+                  productName: prod ? prod.name : formData.productName 
+                });
+              }}
+            >
+              <MenuItem value="">-- Select Stone --</MenuItem>
+              {projects.find(p => p.id === formData.projectId)?.quotations?.[0]?.products?.map((prod: any) => (
+                <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
+              ))}
+            </TextField>
+          )}
 
           <TextField
             label="Product Name / Notes (Optional)"
