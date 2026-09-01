@@ -185,6 +185,8 @@ const ManagerDashboard: React.FC = () => {
   const [materialPhotos, setMaterialPhotos] = useState({ machine: '', unit: '', software: '', endPhoto: '' });
   const [requiresMachine, setRequiresMachine] = useState(true);
   const [assigneeType, setAssigneeType] = useState<'self'|'worker'|'vendor'>('vendor');
+  const [simpleAssigneeType, setSimpleAssigneeType] = useState<'client'|'vendor'>('client');
+  const [customClientName, setCustomClientName] = useState('');
   const [selectedVendors, setSelectedVendors] = useState<any[]>([]); // Keep for legacy
   const [vendorRows, setVendorRows] = useState<any[]>([{ vendorId: '', vendorName: '', stage: 'Production', qty: '' }]);
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -363,6 +365,8 @@ const ManagerDashboard: React.FC = () => {
     setMaterialQuantity('');
     setMaterialPhotos({ machine: '', unit: '', software: '' });
     setAssigneeType(isStageCompletion ? 'self' : 'vendor');
+    setSimpleAssigneeType('client');
+    setCustomClientName('');
     setRequiresMachine(isStageCompletion ? false : true);
     setSelectedStaffId('');
     setSelectedVendors([]);
@@ -400,20 +404,23 @@ const ManagerDashboard: React.FC = () => {
         }
       }
 
+      const isStageCompletion = dialogOrigin !== 'Material Tracking';
+
       await createMaterialLog({
         stage: materialStage,
-        quantityProduced: materialQuantity,
+        quantityProduced: isStageCompletion ? 1 : materialQuantity, // Default to 1 for simple tracking
         transactionType: materialType,
         startPhotos: materialPhotos,
-        workerId: assigneeType === 'worker' ? selectedStaffId : (assigneeType === 'self' ? (user?.id || user?._id) : undefined),
-        vendors: vendorRows,
+        workerId: !isStageCompletion && assigneeType === 'worker' ? selectedStaffId : (!isStageCompletion && assigneeType === 'self' ? (user?.id || user?._id) : undefined),
+        vendors: isStageCompletion && simpleAssigneeType === 'vendor' ? vendorRows : (!isStageCompletion ? vendorRows : []),
+        vendorName: isStageCompletion && simpleAssigneeType === 'client' ? customClientName : undefined,
         vehicleNumber: vehicleNumber || undefined,
-        parentLogId: materialType === 'IN' ? selectedOutLogId : undefined,
+        parentLogId: materialType === 'IN' && !isStageCompletion ? selectedOutLogId : undefined,
         source: 'Material Tracking',
-        requiresMachine: materialType === 'OUT' ? requiresMachine : undefined,
-        projectId: materialType === 'OUT' ? (selectedProjectId || undefined) : undefined,
-        productId: materialType === 'OUT' ? (selectedProductId || undefined) : undefined,
-        productName: materialType === 'OUT' ? (productName || undefined) : undefined,
+        requiresMachine: isStageCompletion ? false : (materialType === 'OUT' ? requiresMachine : undefined),
+        projectId: materialType === 'OUT' && !isStageCompletion ? (selectedProjectId || undefined) : undefined,
+        productId: materialType === 'OUT' && !isStageCompletion ? (selectedProductId || undefined) : undefined,
+        productName: materialType === 'OUT' && !isStageCompletion ? (productName || undefined) : undefined,
       }).unwrap();
       showToast(
         materialType === 'OUT' 
@@ -579,178 +586,216 @@ const ManagerDashboard: React.FC = () => {
               {materialType === 'OUT' && (
                 <>
                   <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Select Client & Stone</Typography>
-                    <TextField 
-                      select
-                      label="Select Project / Client" 
-                      fullWidth 
-                      value={selectedProjectId}
-                      onChange={(e) => {
-                        setSelectedProjectId(e.target.value);
-                        setSelectedProductId('');
-                      }}
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                    >
-                      <MenuItem value="" disabled>-- Select Project --</MenuItem>
-                      {projectsData?.map((p: any) => (
-                        <MenuItem key={p.id} value={p.id}>{p.name} ({p.clientName})</MenuItem>
-                      ))}
-                    </TextField>
-
-                    {selectedProjectId && (
-                      <TextField 
-                        select
-                        label="Select Stone / Product" 
-                        fullWidth 
-                        value={selectedProductId}
-                        onChange={(e) => setSelectedProductId(e.target.value)}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                      >
-                        <MenuItem value="" disabled>-- Select Stone --</MenuItem>
-                        {projectsData?.find((p: any) => p.id === selectedProjectId)?.quotations?.[0]?.products?.map((prod: any) => (
-                          <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
-                        ))}
-                      </TextField>
-                    )}
-
-                    {dialogOrigin === 'Material Tracking' && (
+                    {dialogOrigin !== 'Material Tracking' ? (
                       <>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Done By / Sent To:</Typography>
+                        <RadioGroup row value={simpleAssigneeType} onChange={(e) => setSimpleAssigneeType(e.target.value as any)}>
+                          <FormControlLabel value="client" control={<Radio />} label="Client" />
+                          <FormControlLabel value="vendor" control={<Radio />} label="Vendor" />
+                        </RadioGroup>
+
+                        {simpleAssigneeType === 'client' && (
+                          <TextField 
+                            label="Client Name" 
+                            fullWidth 
+                            value={customClientName}
+                            onChange={(e) => setCustomClientName(e.target.value)}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                          />
+                        )}
+
+                        {simpleAssigneeType === 'vendor' && (
+                          <TextField 
+                            select
+                            label="Select Vendor" 
+                            fullWidth 
+                            value={vendorRows[0]?.vendorId || ''} 
+                            onChange={(e) => {
+                              const vId = e.target.value;
+                              const vName = vendorsList?.find((v:any) => v.id === vId)?.name || '';
+                              setVendorRows([{ vendorId: vId, vendorName: vName, stage: materialStage, qty: '1' }]);
+                            }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                          >
+                            <MenuItem value="" disabled>-- Select Vendor --</MenuItem>
+                            {vendorsList?.map((v: any) => (
+                              <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
+                            ))}
+                          </TextField>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Select Client & Stone</Typography>
+                        <TextField 
+                          select
+                          label="Select Project / Client" 
+                          fullWidth 
+                          value={selectedProjectId}
+                          onChange={(e) => {
+                            setSelectedProjectId(e.target.value);
+                            setSelectedProductId('');
+                          }}
+                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                        >
+                          <MenuItem value="" disabled>-- Select Project --</MenuItem>
+                          {projectsData?.map((p: any) => (
+                            <MenuItem key={p.id} value={p.id}>{p.name} ({p.clientName})</MenuItem>
+                          ))}
+                        </TextField>
+
+                        {selectedProjectId && (
+                          <TextField 
+                            select
+                            label="Select Stone / Product" 
+                            fullWidth 
+                            value={selectedProductId}
+                            onChange={(e) => setSelectedProductId(e.target.value)}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                          >
+                            <MenuItem value="" disabled>-- Select Stone --</MenuItem>
+                            {projectsData?.find((p: any) => p.id === selectedProjectId)?.quotations?.[0]?.products?.map((prod: any) => (
+                              <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
+                            ))}
+                          </TextField>
+                        )}
+
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Who is taking this material?</Typography>
                         <RadioGroup row value={assigneeType} onChange={(e) => setAssigneeType(e.target.value as any)}>
                           <FormControlLabel value="vendor" control={<Radio />} label="Vendor" />
                           <FormControlLabel value="worker" control={<Radio />} label="Staff/Worker" />
                           <FormControlLabel value="self" control={<Radio />} label="Self (Me)" />
                         </RadioGroup>
-                      </>
-                    )}
 
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: dialogOrigin === 'Material Tracking' ? 2 : 1 }}>
-                      {dialogOrigin === 'Material Tracking' ? '3.' : '2.'} Fill Details
-                    </Typography>
-                    {assigneeType === 'vendor' && (
-                      <>
-                        {vendorRows.map((row, index) => (
-                              <Paper key={index} elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <Typography variant="subtitle2" fontWeight="bold">Assignment {index + 1}</Typography>
-                                  {vendorRows.length > 1 && (
-                                    <IconButton size="small" color="error" onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))}>
-                                      <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                  )}
-                                </Box>
-                                <TextField 
-                                  select
-                                  label="Select Vendor" 
-                                  fullWidth 
-                                  value={row.vendorId} 
-                                  onChange={(e) => {
-                                    const vName = vendorsList?.find((v:any) => v.id === e.target.value)?.name || '';
-                                    setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], vendorId: e.target.value, vendorName: vName }; return arr; });
-                                  }}
-                                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                                >
-                                  {vendorsList?.map((v: any) => (
-                                    <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
-                                  ))}
-                                </TextField>
-                                <Box sx={{ display: 'flex', gap: 2 }}>
-                                  <TextField 
-                                    select
-                                    label="Work Stage" 
-                                    fullWidth 
-                                    value={row.stage} 
-                                    onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], stage: e.target.value }; return arr; })} 
-                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                                  >
-                                    <MenuItem value="Production">Production</MenuItem>
-                                    <MenuItem value="Polishing">Polishing</MenuItem>
-                                    <MenuItem value="Packing">Packing</MenuItem>
-                                    <MenuItem value="Dispatch">Dispatch</MenuItem>
-                                  </TextField>
-                                  <TextField 
-                                    fullWidth 
-                                    label="Quantity" 
-                                    type="number"
-                                    value={row.qty}
-                                    onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
-                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                                  />
-                                </Box>
-                              </Paper>
-                            ))}
-                            <Button startIcon={<AddIcon />} onClick={() => setVendorRows(prev => [...prev, { vendorId: '', vendorName: '', stage: 'Production', qty: '' }])} sx={{ alignSelf: 'flex-start' }}>
-                              Add Another Vendor
-                            </Button>
-                      </>
-                    )}
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 2 }}>
+                          3. Fill Details
+                        </Typography>
+                        {assigneeType === 'vendor' && (
+                          <>
+                            {vendorRows.map((row, index) => (
+                                  <Paper key={index} elevation={0} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <Typography variant="subtitle2" fontWeight="bold">Assignment {index + 1}</Typography>
+                                      {vendorRows.length > 1 && (
+                                        <IconButton size="small" color="error" onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))}>
+                                          <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                      )}
+                                    </Box>
+                                    <TextField 
+                                      select
+                                      label="Select Vendor" 
+                                      fullWidth 
+                                      value={row.vendorId} 
+                                      onChange={(e) => {
+                                        const vName = vendorsList?.find((v:any) => v.id === e.target.value)?.name || '';
+                                        setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], vendorId: e.target.value, vendorName: vName }; return arr; });
+                                      }}
+                                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                                    >
+                                      {vendorsList?.map((v: any) => (
+                                        <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
+                                      ))}
+                                    </TextField>
+                                    <Box sx={{ display: 'flex', gap: 2 }}>
+                                      <TextField 
+                                        select
+                                        label="Work Stage" 
+                                        fullWidth 
+                                        value={row.stage} 
+                                        onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], stage: e.target.value }; return arr; })} 
+                                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                                      >
+                                        <MenuItem value="Production">Production</MenuItem>
+                                        <MenuItem value="Polishing">Polishing</MenuItem>
+                                        <MenuItem value="Packing">Packing</MenuItem>
+                                        <MenuItem value="Dispatch">Dispatch</MenuItem>
+                                      </TextField>
+                                      <TextField 
+                                        fullWidth 
+                                        label="Quantity" 
+                                        type="number"
+                                        value={row.qty}
+                                        onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
+                                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                                      />
+                                    </Box>
+                                  </Paper>
+                                ))}
+                                <Button startIcon={<AddIcon />} onClick={() => setVendorRows(prev => [...prev, { vendorId: '', vendorName: '', stage: 'Production', qty: '' }])} sx={{ alignSelf: 'flex-start' }}>
+                                  Add Another Vendor
+                                </Button>
+                          </>
+                        )}
 
-                    {assigneeType === 'worker' && (
-                      <>
-                        <TextField 
-                          select
-                          label="Select Staff/Worker" 
-                          fullWidth 
-                          value={selectedStaffId} 
-                          onChange={(e) => setSelectedStaffId(e.target.value)}
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                        >
-                          {staffList?.map((s: any) => (
-                            <MenuItem key={s.id} value={s.id}>{s.name} ({s.role})</MenuItem>
-                          ))}
-                        </TextField>
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                          <TextField 
-                            select
-                            label="Work Stage" 
-                            fullWidth 
-                            value={materialStage} 
-                            onChange={(e) => setMaterialStage(e.target.value)}
-                            disabled={dialogOrigin !== 'Material Tracking'}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                          >
-                            <MenuItem value="Production">Production</MenuItem>
-                            <MenuItem value="Polishing">Polishing</MenuItem>
-                            <MenuItem value="Packing">Packing</MenuItem>
-                            <MenuItem value="Dispatch">Dispatch</MenuItem>
-                          </TextField>
-                          <TextField 
-                            fullWidth 
-                            label="Quantity" 
-                            type="number"
-                            value={materialQuantity}
-                            onChange={(e) => setMaterialQuantity(e.target.value)}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                          />
-                        </Box>
-                      </>
-                    )}
+                        {assigneeType === 'worker' && (
+                          <>
+                            <TextField 
+                              select
+                              label="Select Staff/Worker" 
+                              fullWidth 
+                              value={selectedStaffId} 
+                              onChange={(e) => setSelectedStaffId(e.target.value)}
+                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                            >
+                              {staffList?.map((s: any) => (
+                                <MenuItem key={s.id} value={s.id}>{s.name} ({s.role})</MenuItem>
+                              ))}
+                            </TextField>
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                              <TextField 
+                                select
+                                label="Work Stage" 
+                                fullWidth 
+                                value={materialStage} 
+                                onChange={(e) => setMaterialStage(e.target.value)}
+                                disabled={dialogOrigin !== 'Material Tracking'}
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                              >
+                                <MenuItem value="Production">Production</MenuItem>
+                                <MenuItem value="Polishing">Polishing</MenuItem>
+                                <MenuItem value="Packing">Packing</MenuItem>
+                                <MenuItem value="Dispatch">Dispatch</MenuItem>
+                              </TextField>
+                              <TextField 
+                                fullWidth 
+                                label="Quantity" 
+                                type="number"
+                                value={materialQuantity}
+                                onChange={(e) => setMaterialQuantity(e.target.value)}
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                              />
+                            </Box>
+                          </>
+                        )}
 
-                    {assigneeType === 'self' && (
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        <TextField 
-                          select
-                          label="Work Stage" 
-                          fullWidth 
-                          value={materialStage} 
-                          onChange={(e) => setMaterialStage(e.target.value)}
-                          disabled={dialogOrigin !== 'Material Tracking'}
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                        >
-                          <MenuItem value="Production">Production</MenuItem>
-                          <MenuItem value="Polishing">Polishing</MenuItem>
-                          <MenuItem value="Packing">Packing</MenuItem>
-                          <MenuItem value="Dispatch">Dispatch</MenuItem>
-                        </TextField>
-                        <TextField 
-                          fullWidth 
-                          label="Quantity" 
-                          type="number"
-                          value={materialQuantity}
-                          onChange={(e) => setMaterialQuantity(e.target.value)}
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                        />
-                      </Box>
+                        {assigneeType === 'self' && (
+                          <Box sx={{ display: 'flex', gap: 2 }}>
+                            <TextField 
+                              select
+                              label="Work Stage" 
+                              fullWidth 
+                              value={materialStage} 
+                              onChange={(e) => setMaterialStage(e.target.value)}
+                              disabled={dialogOrigin !== 'Material Tracking'}
+                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                            >
+                              <MenuItem value="Production">Production</MenuItem>
+                              <MenuItem value="Polishing">Polishing</MenuItem>
+                              <MenuItem value="Packing">Packing</MenuItem>
+                              <MenuItem value="Dispatch">Dispatch</MenuItem>
+                            </TextField>
+                            <TextField 
+                              fullWidth 
+                              label="Quantity" 
+                              type="number"
+                              value={materialQuantity}
+                              onChange={(e) => setMaterialQuantity(e.target.value)}
+                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                            />
+                          </Box>
+                        )}
+                      </>
                     )}
 
                   </Box>
@@ -769,7 +814,7 @@ const ManagerDashboard: React.FC = () => {
 
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>
-                  {materialType === 'OUT' ? (dialogOrigin === 'Material Tracking' ? '4.' : '3.') : '3.'} Upload Photos
+                  {materialType === 'OUT' ? (dialogOrigin === 'Material Tracking' ? '4.' : '2.') : '3.'} Upload Photos
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
                   <ImageUploadBox label="START PHOTO (Mandatory)" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
@@ -788,18 +833,28 @@ const ManagerDashboard: React.FC = () => {
               color={materialType === 'OUT' ? 'warning' : 'info'} 
               onClick={handleMaterialSubmit}
               disabled={
-                // OUT with vendor: need vendorId and qty in every row
-                (materialType === 'OUT' && assigneeType === 'vendor' && vendorRows.some(r => !r.vendorId || !r.qty)) ||
-                // OUT with self: need materialStage
-                (materialType === 'OUT' && assigneeType === 'self' && !materialStage) ||
-                // OUT with worker: need quantity and stage
-                (materialType === 'OUT' && assigneeType === 'worker' && (!materialQuantity || !materialStage)) ||
-                // IN: need quantity (except vendor OUT handled above)
-                (materialType === 'IN' && !materialQuantity && !selectedOutLogId) ||
-                // Always need the mandatory photo
-                !materialPhotos.machine ||
-                (materialType === 'OUT' && !requiresMachine && !materialPhotos.endPhoto) ||
-                creatingMaterial
+                dialogOrigin !== 'Material Tracking' 
+                ? (
+                  (simpleAssigneeType === 'client' && !customClientName.trim()) ||
+                  (simpleAssigneeType === 'vendor' && !vendorRows[0]?.vendorId) ||
+                  !materialPhotos.machine || 
+                  !materialPhotos.endPhoto || 
+                  creatingMaterial
+                )
+                : (
+                  // OUT with vendor: need vendorId and qty in every row
+                  (materialType === 'OUT' && assigneeType === 'vendor' && vendorRows.some(r => !r.vendorId || !r.qty)) ||
+                  // OUT with self: need materialStage
+                  (materialType === 'OUT' && assigneeType === 'self' && !materialStage) ||
+                  // OUT with worker: need quantity and stage
+                  (materialType === 'OUT' && assigneeType === 'worker' && (!materialQuantity || !materialStage)) ||
+                  // IN: need quantity (except vendor OUT handled above)
+                  (materialType === 'IN' && !materialQuantity && !selectedOutLogId) ||
+                  // Always need the mandatory photo
+                  !materialPhotos.machine ||
+                  (materialType === 'OUT' && !requiresMachine && !materialPhotos.endPhoto) ||
+                  creatingMaterial
+                )
               }
               sx={{ fontWeight: 'bold' }}
             >
