@@ -138,25 +138,6 @@ const ItemLedger = () => {
     };
   });
 
-  const handleExportCSV = () => {
-    const headers = ['Date', 'Project / Remarks', 'Available / IN (+)', 'OUT (-)', 'Balance'];
-    const csvRows = ledgerRows.map((log: any) => {
-      const date = new Date(log.createdAt).toLocaleDateString();
-      const remarks = log.remarks || '-';
-      const available = log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : `${log.previousBalance.toFixed(2)} ${inventory?.unit || ''}`;
-      const out = log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : '-';
-      const balance = `${log.balance.toFixed(2)} ${inventory?.unit || ''}`;
-      return [date, remarks, available, out, balance];
-    });
-
-    const csvContent = [headers.join(','), ...csvRows.map(e => e.map(s => `"${s}"`).join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${inventory?.itemName}_Block_${inventory?.blockNumber}_Ledger.csv`;
-    link.click();
-  };
-
   return (
     <Box sx={{ p: 4, maxWidth: 1200, margin: '0 auto' }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 2, color: '#b8860b' }}>
@@ -169,9 +150,6 @@ const ItemLedger = () => {
           <Typography variant="subtitle1" color="text.secondary">Item Ledger Details</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} color="primary" sx={{ fontWeight: 'bold' }}>
-            Export Excel
-          </Button>
           <Button variant="contained" color="error" onClick={() => setOpenDeduct(true)} sx={{ fontWeight: 'bold' }}>
             - Deduct Stock
           </Button>

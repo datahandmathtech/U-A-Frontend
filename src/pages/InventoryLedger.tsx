@@ -31,27 +31,43 @@ const InventoryLedger = () => {
       ...item,
       procure: inQty,
       used: usedQty,
-      balance: item.quantity // Current quantity
+      balance: item.quantity, // Current quantity
+      itemLogs: itemLogs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     };
   }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Material Name', 'Block No', 'L x W x T', 'Procure', 'Used', 'Balance'];
-    const rows = inventoryStats.map((item: any) => [
-      new Date(item.createdAt).toLocaleDateString(),
-      item.itemName || '',
-      item.blockNumber || '',
-      item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A',
-      `${item.procure.toFixed(2)} ${item.unit}`,
-      `${item.used.toFixed(2)} ${item.unit}`,
-      `${item.balance.toFixed(2)} ${item.unit}`
-    ]);
+    let csvContent = `Supplier:,${decodedSupplier}\n\n`;
 
-    const csvContent = [headers.join(','), ...rows.map(e => e.map(s => `"${s}"`).join(','))].join('\n');
+    inventoryStats.forEach((item: any) => {
+      csvContent += `Block No:,${item.blockNumber || 'N/A'},Material:,${item.itemName}\n`;
+      csvContent += `Size:,${item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A'}\n`;
+      csvContent += `Procure:,${item.procure.toFixed(2)} ${item.unit},Used:,${item.used.toFixed(2)} ${item.unit},Balance:,${item.balance.toFixed(2)} ${item.unit}\n`;
+      csvContent += `\n`;
+      
+      csvContent += `Date,Project / Remarks,Available / IN (+),OUT (-),Balance\n`;
+      
+      let currentBalance = 0;
+      item.itemLogs.forEach((log: any) => {
+        const previousBalance = currentBalance;
+        if (log.type === 'IN') currentBalance += Number(log.quantity);
+        else currentBalance -= Number(log.quantity);
+        
+        const date = new Date(log.createdAt).toLocaleDateString();
+        const remarks = `"${(log.remarks || '-').replace(/"/g, '""')}"`;
+        const available = log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${item.unit}` : `${previousBalance.toFixed(2)} ${item.unit}`;
+        const out = log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${item.unit}` : '-';
+        const balance = `${currentBalance.toFixed(2)} ${item.unit}`;
+        
+        csvContent += `${date},${remarks},${available},${out},${balance}\n`;
+      });
+      csvContent += `\n--------------------------------------------------\n\n`;
+    });
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `${decodedSupplier}_Inventory_Summary.csv`;
+    link.download = `${decodedSupplier}_Full_Ledger.csv`;
     link.click();
   };
 
@@ -66,8 +82,8 @@ const InventoryLedger = () => {
           <Typography variant="h4" sx={{ color: '#333', mb: 1 }}>{decodedSupplier}</Typography>
           <Typography variant="subtitle1" color="text.secondary">Inventory Items Summary</Typography>
         </Box>
-        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCSV} color="primary" sx={{ fontWeight: 'bold' }}>
-          Export Excel
+        <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportCSV} color="primary" sx={{ fontWeight: 'bold' }}>
+          Export Excel (All Data)
         </Button>
       </Box>
 
