@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, ArrowBack as ArrowBackIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGetVendorLedgerQuery, useGetVendorsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetActiveOutLogsQuery, useUpdateProductionLogMutation, useGetProjectsQuery } from '../store/apiSlice';
+import { useGetVendorLedgerQuery, useGetVendorsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetActiveOutLogsQuery, useEditProductionLogMutation, useGetProjectsQuery } from '../store/apiSlice';
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 
 const VendorLedger = () => {
@@ -21,7 +21,7 @@ const VendorLedger = () => {
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [deleteProductionLog] = useDeleteProductionLogMutation();
   const [createMaterialLog] = useCreateMaterialLogMutation();
-  const [updateProductionLog] = useUpdateProductionLogMutation();
+  const [editProductionLog] = useEditProductionLogMutation();
 
   const [openManual, setOpenManual] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
@@ -29,7 +29,7 @@ const VendorLedger = () => {
   const handleManualSubmit = async (data: any) => {
     try {
       if (openEdit && selectedEntry) {
-        await updateProductionLog({
+        await editProductionLog({
           id: selectedEntry.id,
           data
         }).unwrap();

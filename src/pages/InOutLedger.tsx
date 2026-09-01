@@ -13,7 +13,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import HistoryIcon from '@mui/icons-material/History';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
-import { useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetVendorsQuery, useGetStaffListQuery, useUpdateProductionLogMutation } from '../store/apiSlice';
+import { useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetVendorsQuery, useGetStaffListQuery, useEditProductionLogMutation } from '../store/apiSlice';
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 
 const InOutLedger: React.FC = () => {
@@ -27,7 +27,7 @@ const InOutLedger: React.FC = () => {
   const { data: vendorsData } = useGetVendorsQuery({});
   const { data: staffData } = useGetStaffListQuery();
   const [createMaterialLog] = useCreateMaterialLogMutation();
-  const [updateProductionLog] = useUpdateProductionLogMutation();
+  const [editProductionLog] = useEditProductionLogMutation();
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [editLogOpen, setEditLogOpen] = useState(false);
   const [selectedEditLog, setSelectedEditLog] = useState<any>(null);
@@ -35,8 +35,8 @@ const InOutLedger: React.FC = () => {
   const handleManualEntrySubmit = async (data: any) => {
     try {
       if (editLogOpen && selectedEditLog) {
-        await updateProductionLog({ id: selectedEditLog.id, data }).unwrap();
-        setToast({ open: true, message: 'Log updated successfully', severity: 'success' });
+        await editProductionLog({ id: selectedEditLog.id, data }).unwrap();
+        setToast({ open: true, message: 'Log updated successfully!', severity: 'success' });
       } else {
         await createMaterialLog({
           ...data,
