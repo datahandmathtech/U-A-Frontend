@@ -261,13 +261,13 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
       minCellHeight: 35
     },
     columnStyles: {
-      0: { cellWidth: 15, fontStyle: 'bold', fontSize: 12 },
-      1: { cellWidth: 35 }, // Image column
+      0: { cellWidth: 10, fontStyle: 'bold', fontSize: 10 },
+      1: { cellWidth: 25 }, // Image column
       2: { cellWidth: 35, fontStyle: 'bold', fontSize: 8 },
-      3: { cellWidth: 30, textColor: [100,100,100], fontSize: 8 },
-      4: { cellWidth: 20 },
-      5: { cellWidth: 20 },
-      6: { cellWidth: 20 }
+      3: { cellWidth: 25, textColor: [100,100,100], fontSize: 8 },
+      4: { cellWidth: 15 },
+      5: { cellWidth: 15 },
+      6: { cellWidth: 25 }
     },
     didDrawCell: function(data) {
       // Draw bottom border for body rows
