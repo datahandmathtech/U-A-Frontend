@@ -15,6 +15,7 @@ import Dispatch from './pages/Dispatch';
 import HR from './pages/HR';
 import Approvals from './pages/Approvals';
 import InOutLedger from './pages/InOutLedger';
+import AdminConsole from './pages/AdminConsole';
 import VendorsList from './pages/VendorsList';
 import Dashboard from './pages/Dashboard';
 import LiveFeed from './pages/LiveFeed';
@@ -125,9 +126,13 @@ const router = createBrowserRouter([
       {
         path: 'production',
         element: <Production />
-      },
-      {
-        path: 'dispatch',
+        },
+        {
+          path: 'admin-console',
+          element: <AdminConsole />
+        },
+        {
+          path: 'dispatch',
         element: <Dispatch />
       },
       {

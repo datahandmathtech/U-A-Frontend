@@ -1,10 +1,26 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Tabs, Tab, TextField, MenuItem, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Tabs, Tab, TextField, MenuItem, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Checkbox, FormControlLabel, FormGroup, FormLabel } from '@mui/material';
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useGetAttendanceQuery, useGetStaffSalaryQuery, useRegisterUserMutation, useGetStaffListQuery, useDeleteStaffMutation, useEditStaffMutation, useAddManualAttendanceMutation } from '../store/apiSlice';
 import EditIcon from '@mui/icons-material/Edit';
+
+
+const ALL_TABS = [
+  { id: '/', label: 'Dashboard' },
+  { id: '/live-feed', label: 'Live Feed' },
+  { id: '/log-book', label: 'Log Book' },
+  { id: '/crm', label: 'Enquiries Pipeline' },
+  { id: '/projects', label: 'Active Work Orders' },
+  { id: '/inventory', label: 'Inventory' },
+  { id: '/machines', label: 'Machine Master' },
+  { id: '/approvals', label: 'Approvals' },
+  { id: '/dispatch', label: 'Dispatch & Packing' },
+  { id: '/in-out-ledger', label: 'In/Out Ledger' },
+  { id: '/waste-ledger', label: 'Waste Ledger' },
+  { id: '/hr', label: 'HR & Payroll' },
+];
 
 const HR: React.FC = () => {
   const [tab, setTab] = useState(0);
@@ -14,7 +30,7 @@ const HR: React.FC = () => {
   const [registerUser, { isLoading: registering }] = useRegisterUserMutation();
   const [deleteStaff, { isLoading: deleting }] = useDeleteStaffMutation();
 
-  const [staffData, setStaffData] = useState({ name: '', email: '', staffId: '', password: '', role: 'worker', department: '' });
+  const [staffData, setStaffData] = useState({ name: '', email: '', staffId: '', password: '', role: 'worker', department: '', allowedTabs: [] as string[] });
   const [successMsg, setSuccessMsg] = useState('');
   const [editStaff] = useEditStaffMutation();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -55,7 +71,7 @@ const HR: React.FC = () => {
     try {
       await registerUser(staffData).unwrap();
       setSuccessMsg(`Staff ${staffData.name} created successfully! They can now login with Staff ID: ${staffData.staffId}`);
-      setStaffData({ name: '', email: '', staffId: '', password: '', role: 'worker', department: '' });
+      setStaffData({ name: '', email: '', staffId: '', password: '', role: 'worker', department: '', allowedTabs: [] });
       refetchStaff();
       refetchStaffList();
     } catch (err) {
@@ -79,7 +95,7 @@ const HR: React.FC = () => {
   };
 
   const handleEditClick = (staff: any) => {
-    setEditingStaffData({ id: staff.id, name: staff.name, staffId: staff.staffId || '', role: staff.role, department: staff.department || '', password: '' });
+    setEditingStaffData({ id: staff.id, name: staff.name, staffId: staff.staffId || '', role: staff.role, department: staff.department || '', password: '', allowedTabs: staff.allowedTabs || [] });
     setEditDialogOpen(true);
   };
 

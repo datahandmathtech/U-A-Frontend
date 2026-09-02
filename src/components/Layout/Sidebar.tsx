@@ -26,10 +26,10 @@ interface SidebarProps {
 }
 
 import StoreIcon from '@mui/icons-material/Store';
-
 import RecyclingIcon from '@mui/icons-material/Recycling';
+import { useSelector } from 'react-redux';
 
-const menuItems = [
+const ALL_MENU_ITEMS = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Live Feed', icon: <LiveTvIcon />, path: '/live-feed' },
   { text: 'Log Book', icon: <MenuBookIcon />, path: '/log-book' },
@@ -42,13 +42,23 @@ const menuItems = [
   { text: 'In/Out Ledger', icon: <FolderSpecialIcon />, path: '/in-out-ledger' },
   { text: 'Waste Ledger', icon: <RecyclingIcon />, path: '/waste-ledger' },
   { text: 'HR & Payroll', icon: <GroupsIcon />, path: '/hr' },
+  { text: 'Admin Console', icon: <ShieldIcon />, path: '/admin-console' },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawerWidth }) => {
+  const user = useSelector((state: any) => state.auth.user);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.reload();
+    localStorage.removeItem('user');
+    window.location.href = '/login';
   };
+
+  const menuItems = ALL_MENU_ITEMS.filter(item => {
+    if (user?.role === 'admin') return true; // Master admin sees everything
+    if (!user?.modulesAccess || user.modulesAccess.length === 0) return true; // Fallback
+    return user.modulesAccess.includes(item.path);
+  });
 
   const drawer = (
     <Box sx={{ 
@@ -99,9 +109,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
           alignItems: 'center',
           gap: 2
         }}>
-           <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>A</Avatar>
+           <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>{user?.name?.[0]?.toUpperCase() || 'U'}</Avatar>
            <Box>
-             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Admin User</Typography>
+             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{user?.name || 'User'}</Typography>
              <Typography variant="caption" sx={{ color: 'primary.main', display: 'block' }}>• Online</Typography>
            </Box>
         </Box>
