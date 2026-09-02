@@ -1336,7 +1336,7 @@ const ProjectDetails: React.FC = () => {
                       if (packageCostEnabled) globalCostTotal += Number(packageCost || 0);
                       if (transportCostEnabled) globalCostTotal += Number(transportCost || 0);
 
-                      const subTotal = totalProductsAmount + additionalTotal + globalCostTotal;
+                      const subTotal = totalProductsAmount + globalCostTotal;
                       const gstAmount = (subTotal * gstPercent) / 100;
                       const finalBill = subTotal + gstAmount;
 
@@ -1378,11 +1378,6 @@ const ProjectDetails: React.FC = () => {
                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                               <Typography variant="body2" color="text.secondary">Total Products Amount</Typography>
                               <Typography variant="body2" fontWeight="bold">₹{totalProductsAmount.toLocaleString('en-IN')}</Typography>
-                            </Box>
-                            
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <Typography variant="body2" color="text.secondary">Total Additional Cost</Typography>
-                              <Typography variant="body2" fontWeight="bold">₹{additionalTotal.toLocaleString('en-IN')}</Typography>
                             </Box>
                             
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

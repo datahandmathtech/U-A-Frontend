@@ -172,21 +172,12 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
 
   // Calculate totals
   const productsTotal = products.reduce((acc, p) => acc + (p.amount || 0), 0);
-  
-  let additionalTotal = 0;
-  if (quoteDetails) {
-    Object.values(quoteDetails).forEach((arr: any) => {
-      arr.forEach((item: any) => {
-        additionalTotal += Number(item.amount || 0);
-      });
-    });
-  }
 
   let globalCostTotal = 0;
   if (globalCosts?.packageCostEnabled) globalCostTotal += Number(globalCosts.packageCost || 0);
   if (globalCosts?.transportCostEnabled) globalCostTotal += Number(globalCosts.transportCost || 0);
   
-  const subTotal = productsTotal + additionalTotal + globalCostTotal;
+  const subTotal = productsTotal + globalCostTotal;
   const gstAmount = (subTotal * gstPercent) / 100;
   const finalGrandTotal = subTotal + gstAmount;
 
@@ -199,10 +190,6 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   doc.text('Total Products Amount: Rs. ' + productsTotal.toLocaleString('en-IN'), 25, currentY + 10);
   
   let boxYOffset = 18;
-  if (additionalTotal > 0) {
-    doc.text('Total Additional Cost: Rs. ' + additionalTotal.toLocaleString('en-IN'), 25, currentY + boxYOffset);
-    boxYOffset += 8;
-  }
   if (globalCosts?.transportCostEnabled && globalCosts?.transportCost > 0) {
     doc.text('Installation Cost: Rs. ' + Number(globalCosts.transportCost).toLocaleString('en-IN'), 25, currentY + boxYOffset);
     boxYOffset += 8;
