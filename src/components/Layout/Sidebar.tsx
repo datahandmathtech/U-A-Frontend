@@ -55,9 +55,13 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
   };
 
   const menuItems = ALL_MENU_ITEMS.filter(item => {
-    if (user?.role === 'admin') return true; // Master admin sees everything
-    if (!user?.modulesAccess || user.modulesAccess.length === 0) return true; // Fallback
-    return user.modulesAccess.includes(item.path);
+    // If the user has specific modules assigned, STRICTLY limit to those modules
+    if (user?.modulesAccess && user.modulesAccess.length > 0) {
+      return user.modulesAccess.includes(item.path);
+    }
+    
+    // Fallback: If no specific modules are assigned, give full access (useful for the main admin)
+    return true;
   });
 
   const drawer = (
