@@ -1352,17 +1352,19 @@ const ProjectDetails: React.FC = () => {
                               </Button>
                             </Box>
                             
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: '250px', overflowY: 'auto', pr: 1 }}>
                               {selectedTerms.length === 0 ? (
                                 <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
                                   No terms selected. Click 'Select Terms' to add.
                                 </Typography>
                               ) : (
                                 selectedTerms.map((term: string, i: number) => (
-                                  <Box key={i} sx={{ display: 'flex', gap: 1, p: 1, bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', borderRadius: 1 }}>
+                                  <Box key={i} sx={{ display: 'flex', gap: 1, p: 1, bgcolor: '#FFF', border: '1px solid #E0E0E0', borderRadius: 1, alignItems: 'center' }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ minWidth: 20 }}>{i + 1}.</Typography>
-                                    <Typography variant="body2" sx={{ flex: 1 }}>{term}</Typography>
-                                    <IconButton size="small" onClick={() => setSelectedTerms(selectedTerms.filter(t => t !== term))} sx={{ p: 0.5 }}>
+                                    <Typography variant="body2" sx={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'text.secondary', fontSize: '0.8rem' }} title={term}>
+                                      {term}
+                                    </Typography>
+                                    <IconButton size="small" onClick={() => setSelectedTerms(selectedTerms.filter(t => t !== term))} sx={{ p: 0.5, color: 'error.main' }}>
                                       <CloseIcon fontSize="small" />
                                     </IconButton>
                                   </Box>
