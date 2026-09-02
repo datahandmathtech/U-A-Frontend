@@ -17,6 +17,7 @@ import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import EngineeringIcon from '@mui/icons-material/Engineering';
 import GroupIcon from '@mui/icons-material/Group';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -37,6 +38,7 @@ const menuItems = [
   { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory' },
   { text: 'Machine Master', icon: <PrecisionManufacturingIcon />, path: '/machines' },
   { text: 'Approvals', icon: <PendingActionsIcon />, path: '/approvals' },
+  { text: 'Dispatch & Packing', icon: <LocalShippingIcon />, path: '/dispatch' },
   { text: 'In/Out Ledger', icon: <FolderSpecialIcon />, path: '/in-out-ledger' },
   { text: 'Waste Ledger', icon: <RecyclingIcon />, path: '/waste-ledger' },
   { text: 'HR & Payroll', icon: <GroupsIcon />, path: '/hr' },
