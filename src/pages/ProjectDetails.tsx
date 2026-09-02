@@ -1294,14 +1294,14 @@ const ProjectDetails: React.FC = () => {
                             </TableCell>
                             <TableCell><Typography variant="body2">{p.unit}</Typography></TableCell>
                             <TableCell>
-                              {p.unit !== 'Pieces' ? <Typography variant="body2">{p.length}</Typography> : <Typography variant="body2" color="text.secondary">-</Typography>}
-                            </TableCell>
-                            <TableCell>
-                              {p.unit !== 'Pieces' ? <Typography variant="body2">{p.width}</Typography> : <Typography variant="body2" color="text.secondary">-</Typography>}
-                            </TableCell>
-                            <TableCell>
-                              {p.unit !== 'Pieces' ? <Typography variant="body2">{p.breadth || 0}</Typography> : <Typography variant="body2" color="text.secondary">-</Typography>}
-                            </TableCell>
+                                <Typography variant="body2">{p.length || '-'}</Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">{p.width || '-'}</Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">{p.breadth || '-'}</Typography>
+                              </TableCell>
                             <TableCell><Typography variant="body2">{p.qty}</Typography></TableCell>
                             <TableCell><Typography variant="body2">₹{p.rate.toLocaleString('en-IN')}</Typography></TableCell>
                             <TableCell><Typography variant="body2" fontWeight="bold" color="#B38B36">₹{p.amount.toLocaleString('en-IN')}</Typography></TableCell>
