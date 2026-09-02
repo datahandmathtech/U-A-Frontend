@@ -201,11 +201,13 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
 
   // Table Data
   const tableBody = products.map((p, index) => {
-    const dimensionsStr = p.unit !== 'Pieces' 
-      ? (p.length || 0) + ' x ' + (p.width || 0)
-      : 'sizes as per\nshared\ndrawing';
+    let dimensionsStr = 'sizes as per\nshared\ndrawing';
+    if (p.length || p.width) {
+      dimensionsStr = `${p.length || 0} x ${p.width || 0}`;
+      if (p.breadth) dimensionsStr += ` | ${p.breadth} MM`;
+    }
     
-    const qtySqft = p.unit === 'Sq. Ft' ? String((p.length || 0) * (p.width || 0)) : String(p.qty || 1);
+    const qtySqft = p.unit === 'Sq. Ft' ? String(Number(((p.length || 0) * (p.width || 0)).toFixed(2))) : String(p.qty || 1);
 
     return [
       String(index + 1),
