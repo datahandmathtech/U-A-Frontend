@@ -1,13 +1,15 @@
-﻿const fs = require('fs');
-const file = 'src/utils/pdfGenerator.ts';
-let code = fs.readFileSync(file, 'utf8');
+﻿import re
 
-const startIndex = code.indexOf('export const generateQuotationPDF');
-if (startIndex !== -1) {
-  code = code.substring(0, startIndex);
-}
+with open('src/utils/pdfGenerator.ts', 'r', encoding='utf-8') as f:
+    content = f.read()
 
-const newFunc = \export const generateQuotationPDF = async (project: any, products: any[], quoteDetails: any, globalCosts?: any, terms?: string[], gstPercent: number = 0) => {
+start_str = "export const generateQuotationPDF ="
+start_idx = content.find(start_str)
+
+if start_idx != -1:
+    content = content[:start_idx]
+
+new_func = r'''export const generateQuotationPDF = async (project: any, products: any[], quoteDetails: any, globalCosts?: any, terms?: string[], gstPercent: number = 0) => {
   const doc = new jsPDF();
   
   // Pre-fetch images for the table
@@ -25,19 +27,15 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
     }
   }
 
-  // Common styles
   const goldColor = [179, 139, 54] as [number, number, number];
   
   // Custom Hook to draw left black bar on every page
-  const pageCount = doc.getNumberOfPages();
-  const addPageDecorations = (pdfDoc: jsPDF) => {
+  const addPageDecorations = (pdfDoc: any) => {
     const pages = pdfDoc.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
       pdfDoc.setPage(i);
-      // Thick black bar
       pdfDoc.setFillColor(0, 0, 0);
       pdfDoc.rect(10, 0, 8, 297, 'F');
-      // Thin black line next to it
       pdfDoc.setLineWidth(0.5);
       pdfDoc.setDrawColor(0, 0, 0);
       pdfDoc.line(20, 0, 20, 297);
@@ -49,21 +47,21 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
   doc.rect(20, 15, 190, 30, 'F');
   
   // Header Text - Left (Logo substitute)
-  doc.setFontSize(26);
+  doc.setFontSize(36);
   doc.setTextColor(0, 0, 0);
   doc.setFont(undefined, 'bold');
-  doc.text('UA', 25, 30);
+  doc.text('UA', 25, 36);
   doc.setFontSize(16);
-  doc.text('Unnati', 40, 28);
+  doc.text('Unnati', 50, 30);
   doc.setFontSize(14);
   doc.setFont(undefined, 'normal');
-  doc.text('Arts', 40, 34);
+  doc.text('Arts', 50, 36);
 
   // Header Text - Right (Company Info)
   doc.setFontSize(10);
   doc.setFont(undefined, 'bold');
   doc.text('UNNATI ARTS', 205, 20, { align: 'right' });
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setFont(undefined, 'normal');
   doc.text('101, Vintage Delight', 205, 24, { align: 'right' });
   doc.text('Apartment, Shobhagpura, Udaipur', 205, 28, { align: 'right' });
@@ -73,7 +71,7 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
   doc.text('9001843501/9887253946', 205, 40, { align: 'right' });
 
   // Gold Line below header
-  doc.setFillColor(...goldColor);
+  doc.setFillColor(goldColor[0], goldColor[1], goldColor[2]);
   doc.rect(20, 45, 190, 2, 'F');
 
   // Title
@@ -83,7 +81,7 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
   doc.text('QUOTATION', 115, 60, { align: 'center' });
 
   // Client Info & Date
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.text('TO,', 25, 75);
   doc.text(String(project.clientName || 'CLIENT NAME').toUpperCase(), 25, 80);
   doc.setFont(undefined, 'normal');
@@ -95,11 +93,16 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
   doc.text('DATE  ' + dateStr, 205, 75, { align: 'right' });
   doc.text('QUOTE #.  UA/QT/' + d.getFullYear().toString().slice(-2) + '/' + String(Math.floor(Math.random()*100)).padStart(2, '0'), 205, 80, { align: 'right' });
 
+  // Add a horizontal gray line above table
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.5);
+  doc.line(25, 90, 205, 90);
+
   // Table Data
   const tableBody = products.map((p, index) => {
     const dimensionsStr = p.unit !== 'Pieces' 
       ? (p.length || 0) + ' x ' + (p.width || 0)
-      : 'sizes as per\\nshared drawing';
+      : 'sizes as per\nshared\ndrawing';
     
     const qtySqft = p.unit === 'Sq. Ft' ? String((p.length || 0) * (p.width || 0)) : String(p.qty || 1);
 
@@ -114,10 +117,31 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
     ];
   });
 
+  // Calculate global costs as a separate row if any
+  let globalCostTotal = 0;
+  if (globalCosts?.packageCostEnabled) globalCostTotal += Number(globalCosts.packageCost || 0);
+  if (globalCosts?.transportCostEnabled) globalCostTotal += Number(globalCosts.transportCost || 0);
+  
+  if (globalCostTotal > 0) {
+    let globalCostDesc = [];
+    if (globalCosts?.packageCostEnabled) globalCostDesc.push('PACKING CHARGES');
+    if (globalCosts?.transportCostEnabled) globalCostDesc.push('INSTALLATION COST');
+    
+    tableBody.push([
+      String(tableBody.length + 1),
+      '',
+      globalCostDesc.join(' + \n'),
+      '',
+      '-',
+      '-',
+      String(globalCostTotal)
+    ]);
+  }
+
   autoTable(doc, {
     startY: 95,
     margin: { left: 25, right: 5 },
-    head: [['SR. NO.', 'IMAGE', 'MATERIAL', 'DIMENSIONS', 'QUANTITY\\n(SQFT)', 'RATE\\n(RS/SQFT)', 'AMOUNT']],
+    head: [['SR. NO.', 'IMAGE', 'MATERIAL', 'DIMENSIONS', 'QUANTITY\n(SQFT)', 'RATE\n(RS/SQFT)', 'AMOUNT']],
     body: tableBody,
     theme: 'plain',
     headStyles: { 
@@ -132,31 +156,31 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
       halign: 'center',
       valign: 'middle',
       fontSize: 9,
-      textColor: [0,0,0]
+      textColor: [0,0,0],
+      minCellHeight: 35
     },
     columnStyles: {
       0: { cellWidth: 15, fontStyle: 'bold', fontSize: 12 },
-      1: { cellWidth: 40, minCellHeight: 30 }, // Image column
+      1: { cellWidth: 35 }, // Image column
       2: { cellWidth: 35, fontStyle: 'bold', fontSize: 8 },
-      3: { cellWidth: 35, textColor: [100,100,100], fontSize: 8 },
+      3: { cellWidth: 30, textColor: [100,100,100], fontSize: 8 },
       4: { cellWidth: 20 },
       5: { cellWidth: 20 },
       6: { cellWidth: 20 }
     },
     didDrawCell: function(data) {
       // Draw bottom border for body rows
-      if (data.row.section === 'body' && data.row.index < products.length - 1) {
+      if (data.row.section === 'body') {
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.5);
         doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
       }
       
       // Draw image in cell index 1
-      if (data.row.section === 'body' && data.column.index === 1) {
+      if (data.row.section === 'body' && data.column.index === 1 && data.row.index < products.length) {
         const base64 = productImages[data.row.index];
         if (base64) {
           try {
-            // center the image in the cell
             const dim = 24;
             const x = data.cell.x + (data.cell.width - dim) / 2;
             const y = data.cell.y + (data.cell.height - dim) / 2;
@@ -175,16 +199,12 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
   }
 
   // Draw Bank Details and Totals
-  // Subtotal & Totals on Right
   const productsTotal = products.reduce((acc, p) => acc + (p.amount || 0), 0);
-  let globalCostTotal = 0;
-  if (globalCosts?.packageCostEnabled) globalCostTotal += Number(globalCosts.packageCost || 0);
-  if (globalCosts?.transportCostEnabled) globalCostTotal += Number(globalCosts.transportCost || 0);
-  
   const subTotal = productsTotal + globalCostTotal;
   const gstAmount = (subTotal * gstPercent) / 100;
   const finalGrandTotal = subTotal + gstAmount;
 
+  // Subtotal & Totals on Right
   doc.setFontSize(9);
   doc.setTextColor(100, 100, 100);
   doc.text('Subtotal', 160, currentY);
@@ -197,14 +217,14 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
   doc.text(String(gstAmount), 200, currentY + 6, { align: 'right' });
 
   doc.setFont(undefined, 'bold');
-  doc.setTextColor(...goldColor);
+  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
   doc.text('Total', 160, currentY + 16);
   doc.text(String(finalGrandTotal), 200, currentY + 16, { align: 'right' });
 
   // Draw gold line under Total
-  doc.setDrawColor(...goldColor);
+  doc.setDrawColor(goldColor[0], goldColor[1], goldColor[2]);
   doc.setLineWidth(0.5);
-  doc.line(160, currentY + 18, 200, currentY + 18);
+  doc.line(160, currentY + 18, 205, currentY + 18);
 
   // Bank Details Table on Left
   doc.setDrawColor(0, 0, 0);
@@ -227,12 +247,12 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
   let bY = currentY + 1;
   rows.forEach(r => {
     doc.rect(25, bY, 80, 6);
-    doc.line(45, bY, 45, bY + 6); // vertical divider
+    doc.line(50, bY, 50, bY + 6); // vertical divider
     doc.setFont(undefined, 'bold');
     doc.text(r[0], 27, bY + 4);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(100, 100, 100);
-    doc.text(r[1], 47, bY + 4);
+    doc.text(r[1], 52, bY + 4);
     doc.setTextColor(0, 0, 0);
     bY += 6;
   });
@@ -259,12 +279,12 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
       doc.text(String(index + 1), 25, currentY);
       
       const splitTerm = doc.splitTextToSize(term, 160);
-      if (currentY + (splitTerm.length * 5) > 280) {
+      if (currentY + (splitTerm.length * 4) > 280) {
         doc.addPage();
         currentY = 20;
       }
       doc.text(splitTerm, 30, currentY);
-      currentY += splitTerm.length * 5 + 3;
+      currentY += splitTerm.length * 4 + 3;
     });
   }
 
@@ -274,7 +294,7 @@ const newFunc = \export const generateQuotationPDF = async (project: any, produc
   // Download
   doc.save('Quotation_' + project.projectId + '.pdf');
 };
-\;
+'''
 
-code = code + newFunc;
-fs.writeFileSync(file, code);
+with open('src/utils/pdfGenerator.ts', 'w', encoding='utf-8') as f:
+    f.write(content + newFunc)

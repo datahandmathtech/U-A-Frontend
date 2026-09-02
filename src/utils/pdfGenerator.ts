@@ -113,186 +113,284 @@ export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
 export const generateQuotationPDF = async (project: any, products: any[], quoteDetails: any, globalCosts?: any, terms?: string[], gstPercent: number = 0) => {
   const doc = new jsPDF();
   
-  // Header
-  doc.setFontSize(22);
-  doc.setTextColor(179, 139, 54); // Gold #B38B36
-  doc.text('UNNATI ARTS', 105, 20, { align: 'center' });
+  // Pre-fetch images for the table
+  const productImages: Record<number, string | null> = {};
+  for (let i = 0; i < products.length; i++) {
+    const p = products[i];
+    if (p.photo) {
+      const photos = p.photo.split(',').filter(Boolean);
+      if (photos.length > 0) {
+        const base64Img = await getBase64ImageFromUrl(photos[0]);
+        if (base64Img) {
+          productImages[i] = base64Img as string;
+        }
+      }
+    }
+  }
+
+  const goldColor = [179, 139, 54] as [number, number, number];
   
+  // Custom Hook to draw left black bar on every page
+  const addPageDecorations = (pdfDoc: any) => {
+    const pages = pdfDoc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      pdfDoc.setPage(i);
+      pdfDoc.setFillColor(0, 0, 0);
+      pdfDoc.rect(10, 0, 8, 297, 'F');
+      pdfDoc.setLineWidth(0.5);
+      pdfDoc.setDrawColor(0, 0, 0);
+      pdfDoc.line(20, 0, 20, 297);
+    }
+  };
+
+  // Header Background
+  doc.setFillColor(220, 220, 220); // Light Gray
+  doc.rect(20, 15, 190, 30, 'F');
+  
+  // Header Text - Left (Logo substitute)
+  doc.setFontSize(36);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont(undefined, 'bold');
+  doc.text('UA', 25, 36);
+  doc.setFontSize(16);
+  doc.text('Unnati', 50, 30);
+  doc.setFontSize(14);
+  doc.setFont(undefined, 'normal');
+  doc.text('Arts', 50, 36);
+
+  // Header Text - Right (Company Info)
   doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100);
-  doc.text('Fine Stone Craftsmanship & Custom Designs', 105, 26, { align: 'center' });
-  
-  doc.setLineWidth(0.5);
-  doc.line(20, 30, 190, 30);
+  doc.setFont(undefined, 'bold');
+  doc.text('UNNATI ARTS', 205, 20, { align: 'right' });
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'normal');
+  doc.text('101, Vintage Delight', 205, 24, { align: 'right' });
+  doc.text('Apartment, Shobhagpura, Udaipur', 205, 28, { align: 'right' });
+  doc.text('Rajasthan (313001)', 205, 32, { align: 'right' });
+  doc.setFont(undefined, 'bold');
+  doc.text('GSTIN : 08ARMPV8958M1ZF', 205, 36, { align: 'right' });
+  doc.text('9001843501/9887253946', 205, 40, { align: 'right' });
+
+  // Gold Line below header
+  doc.setFillColor(goldColor[0], goldColor[1], goldColor[2]);
+  doc.rect(20, 45, 190, 2, 'F');
 
   // Title
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
-  doc.text('PRODUCT ESTIMATION & QUOTATION', 105, 45, { align: 'center' });
+  doc.setFont(undefined, 'bold');
+  doc.text('QUOTATION', 115, 60, { align: 'center' });
 
-  // Details
-  doc.setFontSize(11);
-  doc.text('Quotation Date: ' + new Date().toLocaleDateString('en-GB'), 20, 60);
-  doc.text('Project ID: ' + project.projectId, 140, 60);
-  
-  doc.text('Client Name: ' + (project.clientName || 'N/A'), 20, 70);
-  doc.text('Project Name: ' + project.name, 140, 70);
-  doc.text('Contact: ' + (project.clientContact || 'N/A'), 20, 80);
+  // Client Info & Date
+  doc.setFontSize(8);
+  doc.text('TO,', 25, 75);
+  doc.text(String(project.clientName || 'CLIENT NAME').toUpperCase(), 25, 80);
+  doc.setFont(undefined, 'normal');
+  doc.text(String(project.clientContact || 'CLIENT ADDRESS DETAILS').toUpperCase(), 25, 85);
 
-  // Products Table
-  const tableBody = products.map(p => {
+  doc.setFont(undefined, 'bold');
+  const d = new Date();
+  const dateStr = d.getDate().toString().padStart(2, '0') + '-' + (d.getMonth() + 1).toString().padStart(2, '0') + '-' + d.getFullYear();
+  doc.text('DATE  ' + dateStr, 205, 75, { align: 'right' });
+  doc.text('QUOTE #.  UA/QT/' + d.getFullYear().toString().slice(-2) + '/' + String(Math.floor(Math.random()*100)).padStart(2, '0'), 205, 80, { align: 'right' });
+
+  // Add a horizontal gray line above table
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.5);
+  doc.line(25, 90, 205, 90);
+
+  // Table Data
+  const tableBody = products.map((p, index) => {
     const dimensionsStr = p.unit !== 'Pieces' 
       ? (p.length || 0) + ' x ' + (p.width || 0)
-      : '-';
-    const mm = p.unit !== 'Pieces' ? String(p.breadth || 0) : '-';
-    const sqFt = p.unit === 'Sq. Ft' ? String((p.length || 0) * (p.width || 0)) : '-';
+      : 'sizes as per\nshared\ndrawing';
+    
+    const qtySqft = p.unit === 'Sq. Ft' ? String((p.length || 0) * (p.width || 0)) : String(p.qty || 1);
 
     return [
-      p.category || 'N/A',
-      p.unit || 'N/A',
+      String(index + 1),
+      '', // Image placeholder
+      (p.category || 'MATERIAL').toUpperCase(),
       dimensionsStr,
-      mm,
-      sqFt,
-      p.qty || 0,
-      'Rs. ' + (p.rate || 0).toLocaleString('en-IN'),
-      'Rs. ' + (p.amount || 0).toLocaleString('en-IN')
+      qtySqft,
+      String(p.rate || 0),
+      String(p.amount || 0)
     ];
   });
 
-  autoTable(doc, {
-    startY: 90,
-    head: [['Category', 'Unit', 'Dimensions (L x W)', 'MM', 'Sq. Ft', 'Qty', 'Rate', 'Amount']],
-    body: tableBody,
-    theme: 'grid',
-    headStyles: { fillColor: [26, 28, 41] }, // Dark header
-    styles: { fontSize: 10, cellPadding: 3 }
-  });
-
-  let currentY = (doc as any).lastAutoTable.finalY + 10;
-
-  // Calculate totals
-  const productsTotal = products.reduce((acc, p) => acc + (p.amount || 0), 0);
-
+  // Calculate global costs as a separate row if any
   let globalCostTotal = 0;
   if (globalCosts?.packageCostEnabled) globalCostTotal += Number(globalCosts.packageCost || 0);
   if (globalCosts?.transportCostEnabled) globalCostTotal += Number(globalCosts.transportCost || 0);
   
+  if (globalCostTotal > 0) {
+    let globalCostDesc = [];
+    if (globalCosts?.packageCostEnabled) globalCostDesc.push('PACKING CHARGES');
+    if (globalCosts?.transportCostEnabled) globalCostDesc.push('INSTALLATION COST');
+    
+    tableBody.push([
+      String(tableBody.length + 1),
+      '',
+      globalCostDesc.join(' + \n'),
+      '',
+      '-',
+      '-',
+      String(globalCostTotal)
+    ]);
+  }
+
+  autoTable(doc, {
+    startY: 95,
+    margin: { left: 25, right: 5 },
+    head: [['SR. NO.', 'IMAGE', 'MATERIAL', 'DIMENSIONS', 'QUANTITY\n(SQFT)', 'RATE\n(RS/SQFT)', 'AMOUNT']],
+    body: tableBody,
+    theme: 'plain',
+    headStyles: { 
+      fillColor: [0, 0, 0], 
+      textColor: goldColor,
+      fontStyle: 'bold',
+      halign: 'center',
+      valign: 'middle',
+      fontSize: 8
+    },
+    bodyStyles: {
+      halign: 'center',
+      valign: 'middle',
+      fontSize: 9,
+      textColor: [0,0,0],
+      minCellHeight: 35
+    },
+    columnStyles: {
+      0: { cellWidth: 15, fontStyle: 'bold', fontSize: 12 },
+      1: { cellWidth: 35 }, // Image column
+      2: { cellWidth: 35, fontStyle: 'bold', fontSize: 8 },
+      3: { cellWidth: 30, textColor: [100,100,100], fontSize: 8 },
+      4: { cellWidth: 20 },
+      5: { cellWidth: 20 },
+      6: { cellWidth: 20 }
+    },
+    didDrawCell: function(data) {
+      // Draw bottom border for body rows
+      if (data.row.section === 'body') {
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+      }
+      
+      // Draw image in cell index 1
+      if (data.row.section === 'body' && data.column.index === 1 && data.row.index < products.length) {
+        const base64 = productImages[data.row.index];
+        if (base64) {
+          try {
+            const dim = 24;
+            const x = data.cell.x + (data.cell.width - dim) / 2;
+            const y = data.cell.y + (data.cell.height - dim) / 2;
+            doc.addImage(base64, 'JPEG', x, y, dim, dim);
+          } catch(e) {}
+        }
+      }
+    }
+  });
+
+  let currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  if (currentY > 230) {
+    doc.addPage();
+    currentY = 30;
+  }
+
+  // Draw Bank Details and Totals
+  const productsTotal = products.reduce((acc, p) => acc + (p.amount || 0), 0);
   const subTotal = productsTotal + globalCostTotal;
   const gstAmount = (subTotal * gstPercent) / 100;
   const finalGrandTotal = subTotal + gstAmount;
 
-  // Grand Total Summary Box
-  doc.setFillColor(247, 243, 235); // Light Gold/Cream background
-  doc.rect(20, currentY, 170, 50, 'F');
-  
-  doc.setFontSize(11);
-  doc.setTextColor(50, 50, 50);
-  doc.text('Total Products Amount: Rs. ' + productsTotal.toLocaleString('en-IN'), 25, currentY + 10);
-  
-  let boxYOffset = 18;
-  if (globalCosts?.transportCostEnabled && globalCosts?.transportCost > 0) {
-    doc.text('Installation Cost: Rs. ' + Number(globalCosts.transportCost).toLocaleString('en-IN'), 25, currentY + boxYOffset);
-    boxYOffset += 8;
-  }
-  if (globalCosts?.packageCostEnabled && globalCosts?.packageCost > 0) {
-    doc.text('Packing Charges: Rs. ' + Number(globalCosts.packageCost).toLocaleString('en-IN'), 25, currentY + boxYOffset);
-    boxYOffset += 8;
-  }
-  
-  doc.text('GST (' + gstPercent + '%): Rs. ' + gstAmount.toLocaleString('en-IN'), 25, currentY + boxYOffset);
-  boxYOffset += 8;
-  
-  doc.setFontSize(12);
-  doc.setTextColor(179, 139, 54);
+  // Subtotal & Totals on Right
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text('Subtotal', 160, currentY);
+  doc.setTextColor(0, 0, 0);
+  doc.text(String(subTotal), 200, currentY, { align: 'right' });
+
+  doc.setTextColor(100, 100, 100);
+  doc.text('GST ' + gstPercent + '%', 160, currentY + 6);
+  doc.setTextColor(0, 0, 0);
+  doc.text(String(gstAmount), 200, currentY + 6, { align: 'right' });
+
   doc.setFont(undefined, 'bold');
-  doc.text('Estimated Grand Total: Rs. ' + finalGrandTotal.toLocaleString('en-IN'), 25, currentY + boxYOffset);
+  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
+  doc.text('Total', 160, currentY + 16);
+  doc.text(String(finalGrandTotal), 200, currentY + 16, { align: 'right' });
+
+  // Draw gold line under Total
+  doc.setDrawColor(goldColor[0], goldColor[1], goldColor[2]);
+  doc.setLineWidth(0.5);
+  doc.line(160, currentY + 18, 205, currentY + 18);
+
+  // Bank Details Table on Left
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.5);
+  // Header
+  doc.setFillColor(0, 0, 0);
+  doc.rect(25, currentY - 5, 80, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
+  doc.text('Bank details', 27, currentY - 1);
+  
+  doc.setTextColor(0, 0, 0);
+  const rows = [
+    ['Bank name', 'state bank of india'],
+    ['A/c no.', '40127845471'],
+    ['Ifsc code', 'SBIN0032153'],
+    ['Branch', 'sukher, udaipur']
+  ];
+  
+  let bY = currentY + 1;
+  rows.forEach(r => {
+    doc.rect(25, bY, 80, 6);
+    doc.line(50, bY, 50, bY + 6); // vertical divider
+    doc.setFont(undefined, 'bold');
+    doc.text(r[0], 27, bY + 4);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(r[1], 52, bY + 4);
+    doc.setTextColor(0, 0, 0);
+    bY += 6;
+  });
+
+  currentY = bY + 15;
+
+  // Terms and Conditions Title
+  doc.setFontSize(9);
   doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text('All payments are subject to the terms and conditions stated on Page 2', 25, currentY);
+  doc.setTextColor(100, 100, 100);
+  doc.text('Term & conditions', 25, currentY + 5);
+  currentY += 15;
 
-  currentY += 60;
-
-  // Render Product Photos
-  const photosWithCategories = products
-    .filter(p => p.photo)
-    .map(p => ({ category: p.category, photos: p.photo.split(',').filter(Boolean) }))
-    .filter(p => p.photos.length > 0);
-
-  if (photosWithCategories.length > 0) {
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0);
-    doc.text('Product Reference Designs', 20, currentY);
-    currentY += 10;
-
-    for (const item of photosWithCategories) {
-      if (currentY > 250) {
-        doc.addPage();
-        currentY = 20;
-      }
-      doc.setFontSize(12);
-      doc.text(item.category || 'Product', 20, currentY);
-      currentY += 5;
-
-      let startX = 20;
-      for (const photoUrl of item.photos) {
-        if (startX > 150) {
-          startX = 20;
-          currentY += 45;
-        }
-        if (currentY > 250) {
-          doc.addPage();
-          currentY = 20;
-          startX = 20;
-        }
-
-        const base64Img = await getBase64ImageFromUrl(photoUrl);
-        if (base64Img) {
-          try {
-            doc.addImage(base64Img as string, 'JPEG', startX, currentY, 40, 40);
-          } catch(e) {}
-        }
-        startX += 45;
-      }
-      currentY += 50;
-    }
-  }
-
-  // Terms and Conditions
+  // Render Terms
   if (terms && terms.length > 0) {
-    if (currentY > 250) {
-      doc.addPage();
-      currentY = 20;
-    }
-    doc.setFontSize(12);
+    doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
-    doc.text('Terms and Conditions', 20, currentY);
-    currentY += 10;
+    doc.setFont(undefined, 'bold');
     
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
     terms.forEach((term, index) => {
-      const splitTerm = doc.splitTextToSize(String(index + 1) + '. ' + term, 170);
-      if (currentY + (splitTerm.length * 5) > 280) {
+      // number
+      doc.text(String(index + 1), 25, currentY);
+      
+      const splitTerm = doc.splitTextToSize(term, 160);
+      if (currentY + (splitTerm.length * 4) > 280) {
         doc.addPage();
         currentY = 20;
       }
-      doc.text(splitTerm, 20, currentY);
-      currentY += splitTerm.length * 5 + 2;
+      doc.text(splitTerm, 30, currentY);
+      currentY += splitTerm.length * 4 + 3;
     });
   }
 
-  // Footer Signature
-  if (currentY > 250) {
-    doc.addPage();
-    currentY = 20;
-  }
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(12);
-  doc.text('Authorized Signature', 140, currentY + 30);
-  doc.setLineWidth(0.5);
-  doc.line(140, currentY + 32, 185, currentY + 32);
-
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  doc.text('This is a computer generated quote.', 105, 290, { align: 'center' });
+  // Final decorations
+  addPageDecorations(doc);
 
   // Download
   doc.save('Quotation_' + project.projectId + '.pdf');
