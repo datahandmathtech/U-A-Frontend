@@ -76,31 +76,35 @@ const Approvals: React.FC = () => {
 
   const submitApproval = async () => {
     try {
+      const isProjectSplitRequired = (!selectedLog?.stage.includes('Production') && selectedLog?.transactionType === 'OUT');
+      
       const validSplits = projectSplits.filter(s => s.projectId && s.qty > 0);
       
-      if (validSplits.length === 0) {
-        setToast({ open: true, message: 'Please select at least one project and enter item count.', severity: 'error' });
-        return;
-      }
+      if (isProjectSplitRequired) {
+        if (validSplits.length === 0) {
+          setToast({ open: true, message: 'Please select at least one project and enter item count.', severity: 'error' });
+          return;
+        }
 
-      if (validSplits.some(s => !s.slabId)) {
-        setToast({ open: true, message: 'Please select a Product / Slab for all assignments so it appears in the pipeline.', severity: 'error' });
-        return;
-      }
+        if (validSplits.some(s => !s.slabId)) {
+          setToast({ open: true, message: 'Please select a Product / Slab for all assignments so it appears in the pipeline.', severity: 'error' });
+          return;
+        }
 
-      const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
-      const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
+        const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
+        const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
 
-      if (!hasPieces && totalSplitQty > selectedLog.quantityProduced) {
-        setToast({ open: true, message: `Total split item count (${totalSplitQty}) cannot exceed original item count (${selectedLog.quantityProduced}).`, severity: 'error' });
-        return;
+        if (!hasPieces && totalSplitQty > selectedLog.quantityProduced) {
+          setToast({ open: true, message: `Total split item count (${totalSplitQty}) cannot exceed original item count (${selectedLog.quantityProduced}).`, severity: 'error' });
+          return;
+        }
       }
 
       await approveLog({ 
         id: selectedLog.id, 
         data: { 
           approvalStatus: 'approved', 
-          splits: validSplits
+          ...(isProjectSplitRequired ? { splits: validSplits } : {})
         } 
       }).unwrap();
       
