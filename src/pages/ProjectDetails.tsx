@@ -692,11 +692,14 @@ const ProjectDetails: React.FC = () => {
     const lengthDec = p.length || 0;
     const widthDec = p.width || 0;
     const breadthDec = p.breadth || 1; // Default to 1 if breadth is 0
+    const qtyDec = p.qty || 1; // 0 pe bhi 1 calculate hoga, as requested
 
-    if (p.unit !== 'Pieces') {
-      amount = lengthDec * widthDec * p.qty * p.rate;
+    if (p.unit?.toLowerCase().includes('inch')) {
+      amount = ((lengthDec * widthDec) / 144) * qtyDec * p.rate;
+    } else if (p.unit?.toLowerCase() !== 'pieces' && p.unit?.toLowerCase() !== 'piece' && p.unit?.toLowerCase() !== 'pcs') {
+      amount = lengthDec * widthDec * qtyDec * p.rate;
     } else {
-      amount = p.qty * p.rate;
+      amount = qtyDec * p.rate;
     }
     return Math.round(amount);
   };
@@ -2657,8 +2660,9 @@ const ProjectDetails: React.FC = () => {
               ) : (
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                   <TextField 
-                    size="small" type="number" label={`Total ${ep.unit || ''}`} 
-                    value={(ep.length || 0) * (ep.width || 0)} 
+                    size="small" type="number" 
+                    label={ep.unit?.toLowerCase().includes('inch') ? 'Total Sq.Ft' : `Total ${ep.unit || ''}`} 
+                    value={ep.unit?.toLowerCase().includes('inch') ? Number((((ep.length || 0) * (ep.width || 0)) / 144).toFixed(2)) : (ep.length || 0) * (ep.width || 0)} 
                     disabled 
                     fullWidth 
                     sx={{ bgcolor: '#f5f5f5' }}
