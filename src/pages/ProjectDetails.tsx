@@ -2624,64 +2624,65 @@ const ProjectDetails: React.FC = () => {
                 </Box>
               </Box>
 
-              {ep.unit !== 'Pieces' && (
-                <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Length (L)</Typography>
-                    <TextField size="small" type="number" value={ep.length === 0 ? '' : ep.length} onChange={e => handleUpdateEditingProduct(index, 'length', Number(e.target.value))} fullWidth />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Width (W)</Typography>
-                    <TextField size="small" type="number" value={ep.width === 0 ? '' : ep.width} onChange={e => handleUpdateEditingProduct(index, 'width', Number(e.target.value))} fullWidth />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>MM</Typography>
-                    <TextField size="small" type="number" value={ep.breadth === 0 ? '' : ep.breadth} onChange={e => handleUpdateEditingProduct(index, 'breadth', Number(e.target.value))} fullWidth />
-                  </Box>
+              <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Length (L)</Typography>
+                  <TextField size="small" type="number" value={ep.length === 0 ? '' : ep.length} onChange={e => handleUpdateEditingProduct(index, 'length', Number(e.target.value))} fullWidth />
                 </Box>
-              )}
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Width (W)</Typography>
+                  <TextField size="small" type="number" value={ep.width === 0 ? '' : ep.width} onChange={e => handleUpdateEditingProduct(index, 'width', Number(e.target.value))} fullWidth />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>MM</Typography>
+                  <TextField size="small" type="number" value={ep.breadth === 0 ? '' : ep.breadth} onChange={e => handleUpdateEditingProduct(index, 'breadth', Number(e.target.value))} fullWidth />
+                </Box>
+                {ep.unit === 'Pieces' && (
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Dimension In</Typography>
+                    <Select 
+                      size="small" 
+                      fullWidth 
+                      value={(ep as any).dimensionUnit || 'inch'} 
+                      onChange={e => handleUpdateEditingProduct(index, 'dimensionUnit', e.target.value)}
+                    >
+                      <MenuItem value="inch">Inches</MenuItem>
+                      <MenuItem value="sq_ft">Sq. Feet</MenuItem>
+                    </Select>
+                  </Box>
+                )}
+              </Box>
 
-              {ep.unit === 'Pieces' ? (
-                <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                  <TextField 
-                    size="small" type="number" label="Quantity (Pieces)" 
-                    value={ep.qty === 0 ? '' : ep.qty} 
-                    onChange={e => handleUpdateEditingProduct(index, 'qty', Number(e.target.value))} 
-                    fullWidth 
-                  />
-                  <TextField 
-                    size="small" type="number" label="Rate (per piece)" 
-                    value={ep.rate === 0 ? '' : ep.rate} 
-                    onChange={e => handleUpdateEditingProduct(index, 'rate', Number(e.target.value))} 
-                    fullWidth 
-                    slotProps={{ input: { startAdornment: <Typography variant="body2" color="text.secondary" sx={{mr: 0.5}}>₹</Typography> } as any }}
-                  />
-                </Box>
-              ) : (
-                <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                  <TextField 
-                    size="small" type="number" 
-                    label={ep.unit?.toLowerCase().includes('inch') ? 'Total Sq.Ft' : `Total ${ep.unit || ''}`} 
-                    value={ep.unit?.toLowerCase().includes('inch') ? Number((((ep.length || 0) * (ep.width || 0)) / 144).toFixed(2)) : (ep.length || 0) * (ep.width || 0)} 
-                    disabled 
-                    fullWidth 
-                    sx={{ bgcolor: '#f5f5f5' }}
-                  />
-                  <TextField 
-                    size="small" type="number" label="Rate (per unit)" 
-                    value={ep.rate === 0 ? '' : ep.rate} 
-                    onChange={e => handleUpdateEditingProduct(index, 'rate', Number(e.target.value))} 
-                    fullWidth 
-                    slotProps={{ input: { startAdornment: <Typography variant="body2" color="text.secondary" sx={{mr: 0.5}}>₹</Typography> } as any }}
-                  />
-                  <TextField 
-                    size="small" type="number" label="No. of Pieces" 
-                    value={ep.qty === 0 ? '' : ep.qty} 
-                    onChange={e => handleUpdateEditingProduct(index, 'qty', Number(e.target.value))} 
-                    fullWidth 
-                  />
-                </Box>
-              )}
+              <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                <TextField 
+                  size="small" type="number" 
+                  label={ep.unit === 'Pieces' ? 'Total Sq.Ft' : (ep.unit?.toLowerCase().includes('inch') ? 'Total Sq.Ft' : `Total ${ep.unit || ''}`)} 
+                  value={(() => {
+                    const l = ep.length || 0;
+                    const w = ep.width || 0;
+                    if (ep.unit === 'Pieces') {
+                      return ((ep as any).dimensionUnit || 'inch') === 'inch' ? Number(((l * w) / 144).toFixed(2)) : l * w;
+                    }
+                    return ep.unit?.toLowerCase().includes('inch') ? Number(((l * w) / 144).toFixed(2)) : l * w;
+                  })()} 
+                  disabled 
+                  fullWidth 
+                  sx={{ bgcolor: '#f5f5f5' }}
+                />
+                <TextField 
+                  size="small" type="number" label={ep.unit === 'Pieces' ? "Rate (per piece)" : "Rate (per unit)"} 
+                  value={ep.rate === 0 ? '' : ep.rate} 
+                  onChange={e => handleUpdateEditingProduct(index, 'rate', Number(e.target.value))} 
+                  fullWidth 
+                  slotProps={{ input: { startAdornment: <Typography variant="body2" color="text.secondary" sx={{mr: 0.5}}>₹</Typography> } as any }}
+                />
+                <TextField 
+                  size="small" type="number" label={ep.unit === 'Pieces' ? "Quantity (Pieces)" : "No. of Pieces"} 
+                  value={ep.qty === 0 ? '' : ep.qty} 
+                  onChange={e => handleUpdateEditingProduct(index, 'qty', Number(e.target.value))} 
+                  fullWidth 
+                />
+              </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                 <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>Item Amount:</Typography>
