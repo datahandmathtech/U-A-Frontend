@@ -5,7 +5,7 @@ import AddIcon from '@mui/icons-material/Add';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { useGetProjectsQuery } from '../store/apiSlice';
+import { useGetProjectsQuery, useSavePackingItemsMutation, useGetPackingItemsQuery } from '../store/apiSlice';
 
 interface PackingRow {
   id: number;
@@ -19,10 +19,28 @@ interface PackingRow {
 const Dispatch: React.FC = () => {
   const { data: projects } = useGetProjectsQuery();
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [savePackingItems] = useSavePackingItemsMutation();
+  const { data: savedPackingItems } = useGetPackingItemsQuery(selectedProjectId, { skip: !selectedProjectId });
   
   const [rows, setRows] = useState<PackingRow[]>([
     { id: 1, box: '', code: '', subCategory: '', size: '', pcs: '' }
   ]);
+
+  // Auto-load saved packing items when project is selected
+  React.useEffect(() => {
+    if (savedPackingItems && savedPackingItems.length > 0) {
+      setRows(savedPackingItems.map((item: any) => ({
+        id: item.id || Date.now() + Math.random(),
+        box: item.box || '',
+        code: item.code || '',
+        subCategory: item.subCategory || '',
+        size: item.size || '',
+        pcs: item.pcs ?? ''
+      })));
+    } else if (selectedProjectId) {
+      setRows([{ id: 1, box: '', code: '', subCategory: '', size: '', pcs: '' }]);
+    }
+  }, [savedPackingItems, selectedProjectId]);
 
   const handleAddRow = () => {
     setRows([...rows, { id: Date.now(), box: '', code: '', subCategory: '', size: '', pcs: '' }]);
@@ -36,9 +54,25 @@ const Dispatch: React.FC = () => {
     setRows(rows.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     const project = projects?.find((p: any) => p.id === selectedProjectId);
     if (!project) return;
+
+    // Save packing items to database
+    try {
+      await savePackingItems({
+        projectId: selectedProjectId,
+        items: rows.filter(r => r.box || r.code).map(r => ({
+          box: r.box,
+          code: r.code,
+          subCategory: r.subCategory,
+          size: r.size,
+          pcs: r.pcs ? Number(r.pcs) : undefined
+        }))
+      }).unwrap();
+    } catch (err) {
+      console.error('Failed to save packing items:', err);
+    }
 
     const doc = new jsPDF();
     
@@ -183,7 +217,32 @@ const Dispatch: React.FC = () => {
             </Table>
           </TableContainer>
 
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+            <Button 
+              variant="outlined" 
+              color="success" 
+              size="large"
+              onClick={async () => {
+                try {
+                  await savePackingItems({
+                    projectId: selectedProjectId,
+                    items: rows.filter(r => r.box || r.code).map(r => ({
+                      box: r.box,
+                      code: r.code,
+                      subCategory: r.subCategory,
+                      size: r.size,
+                      pcs: r.pcs ? Number(r.pcs) : undefined
+                    }))
+                  }).unwrap();
+                  alert('Packing items saved successfully!');
+                } catch (err) {
+                  alert('Failed to save');
+                }
+              }}
+              sx={{ borderRadius: 8, px: 4 }}
+            >
+              Save Items
+            </Button>
             <Button 
               variant="contained" 
               color="primary" 

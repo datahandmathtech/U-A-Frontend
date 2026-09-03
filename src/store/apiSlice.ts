@@ -500,6 +500,15 @@ export const apiSlice = createApi({
       query: (supplier) => `/inventory/logs/${encodeURIComponent(supplier)}`,
       providesTags: ['Inventory']
     }),
+    // Packing Items
+    getPackingItems: builder.query<any[], string>({
+      query: (projectId) => `/packing-items/${projectId}`,
+      providesTags: ['Dispatch']
+    }),
+    savePackingItems: builder.mutation<any, { projectId: string, items: any[] }>({
+      query: ({ projectId, items }) => ({ url: `/packing-items/${projectId}`, method: 'POST', body: { items } }),
+      invalidatesTags: ['Dispatch']
+    }),
   }),
 });
 
@@ -595,5 +604,7 @@ export const {
   useUpdateMaterialLogMutation,
   useUpdateReturnQtyMutation,
   useDeleteProductionLogMutation,
-  useEditProductionLogMutation
+  useEditProductionLogMutation,
+  useGetPackingItemsQuery,
+  useSavePackingItemsMutation
 } = apiSlice;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, Paper, TextField, MenuItem, CircularProgress, Alert, Snackbar, Divider, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, RadioGroup, FormControlLabel, Radio, FormControl, Grid, Switch } from '@mui/material';
-import { useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, useGetActiveSessionQuery, useMachineClockInMutation, useGetDailyMachineLogsQuery, useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, useGetActiveOutLogsQuery, useGetProjectsQuery, useGetVendorsQuery, useGetRejectedLogsQuery, useApproveMaterialLogMutation } from '../store/apiSlice';
+import { useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, useGetActiveSessionQuery, useMachineClockInMutation, useGetDailyMachineLogsQuery, useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, useGetActiveOutLogsQuery, useGetProjectsQuery, useGetVendorsQuery, useGetRejectedLogsQuery, useApproveMaterialLogMutation, useGetPackingItemsQuery } from '../store/apiSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/authSlice';
 import { useNavigate } from 'react-router-dom';
@@ -163,6 +163,7 @@ const ManagerDashboard: React.FC = () => {
   const { data: projectsData } = useGetProjectsQuery();
   const [selectedMachine, setSelectedMachine] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const { data: packingItemsForProject } = useGetPackingItemsQuery(selectedProjectId, { skip: !selectedProjectId });
   const [selectedProductId, setSelectedProductId] = useState('');
   const [estimatedHours, setEstimatedHours] = useState('');
   const [photos, setPhotos] = useState({ machine: '', unit: '', software: '' });
@@ -820,30 +821,50 @@ const ManagerDashboard: React.FC = () => {
               )}
 
               {materialStage === 'Packing' && (
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <TextField 
-                    fullWidth 
-                    label="Box (Required)"
-                    placeholder="e.g. V, W, 26"
-                    value={boxCode.split('|')[0] || ''}
-                    onChange={(e) => {
-                      const codePart = boxCode.split('|')[1] || '';
-                      setBoxCode(e.target.value + '|' + codePart);
-                    }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                  />
-                  <TextField 
-                    fullWidth 
-                    label="Code (Required)"
-                    placeholder="e.g. MD2a"
-                    value={boxCode.split('|')[1] || ''}
-                    onChange={(e) => {
-                      const boxPart = boxCode.split('|')[0] || '';
-                      setBoxCode(boxPart + '|' + e.target.value);
-                    }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                  />
-                </Box>
+                <>
+                  {packingItemsForProject && packingItemsForProject.length > 0 ? (
+                    <TextField 
+                      select
+                      fullWidth 
+                      label="Select Box & Code (From Dispatch & Packing List)"
+                      value={boxCode}
+                      onChange={(e) => setBoxCode(e.target.value)}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                    >
+                      <MenuItem value="" disabled>-- Select Box & Code --</MenuItem>
+                      {packingItemsForProject.map((item: any) => (
+                        <MenuItem key={item.id} value={`${item.box}|${item.code}`}>
+                          Box: {item.box} | Code: {item.code} {item.pcs ? `| ${item.pcs} Pcs` : ''} {item.size ? `| ${item.size}` : ''}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  ) : (
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField 
+                        fullWidth 
+                        label="Box (Required)"
+                        placeholder="e.g. V, W, 26"
+                        value={boxCode.split('|')[0] || ''}
+                        onChange={(e) => {
+                          const codePart = boxCode.split('|')[1] || '';
+                          setBoxCode(e.target.value + '|' + codePart);
+                        }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      />
+                      <TextField 
+                        fullWidth 
+                        label="Code (Required)"
+                        placeholder="e.g. MD2a"
+                        value={boxCode.split('|')[1] || ''}
+                        onChange={(e) => {
+                          const boxPart = boxCode.split('|')[0] || '';
+                          setBoxCode(boxPart + '|' + e.target.value);
+                        }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      />
+                    </Box>
+                  )}
+                </>
               )}
 
               <Box>
