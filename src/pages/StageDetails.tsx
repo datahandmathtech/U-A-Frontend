@@ -390,7 +390,7 @@ const StageDetails = () => {
               <PendingActionsIcon sx={{ color: '#f57c00' }} />
             </Box>
             <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>Pending Pieces (Baki)</Typography>
+              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>Pending Pieces</Typography>
               <Typography variant="h4" fontWeight="900" color="#f57c00" sx={{ lineHeight: 1 }}>{pendingPieces}</Typography>
             </Box>
           </Paper>
