@@ -298,8 +298,8 @@ const ManagerDashboard: React.FC = () => {
       // Find selected product name for payload
       const selectedProject = projectsData?.find((p: any) => p.id === selectedProjectId);
       let productName = '';
-      if (selectedProject && selectedProject.quotations && selectedProject.quotations.length > 0) {
-        const prod = selectedProject.quotations[0].products?.find((p: any) => p.id === selectedProductId);
+      if (selectedProject && selectedProject.products && selectedProject.products.length > 0) {
+        const prod = selectedProject.products?.find((p: any) => p.id === selectedProductId);
         if (prod) productName = prod.name;
       }
       
@@ -414,8 +414,8 @@ const ManagerDashboard: React.FC = () => {
       let productName = '';
       if (selectedProjectId && selectedProductId) {
         const selectedProject = projectsData?.find((p: any) => p.id === selectedProjectId);
-        if (selectedProject && selectedProject.quotations && selectedProject.quotations.length > 0) {
-          const prod = selectedProject.quotations[0].products?.find((p: any) => p.id === selectedProductId);
+        if (selectedProject && selectedProject.products && selectedProject.products.length > 0) {
+          const prod = selectedProject.products?.find((p: any) => p.id === selectedProductId);
           if (prod) productName = prod.name;
         }
       }
@@ -634,7 +634,7 @@ const ManagerDashboard: React.FC = () => {
                             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 }, mt: 2 }}
                           >
                             <MenuItem value="" disabled>-- Select Stone --</MenuItem>
-                            {projectsData?.find((p: any) => p.id === selectedProjectId)?.quotations?.[0]?.products?.map((prod: any) => (
+                            {projectsData?.find((p: any) => p.id === selectedProjectId)?.products?.map((prod: any) => (
                               <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
                             ))}
                           </TextField>
@@ -681,7 +681,7 @@ const ManagerDashboard: React.FC = () => {
                             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                           >
                             <MenuItem value="" disabled>-- Select Stone --</MenuItem>
-                            {projectsData?.find((p: any) => p.id === selectedProjectId)?.quotations?.[0]?.products?.map((prod: any) => (
+                            {projectsData?.find((p: any) => p.id === selectedProjectId)?.products?.map((prod: any) => (
                               <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
                             ))}
                           </TextField>
