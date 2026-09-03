@@ -206,13 +206,15 @@ const Approvals: React.FC = () => {
                   <Grid size={{ xs: 12, md: 6, lg: 4 }} key={log.id}>
                     <Card sx={{ borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', position: 'relative', bgcolor: 'white' }}>
                       <Box sx={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
-                        <Chip 
-                          label={log.transactionType === 'OUT' ? 'MATERIAL OUT' : 'MATERIAL IN'} 
-                          color={log.transactionType === 'OUT' ? 'warning' : 'info'} 
-                          size="small" 
-                          sx={{ fontWeight: 'bold', fontSize: '0.7rem' }} 
-                          icon={log.transactionType === 'OUT' ? <OutputIcon /> : <InputIcon />}
-                        />
+                        {log.stage !== 'Packing' && log.stage !== 'Dispatch' && (
+                          <Chip 
+                            label={log.transactionType === 'OUT' ? 'MATERIAL OUT' : 'MATERIAL IN'} 
+                            color={log.transactionType === 'OUT' ? 'warning' : 'info'} 
+                            size="small" 
+                            sx={{ fontWeight: 'bold', fontSize: '0.7rem' }} 
+                            icon={log.transactionType === 'OUT' ? <OutputIcon /> : <InputIcon />}
+                          />
+                        )}
                       </Box>
                       <CardContent sx={{ pt: 4 }}>
                         <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between' }}>
@@ -224,12 +226,6 @@ const Approvals: React.FC = () => {
                             Vehicle No: {log.vehicleNumber}
                           </Typography>
                         )}
-                        {log.boxCode && (
-                          <Typography variant="body2" sx={{ mb: 1, color: '#9c27b0', fontWeight: 'bold' }}>
-                            Box / Code: {log.boxCode.replace('|', ' / ')}
-                          </Typography>
-                        )}
-                        
                         {(log.project || log.projectId) && (
                           <Box sx={{ mt: 2, mb: 1 }}>
                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Project:</Typography>
@@ -602,10 +598,16 @@ const Approvals: React.FC = () => {
         </DialogTitle>
         <DialogContent dividers>
           <>
+            {selectedLog?.boxCode && (
+              <Box sx={{ mb: 2, p: 2, bgcolor: '#f3e5f5', borderRadius: 2, border: '1px solid #e1bee7' }}>
+                <Typography variant="body2" sx={{ color: '#9c27b0', fontWeight: 'bold' }}>
+                  Packing Info (Box | Code | Size): {selectedLog.boxCode.replace(/\|/g, ' / ')}
+                </Typography>
+              </Box>
+            )}
             <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
               Select one or more projects for this material. You can split the items across multiple projects.
             </Typography>
-    
               {/* Project Assignment rows */}
               {projectSplits.map((split, idx) => {
                 const selectedProjectObj = projects?.find((p: any) => p.id === split.projectId);
