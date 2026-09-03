@@ -4,13 +4,16 @@ import {
   Box, Typography, Button, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, IconButton, TextField, 
   Switch, FormControlLabel, Breadcrumbs, Link, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, Select, MenuItem
+  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, Select, MenuItem, Grid
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import { 
   useGetProjectByIdQuery, 
   useGetSlabsQuery,
@@ -301,6 +304,19 @@ const StageDetails = () => {
     });
   };
 
+  const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+  const stageIdx = BASE_STAGES.indexOf(stageFormatted);
+  
+  const totalPieces = slab.pieces?.length || 0;
+  
+  const completedPieces = (slab.pieces || []).filter((p: any) => {
+    const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0];
+    const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
+    return pStageIdx > stageIdx || (normalizedPieceStage === stageFormatted && p.status === 'completed');
+  }).length;
+  
+  const pendingPieces = totalPieces - completedPieces;
+
   return (
     <Box sx={{ p: 4, maxWidth: '100%', margin: '0 auto' }}>
       <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -344,7 +360,42 @@ const StageDetails = () => {
         )}
       </Box>
 
-
+      {/* SUMMARY BOXES */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={4}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ViewModuleIcon sx={{ color: '#1976d2' }} />
+            </Box>
+            <Box>
+              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>Total Pieces</Typography>
+              <Typography variant="h4" fontWeight="900" color="#222" sx={{ lineHeight: 1 }}>{totalPieces}</Typography>
+            </Box>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircleIcon sx={{ color: '#388e3c' }} />
+            </Box>
+            <Box>
+              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>Completed Pieces</Typography>
+              <Typography variant="h4" fontWeight="900" color="#388e3c" sx={{ lineHeight: 1 }}>{completedPieces}</Typography>
+            </Box>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#fff3e0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <PendingActionsIcon sx={{ color: '#f57c00' }} />
+            </Box>
+            <Box>
+              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>Pending Pieces (Baki)</Typography>
+              <Typography variant="h4" fontWeight="900" color="#f57c00" sx={{ lineHeight: 1 }}>{pendingPieces}</Typography>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
 
       {cutPiecesOption === 'no' && stageFormatted === 'Production' && (
         <Paper elevation={0} sx={{ p: 3, mb: 4, borderRadius: 4, border: '1px dashed #ccc', bgcolor: '#fff' }}>

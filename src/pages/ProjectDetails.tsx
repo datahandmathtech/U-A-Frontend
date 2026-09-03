@@ -93,7 +93,10 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumn
   return (
     <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
       <TableCell sx={{ color: '#444' }}>
-        <Typography variant="body2">{slab.name}</Typography>
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{slab.name}</Typography>
+          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 'bold', display: 'inline-block', mt: 0.5, bgcolor: 'primary.50', px: 1, borderRadius: 1 }}>{slab.pieces?.length || 0} Pieces</Typography>
+        </Box>
       </TableCell>
       <TableCell sx={{ color: '#666' }}>
         <Typography variant="body2">{dimensionStr}</Typography>
@@ -201,7 +204,10 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
   return (
     <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
       <TableCell sx={{ color: '#444' }}>
-        <Typography variant="body2">{slab.name}</Typography>
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{slab.name}</Typography>
+          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 'bold', display: 'inline-block', mt: 0.5, bgcolor: 'primary.50', px: 1, borderRadius: 1 }}>{slab.pieces?.length || 0} Pieces</Typography>
+        </Box>
       </TableCell>
       <TableCell sx={{ color: '#666' }}>
         <Typography variant="body2">{dimensionStr}</Typography>
