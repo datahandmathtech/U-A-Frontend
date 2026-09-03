@@ -411,7 +411,7 @@ const ManagerDashboard: React.FC = () => {
         quantityProduced: isStageCompletion ? 1 : materialQuantity, // Default to 1 for simple tracking
         transactionType: materialType,
         startPhotos: materialPhotos,
-        workerId: !isStageCompletion && assigneeType === 'worker' ? selectedStaffId : (!isStageCompletion && assigneeType === 'self' ? (user?.id || user?._id) : undefined),
+        workerId: assigneeType === 'worker' ? selectedStaffId : (assigneeType === 'self' || isStageCompletion ? (user?.id || user?._id) : undefined),
         vendors: !isStageCompletion ? vendorRows : [],
         vendorName: undefined,
         vehicleNumber: vehicleNumber || undefined,
