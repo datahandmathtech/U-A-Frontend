@@ -151,10 +151,27 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
   const requiredStages = slab.requiredStages || [];
 
   const getStageStatus = (stageName: string) => {
+    const normalizedStageName = stageName.split(' - ')[0];
+
+    // For Packing and Dispatch, rely entirely on logs since piece tracking is bypassed
+    if (normalizedStageName === 'Packing' || normalizedStageName === 'Dispatch') {
+      const targetQty = slab.pieces?.length || matchedProduct?.qty || 0;
+      if (targetQty > 0 && productionLogs) {
+        const stageLogs = productionLogs.filter((log: any) => 
+          log.approvalStatus === 'approved' &&
+          log.stage === normalizedStageName &&
+          (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
+        );
+        const sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+        if (sumQty >= targetQty) return 'Completed';
+        if (sumQty > 0) return 'In Progress';
+      }
+      return 'Pending';
+    }
+
     if (slab.pieces && slab.pieces.length > 0) {
       const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
       
-      const normalizedStageName = stageName.split(' - ')[0];
       const stageIdx = BASE_STAGES.indexOf(normalizedStageName);
       
       let allPiecesPassed = true;
