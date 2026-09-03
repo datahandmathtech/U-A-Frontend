@@ -224,6 +224,11 @@ const Approvals: React.FC = () => {
                             Vehicle No: {log.vehicleNumber}
                           </Typography>
                         )}
+                        {log.boxCode && (
+                          <Typography variant="body2" sx={{ mb: 1, color: '#9c27b0', fontWeight: 'bold' }}>
+                            Box / Code: {log.boxCode.replace('|', ' / ')}
+                          </Typography>
+                        )}
                         
                         {(log.project || log.projectId) && (
                           <Box sx={{ mt: 2, mb: 1 }}>
