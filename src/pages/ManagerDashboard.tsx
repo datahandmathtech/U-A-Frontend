@@ -632,15 +632,19 @@ const ManagerDashboard: React.FC = () => {
                           ))}
                         </TextField>
 
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Quantity Produced</Typography>
-                        <TextField 
-                          fullWidth 
-                          label="Quantity Produced / Completed" 
-                          type="number"
-                          value={materialQuantity}
-                          onChange={(e) => setMaterialQuantity(e.target.value)}
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                        />
+                        {materialStage !== 'Dispatch' && (
+                          <>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Quantity Produced</Typography>
+                            <TextField 
+                              fullWidth 
+                              label="Quantity Produced / Completed" 
+                              type="number"
+                              value={materialQuantity}
+                              onChange={(e) => setMaterialQuantity(e.target.value)}
+                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                            />
+                          </>
+                        )}
 
                       </>
                     ) : (
