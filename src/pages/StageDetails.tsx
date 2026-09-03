@@ -604,8 +604,7 @@ const StageDetails = () => {
                     
                     const dispatchLogs = productionLogs?.filter((l: any) =>
                       l.stage === 'Dispatch' &&
-                      l.approvalStatus === 'approved' &&
-                      (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
+                      l.approvalStatus === 'approved'
                     ) || [];
 
                     displayLogs = packedLogs.map((pLog: any) => {
