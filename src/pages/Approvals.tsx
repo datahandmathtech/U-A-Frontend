@@ -76,35 +76,31 @@ const Approvals: React.FC = () => {
 
   const submitApproval = async () => {
     try {
-      const isProjectSplitRequired = (selectedLog?.stage?.includes('Production') || selectedLog?.transactionType === 'OUT');
-      
       const validSplits = projectSplits.filter(s => s.projectId && s.qty > 0);
       
-      if (isProjectSplitRequired) {
-        if (validSplits.length === 0) {
-          setToast({ open: true, message: 'Please select at least one project and enter item count.', severity: 'error' });
-          return;
-        }
+      if (validSplits.length === 0) {
+        setToast({ open: true, message: 'Please select at least one project and enter item count.', severity: 'error' });
+        return;
+      }
 
-        if (validSplits.some(s => !s.slabId)) {
-          setToast({ open: true, message: 'Please select a Product / Slab for all assignments so it appears in the pipeline.', severity: 'error' });
-          return;
-        }
+      if (validSplits.some(s => !s.slabId)) {
+        setToast({ open: true, message: 'Please select a Product / Slab for all assignments so it appears in the pipeline.', severity: 'error' });
+        return;
+      }
 
-        const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
-        const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
+      const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
+      const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
 
-        if (!hasPieces && totalSplitQty > selectedLog.quantityProduced) {
-          setToast({ open: true, message: `Total split item count (${totalSplitQty}) cannot exceed original item count (${selectedLog.quantityProduced}).`, severity: 'error' });
-          return;
-        }
+      if (!hasPieces && totalSplitQty > selectedLog.quantityProduced) {
+        setToast({ open: true, message: `Total split item count (${totalSplitQty}) cannot exceed original item count (${selectedLog.quantityProduced}).`, severity: 'error' });
+        return;
       }
 
       await approveLog({ 
         id: selectedLog.id, 
         data: { 
           approvalStatus: 'approved', 
-          ...(isProjectSplitRequired ? { splits: validSplits } : {})
+          splits: validSplits
         } 
       }).unwrap();
       
@@ -599,11 +595,10 @@ const Approvals: React.FC = () => {
           )}
         </DialogTitle>
         <DialogContent dividers>
-          {(selectedLog?.stage?.includes('Production') || selectedLog?.transactionType === 'OUT') ? (
-            <>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                Select one or more projects for this material. You can split the items across multiple projects.
-              </Typography>
+          <>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+              Select one or more projects for this material. You can split the items across multiple projects.
+            </Typography>
     
               {/* Project Assignment rows */}
               {projectSplits.map((split, idx) => {
@@ -790,20 +785,15 @@ const Approvals: React.FC = () => {
           >
             Add Project Split
           </Button>
-            </>
-          ) : (
-            <Typography variant="body1" sx={{ color: '#444' }}>
-              Are you sure you want to approve this log?
-            </Typography>
-          )}
-          </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
+          </>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
             <Button onClick={() => setApprovalDialogOpen(false)} color="inherit">Cancel</Button>
             <Button 
               variant="contained" 
               color="success" 
               onClick={submitApproval}
-              disabled={(selectedLog?.stage?.includes('Production') || selectedLog?.transactionType === 'OUT') ? !projectSplits.some(s => s.projectId && s.qty > 0) || isApproving : isApproving}
+              disabled={!projectSplits.some(s => s.projectId && s.qty > 0) || isApproving}
               sx={{ fontWeight: 'bold' }}
             >
             {isApproving ? 'Approving...' : 'Confirm Approval'}
