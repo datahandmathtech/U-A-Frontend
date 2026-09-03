@@ -677,33 +677,7 @@ const Approvals: React.FC = () => {
                           options={projectSlabs}
                           getOptionLabel={(option: any) => `${option.name} (${option.pieces?.length || 0} Pieces)`}
                           value={projectSlabs.find((s: any) => s.id === split.slabId) || null}
-                          onChange={async (e, newValue: any) => {
-                            if (newValue && selectedLog?.stage === 'Packing') {
-                              // Auto-submit for Packing
-                              try {
-                                await approveLog({ 
-                                  id: selectedLog.id, 
-                                  data: { 
-                                    approvalStatus: 'approved',
-                                    splits: [{ 
-                                      projectId: split.projectId, 
-                                      qty: split.qty, 
-                                      productName: newValue.name,
-                                      slabId: newValue.id,
-                                      pieceIds: []
-                                    }]
-                                  } 
-                                }).unwrap();
-                                setToast({ open: true, message: 'Log Approved successfully', severity: 'success' });
-                                refetch();
-                                refetchApproved();
-                                setApprovalDialogOpen(false);
-                              } catch (err) {
-                                setToast({ open: true, message: 'Failed to approve log', severity: 'error' });
-                              }
-                              return;
-                            }
-
+                          onChange={(e, newValue: any) => {
                             const newSplits = [...projectSplits];
                             if (newValue) {
                               newSplits[idx].slabId = newValue.id;
@@ -727,7 +701,7 @@ const Approvals: React.FC = () => {
                       </Box>
                       
                       {/* Pieces Dropdown */}
-                      {split.slabId && projectSlabs.find((s: any) => s.id === split.slabId)?.pieces?.length > 0 && (
+                      {split.slabId && selectedLog?.stage !== 'Packing' && selectedLog?.stage !== 'Dispatch' && projectSlabs.find((s: any) => s.id === split.slabId)?.pieces?.length > 0 && (
                         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                           <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
                             <InputLabel id={`select-piece-label-${idx}`}>Select Piece(s) (Optional)</InputLabel>

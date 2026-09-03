@@ -585,6 +585,7 @@ const StageDetails = () => {
                   {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Code</TableCell>}
                   {stageFormatted === 'Dispatch' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Vehicle Number</TableCell>}
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Pieces</TableCell>
+                  {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Size</TableCell>}
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Photo</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }} align="right">Action</TableCell>
                 </TableRow>
@@ -599,7 +600,7 @@ const StageDetails = () => {
                   if (stageLogs.length === 0) {
                     return (
                       <TableRow>
-                        <TableCell colSpan={stageFormatted === 'Packing' ? 7 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                        <TableCell colSpan={stageFormatted === 'Packing' ? 8 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                           No {stageFormatted.toLowerCase()} entries yet.
                         </TableCell>
                       </TableRow>
@@ -618,6 +619,7 @@ const StageDetails = () => {
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
                           <Chip label={`${log.quantityProduced || log.pieceIds?.length || 0} Pieces`} size="small" sx={{ fontWeight: 'bold', bgcolor: '#E3F2FD', color: '#1565c0' }} />
                         </TableCell>
+                        {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary', fontSize: '0.85rem' }}>{(log as any).boxCode?.split('|')[2] || '-'}</TableCell>}
                         <TableCell>
                           {photo ? (
                             <img

@@ -192,7 +192,9 @@ const ManagerDashboard: React.FC = () => {
   const [vendorRows, setVendorRows] = useState<any[]>([{ vendorId: '', vendorName: '', stage: 'Production', qty: '' }]);
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
-  const [boxCode, setBoxCode] = useState('');
+  const [packingBox, setPackingBox] = useState('');
+  const [packingCode, setPackingCode] = useState('');
+  const [packingSize, setPackingSize] = useState('');
 
   const [selectedOutLogId, setSelectedOutLogId] = useState('');
 
@@ -374,7 +376,9 @@ const ManagerDashboard: React.FC = () => {
     setSelectedVendors([]);
     setVendorRows([{ vendorId: '', vendorName: '', stage: 'Production', qty: '' }]);
     setVehicleNumber('');
-    setBoxCode('');
+    setPackingBox('');
+    setPackingCode('');
+    setPackingSize('');
     setSelectedProjectId('');
     setSelectedProductId('');
 
@@ -398,9 +402,7 @@ const ManagerDashboard: React.FC = () => {
     }
 
     if (materialStage === 'Packing') {
-      const boxPart = boxCode.split('|')[0]?.trim();
-      const codePart = boxCode.split('|')[1]?.trim();
-      if (!boxPart || !codePart) {
+      if (!packingBox || !packingCode) {
         showToast('Both Box and Code are required for Packing!', 'error');
         return;
       }
@@ -409,6 +411,8 @@ const ManagerDashboard: React.FC = () => {
       showToast('Vehicle Number is required for Dispatch!', 'error');
       return;
     }
+
+    const finalBoxCode = (packingBox || packingCode || packingSize) ? `${packingBox}|${packingCode}|${packingSize}` : undefined;
 
     try {
       let productName = '';
@@ -431,7 +435,7 @@ const ManagerDashboard: React.FC = () => {
         vendors: !isStageCompletion ? vendorRows : [],
         vendorName: undefined,
         vehicleNumber: vehicleNumber || undefined,
-        boxCode: boxCode || undefined,
+        boxCode: finalBoxCode,
         parentLogId: materialType === 'IN' && !isStageCompletion ? selectedOutLogId : undefined,
         source: 'Material Tracking',
         requiresMachine: isStageCompletion ? false : (materialType === 'OUT' ? requiresMachine : undefined),
@@ -821,50 +825,32 @@ const ManagerDashboard: React.FC = () => {
               )}
 
               {materialStage === 'Packing' && (
-                <>
-                  {packingItemsForProject && packingItemsForProject.length > 0 ? (
+                  <Box sx={{ display: 'flex', gap: 2 }}>
                     <TextField 
-                      select
                       fullWidth 
-                      label="Select Box & Code (From Dispatch & Packing List)"
-                      value={boxCode}
-                      onChange={(e) => setBoxCode(e.target.value)}
+                      label="Box (Required)"
+                      placeholder="e.g. Ram"
+                      value={packingBox}
+                      onChange={(e) => setPackingBox(e.target.value)}
                       sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                    >
-                      <MenuItem value="" disabled>-- Select Box & Code --</MenuItem>
-                      {packingItemsForProject.map((item: any) => (
-                        <MenuItem key={item.id} value={`${item.box}|${item.code}`}>
-                          Box: {item.box} | Code: {item.code} {item.pcs ? `| ${item.pcs} Pcs` : ''} {item.size ? `| ${item.size}` : ''}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  ) : (
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                      <TextField 
-                        fullWidth 
-                        label="Box (Required)"
-                        placeholder="e.g. V, W, 26"
-                        value={boxCode.split('|')[0] || ''}
-                        onChange={(e) => {
-                          const codePart = boxCode.split('|')[1] || '';
-                          setBoxCode(e.target.value + '|' + codePart);
-                        }}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                      />
-                      <TextField 
-                        fullWidth 
-                        label="Code (Required)"
-                        placeholder="e.g. MD2a"
-                        value={boxCode.split('|')[1] || ''}
-                        onChange={(e) => {
-                          const boxPart = boxCode.split('|')[0] || '';
-                          setBoxCode(boxPart + '|' + e.target.value);
-                        }}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                      />
-                    </Box>
-                  )}
-                </>
+                    />
+                    <TextField 
+                      fullWidth 
+                      label="Code (Required)"
+                      placeholder="e.g. 101"
+                      value={packingCode}
+                      onChange={(e) => setPackingCode(e.target.value)}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                    />
+                    <TextField 
+                      fullWidth 
+                      label="Size (Optional)"
+                      placeholder="e.g. 10x25x52 LBH"
+                      value={packingSize}
+                      onChange={(e) => setPackingSize(e.target.value)}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                    />
+                  </Box>
               )}
 
               <Box>
