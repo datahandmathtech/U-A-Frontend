@@ -155,7 +155,7 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
 
     // For Packing and Dispatch, rely entirely on logs since piece tracking is bypassed
     if (normalizedStageName === 'Packing' || normalizedStageName === 'Dispatch') {
-      const targetQty = projectTotalPieces > 0 ? projectTotalPieces : (slab.pieces?.length || matchedProduct?.qty || 0);
+      const targetQty = slab.pieces?.length || matchedProduct?.qty || 0;
       if (targetQty > 0 && productionLogs) {
         const stageLogs = productionLogs.filter((log: any) => 
           log.approvalStatus === 'approved' &&

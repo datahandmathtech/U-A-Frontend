@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, Paper, TextField, MenuItem, CircularProgress, Alert, Snackbar, Divider, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, RadioGroup, FormControlLabel, Radio, FormControl, Grid, Switch } from '@mui/material';
-import { useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, useGetActiveSessionQuery, useMachineClockInMutation, useGetDailyMachineLogsQuery, useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, useGetActiveOutLogsQuery, useGetProjectsQuery, useGetVendorsQuery, useGetRejectedLogsQuery, useApproveMaterialLogMutation, useGetPackingItemsQuery } from '../store/apiSlice';
+import { useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, useGetActiveSessionQuery, useMachineClockInMutation, useGetDailyMachineLogsQuery, useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, useGetActiveOutLogsQuery, useGetProjectsQuery, useGetVendorsQuery, useGetRejectedLogsQuery, useApproveMaterialLogMutation, useGetPackingItemsQuery, useGetApprovedLogsQuery } from '../store/apiSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/authSlice';
 import { useNavigate } from 'react-router-dom';
@@ -163,7 +163,8 @@ const ManagerDashboard: React.FC = () => {
   const { data: projectsData } = useGetProjectsQuery();
   const [selectedMachine, setSelectedMachine] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const { data: packingItemsForProject } = useGetPackingItemsQuery(selectedProjectId, { skip: !selectedProjectId });
+  const { data: approvedLogs } = useGetApprovedLogsQuery(undefined);
+  const packedBoxes = approvedLogs?.filter((log: any) => log.stage === 'Packing' && log.projectId === selectedProjectId) || [];
   const [selectedProductId, setSelectedProductId] = useState('');
   const [estimatedHours, setEstimatedHours] = useState('');
   const [photos, setPhotos] = useState({ machine: '', unit: '', software: '' });
@@ -193,6 +194,7 @@ const ManagerDashboard: React.FC = () => {
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [packingBox, setPackingBox] = useState('');
+  const [dispatchBoxCode, setDispatchBoxCode] = useState('');
   const [packingCode, setPackingCode] = useState('');
   const [packingSize, setPackingSize] = useState('');
 
@@ -379,6 +381,7 @@ const ManagerDashboard: React.FC = () => {
     setPackingBox('');
     setPackingCode('');
     setPackingSize('');
+    setDispatchBoxCode('');
     setSelectedProjectId('');
     setSelectedProductId('');
 
@@ -411,8 +414,12 @@ const ManagerDashboard: React.FC = () => {
       showToast('Vehicle Number is required for Dispatch!', 'error');
       return;
     }
+    if (materialStage === 'Dispatch' && !dispatchBoxCode) {
+      showToast('Box is required for Dispatch!', 'error');
+      return;
+    }
 
-    const finalBoxCode = (packingBox || packingCode || packingSize) ? `${packingBox}|${packingCode}|${packingSize}` : undefined;
+    const finalBoxCode = materialStage === 'Dispatch' ? dispatchBoxCode : ((packingBox || packingCode || packingSize) ? `${packingBox}|${packingCode}|${packingSize}` : undefined);
 
     try {
       let productName = '';
@@ -822,6 +829,30 @@ const ManagerDashboard: React.FC = () => {
                   onChange={(e) => setVehicleNumber(e.target.value.substring(0, 15).toUpperCase())}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                 />
+              )}
+
+              {materialStage === 'Dispatch' && (
+                <TextField 
+                  select
+                  fullWidth 
+                  label="Select Packed Box (Required)"
+                  value={dispatchBoxCode}
+                  onChange={(e) => {
+                    setDispatchBoxCode(e.target.value);
+                    const selectedLog = packedBoxes.find((b: any) => b.boxCode === e.target.value);
+                    if (selectedLog && selectedLog.quantityProduced) {
+                      setMaterialQuantity(String(selectedLog.quantityProduced));
+                    }
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                >
+                  <MenuItem value="" disabled>-- Select Packed Box --</MenuItem>
+                  {packedBoxes.map((log: any) => (
+                    <MenuItem key={log.id} value={log.boxCode || log.id}>
+                      {log.boxCode ? log.boxCode.replace(/\|/g, ' / ') : `No Box Code - ${log.productName}`} ({log.quantityProduced} Pcs)
+                    </MenuItem>
+                  ))}
+                </TextField>
               )}
 
               {materialStage === 'Packing' && (
