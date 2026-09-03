@@ -593,39 +593,84 @@ const StageDetails = () => {
               </TableHead>
               <TableBody>
                 {(() => {
-                  const stageLogs = productionLogs?.filter((l: any) =>
-                    l.stage === stageFormatted &&
-                    l.approvalStatus === 'approved' &&
-                    (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
-                  ) || [];
-                  if (stageLogs.length === 0) {
+                  let displayLogs: any[] = [];
+                  
+                  if (stageFormatted === 'Dispatch') {
+                    // For Dispatch, show ALL Packed boxes, and match them with any Dispatch logs
+                    const packedLogs = productionLogs?.filter((l: any) =>
+                      l.stage === 'Packing' &&
+                      l.approvalStatus === 'approved' &&
+                      (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
+                    ) || [];
+                    
+                    const dispatchLogs = productionLogs?.filter((l: any) =>
+                      l.stage === 'Dispatch' &&
+                      l.approvalStatus === 'approved' &&
+                      (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
+                    ) || [];
+
+                    displayLogs = packedLogs.map((pLog: any) => {
+                      // Find if this packed box was dispatched
+                      const dLog = dispatchLogs.find((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode));
+                      return {
+                        id: pLog.id, // Use pLog id for key
+                        isDispatched: !!dLog,
+                        dispatchLogId: dLog?.id,
+                        createdAt: dLog ? dLog.createdAt : pLog.createdAt,
+                        boxCode: pLog.boxCode,
+                        vehicleNumber: dLog ? dLog.vehicleNumber : null,
+                        quantityProduced: pLog.quantityProduced,
+                        photo: dLog ? (dLog.startPhotos?.machine || dLog.startPhotos?.unit || dLog.startPhotos?.software || dLog.startPhotos?.endPhoto) : null,
+                        logToDelete: dLog?.id || pLog.id // Action deletes the dispatch log if exists, else the packing log
+                      };
+                    });
+                  } else {
+                    displayLogs = productionLogs?.filter((l: any) =>
+                      l.stage === stageFormatted &&
+                      l.approvalStatus === 'approved' &&
+                      (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
+                    ) || [];
+                  }
+
+                  if (displayLogs.length === 0) {
                     return (
                       <TableRow>
                         <TableCell colSpan={stageFormatted === 'Packing' || stageFormatted === 'Dispatch' ? 8 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                          No {stageFormatted.toLowerCase()} entries yet.
+                          No entries yet.
                         </TableCell>
                       </TableRow>
                     );
                   }
-                  return stageLogs.map((log: any) => {
+
+                  return displayLogs.map((log: any) => {
                     const logDate = new Date(log.createdAt);
                     const formattedDate = `${logDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })} | ${logDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
-                    const photo = log.startPhotos?.machine || log.startPhotos?.unit || log.startPhotos?.software || log.startPhotos?.endPhoto;
+                    const photo = stageFormatted === 'Dispatch' ? log.photo : (log.startPhotos?.machine || log.startPhotos?.unit || log.startPhotos?.software || log.startPhotos?.endPhoto);
+                    
                     return (
-                      <TableRow key={log.id} hover>
+                      <TableRow key={log.id} hover sx={{ opacity: stageFormatted === 'Dispatch' && !log.isDispatched ? 0.7 : 1 }}>
                         <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{formattedDate}</TableCell>
+                        
                         {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{(log as any).boxCode?.split('|')[0] || '-'}</TableCell>}
                         {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap' }}>{(log as any).boxCode?.split('|')[1] || '-'}</TableCell>}
+                        
                         {stageFormatted === 'Dispatch' && (
-                          <TableCell sx={{ whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {log.boxCode ? log.boxCode.split('||').map((b: string) => b.split('|')[0] + ' / ' + b.split('|')[1]).join(', ') : '-'}
+                          <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>
+                            {log.boxCode ? log.boxCode.split('|')[0] + ' / ' + log.boxCode.split('|')[1] : '-'}
                           </TableCell>
                         )}
-                        {stageFormatted === 'Dispatch' && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: '#1565c0' }}>{log.vehicleNumber || '-'}</TableCell>}
+                        {stageFormatted === 'Dispatch' && (
+                          <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: log.isDispatched ? '#1565c0' : 'text.secondary' }}>
+                            {log.isDispatched ? log.vehicleNumber || '-' : 'Pending Dispatch'}
+                          </TableCell>
+                        )}
+                        
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
                           <Chip label={`${log.quantityProduced || log.pieceIds?.length || 0} Pieces`} size="small" sx={{ fontWeight: 'bold', bgcolor: '#E3F2FD', color: '#1565c0' }} />
                         </TableCell>
+                        
                         {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary', fontSize: '0.85rem' }}>{(log as any).boxCode?.split('|')[2] || '-'}</TableCell>}
+                        
                         <TableCell>
                           {photo ? (
                             <img
@@ -636,17 +681,24 @@ const StageDetails = () => {
                             />
                           ) : <Typography variant="body2" color="text.secondary">-</Typography>}
                         </TableCell>
+                        
                         <TableCell align="right">
-                          <IconButton color="error" size="small" onClick={async () => {
-                            if (window.confirm('Are you sure you want to delete this entry?')) {
-                              try {
-                                await deleteProductionLog(log.id).unwrap();
-                                refetchProductionLogs();
-                              } catch (err) {
-                                console.error(err);
+                          <IconButton 
+                            color="error" 
+                            size="small" 
+                            disabled={stageFormatted === 'Dispatch' && !log.isDispatched}
+                            onClick={async () => {
+                              if (window.confirm('Are you sure you want to delete this entry?')) {
+                                try {
+                                  const idToDelete = stageFormatted === 'Dispatch' ? log.logToDelete : log.id;
+                                  await deleteProductionLog(idToDelete).unwrap();
+                                  refetchProductionLogs();
+                                } catch (err) {
+                                  console.error(err);
+                                }
                               }
-                            }
-                          }}>
+                            }}
+                          >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </TableCell>
