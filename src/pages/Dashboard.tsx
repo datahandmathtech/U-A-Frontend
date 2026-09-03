@@ -36,7 +36,7 @@ const Dashboard: React.FC = () => {
   const [selectedFY, setSelectedFY] = useState<string>(currentFY);
   const [selectedMonth, setSelectedMonth] = useState<number | ''>(''); 
 
-  const { data: summary, isLoading } = useGetDashboardSummaryQuery({ fy: selectedFY, month: selectedMonth });
+  const { data: summary, isLoading } = useGetDashboardSummaryQuery({ fy: selectedFY, month: selectedMonth }, { pollingInterval: 10000 });
   const navigate = useNavigate();
 
   const handleOpenLiveFeed = () => {
