@@ -1,0 +1,14 @@
+const fs = require('fs');
+let c = fs.readFileSync('src/pages/Approvals.tsx', 'utf8');
+c = c.replace(/src=\{ml.endMachinePhotoUrl\}/g, 'src={getOptimizedUrl(ml.endMachinePhotoUrl)}');
+c = c.replace(/src=\{ml.endUnitPhotoUrl\}/g, 'src={getOptimizedUrl(ml.endUnitPhotoUrl)}');
+c = c.replace(/src=\{ml.endSoftwarePhotoUrl\}/g, 'src={getOptimizedUrl(ml.endSoftwarePhotoUrl)}');
+c = c.replace(/src=\{detailsLog.startPhotos\?.machine\}/g, 'src={getOptimizedUrl(detailsLog.startPhotos?.machine)}');
+c = c.replace(/src=\{detailsLog.startPhotos\?.unit\}/g, 'src={getOptimizedUrl(detailsLog.startPhotos?.unit)}');
+c = c.replace(/src=\{detailsLog.startPhotos\?.software\}/g, 'src={getOptimizedUrl(detailsLog.startPhotos?.software)}');
+c = c.replace(/src=\{previewPhoto\}/g, 'src={getFullQualityUrl(previewPhoto)}');
+c = c.replace(/src=\{detailsLog.startPhotos.machine\}/g, 'src={getOptimizedUrl(detailsLog.startPhotos.machine)}');
+c = c.replace(/src=\{detailsLog.startPhotos.unit\}/g, 'src={getOptimizedUrl(detailsLog.startPhotos.unit)}');
+c = c.replace(/src=\{detailsLog.startPhotos.software\}/g, 'src={getOptimizedUrl(detailsLog.startPhotos.software)}');
+fs.writeFileSync('src/pages/Approvals.tsx', c);
+console.log("Done");

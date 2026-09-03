@@ -11,6 +11,7 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { useGetLiveFeedQuery, useGetProjectsQuery, useApproveMachineLogMutation, useRejectMachineLogMutation, useGetMachinesQuery, useGetProjectByIdQuery } from '../store/apiSlice';
+import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 import { TextField, MenuItem, Button } from '@mui/material';
 
 const SummaryCard = ({ icon: Icon, value, label, colorHint, bgHint, gradient }: any) => (
@@ -380,7 +381,7 @@ const LiveFeed: React.FC = () => {
                                 '&:hover': photo.url ? { transform: 'scale(1.05)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } : {}
                               }}>
                               {photo.url ? (
-                                <img src={photo.url} alt={photo.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <img src={getOptimizedUrl(photo.url)} alt={photo.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               ) : (
                                 <Typography variant="caption" color="textSecondary">No Image</Typography>
                               )}
@@ -427,7 +428,7 @@ const LiveFeed: React.FC = () => {
                                     '&:hover': photo.url ? { transform: 'scale(1.05)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } : {}
                                   }}>
                                   {photo.url ? (
-                                    <img src={photo.url} alt={photo.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <img src={getOptimizedUrl(photo.url)} alt={photo.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                   ) : (
                                     <Typography variant="caption" color="textSecondary">No Image</Typography>
                                   )}
@@ -508,7 +509,7 @@ const LiveFeed: React.FC = () => {
           >
             <CloseIcon fontSize="large" />
           </IconButton>
-          {previewPhoto && <img src={previewPhoto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }} />}
+          {previewPhoto && <img src={getFullQualityUrl(previewPhoto)} alt="Preview" style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }} />}
         </Box>
       </Dialog>
     </Box>

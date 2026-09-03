@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel } from '@mui/material';
+import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetApprovedLogsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useGetActiveOutLogsQuery } from '../store/apiSlice';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -850,7 +851,7 @@ const Approvals: React.FC = () => {
                         <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
                           {ml.endMachinePhotoUrl && (
                             <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(ml.endMachinePhotoUrl)}>
-                              <img src={ml.endMachinePhotoUrl} alt="Machine Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={getOptimizedUrl(ml.endMachinePhotoUrl)} alt="Machine Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
                                 <VisibilityIcon sx={{ color: 'white' }} />
                               </Box>
@@ -859,7 +860,7 @@ const Approvals: React.FC = () => {
                           )}
                           {ml.endUnitPhotoUrl && (
                             <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(ml.endUnitPhotoUrl)}>
-                              <img src={ml.endUnitPhotoUrl} alt="Unit Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={getOptimizedUrl(ml.endUnitPhotoUrl)} alt="Unit Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
                                 <VisibilityIcon sx={{ color: 'white' }} />
                               </Box>
@@ -868,7 +869,7 @@ const Approvals: React.FC = () => {
                           )}
                           {ml.endSoftwarePhotoUrl && (
                             <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(ml.endSoftwarePhotoUrl)}>
-                              <img src={ml.endSoftwarePhotoUrl} alt="Software Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={getOptimizedUrl(ml.endSoftwarePhotoUrl)} alt="Software Out" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
                                 <VisibilityIcon sx={{ color: 'white' }} />
                               </Box>
@@ -920,7 +921,7 @@ const Approvals: React.FC = () => {
                     <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
                       {detailsLog.startPhotos?.machine && (
                         <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(detailsLog.startPhotos.machine)}>
-                          <img src={detailsLog.startPhotos.machine} alt="Machine In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={getOptimizedUrl(detailsLog.startPhotos.machine)} alt="Machine In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
                             <VisibilityIcon sx={{ color: 'white' }} />
                           </Box>
@@ -929,7 +930,7 @@ const Approvals: React.FC = () => {
                       )}
                       {detailsLog.startPhotos?.unit && (
                         <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(detailsLog.startPhotos.unit)}>
-                          <img src={detailsLog.startPhotos.unit} alt="Unit In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={getOptimizedUrl(detailsLog.startPhotos.unit)} alt="Unit In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
                             <VisibilityIcon sx={{ color: 'white' }} />
                           </Box>
@@ -938,7 +939,7 @@ const Approvals: React.FC = () => {
                       )}
                       {detailsLog.startPhotos?.software && (
                         <Box sx={{ position: 'relative', width: 80, height: 80, cursor: 'pointer', borderRadius: 2, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} onClick={() => setPreviewPhoto(detailsLog.startPhotos.software)}>
-                          <img src={detailsLog.startPhotos.software} alt="Software In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={getOptimizedUrl(detailsLog.startPhotos.software)} alt="Software In" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
                             <VisibilityIcon sx={{ color: 'white' }} />
                           </Box>
@@ -1116,7 +1117,7 @@ const Approvals: React.FC = () => {
       <Dialog open={!!previewPhoto} onClose={() => setPreviewPhoto(null)} maxWidth="lg" fullWidth PaperProps={{ style: { backgroundColor: 'transparent', boxShadow: 'none' } } as any}>
         <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', p: 2 }} onClick={() => setPreviewPhoto(null)}>
           {previewPhoto ? (
-            <img src={previewPhoto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} />
+            <img src={getFullQualityUrl(previewPhoto)} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} />
           ) : null}
         </Box>
       </Dialog>

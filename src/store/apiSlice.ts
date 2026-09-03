@@ -26,6 +26,9 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: 15, // refetch if 15 seconds have passed
   tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste'],
   endpoints: (builder) => ({
     // VENDOR ENDPOINTS
