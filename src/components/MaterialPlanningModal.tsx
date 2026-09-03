@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, IconButton, Button, TextField, Select, MenuItem, Dialog, DialogTitle, DialogContent, Autocomplete, CircularProgress, FormControlLabel, RadioGroup, Radio } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
@@ -10,8 +10,8 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
 
   const { data: projectMaterials, refetch: refetchMaterials, isLoading: materialsLoading } = useGetProjectMaterialsQuery(selectedProjectId || '', { skip: !selectedProjectId });
   const [deleteProjectMaterial] = useDeleteProjectMaterialMutation();
-  const [reserveProjectMaterial] = useReserveMaterialMutation();
-  const [createInventory] = useCreateInventoryItemMutation();
+  const [reserveProjectMaterial] = useReserveProjectMaterialMutation();
+  const [createInventory] = useCreateInventoryMutation();
 
   const [clientSlabs, setClientSlabs] = useState([{ isUnnati: true, unnatiId: '', unnatiQty: '', materialName: '', blockNo: '', unit: 'inch', length: '', width: '', thickness: '' }]);
   const [isReservingClientMaterial, setIsReservingClientMaterial] = useState(false);
