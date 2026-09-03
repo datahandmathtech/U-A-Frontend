@@ -22,7 +22,8 @@ import {
   useAddPiecesMutation,
   useUpdatePieceMutation,
   useDeletePieceMutation,
-  useGetProjectMaterialsQuery
+  useGetProjectMaterialsQuery,
+  useDeleteProductionLogMutation
 } from '../store/apiSlice';
 
 const StageDetails = () => {
@@ -31,13 +32,14 @@ const StageDetails = () => {
   
   const { data: project } = useGetProjectByIdQuery(projectId as string, { skip: !projectId });
   const { data: slabs, refetch: refetchSlabs } = useGetSlabsQuery(projectId as string, { skip: !projectId });
-  const { data: productionLogs } = useGetProjectProductionLogsQuery(projectId as string, { skip: !projectId });
+  const { data: productionLogs, refetch: refetchProductionLogs } = useGetProjectProductionLogsQuery(projectId as string, { skip: !projectId });
   const { data: machineLogs } = useGetMachineLogsQuery();
   const { data: projectMaterials } = useGetProjectMaterialsQuery(projectId as string, { skip: !projectId });
 
   const [addPieces] = useAddPiecesMutation();
   const [updatePiece] = useUpdatePieceMutation();
   const [deletePiece] = useDeletePieceMutation();
+  const [deleteProductionLog] = useDeleteProductionLogMutation();
 
   const slab = slabs?.find((s: any) => s.id === slabId);
   const stageFormatted = stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : '';
@@ -564,44 +566,108 @@ const StageDetails = () => {
             <TextField size="small" placeholder="Search Machine or Product..." sx={{ bgcolor: 'white', width: 250 }} />
           </Box>
         </Box>
-        <TableContainer sx={{ maxHeight: 600 }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                {stageFormatted === 'Production' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Machine Name</TableCell>}
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Product Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Size (L x W)</TableCell>
-                {stageFormatted === 'Production' && (
-                  <>
-                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Start Time</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>End Time</TableCell>
-                  </>
-                )}
-                {stageFormatted === 'Polishing' && (
-                  <>
-                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Completed Date</TableCell>
-                  </>
-                )}
-                {stageFormatted === 'Packing' && (
-                  <>
-                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Completed Date</TableCell>
-                  </>
-                )}
-                {stageFormatted === 'Dispatch' && (
-                  <>
-                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Dispatch Date</TableCell>
-                  </>
-                )}
 
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }} align="right">Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {renderTableRows()}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        {/* Packing & Dispatch: Log-based table */}
+        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') ? (
+          <TableContainer sx={{ maxHeight: 600 }}>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Date</TableCell>
+                  {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Box Code</TableCell>}
+                  {stageFormatted === 'Dispatch' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Vehicle Number</TableCell>}
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Pieces</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Photo</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }} align="right">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(() => {
+                  const stageLogs = productionLogs?.filter((l: any) =>
+                    l.stage === stageFormatted &&
+                    l.approvalStatus === 'approved' &&
+                    (l.slabId === slab?.id || l.productName === slab?.name)
+                  ) || [];
+                  if (stageLogs.length === 0) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                          No {stageFormatted.toLowerCase()} entries yet.
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  return stageLogs.map((log: any) => {
+                    const logDate = new Date(log.createdAt);
+                    const formattedDate = `${logDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })} | ${logDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+                    const photo = log.startPhotos?.machine || log.startPhotos?.unit || log.startPhotos?.software || log.startPhotos?.endPhoto;
+                    return (
+                      <TableRow key={log.id} hover>
+                        <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{formattedDate}</TableCell>
+                        {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap' }}>{(log as any).boxCode || '-'}</TableCell>}
+                        {stageFormatted === 'Dispatch' && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: '#1565c0' }}>{log.vehicleNumber || '-'}</TableCell>}
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                          <Chip label={`${log.quantityProduced || log.pieceIds?.length || 0} Pieces`} size="small" sx={{ fontWeight: 'bold', bgcolor: '#E3F2FD', color: '#1565c0' }} />
+                        </TableCell>
+                        <TableCell>
+                          {photo ? (
+                            <img
+                              src={photo}
+                              alt="Entry Photo"
+                              onClick={() => setPreviewPhotoUrl(photo)}
+                              style={{ width: 44, height: 44, borderRadius: 6, cursor: 'pointer', objectFit: 'cover', border: '1px solid #ddd' }}
+                            />
+                          ) : <Typography variant="body2" color="text.secondary">-</Typography>}
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton color="error" size="small" onClick={async () => {
+                            if (window.confirm('Are you sure you want to delete this entry?')) {
+                              try {
+                                await deleteProductionLog(log.id).unwrap();
+                                refetchProductionLogs();
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }
+                          }}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  });
+                })()}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          /* Production & Polishing: Piece-based table */
+          <TableContainer sx={{ maxHeight: 600 }}>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  {stageFormatted === 'Production' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Machine Name</TableCell>}
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Product Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Size (L x W)</TableCell>
+                  {stageFormatted === 'Production' && (
+                    <>
+                      <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Start Time</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>End Time</TableCell>
+                    </>
+                  )}
+                  {stageFormatted === 'Polishing' && (
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Completed Date</TableCell>
+                  )}
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }} align="right">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {renderTableRows()}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
 
       <Dialog open={!!editingPiece} onClose={() => setEditingPiece(null)} maxWidth="sm" fullWidth>

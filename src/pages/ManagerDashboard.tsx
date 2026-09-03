@@ -191,6 +191,7 @@ const ManagerDashboard: React.FC = () => {
   const [vendorRows, setVendorRows] = useState<any[]>([{ vendorId: '', vendorName: '', stage: 'Production', qty: '' }]);
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
+  const [boxCode, setBoxCode] = useState('');
 
   const [selectedOutLogId, setSelectedOutLogId] = useState('');
 
@@ -372,6 +373,7 @@ const ManagerDashboard: React.FC = () => {
     setSelectedVendors([]);
     setVendorRows([{ vendorId: '', vendorName: '', stage: 'Production', qty: '' }]);
     setVehicleNumber('');
+    setBoxCode('');
     setSelectedProjectId('');
     setSelectedProductId('');
 
@@ -392,6 +394,15 @@ const ManagerDashboard: React.FC = () => {
           return;
         }
       }
+    }
+
+    if (materialStage === 'Packing' && !boxCode) {
+      showToast('Box Code is required for Packing!', 'error');
+      return;
+    }
+    if (materialStage === 'Dispatch' && !vehicleNumber) {
+      showToast('Vehicle Number is required for Dispatch!', 'error');
+      return;
     }
 
     try {
@@ -415,6 +426,7 @@ const ManagerDashboard: React.FC = () => {
         vendors: !isStageCompletion ? vendorRows : [],
         vendorName: undefined,
         vehicleNumber: vehicleNumber || undefined,
+        boxCode: boxCode || undefined,
         parentLogId: materialType === 'IN' && !isStageCompletion ? selectedOutLogId : undefined,
         source: 'Material Tracking',
         requiresMachine: isStageCompletion ? false : (materialType === 'OUT' ? requiresMachine : undefined),
@@ -793,12 +805,22 @@ const ManagerDashboard: React.FC = () => {
                 </>
               )}
 
-              {dialogOrigin === 'Material Tracking' && !(materialType === 'IN' && materialStage === 'Polishing') && !(materialType === 'OUT' && materialStage === 'Packing') && (
+              {((dialogOrigin === 'Material Tracking' && !(materialType === 'IN' && materialStage === 'Polishing') && !(materialType === 'OUT' && materialStage === 'Packing')) || materialStage === 'Dispatch') && (
                 <TextField 
                   fullWidth 
-                  label="Vehicle Number (Optional)" 
+                  label={materialStage === 'Dispatch' ? "Vehicle Number (Required)" : "Vehicle Number (Optional)"}
                   value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value.substring(0, 10).toUpperCase())}
+                  onChange={(e) => setVehicleNumber(e.target.value.substring(0, 15).toUpperCase())}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                />
+              )}
+
+              {materialStage === 'Packing' && (
+                <TextField 
+                  fullWidth 
+                  label="Box Code (Required)"
+                  value={boxCode}
+                  onChange={(e) => setBoxCode(e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                 />
               )}
