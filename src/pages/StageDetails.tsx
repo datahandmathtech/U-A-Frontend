@@ -483,7 +483,7 @@ const StageDetails = () => {
                       }
                     }}>Add</Button>
                     <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, pl: 3, borderLeft: '1px solid #E0E0E0' }}>
-                      <Button variant="outlined" color="secondary" onClick={() => {
+                      <Button variant="outlined" color="primary" onClick={() => {
                         if (piecesData.length > 1) {
                           const firstPiece = piecesData[0];
                           const newData = piecesData.map((p, i) => i === 0 ? p : { ...p, l: firstPiece.l, w: firstPiece.w, t: firstPiece.t });
