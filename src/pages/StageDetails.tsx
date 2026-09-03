@@ -482,6 +482,17 @@ const StageDetails = () => {
                         qtyInput.value = '';
                       }
                     }}>Add</Button>
+                    <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, pl: 3, borderLeft: '1px solid #E0E0E0' }}>
+                      <Button variant="outlined" color="secondary" onClick={() => {
+                        if (piecesData.length > 1) {
+                          const firstPiece = piecesData[0];
+                          const newData = piecesData.map((p, i) => i === 0 ? p : { ...p, l: firstPiece.l, w: firstPiece.w, t: firstPiece.t });
+                          setPiecesData(newData);
+                        }
+                      }}>
+                        Copy First Row Size to All
+                      </Button>
+                    </Box>
                   </Box>
                 </Box>
                 <Button variant="contained" color="success" size="large" onClick={() => {
