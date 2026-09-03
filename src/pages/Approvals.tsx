@@ -227,8 +227,33 @@ const Approvals: React.FC = () => {
                             Vehicle No: {log.vehicleNumber}
                           </Typography>
                         )}
-                        <Box sx={{ mt: 2 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Worker/Vendor:</Typography>
+                        
+                        {(log.project || log.projectId) && (
+                          <Box sx={{ mt: 2, mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Project:</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                              {log.project ? `${log.project.projectId || log.project.name} ${log.project.clientName ? `(${log.project.clientName})` : ''}` : 'Unknown Project'}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {(log.productName || log.machine) && (
+                          <Box sx={{ mb: 1 }}>
+                            {log.productName && (
+                              <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 'bold', mb: 0.5 }}>
+                                Item: <span style={{ color: '#ed6c02' }}>{log.productName}</span>
+                              </Typography>
+                            )}
+                            {log.machine && (
+                              <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 'bold' }}>
+                                Machine: <span style={{ color: '#0288d1' }}>{log.machine.name}</span>
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
+
+                        <Box sx={{ mt: 2, mb: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Worker/Vendor:</Typography>
                           {log.vendorName ? (
                             <Typography variant="body1" sx={{ color: 'secondary.main', fontWeight: 'bold' }}>{log.vendorName} (Vendor)</Typography>
                           ) : (
