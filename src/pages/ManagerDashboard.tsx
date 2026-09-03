@@ -605,17 +605,14 @@ const ManagerDashboard: React.FC = () => {
                   <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {dialogOrigin !== 'Material Tracking' ? (
                       <>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Select Client & Stone</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Select Client</Typography>
                         
                         <TextField 
                           select
                           label="Select Client (Fetched from Admin)" 
                           fullWidth 
                           value={selectedProjectId}
-                          onChange={(e) => {
-                            setSelectedProjectId(e.target.value);
-                            setSelectedProductId('');
-                          }}
+                          onChange={(e) => setSelectedProjectId(e.target.value)}
                           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                         >
                           <MenuItem value="" disabled>-- Select Client --</MenuItem>
@@ -623,22 +620,6 @@ const ManagerDashboard: React.FC = () => {
                             <MenuItem key={p.id} value={p.id}>{p.clientName} ({p.name})</MenuItem>
                           ))}
                         </TextField>
-
-                        {selectedProjectId && (
-                          <TextField 
-                            select
-                            label="Select Stone / Product" 
-                            fullWidth 
-                            value={selectedProductId}
-                            onChange={(e) => setSelectedProductId(e.target.value)}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 }, mt: 2 }}
-                          >
-                            <MenuItem value="" disabled>-- Select Stone --</MenuItem>
-                            {projectsData?.find((p: any) => p.id === selectedProjectId)?.products?.map((prod: any) => (
-                              <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
-                            ))}
-                          </TextField>
-                        )}
 
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Quantity Produced</Typography>
                         <TextField 

@@ -137,7 +137,7 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumn
   );
 };
 
-const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLogs, activeColumns }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[], productionLogs: any[], activeColumns: string[] }) => {
+const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLogs, activeColumns, projectTotalPieces }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[], productionLogs: any[], activeColumns: string[], projectTotalPieces: number }) => {
   const navigate = useNavigate();
   const { id: projectId } = useParams();
 
@@ -155,12 +155,11 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
 
     // For Packing and Dispatch, rely entirely on logs since piece tracking is bypassed
     if (normalizedStageName === 'Packing' || normalizedStageName === 'Dispatch') {
-      const targetQty = slab.pieces?.length || matchedProduct?.qty || 0;
+      const targetQty = projectTotalPieces > 0 ? projectTotalPieces : (slab.pieces?.length || matchedProduct?.qty || 0);
       if (targetQty > 0 && productionLogs) {
         const stageLogs = productionLogs.filter((log: any) => 
           log.approvalStatus === 'approved' &&
-          log.stage === normalizedStageName &&
-          (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
+          log.stage === normalizedStageName
         );
         const sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
         if (sumQty >= targetQty) return 'Completed';
@@ -1780,7 +1779,7 @@ const ProjectDetails: React.FC = () => {
                         {projectSlabs?.map((slab: any, idx: number) => (
                           isPlanningMode 
                             ? <SlabPlanningRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} activeColumns={activeColumns} />
-                            : <SlabTrackingRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} productionLogs={productionLogs || []} activeColumns={activeColumns} />
+                            : <SlabTrackingRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} productionLogs={productionLogs || []} activeColumns={activeColumns} projectTotalPieces={projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} />
                         ))}
                         {(!projectSlabs || projectSlabs.length === 0) && (
                            <TableRow><TableCell colSpan={9} align="center" sx={{ py: 5, color: 'text.secondary' }}>No slabs created yet.</TableCell></TableRow>
