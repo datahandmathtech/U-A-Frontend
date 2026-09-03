@@ -581,12 +581,11 @@ const StageDetails = () => {
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Date</TableCell>
-                  {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Box</TableCell>}
-                  {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Code</TableCell>}
-                  {stageFormatted === 'Dispatch' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Packed Boxes</TableCell>}
-                  {stageFormatted === 'Dispatch' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Vehicle Number</TableCell>}
+                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Box</TableCell>}
+                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Code</TableCell>}
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Pieces</TableCell>
-                  {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Size</TableCell>}
+                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Size</TableCell>}
+                  {stageFormatted === 'Dispatch' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Vehicle Number</TableCell>}
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Photo</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }} align="right">Action</TableCell>
                 </TableRow>
@@ -653,25 +652,20 @@ const StageDetails = () => {
                           {stageFormatted === 'Dispatch' && !log.isDispatched ? '-' : formattedDate}
                         </TableCell>
                         
-                        {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{(log as any).boxCode?.split('|')[0] || '-'}</TableCell>}
-                        {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap' }}>{(log as any).boxCode?.split('|')[1] || '-'}</TableCell>}
-                        
-                        {stageFormatted === 'Dispatch' && (
-                          <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>
-                            {log.boxCode ? log.boxCode.split('|')[0] + ' / ' + log.boxCode.split('|')[1] : '-'}
-                          </TableCell>
-                        )}
-                        {stageFormatted === 'Dispatch' && (
-                          <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: log.isDispatched ? '#1565c0' : 'text.secondary' }}>
-                            {log.isDispatched ? log.vehicleNumber || '-' : '-'}
-                          </TableCell>
-                        )}
+                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{log.boxCode?.split('|')[0] || '-'}</TableCell>}
+                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ whiteSpace: 'nowrap' }}>{log.boxCode?.split('|')[1] || '-'}</TableCell>}
                         
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
                           <Chip label={`${log.quantityProduced || log.pieceIds?.length || 0} Pieces`} size="small" sx={{ fontWeight: 'bold', bgcolor: '#E3F2FD', color: '#1565c0' }} />
                         </TableCell>
                         
-                        {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary', fontSize: '0.85rem' }}>{(log as any).boxCode?.split('|')[2] || '-'}</TableCell>}
+                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary', fontSize: '0.85rem' }}>{log.boxCode?.split('|')[2] || '-'}</TableCell>}
+
+                        {stageFormatted === 'Dispatch' && (
+                          <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: log.isDispatched ? '#1565c0' : 'text.secondary' }}>
+                            {log.isDispatched ? log.vehicleNumber || '-' : '-'}
+                          </TableCell>
+                        )}
                         
                         <TableCell>
                           {photo ? (
