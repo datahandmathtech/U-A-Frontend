@@ -4,7 +4,7 @@ import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableConta
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useGetProjectsQuery, useCreateProjectMutation, useUpdateProjectMutation, useDeleteProjectMutation } from '../store/apiSlice';
+import { useGetProjectsQuery, useCreateProjectMutation, useUpdateProjectMutation, useDeleteProjectMutation, useCreateSlabMutation } from '../store/apiSlice';
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ const Projects: React.FC = () => {
   const [createProject] = useCreateProjectMutation();
   const [updateProject] = useUpdateProjectMutation();
   const [deleteProject] = useDeleteProjectMutation();
+  const [createSlab] = useCreateSlabMutation();
   const [open, setOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({ name: '', clientName: '', description: '', status: 'work_order', totalPieces: 0, deliveryDate: '', startDate: '', deadline: '', clientHandle: '' });
@@ -27,6 +28,9 @@ const Projects: React.FC = () => {
         description: project.description || '',
         status: project.status || 'work_order',
         totalPieces: project.totalPieces || 0,
+        length: '',
+        width: '',
+        thickness: '',
         deliveryDate: project.deliveryDate ? new Date(project.deliveryDate).toISOString().split('T')[0] : '',
         startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
         deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
@@ -34,7 +38,7 @@ const Projects: React.FC = () => {
       });
     } else {
       setEditingProjectId(null);
-      setFormData({ name: '', clientName: '', description: '', status: 'work_order', totalPieces: 0, deliveryDate: '', startDate: '', deadline: '', clientHandle: '' });
+      setFormData({ name: '', clientName: '', description: '', status: 'work_order', totalPieces: 0, length: '', width: '', thickness: '', deliveryDate: '', startDate: '', deadline: '', clientHandle: '' });
     }
     setOpen(true);
   };
@@ -58,14 +62,37 @@ const Projects: React.FC = () => {
           } 
         }).unwrap();
       } else {
-        await createProject({ 
+        const createdProject = await createProject({ 
           ...formData,
           projectId: `U-A-${Math.floor(100 + Math.random() * 900)}`,
-          status: 'work_order',
+          status: 'production',
           deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : undefined,
           startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
           deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined,
         }).unwrap();
+        
+        // If Length, Width, and Total Pieces are provided, create a default slab immediately
+        if (formData.length && formData.width && formData.totalPieces > 0) {
+           await createSlab({
+             projectId: createdProject.id,
+             data: {
+               name: formData.description || 'Direct Slab',
+               size: `${formData.length}L x ${formData.width}W${formData.thickness ? ` | ${formData.thickness}MM` : ''}`,
+               cost: 0,
+               requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'],
+               pieces: Array.from({ length: parseInt(formData.totalPieces) }).map((_, i) => ({
+                 pieceNumber: i + 1,
+                 size: `${formData.length}L x ${formData.width}W${formData.thickness ? ` | ${formData.thickness}MM` : ''}`,
+                 status: 'pending',
+                 stage: 'Production'
+               }))
+             }
+           }).unwrap();
+        }
+        
+        // Immediately navigate to Production step
+        navigate(`/projects/${createdProject.id}?view=5`);
+        return;
       }
       refetch();
       handleClose();
@@ -239,13 +266,31 @@ const Projects: React.FC = () => {
               onChange={(e) => setFormData({...formData, clientName: e.target.value})} 
             />
             <TextField 
-              label="Description / Scope of Work" 
+              label="Product Name / Material Name" 
               fullWidth 
-              multiline
-              rows={3}
               value={formData.description} 
               onChange={(e) => setFormData({...formData, description: e.target.value})} 
             />
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField 
+                label="Length (L)" 
+                fullWidth 
+                value={formData.length} 
+                onChange={(e) => setFormData({...formData, length: e.target.value})} 
+              />
+              <TextField 
+                label="Width (W)" 
+                fullWidth 
+                value={formData.width} 
+                onChange={(e) => setFormData({...formData, width: e.target.value})} 
+              />
+              <TextField 
+                label="Thickness (MM)" 
+                fullWidth 
+                value={formData.thickness} 
+                onChange={(e) => setFormData({...formData, thickness: e.target.value})} 
+              />
+            </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField 
                 label="Total Pieces" 
