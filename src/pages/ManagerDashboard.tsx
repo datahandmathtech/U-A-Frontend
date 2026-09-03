@@ -194,7 +194,7 @@ const ManagerDashboard: React.FC = () => {
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [packingBox, setPackingBox] = useState('');
-  const [dispatchBoxCode, setDispatchBoxCode] = useState('');
+  const [dispatchBoxCodes, setDispatchBoxCodes] = useState<string[]>([]);
   const [packingCode, setPackingCode] = useState('');
   const [packingSize, setPackingSize] = useState('');
 
@@ -381,7 +381,7 @@ const ManagerDashboard: React.FC = () => {
     setPackingBox('');
     setPackingCode('');
     setPackingSize('');
-    setDispatchBoxCode('');
+    setDispatchBoxCodes([]);
     setSelectedProjectId('');
     setSelectedProductId('');
 
@@ -414,12 +414,12 @@ const ManagerDashboard: React.FC = () => {
       showToast('Vehicle Number is required for Dispatch!', 'error');
       return;
     }
-    if (materialStage === 'Dispatch' && !dispatchBoxCode) {
+    if (materialStage === 'Dispatch' && (!dispatchBoxCodes || dispatchBoxCodes.length === 0)) {
       showToast('Box is required for Dispatch!', 'error');
       return;
     }
 
-    const finalBoxCode = materialStage === 'Dispatch' ? dispatchBoxCode : ((packingBox || packingCode || packingSize) ? `${packingBox}|${packingCode}|${packingSize}` : undefined);
+    const finalBoxCode = materialStage === 'Dispatch' ? dispatchBoxCodes.join('||') : ((packingBox || packingCode || packingSize) ? `${packingBox}|${packingCode}|${packingSize}` : undefined);
 
     try {
       let productName = '';
@@ -804,14 +804,16 @@ const ManagerDashboard: React.FC = () => {
                               <MenuItem value="Packing">Packing</MenuItem>
                               <MenuItem value="Dispatch">Dispatch</MenuItem>
                             </TextField>
-                            <TextField 
-                              fullWidth 
-                              label="Quantity" 
-                              type="number"
-                              value={materialQuantity}
-                              onChange={(e) => setMaterialQuantity(e.target.value)}
-                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                            />
+                            {materialStage !== 'Dispatch' && (
+                              <TextField 
+                                fullWidth 
+                                label="Quantity" 
+                                type="number"
+                                value={materialQuantity}
+                                onChange={(e) => setMaterialQuantity(e.target.value)}
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                              />
+                            )}
                           </Box>
                         )}
                       </>
@@ -819,6 +821,43 @@ const ManagerDashboard: React.FC = () => {
 
                   </Box>
                 </>
+              )}
+
+              {materialStage === 'Dispatch' && (
+                <Autocomplete
+                  multiple
+                  options={packedBoxes}
+                  getOptionLabel={(option: any) => option.boxCode ? option.boxCode.replace(/\|/g, ' / ') : `No Box Code - ${option.productName}`}
+                  value={packedBoxes.filter((b: any) => dispatchBoxCodes.includes(b.boxCode || b.id))}
+                  onChange={(_, newValue) => {
+                    setDispatchBoxCodes(newValue.map((v: any) => v.boxCode || v.id));
+                    const totalQty = newValue.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+                    setMaterialQuantity(totalQty > 0 ? String(totalQty) : '');
+                  }}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label="Select Packed Box(es) (Required)" 
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                    />
+                  )}
+                  renderTags={(value: readonly any[], getTagProps) =>
+                    value.map((option: any, index: number) => {
+                      const { key, ...tagProps } = getTagProps({ index }) as any;
+                      return (
+                        <Chip variant="outlined" label={option.boxCode ? option.boxCode.split('|')[0] : 'Box'} key={key} {...tagProps} />
+                      );
+                    })
+                  }
+                  renderOption={(props, option: any) => {
+                    const { key, ...restProps } = props as any;
+                    return (
+                      <li key={key} {...restProps}>
+                        {option.boxCode ? option.boxCode.replace(/\|/g, ' / ') : `No Box Code - ${option.productName}`} ({option.quantityProduced} Pcs)
+                      </li>
+                    );
+                  }}
+                />
               )}
 
               {((dialogOrigin === 'Material Tracking' && !(materialType === 'IN' && materialStage === 'Polishing') && !(materialType === 'OUT' && materialStage === 'Packing')) || materialStage === 'Dispatch') && (
@@ -829,30 +868,6 @@ const ManagerDashboard: React.FC = () => {
                   onChange={(e) => setVehicleNumber(e.target.value.substring(0, 15).toUpperCase())}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                 />
-              )}
-
-              {materialStage === 'Dispatch' && (
-                <TextField 
-                  select
-                  fullWidth 
-                  label="Select Packed Box (Required)"
-                  value={dispatchBoxCode}
-                  onChange={(e) => {
-                    setDispatchBoxCode(e.target.value);
-                    const selectedLog = packedBoxes.find((b: any) => b.boxCode === e.target.value);
-                    if (selectedLog && selectedLog.quantityProduced) {
-                      setMaterialQuantity(String(selectedLog.quantityProduced));
-                    }
-                  }}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                >
-                  <MenuItem value="" disabled>-- Select Packed Box --</MenuItem>
-                  {packedBoxes.map((log: any) => (
-                    <MenuItem key={log.id} value={log.boxCode || log.id}>
-                      {log.boxCode ? log.boxCode.replace(/\|/g, ' / ') : `No Box Code - ${log.productName}`} ({log.quantityProduced} Pcs)
-                    </MenuItem>
-                  ))}
-                </TextField>
               )}
 
               {materialStage === 'Packing' && (
