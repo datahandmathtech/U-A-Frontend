@@ -49,7 +49,31 @@ const Approvals: React.FC = () => {
   
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
 
-  const handleApproveClick = (log: any) => {
+  const handleApproveClick = async (log: any) => {
+    if (log.stage === 'Packing') {
+      try {
+        await approveLog({ 
+          id: log.id, 
+          data: { 
+            approvalStatus: 'approved',
+            splits: [{ 
+              projectId: log.projectId, 
+              qty: log.quantityProduced, 
+              productName: log.productName,
+              slabId: log.slabId,
+              pieceIds: log.pieceIds || []
+            }]
+          } 
+        }).unwrap();
+        setToast({ open: true, message: 'Log Approved successfully', severity: 'success' });
+        refetch();
+        refetchApproved();
+      } catch (err) {
+        setToast({ open: true, message: 'Failed to approve log', severity: 'error' });
+      }
+      return;
+    }
+
     setSelectedLog(log);
     setProjectSplits([{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]);
     setApprovalDialogOpen(true);
