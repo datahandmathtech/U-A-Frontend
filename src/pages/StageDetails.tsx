@@ -649,7 +649,9 @@ const StageDetails = () => {
                     
                     return (
                       <TableRow key={log.id} hover sx={{ opacity: stageFormatted === 'Dispatch' && !log.isDispatched ? 0.7 : 1 }}>
-                        <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{formattedDate}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>
+                          {stageFormatted === 'Dispatch' && !log.isDispatched ? '-' : formattedDate}
+                        </TableCell>
                         
                         {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{(log as any).boxCode?.split('|')[0] || '-'}</TableCell>}
                         {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap' }}>{(log as any).boxCode?.split('|')[1] || '-'}</TableCell>}
@@ -661,7 +663,7 @@ const StageDetails = () => {
                         )}
                         {stageFormatted === 'Dispatch' && (
                           <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: log.isDispatched ? '#1565c0' : 'text.secondary' }}>
-                            {log.isDispatched ? log.vehicleNumber || '-' : 'Pending Dispatch'}
+                            {log.isDispatched ? log.vehicleNumber || '-' : '-'}
                           </TableCell>
                         )}
                         
@@ -683,24 +685,28 @@ const StageDetails = () => {
                         </TableCell>
                         
                         <TableCell align="right">
-                          <IconButton 
-                            color="error" 
-                            size="small" 
-                            disabled={stageFormatted === 'Dispatch' && !log.isDispatched}
-                            onClick={async () => {
-                              if (window.confirm('Are you sure you want to delete this entry?')) {
-                                try {
-                                  const idToDelete = stageFormatted === 'Dispatch' ? log.logToDelete : log.id;
-                                  await deleteProductionLog(idToDelete).unwrap();
-                                  refetchProductionLogs();
-                                } catch (err) {
-                                  console.error(err);
+                          {!(stageFormatted === 'Dispatch' && !log.isDispatched) && (
+                            <IconButton 
+                              color="error" 
+                              size="small" 
+                              onClick={async () => {
+                                if (window.confirm('Are you sure you want to delete this entry?')) {
+                                  try {
+                                    const idToDelete = stageFormatted === 'Dispatch' ? log.logToDelete : log.id;
+                                    await deleteProductionLog(idToDelete).unwrap();
+                                    refetchProductionLogs();
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
                                 }
-                              }
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                          {(stageFormatted === 'Dispatch' && !log.isDispatched) && (
+                            <Typography variant="body2" color="text.secondary">-</Typography>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
