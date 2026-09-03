@@ -76,7 +76,7 @@ const Approvals: React.FC = () => {
 
   const submitApproval = async () => {
     try {
-      const isProjectSplitRequired = (!selectedLog?.stage.includes('Production') && selectedLog?.transactionType === 'OUT');
+      const isProjectSplitRequired = (selectedLog?.stage?.includes('Production') || selectedLog?.transactionType === 'OUT');
       
       const validSplits = projectSplits.filter(s => s.projectId && s.qty > 0);
       
@@ -599,7 +599,7 @@ const Approvals: React.FC = () => {
           )}
         </DialogTitle>
         <DialogContent dividers>
-          {(!selectedLog?.stage.includes('Production') && selectedLog?.transactionType === 'OUT') ? (
+          {(selectedLog?.stage?.includes('Production') || selectedLog?.transactionType === 'OUT') ? (
             <>
               <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
                 Select one or more projects for this material. You can split the items across multiple projects.
@@ -803,7 +803,7 @@ const Approvals: React.FC = () => {
               variant="contained" 
               color="success" 
               onClick={submitApproval}
-              disabled={(!selectedLog?.stage.includes('Production') && selectedLog?.transactionType === 'OUT') ? !projectSplits.some(s => s.projectId && s.qty > 0) || isApproving : isApproving}
+              disabled={(selectedLog?.stage?.includes('Production') || selectedLog?.transactionType === 'OUT') ? !projectSplits.some(s => s.projectId && s.qty > 0) || isApproving : isApproving}
               sx={{ fontWeight: 'bold' }}
             >
             {isApproving ? 'Approving...' : 'Confirm Approval'}
