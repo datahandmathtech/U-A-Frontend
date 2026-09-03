@@ -409,6 +409,10 @@ const ManagerDashboard: React.FC = () => {
         showToast('Both Box and Code are required for Packing!', 'error');
         return;
       }
+      if (!materialQuantity) {
+        showToast('Pieces are required for Packing!', 'error');
+        return;
+      }
     }
     if (materialStage === 'Dispatch' && !vehicleNumber) {
       showToast('Vehicle Number is required for Dispatch!', 'error');
@@ -804,7 +808,7 @@ const ManagerDashboard: React.FC = () => {
                               <MenuItem value="Packing">Packing</MenuItem>
                               <MenuItem value="Dispatch">Dispatch</MenuItem>
                             </TextField>
-                            {materialStage !== 'Dispatch' && (
+                            {materialStage !== 'Dispatch' && materialStage !== 'Packing' && (
                               <TextField 
                                 fullWidth 
                                 label="Quantity" 
@@ -871,14 +875,14 @@ const ManagerDashboard: React.FC = () => {
               )}
 
               {materialStage === 'Packing' && (
-                  <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                     <TextField 
                       fullWidth 
                       label="Box (Required)"
                       placeholder="e.g. Ram"
                       value={packingBox}
                       onChange={(e) => setPackingBox(e.target.value)}
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 }, flex: 1, minWidth: '20%' }}
                     />
                     <TextField 
                       fullWidth 
@@ -886,7 +890,16 @@ const ManagerDashboard: React.FC = () => {
                       placeholder="e.g. 101"
                       value={packingCode}
                       onChange={(e) => setPackingCode(e.target.value)}
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 }, flex: 1, minWidth: '20%' }}
+                    />
+                    <TextField 
+                      fullWidth 
+                      label="Pieces (Required)"
+                      type="number"
+                      placeholder="e.g. 50"
+                      value={materialQuantity}
+                      onChange={(e) => setMaterialQuantity(e.target.value)}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 }, flex: 1, minWidth: '20%' }}
                     />
                     <TextField 
                       fullWidth 
@@ -894,7 +907,7 @@ const ManagerDashboard: React.FC = () => {
                       placeholder="e.g. 10x25x52 LBH"
                       value={packingSize}
                       onChange={(e) => setPackingSize(e.target.value)}
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 }, flex: 1, minWidth: '20%' }}
                     />
                   </Box>
               )}
