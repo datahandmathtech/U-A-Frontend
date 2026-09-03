@@ -94,8 +94,8 @@ const AdminConsole: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3, bgcolor: '#0D0D14', minHeight: '100vh', borderRadius: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, color: 'white' }}>
+    <Box sx={{ p: 3, bgcolor: '#f4f6f8', minHeight: '100vh', borderRadius: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, color: 'text.primary' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <SettingsIcon sx={{ fontSize: 32, color: 'primary.main' }} />
           <Box>
@@ -108,27 +108,27 @@ const AdminConsole: React.FC = () => {
         </Button>
       </Box>
 
-      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'rgba(255,255,255,0.1)', borderRadius: 4, bgcolor: '#1A1A24' }}>
+      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'rgba(0,0,0,0.1)', borderRadius: 4, bgcolor: '#ffffff' }}>
         <Table>
-          <TableHead sx={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
+          <TableHead sx={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
             <TableRow>
-              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>USER DETAILS</TableCell>
-              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>LOGIN IDENTITY</TableCell>
-              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>MODULES ACCESS</TableCell>
-              <TableCell align="right" sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>ACTIONS</TableCell>
+              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>USER DETAILS</TableCell>
+              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>LOGIN IDENTITY</TableCell>
+              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>MODULES ACCESS</TableCell>
+              <TableCell align="right" sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {admins.map((user: any) => (
               <TableRow key={user.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <Typography sx={{ fontWeight: 'bold', color: 'white' }}>{user.name}</Typography>
+                <TableCell sx={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                  <Typography sx={{ fontWeight: 'bold', color: 'text.primary' }}>{user.name}</Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>Role: {user.role.toUpperCase()}</Typography>
                 </TableCell>
-                <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <TableCell sx={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                   <Chip label={'@' + (user.staffId || user.email.split('@')[0])} sx={{ bgcolor: 'rgba(255, 179, 54, 0.2)', color: '#B38B36', fontWeight: 'bold' }} size="small" />
                 </TableCell>
-                <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <TableCell sx={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                     {user.role === 'admin' && (!user.modulesAccess || user.modulesAccess.length === 0) ? (
                       <Chip label="FULL ACCESS" size="small" sx={{ bgcolor: 'rgba(76, 175, 80, 0.2)', color: '#4caf50', fontWeight: 'bold', fontSize: '0.7rem' }} />
@@ -136,17 +136,17 @@ const AdminConsole: React.FC = () => {
                       user.modulesAccess?.map((path: string, i: number) => {
                         const mod = MODULES.find(m => m.path === path);
                         return mod ? (
-                          <Chip key={i} label={mod.label.toUpperCase()} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 'bold', fontSize: '0.7rem' }} />
+                          <Chip key={i} label={mod.label.toUpperCase()} size="small" sx={{ bgcolor: 'rgba(0,0,0,0.1)', color: 'text.primary', fontWeight: 'bold', fontSize: '0.7rem' }} />
                         ) : null;
                       })
                     )}
                   </Box>
                 </TableCell>
-                <TableCell align="right" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <IconButton sx={{ color: 'primary.main', bgcolor: 'rgba(255,255,255,0.05)', mr: 1 }} size="small" onClick={() => handleEdit(user)}>
+                <TableCell align="right" sx={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                  <IconButton sx={{ color: 'primary.main', bgcolor: 'rgba(0,0,0,0.04)', mr: 1 }} size="small" onClick={() => handleEdit(user)}>
                     <EditIcon fontSize="small" />
                   </IconButton>
-                  <IconButton sx={{ color: 'error.main', bgcolor: 'rgba(255,255,255,0.05)' }} size="small" onClick={() => handleDelete(user.id)}>
+                  <IconButton sx={{ color: 'error.main', bgcolor: 'rgba(0,0,0,0.04)' }} size="small" onClick={() => handleDelete(user.id)}>
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </TableCell>
@@ -163,8 +163,8 @@ const AdminConsole: React.FC = () => {
         </Table>
       </TableContainer>
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { bgcolor: '#1A1A24', borderRadius: 4, color: 'white' } }}>
-        <DialogTitle sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)', pb: 2, pt: 3, px: 3 }}>
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { bgcolor: '#ffffff', borderRadius: 4, color: 'text.primary' } }}>
+        <DialogTitle sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)', pb: 2, pt: 3, px: 3 }}>
           <Typography variant="h5" fontWeight="bold">{isEditing ? 'Edit Access' : 'Create New Access'}</Typography>
           <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 1 }}>PERMISSIONS & CREDENTIALS</Typography>
         </DialogTitle>
@@ -177,7 +177,7 @@ const AdminConsole: React.FC = () => {
                 variant="outlined" 
                 value={formData.name} 
                 onChange={e => setFormData({...formData, name: e.target.value})}
-                InputProps={{ sx: { color: 'white', bgcolor: 'rgba(255,255,255,0.05)' } }}
+                InputProps={{ sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } }}
                 InputLabelProps={{ sx: { color: 'text.secondary' } }}
               />
             </Grid>
@@ -188,7 +188,7 @@ const AdminConsole: React.FC = () => {
                 variant="outlined" 
                 value={formData.staffId} 
                 onChange={e => setFormData({...formData, staffId: e.target.value})}
-                InputProps={{ sx: { color: 'white', bgcolor: 'rgba(255,255,255,0.05)' } }}
+                InputProps={{ sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } }}
                 InputLabelProps={{ sx: { color: 'text.secondary' } }}
                 helperText="They will use this to log in."
                 FormHelperTextProps={{ sx: { color: 'text.secondary' } }}
@@ -203,7 +203,7 @@ const AdminConsole: React.FC = () => {
                 value={formData.password} 
                 onChange={e => setFormData({...formData, password: e.target.value})}
                 placeholder={isEditing ? 'Leave blank to keep unchanged' : ''}
-                InputProps={{ sx: { color: 'white', bgcolor: 'rgba(255,255,255,0.05)' } }}
+                InputProps={{ sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } }}
                 InputLabelProps={{ sx: { color: 'text.secondary' } }}
               />
             </Grid>
@@ -221,17 +221,17 @@ const AdminConsole: React.FC = () => {
                       p: 1.5, 
                       borderRadius: 2, 
                       border: '1px solid', 
-                      borderColor: isChecked ? 'primary.main' : 'rgba(255,255,255,0.1)',
-                      bgcolor: isChecked ? 'rgba(179, 139, 54, 0.1)' : 'rgba(255,255,255,0.02)',
+                      borderColor: isChecked ? 'primary.main' : 'rgba(0,0,0,0.1)',
+                      bgcolor: isChecked ? 'rgba(179, 139, 54, 0.1)' : 'rgba(0,0,0,0.02)',
                       display: 'flex',
                       alignItems: 'center',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' }
                     }}
                   >
                     <Checkbox checked={isChecked} sx={{ color: 'text.secondary', '&.Mui-checked': { color: 'primary.main' } }} />
-                    <Typography sx={{ fontWeight: isChecked ? 'bold' : 'normal', color: isChecked ? 'white' : 'text.secondary' }}>
+                    <Typography sx={{ fontWeight: isChecked ? 'bold' : 'normal', color: isChecked ? 'text.primary' : 'text.secondary' }}>
                       {mod.label}
                     </Typography>
                   </Box>
@@ -240,7 +240,7 @@ const AdminConsole: React.FC = () => {
             })}
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 0, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+        <DialogActions sx={{ p: 3, pt: 0, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
           <Button onClick={() => setOpen(false)} sx={{ color: 'text.secondary' }}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained" color="primary" sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: 'black' }}>
             {isEditing ? 'Update Access' : 'Create Access'}
