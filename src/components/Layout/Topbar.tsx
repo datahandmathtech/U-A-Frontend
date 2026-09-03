@@ -37,9 +37,8 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
     if (status === 'quotation') return 2;
     if (status === 'advance_payment') return 3;
     if (status === 'shop_drawing') return 4;
-    if (status === 'material_planning') return 5;
-    if (status === 'production') return 6;
-    if (status === 'completed') return 7;
+    if (status === 'production') return 5;
+    if (status === 'work_order' || status === 'completed') return 6;
     return 0;
   };
 
@@ -215,9 +214,8 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                           <ListItemText primary="Project Start & End Dates" slotProps={{ primary: { fontSize: '0.875rem', fontWeight: 'medium' } }} />
                         </MenuItem>
                         {renderMenuItem("Shop Drawing & Approval", 4, 4)}
-                        {renderMenuItem("Material Planning", 5, 5)}
-                        {renderMenuItem("Production", 6, 6)}
-                        {renderMenuItem("Work Order Active", 7, 7)}
+                        {renderMenuItem("Production", 5, 5)}
+                        {renderMenuItem("Work Order Active", 6, 6)}
                       </Box>
                     </Collapse>
                   </>
