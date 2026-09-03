@@ -35,7 +35,7 @@ import {
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
 
 const crmSteps = ['Enquiry Details', 'Reference Image', 'Quotation & Costing', 'Advance Payment'];
-const projectSteps = ['Shop Drawing & Approval', 'Material Planning', 'Production', 'Work Order Active'];
+const projectSteps = ['Shop Drawing & Approval', 'Production', 'Work Order Active'];
 const steps = [...crmSteps, ...projectSteps];
 
 const STANDARD_TERMS = [
@@ -541,9 +541,8 @@ const ProjectDetails: React.FC = () => {
     if (status === 'quotation') return 2;
     if (status === 'advance_payment') return 3;
     if (status === 'shop_drawing') return 4;
-    if (status === 'material_planning') return 5;
-    if (status === 'production') return 6;
-    if (status === 'work_order' || status === 'completed') return 7;
+    if (status === 'production' || status === 'material_planning') return 5;
+    if (status === 'work_order' || status === 'completed') return 6;
     return 0;
   };
 
@@ -1696,244 +1695,21 @@ const ProjectDetails: React.FC = () => {
                       if (viewingStepOverride !== null) {
                          setViewingStepOverride(null);
                       } else {
-                         await updateProject({ id: id as string, data: { status: 'material_planning' } }).unwrap();
+                         await updateProject({ id: id as string, data: { status: 'production' } }).unwrap();
                          setActiveStep(5);
                          setViewingStepOverride(null);
                          refetch();
                       }
                     }} sx={{ px: 4, py: 1.5, borderRadius: 2, bgcolor: viewingStepOverride !== null ? 'primary.main' : '#2E7D32', '&:hover': { bgcolor: viewingStepOverride !== null ? 'primary.dark' : '#1B5E20' } }}>
-                      {viewingStepOverride !== null ? 'Back to Active Step' : 'Proceed to Material Planning'}
-                    </Button>
-                  </Box>
-                </Box>
-              </Paper>
-            )}
-
-            {/* STEP 5: MATERIAL PLANNING */}
-            {stepToRender === 5 && (
-              <Paper elevation={0} sx={{ p: 5, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-                <Typography variant="h5" fontWeight="bold" mb={4} color="text.primary">Material Planning & Procurement</Typography>
-                <Typography variant="body2" color="text.secondary" mb={4}>Select blocks, slabs, or other materials from inventory to reserve for this project.</Typography>
-
-                <Box sx={{ mb: 4 }}>
-                  <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', border: '1px solid #E0E0E0' }}>
-                    <TableContainer>
-  <Table size="small">
-    <TableHead sx={{ bgcolor: '#FFFDF5' }}>
-      <TableRow>
-        <TableCell><strong>Source</strong></TableCell>
-        <TableCell><strong>Material Name</strong></TableCell>
-        <TableCell><strong>Block No.</strong></TableCell>
-        <TableCell><strong>L x W x T</strong></TableCell>
-        <TableCell><strong>Qty</strong></TableCell>
-        <TableCell align="center"><strong>Actions</strong></TableCell>
-      </TableRow>
-    </TableHead>
-    <TableBody>
-      {projectMaterials && projectMaterials.length > 0 ? projectMaterials.map((pm: any) => (
-        <TableRow key={pm.id} hover>
-          <TableCell>
-            {pm.inventory.jobWorkType === 'client' ? (
-              <Chip label="Client" size="small" color="info" variant="outlined" />
-            ) : (
-              <Chip label="Unnati" size="small" color="success" variant="outlined" />
-            )}
-          </TableCell>
-          <TableCell>{pm.inventory.itemName}</TableCell>
-          <TableCell>{pm.inventory.blockNumber || '-'}</TableCell>
-          <TableCell>{[pm.inventory.length, pm.inventory.width, pm.inventory.thickness].filter(Boolean).join(' x ') || '-'}</TableCell>
-          <TableCell>{pm.quantity} {pm.inventory.unit}</TableCell>
-          <TableCell align="center">
-            <IconButton color="primary" size="small" onClick={async () => {
-              if (isEditingRef.current) return;
-              isEditingRef.current = true;
-              try {
-                setClientSlabs([{
-                  materialName: pm.inventory.itemName || '',
-                  blockNo: pm.inventory.blockNumber || '',
-                  unit: 'inch',
-                  length: pm.inventory.length || '',
-                  width: pm.inventory.width || '',
-                  thickness: pm.inventory.thickness || '',
-                  isUnnati: pm.inventory.jobWorkType !== 'client',
-                  unnatiId: '',
-                  unnatiQty: pm.quantity || ''
-                }]);
-                await deleteProjectMaterial({ projectId: id as string, materialId: pm.id }).unwrap();
-                setSnackbarMessage('Material moved to edit mode. Please update and reserve again.');
-                refetchMaterials();
-              } catch (err) {
-                console.error(err);
-                setSnackbarMessage('Error editing material.');
-              } finally {
-                isEditingRef.current = false;
-              }
-            }}><EditIcon fontSize="small" /></IconButton>
-            <IconButton color="error" size="small" onClick={async () => {
-              if (window.confirm('Are you sure you want to delete this reserved material?')) {
-                try {
-                  await deleteProjectMaterial({ projectId: id as string, materialId: pm.id }).unwrap();
-                  setSnackbarMessage('Material deleted successfully');
-                  refetchMaterials();
-                } catch (err) {
-                  console.error(err);
-                  setSnackbarMessage('Error deleting material.');
-                }
-              }
-            }}><DeleteIcon fontSize="small" /></IconButton>
-          </TableCell>
-        </TableRow>
-      )) : (
-        <TableRow>
-          <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>No materials reserved yet.</TableCell>
-        </TableRow>
-      )}
-    </TableBody>
-  </Table>
-</TableContainer>
-</Paper>
-                </Box>
-
-                <Box sx={{ p: 3, border: '1px dashed #B38B36', borderRadius: 3, bgcolor: '#FFFDF5', mb: 4 }}>
-                  <Typography variant="subtitle1" fontWeight="bold" color="#B38B36" mb={2}>Reserve New Material</Typography>
-                  <Box>
-                    <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell width="12%">Source</TableCell>
-                            <TableCell width="25%">Material Name</TableCell>
-                            <TableCell width="10%">Block No</TableCell>
-                            <TableCell width="10%">Unit</TableCell>
-                            <TableCell width="10%">Length</TableCell>
-                            <TableCell width="10%">Width</TableCell>
-                            <TableCell width="10%">Thick</TableCell>
-                            <TableCell width="8%">Qty</TableCell>
-                            <TableCell width="5%"></TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {clientSlabs.map((row, idx) => {
-                            // For Unnati material, quantity is what they typed; for Client, it's auto-calculated L x W
-                            const sqFt = row.isUnnati ? Number(row.unnatiQty || 0) : (row.unit === 'inch' ? (Number(row.length || 0) * Number(row.width || 0)) / 144 : (Number(row.length || 0) * Number(row.width || 0)));
-                            
-                            return (
-                              <TableRow key={idx}>
-                                <TableCell>
-                                  <Select size="small" fullWidth value={row.isUnnati ? 'unnati' : 'client'} onChange={(e) => {
-                                    const newSlabs = [...clientSlabs];
-                                    newSlabs[idx].isUnnati = e.target.value === 'unnati';
-                                    setClientSlabs(newSlabs);
-                                  }}>
-                                    <MenuItem value="unnati">Unnati</MenuItem>
-                                    <MenuItem value="client">Client</MenuItem>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <TextField size="small" fullWidth placeholder="Material Name" value={row.materialName} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].materialName = e.target.value; setClientSlabs(newSlabs); }} />
-                                </TableCell>
-                                <TableCell><TextField size="small" value={row.blockNo} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].blockNo = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell>
-                                  <Select size="small" fullWidth value={row.unit || 'inch'} onChange={(e) => {
-                                    const newSlabs = [...clientSlabs];
-                                    newSlabs[idx].unit = e.target.value;
-                                    setClientSlabs(newSlabs);
-                                  }}>
-                                    <MenuItem value="inch">Inches</MenuItem>
-                                    <MenuItem value="feet">Sq. Feet</MenuItem>
-                                  </Select>
-                                </TableCell>
-                                <TableCell><TextField size="small" type="number" value={row.length} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].length = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell><TextField size="small" type="number" value={row.width} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].width = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell><TextField size="small" type="number" value={row.thickness} onChange={e => { const newSlabs = [...clientSlabs]; newSlabs[idx].thickness = e.target.value; setClientSlabs(newSlabs); }} /></TableCell>
-                                <TableCell>
-                                  <Typography variant="body2">{(row.unit === 'inch' ? (Number(row.length || 0) * Number(row.width || 0)) / 144 : (Number(row.length || 0) * Number(row.width || 0))).toFixed(2)}</Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <IconButton color="error" size="small" onClick={() => {
-                                    const newSlabs = clientSlabs.filter((_, i) => i !== idx);
-                                    setClientSlabs(newSlabs.length ? newSlabs : [{ isUnnati: true, unnatiId: '', unnatiQty: '', materialName: '', blockNo: '', unit: 'inch', length: '', width: '', thickness: '' }]);
-                                  }}><DeleteIcon fontSize="small" /></IconButton>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                      <Button variant="outlined" onClick={() => setClientSlabs([...clientSlabs, { isUnnati: true, unnatiId: '', unnatiQty: '', materialName: '', blockNo: '', unit: 'inch', length: '', width: '', thickness: '' }])}>
-                        + Add Slab
-                      </Button>
-                      <Button variant="contained" disabled={isReservingClientMaterial} onClick={async () => {
-                        if (isReservingRef.current) return;
-                        isReservingRef.current = true;
-                        setIsReservingClientMaterial(true);
-                        try {
-                          const token = localStorage.getItem('token');
-                          for (const row of clientSlabs) {
-                            if (!row.materialName || !row.length || !row.width) continue;
-                            const len = Number(row.length || 0);
-                            const wid = Number(row.width || 0);
-                            const qty = row.unit === 'inch' ? (len * wid) / 144 : (len * wid);
-                            
-                            const newItem = await createInventoryItem({
-                              type: 'slab', 
-                              jobWorkType: row.isUnnati ? 'company' : 'client', 
-                              itemName: row.materialName, 
-                              blockNumber: row.blockNo, 
-                              length: len, width: wid, thickness: Number(row.thickness),
-                              quantity: qty, unit: 'sq_ft', 
-                              supplier: row.isUnnati ? 'Unnati Arts' : (project?.clientName || 'Client')
-                            }).unwrap();
-                            
-                            await reserveMaterial({ projectId: id as string, data: { inventoryId: newItem.id, quantity: qty, cost: 0 } }).unwrap();
-                          }
-                          setSnackbarMessage('Materials reserved successfully!');
-                          setClientSlabs([{ isUnnati: true, unnatiId: '', unnatiQty: '', materialName: '', blockNo: '', unit: 'inch', length: '', width: '', thickness: '' }]);
-                          refetchMaterials();
-                        } catch (err) {
-                          console.error(err);
-                          setSnackbarMessage('Error reserving materials.');
-                        } finally {
-                          isReservingRef.current = false;
-                          setIsReservingClientMaterial(false);
-                        }
-                      }}>
-                        {isReservingClientMaterial ? 'Reserving...' : 'Reserve Materials'}
-                      </Button>
-                    </Box>
-                  </Box>
-                </Box>
-
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Button variant="outlined" size="large" onClick={() => {
-                    if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    else handleNextStage('shop_drawing');
-                  }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                    Back
-                  </Button>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    
-                    <Button variant="contained" size="large" onClick={async () => {
-                      if (viewingStepOverride !== null) {
-                         setViewingStepOverride(null);
-                      } else {
-                         await updateProject({ id: id as string, data: { status: 'production' } }).unwrap();
-                         setActiveStep(6);
-                         setViewingStepOverride(null);
-                         refetch();
-                      }
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
                       {viewingStepOverride !== null ? 'Back to Active Step' : 'Proceed to Production'}
                     </Button>
                   </Box>
                 </Box>
-              </Paper>
-            )}
+                </Paper>
+              )}
 
-            {/* STEP 6: PRODUCTION MANAGEMENT */}
-            {stepToRender === 6 && (
+            {/* STEP 5: PRODUCTION MANAGEMENT */}
+            {stepToRender === 5 && (
               <Box sx={{ width: '100%' }}>
                 {viewingStepOverride !== null && (
                    <Button startIcon={<ArrowBackIcon />} variant="text" size="small" onClick={() => setViewingStepOverride(null)} sx={{ mb: 3 }}>
@@ -2012,7 +1788,7 @@ const ProjectDetails: React.FC = () => {
               </Box>
             )}
 
-            {/* STEP 7: WORK ORDER ACTIVE */}
+            {/* STEP 6: WORK ORDER ACTIVE */}
             {stepToRender >= 7 && (
               <Paper elevation={0} sx={{ 
                 p: 6, textAlign: 'center', 

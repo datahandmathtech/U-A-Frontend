@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import { useGetInventoryQuery, useGetInventoryLogsQuery } from '../store/apiSlice';
+import { MaterialPlanningModal } from '../components/MaterialPlanningModal';
 
 const MONTHS = [
   { value: 3, label: 'April' },
@@ -22,6 +24,7 @@ const MONTHS = [
 const Inventory: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
+  const [planningModalOpen, setPlanningModalOpen] = useState(false);
   
   // Default to current FY and current Month
   const currentMonth = new Date().getMonth();
@@ -88,7 +91,16 @@ const Inventory: React.FC = () => {
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Inventory Management</Typography>
           <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>View Unnati Materials and Client Materials.</Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Button 
+            variant="contained" 
+            color="success" 
+            startIcon={<AssignmentIcon />} 
+            onClick={() => setPlanningModalOpen(true)}
+            sx={{ fontWeight: 'bold', py: 1 }}
+          >
+            Material Planning & Procurement
+          </Button>
           <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#FFF' }}>
             <InputLabel>Financial Year</InputLabel>
             <Select
@@ -286,6 +298,10 @@ const Inventory: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      
+      {planningModalOpen && (
+        <MaterialPlanningModal open={planningModalOpen} onClose={() => setPlanningModalOpen(false)} />
+      )}
     </Box>
   );
 };
