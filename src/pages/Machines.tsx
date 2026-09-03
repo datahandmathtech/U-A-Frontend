@@ -57,7 +57,7 @@ const Machines: React.FC = () => {
             ) : machines?.length === 0 ? (
               <TableRow><TableCell colSpan={7} align="center">No machines found.</TableCell></TableRow>
             ) : (
-              machines?.map((machine: any) => {
+              [...(machines || [])].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map((machine: any) => {
                 const needsMaintenance = (machine.totalRunHours || 0) >= (machine.maintenanceIntervalHours || 200);
                 return (
                   <TableRow key={machine.id} hover>

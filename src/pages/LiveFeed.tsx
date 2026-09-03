@@ -145,7 +145,7 @@ const LiveFeed: React.FC = () => {
         {(!machines || machines.length === 0) ? (
           <Grid size={{ xs: 12 }}><Typography align="center" color="textSecondary" sx={{ py: 8 }}>No machines found in the factory.</Typography></Grid>
         ) : (
-          machines?.map((machine: any) => {
+          [...machines].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map((machine: any) => {
             const log = liveFeedData?.find((l: any) => l.machineId === machine.id);
             const isCompleted = log?.status === 'completed';
             const isPending = log?.approvalStatus === 'pending';
