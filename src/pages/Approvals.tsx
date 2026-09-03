@@ -50,30 +50,6 @@ const Approvals: React.FC = () => {
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
 
   const handleApproveClick = async (log: any) => {
-    if (log.stage === 'Packing') {
-      try {
-        await approveLog({ 
-          id: log.id, 
-          data: { 
-            approvalStatus: 'approved',
-            splits: [{ 
-              projectId: log.projectId, 
-              qty: log.quantityProduced, 
-              productName: log.productName,
-              slabId: log.slabId,
-              pieceIds: log.pieceIds || []
-            }]
-          } 
-        }).unwrap();
-        setToast({ open: true, message: 'Log Approved successfully', severity: 'success' });
-        refetch();
-        refetchApproved();
-      } catch (err) {
-        setToast({ open: true, message: 'Failed to approve log', severity: 'error' });
-      }
-      return;
-    }
-
     setSelectedLog(log);
     setProjectSplits([{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]);
     setApprovalDialogOpen(true);
@@ -695,32 +671,33 @@ const Approvals: React.FC = () => {
                   return (
                     <>
                       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                        <TextField 
-                          select
-                          label="Select Product / Slab *" 
+                        <Autocomplete
                           fullWidth
                           size="small"
-                          value={split.slabId || ''} 
-                          onChange={(e) => {
+                          options={projectSlabs}
+                          getOptionLabel={(option: any) => `${option.name} ${option.size ? `(${option.size})` : ''}`}
+                          value={projectSlabs.find((s: any) => s.id === split.slabId) || null}
+                          onChange={(e, newValue: any) => {
                             const newSplits = [...projectSplits];
-                            const selectedSlabId = e.target.value;
-                            newSplits[idx].slabId = selectedSlabId;
-                            newSplits[idx].pieceIds = [];
-                            
-                            const slab = projectSlabs.find((s: any) => s.id === selectedSlabId);
-                            if (slab) {
-                              newSplits[idx].productName = slab.name;
+                            if (newValue) {
+                              newSplits[idx].slabId = newValue.id;
+                              newSplits[idx].productName = newValue.name;
+                            } else {
+                              newSplits[idx].slabId = '';
+                              newSplits[idx].productName = '';
                             }
-                            
+                            newSplits[idx].pieceIds = [];
                             setProjectSplits(newSplits);
-                          }} 
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                        >
-                          <MenuItem value="">-- Clear Selection --</MenuItem>
-                          {projectSlabs.map((s: any) => (
-                            <MenuItem key={s.id} value={s.id}>{s.name} {s.size ? `(${s.size})` : ''}</MenuItem>
-                          ))}
-                        </TextField>
+                          }}
+                          renderInput={(params) => (
+                            <TextField 
+                              {...params} 
+                              label="Search Product / Slab *" 
+                              placeholder="Type name..."
+                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                            />
+                          )}
+                        />
                       </Box>
                       
                       {/* Pieces Dropdown */}

@@ -159,7 +159,8 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
       if (targetQty > 0 && productionLogs) {
         const stageLogs = productionLogs.filter((log: any) => 
           log.approvalStatus === 'approved' &&
-          log.stage === normalizedStageName
+          log.stage === normalizedStageName &&
+          (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
         );
         const sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
         if (sumQty >= targetQty) return 'Completed';
