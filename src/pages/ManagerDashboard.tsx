@@ -396,9 +396,13 @@ const ManagerDashboard: React.FC = () => {
       }
     }
 
-    if (materialStage === 'Packing' && !boxCode) {
-      showToast('Box Code is required for Packing!', 'error');
-      return;
+    if (materialStage === 'Packing') {
+      const boxPart = boxCode.split('|')[0]?.trim();
+      const codePart = boxCode.split('|')[1]?.trim();
+      if (!boxPart || !codePart) {
+        showToast('Both Box and Code are required for Packing!', 'error');
+        return;
+      }
     }
     if (materialStage === 'Dispatch' && !vehicleNumber) {
       showToast('Vehicle Number is required for Dispatch!', 'error');
@@ -816,13 +820,30 @@ const ManagerDashboard: React.FC = () => {
               )}
 
               {materialStage === 'Packing' && (
-                <TextField 
-                  fullWidth 
-                  label="Box Code (Required)"
-                  value={boxCode}
-                  onChange={(e) => setBoxCode(e.target.value)}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                />
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField 
+                    fullWidth 
+                    label="Box (Required)"
+                    placeholder="e.g. V, W, 26"
+                    value={boxCode.split('|')[0] || ''}
+                    onChange={(e) => {
+                      const codePart = boxCode.split('|')[1] || '';
+                      setBoxCode(e.target.value + '|' + codePart);
+                    }}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                  />
+                  <TextField 
+                    fullWidth 
+                    label="Code (Required)"
+                    placeholder="e.g. MD2a"
+                    value={boxCode.split('|')[1] || ''}
+                    onChange={(e) => {
+                      const boxPart = boxCode.split('|')[0] || '';
+                      setBoxCode(boxPart + '|' + e.target.value);
+                    }}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                  />
+                </Box>
               )}
 
               <Box>
