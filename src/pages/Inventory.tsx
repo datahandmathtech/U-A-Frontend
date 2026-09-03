@@ -4,6 +4,8 @@ import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, Ta
 import CloseIcon from '@mui/icons-material/Close';
 import { useGetInventoryQuery, useGetInventoryLogsQuery } from '../store/apiSlice';
 
+import MaterialAllocation from './MaterialAllocation';
+
 const MONTHS = [
   { value: 3, label: 'April' },
   { value: 4, label: 'May' },
@@ -86,7 +88,7 @@ const Inventory: React.FC = () => {
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Inventory Management</Typography>
-          <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>View Unnati Materials and Client Materials.</Typography>
+          <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>View Unnati Materials, Client Materials, and Allocations.</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#FFF' }}>
@@ -122,10 +124,13 @@ const Inventory: React.FC = () => {
         <Tabs value={activeTab} onChange={handleTabChange} textColor="primary" indicatorColor="primary">
           <Tab label="Unnati Material" sx={{ fontWeight: 'bold', fontSize: '1.1rem', py: 2 }} />
           <Tab label="Client Material" sx={{ fontWeight: 'bold', fontSize: '1.1rem', py: 2 }} />
+          <Tab label="Material Allocation" sx={{ fontWeight: 'bold', fontSize: '1.1rem', py: 2 }} />
         </Tabs>
       </Box>
 
-      {isLoading ? (
+      {activeTab === 2 ? (
+        <MaterialAllocation />
+      ) : isLoading ? (
         <Typography variant="h6" sx={{ color: 'text.secondary' }}>Loading inventory...</Typography>
       ) : Object.keys(groupedBySupplier).length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, bgcolor: '#FAFAFA', border: '2px dashed #E0E0E0' }}>
