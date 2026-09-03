@@ -69,7 +69,7 @@ const WorkerDashboard: React.FC = () => {
   const [machineClockIn, { isLoading: clockingIn }] = useMachineClockInMutation();
   const [machineClockOut, { isLoading: clockingOut }] = useMachineClockOutMutation();
   const [createMaterialLog, { isLoading: creatingMaterial }] = useCreateMaterialLogMutation();
-  const { data: activeMachineLogs, refetch: refetchMachineLogs } = useGetDailyMachineLogsQuery(undefined, { pollingInterval: 10000 });
+  const { data: activeMachineLogs, refetch: refetchMachineLogs } = useGetDailyMachineLogsQuery();
   const { data: staffList } = useGetStaffListQuery();
   const { data: vendorsList } = useGetVendorsQuery();
   const { data: activeOutLogs, refetch: refetchActiveOutLogs } = useGetActiveOutLogsQuery(undefined, {

@@ -14,10 +14,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 
 const Approvals: React.FC = () => {
-  const { data: pendingLogs, isLoading, refetch } = useGetPendingApprovalsQuery(undefined, { pollingInterval: 10000 });
+  const { data: pendingLogs, isLoading, refetch } = useGetPendingApprovalsQuery(undefined);
   const { data: approvedLogs, refetch: refetchApproved } = useGetApprovedLogsQuery(undefined);
   const { data: projects } = useGetProjectsQuery();
-  const { data: machineLogs } = useGetMachineLogsQuery(undefined, { pollingInterval: 10000 });
+  const { data: machineLogs } = useGetMachineLogsQuery(undefined);
   const { data: activeOutLogs } = useGetActiveOutLogsQuery(undefined);
   const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
   
