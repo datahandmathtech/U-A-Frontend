@@ -311,11 +311,18 @@ const StageDetails = () => {
   
   const totalPieces = slab.pieces?.length || 0;
   
-  const completedPieces = (slab.pieces || []).filter((p: any) => {
-    const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0];
-    const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
-    return pStageIdx > stageIdx || (normalizedPieceStage === stageFormatted && p.status === 'completed');
-  }).length;
+  let completedPieces = 0;
+  if (stageFormatted === 'Packing' || stageFormatted === 'Dispatch') {
+    completedPieces = productionLogs
+      ?.filter((l: any) => l.stage === stageFormatted && l.approvalStatus === 'approved')
+      .reduce((sum: number, l: any) => sum + (l.quantityProduced || 0), 0) || 0;
+  } else {
+    completedPieces = (slab.pieces || []).filter((p: any) => {
+      const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0];
+      const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
+      return pStageIdx > stageIdx || (normalizedPieceStage === stageFormatted && p.status === 'completed');
+    }).length;
+  }
   
   const pendingPieces = totalPieces - completedPieces;
 
@@ -587,7 +594,7 @@ const StageDetails = () => {
                   const stageLogs = productionLogs?.filter((l: any) =>
                     l.stage === stageFormatted &&
                     l.approvalStatus === 'approved' &&
-                    (l.slabId === slab?.id || l.productName === slab?.name)
+                    ((stageFormatted === 'Packing' || stageFormatted === 'Dispatch') || (l.slabId === slab?.id || l.productName === slab?.name))
                   ) || [];
                   if (stageLogs.length === 0) {
                     return (
