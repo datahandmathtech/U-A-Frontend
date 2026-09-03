@@ -91,8 +91,8 @@ const Approvals: React.FC = () => {
       const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
       const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
 
-      if (!hasPieces && totalSplitQty > selectedLog.quantityProduced) {
-        setToast({ open: true, message: `Total split item count (${totalSplitQty}) cannot exceed original item count (${selectedLog.quantityProduced}).`, severity: 'error' });
+      if (totalSplitQty !== selectedLog.quantityProduced) {
+        setToast({ open: true, message: `Total assigned item count (${totalSplitQty}) must exactly match the reported item count (${selectedLog.quantityProduced}).`, severity: 'error' });
         return;
       }
 
