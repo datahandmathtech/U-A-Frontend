@@ -157,12 +157,30 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
     if (normalizedStageName === 'Packing' || normalizedStageName === 'Dispatch') {
       const targetQty = slab.pieces?.length || matchedProduct?.qty || 0;
       if (targetQty > 0 && productionLogs) {
-        const stageLogs = productionLogs.filter((log: any) => 
-          log.approvalStatus === 'approved' &&
-          log.stage === normalizedStageName &&
-          (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
-        );
-        const sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+        let sumQty = 0;
+        
+        if (normalizedStageName === 'Dispatch') {
+          const packedLogs = productionLogs.filter((log: any) => 
+            log.approvalStatus === 'approved' &&
+            log.stage === 'Packing' &&
+            (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
+          );
+          const allDispatchLogs = productionLogs.filter((l: any) => l.stage === 'Dispatch' && l.approvalStatus === 'approved');
+          
+          const dispatchedPackedLogs = packedLogs.filter((pLog: any) => 
+             allDispatchLogs.some((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode))
+          );
+          
+          sumQty = dispatchedPackedLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+        } else {
+          const stageLogs = productionLogs.filter((log: any) => 
+            log.approvalStatus === 'approved' &&
+            log.stage === normalizedStageName &&
+            (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
+          );
+          sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+        }
+
         if (sumQty >= targetQty) return 'Completed';
         if (sumQty > 0) return 'In Progress';
       }
