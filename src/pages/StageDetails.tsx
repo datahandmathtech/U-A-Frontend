@@ -583,6 +583,7 @@ const StageDetails = () => {
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Date</TableCell>
                   {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Box</TableCell>}
                   {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Code</TableCell>}
+                  {stageFormatted === 'Dispatch' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Packed Boxes</TableCell>}
                   {stageFormatted === 'Dispatch' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Vehicle Number</TableCell>}
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Pieces</TableCell>
                   {stageFormatted === 'Packing' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Size</TableCell>}
@@ -600,7 +601,7 @@ const StageDetails = () => {
                   if (stageLogs.length === 0) {
                     return (
                       <TableRow>
-                        <TableCell colSpan={stageFormatted === 'Packing' ? 8 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                        <TableCell colSpan={stageFormatted === 'Packing' || stageFormatted === 'Dispatch' ? 8 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                           No {stageFormatted.toLowerCase()} entries yet.
                         </TableCell>
                       </TableRow>
@@ -615,6 +616,11 @@ const StageDetails = () => {
                         <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{formattedDate}</TableCell>
                         {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{(log as any).boxCode?.split('|')[0] || '-'}</TableCell>}
                         {stageFormatted === 'Packing' && <TableCell sx={{ whiteSpace: 'nowrap' }}>{(log as any).boxCode?.split('|')[1] || '-'}</TableCell>}
+                        {stageFormatted === 'Dispatch' && (
+                          <TableCell sx={{ whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {log.boxCode ? log.boxCode.split('||').map((b: string) => b.split('|')[0] + ' / ' + b.split('|')[1]).join(', ') : '-'}
+                          </TableCell>
+                        )}
                         {stageFormatted === 'Dispatch' && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: '#1565c0' }}>{log.vehicleNumber || '-'}</TableCell>}
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>
                           <Chip label={`${log.quantityProduced || log.pieceIds?.length || 0} Pieces`} size="small" sx={{ fontWeight: 'bold', bgcolor: '#E3F2FD', color: '#1565c0' }} />
