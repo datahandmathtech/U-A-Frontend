@@ -408,7 +408,7 @@ const ManagerDashboard: React.FC = () => {
 
       await createMaterialLog({
         stage: materialStage,
-        quantityProduced: isStageCompletion ? 1 : materialQuantity, // Default to 1 for simple tracking
+        quantityProduced: materialQuantity || 1, // Fallback to 1 if not provided (though it should be)
         transactionType: materialType,
         startPhotos: materialPhotos,
         workerId: assigneeType === 'worker' ? selectedStaffId : (assigneeType === 'self' || isStageCompletion ? (user?.id || user?._id) : undefined),
@@ -603,6 +603,16 @@ const ManagerDashboard: React.FC = () => {
                             <MenuItem key={p.id} value={p.id}>{p.clientName} ({p.name})</MenuItem>
                           ))}
                         </TextField>
+
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Quantity Produced</Typography>
+                        <TextField 
+                          fullWidth 
+                          label="Quantity Produced / Completed" 
+                          type="number"
+                          value={materialQuantity}
+                          onChange={(e) => setMaterialQuantity(e.target.value)}
+                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                        />
 
                       </>
                     ) : (
@@ -823,6 +833,7 @@ const ManagerDashboard: React.FC = () => {
                 dialogOrigin !== 'Material Tracking' 
                 ? (
                   !selectedProjectId ||
+                  !materialQuantity ||
                   !materialPhotos.machine || 
                   creatingMaterial
                 )

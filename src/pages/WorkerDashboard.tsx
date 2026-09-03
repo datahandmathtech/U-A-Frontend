@@ -232,9 +232,14 @@ const WorkerDashboard: React.FC = () => {
 
   const handleMachineClockOut = async () => {
     try {
+      if (!endQuantity || isNaN(Number(endQuantity)) || Number(endQuantity) <= 0) {
+        showToast("Please enter a valid quantity.", "error");
+        return;
+      }
       await machineClockOut({ 
         logId: selectedEndMachine, 
         remarks: endRemarks,
+        quantityProduced: Number(endQuantity),
         endMachinePhotoUrl: endPhotos.machine,
         endUnitPhotoUrl: endPhotos.unit,
         endSoftwarePhotoUrl: endPhotos.software
@@ -505,6 +510,15 @@ const WorkerDashboard: React.FC = () => {
                   </MenuItem>
                 ))}
               </TextField>
+
+              <TextField 
+                fullWidth 
+                label="1. Pieces Processed / Quantity" 
+                type="number"
+                value={endQuantity}
+                onChange={(e) => setEndQuantity(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+              />
 
               <TextField 
                 fullWidth 
