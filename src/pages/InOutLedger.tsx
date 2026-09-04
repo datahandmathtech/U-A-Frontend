@@ -418,7 +418,8 @@ const InOutLedger: React.FC = () => {
                         const logStageIndex = stageOrder.indexOf(logStage);
                         if (s.pieces && s.pieces.length > 0 && logStageIndex >= 0) {
                           const allPassed = s.pieces.every((p: any) => {
-                            const pStageIndex = stageOrder.indexOf(p.stage);
+                            const pBaseStage = p.stage?.split(' ')[0] || '';
+                            const pStageIndex = stageOrder.indexOf(pBaseStage);
                             if (pStageIndex > logStageIndex) return true;
                             if (pStageIndex === logStageIndex && p.status === 'Completed') return true;
                             return false;
