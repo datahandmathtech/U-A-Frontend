@@ -15,7 +15,19 @@ document.addEventListener('wheel', (event) => {
     (target as HTMLInputElement).blur();
   }
 }, { passive: true });
-
+// Register PWA Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        console.log('Unnati Arts PWA Service Worker Registered:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('PWA Service Worker Registration Failed:', err);
+      });
+  });
+}
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Provider store={store}>

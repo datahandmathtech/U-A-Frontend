@@ -8,6 +8,7 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import ShieldIcon from '@mui/icons-material/Shield';
 import LogoutIcon from '@mui/icons-material/Logout';
+import GetAppIcon from '@mui/icons-material/GetApp';
 import { NavLink } from 'react-router-dom';
 import GroupsIcon from '@mui/icons-material/Groups';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
@@ -45,6 +46,34 @@ const ALL_MENU_ITEMS = [
 
 const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawerWidth }) => {
   const user = useSelector((state: any) => state.auth.user);
+
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+  const [isStandalone, setIsStandalone] = React.useState(false);
+
+  React.useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsStandalone(true);
+    }
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      alert("To install Unnati Arts ERP:\n• On Chrome/Edge (PC/Laptop): Click the install button (⊕) in the browser address bar.\n• On Android: Tap browser menu (⋮) and tap 'Install app'.\n• On iPhone (Safari): Tap the Share icon and select 'Add to Home Screen'.");
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -110,6 +139,27 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
       </List>
 
       <Box sx={{ p: 2, mb: 2 }}>
+        {!isStandalone && (
+          <ListItemButton 
+            onClick={handleInstallApp} 
+            sx={{ 
+              borderRadius: 3, 
+              mb: 1.5, 
+              bgcolor: 'primary.main', 
+              color: '#FFFFFF',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              '&:hover': { bgcolor: 'primary.dark' } 
+            }}
+          >
+            <ListItemIcon sx={{ color: '#FFFFFF', minWidth: 36 }}>
+              <GetAppIcon />
+            </ListItemIcon>
+            <ListItemText 
+              primary={<Typography sx={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Install ERP App</Typography>} 
+              secondary={<Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.85)' }}>Mobile & Desktop</Typography>}
+            />
+          </ListItemButton>
+        )}
         <Box sx={{ 
           p: 2, 
           borderRadius: 4, 
