@@ -189,7 +189,7 @@ const Approvals: React.FC = () => {
             const combinedPendingLogs = (() => {
               if (!pendingLogs) return [];
               return (pendingLogs || [])
-                .filter((log: any) => log.stage !== 'Material Tracking')
+                .filter((log: any) => log.stage !== 'Material Tracking' && !log.transactionType)
                 .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             })();
 
