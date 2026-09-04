@@ -38,9 +38,7 @@ const ALL_MENU_ITEMS = [
   { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory' },
   { text: 'Machine Master', icon: <PrecisionManufacturingIcon />, path: '/machines' },
   { text: 'Approvals', icon: <PendingActionsIcon />, path: '/approvals' },
-  { text: 'Dispatch & Packing', icon: <LocalShippingIcon />, path: '/dispatch' },
   { text: 'In/Out Ledger', icon: <FolderSpecialIcon />, path: '/in-out-ledger' },
-  { text: 'Waste Ledger', icon: <RecyclingIcon />, path: '/waste-ledger' },
   { text: 'HR & Payroll', icon: <GroupsIcon />, path: '/hr' },
   { text: 'Admin Console', icon: <ShieldIcon />, path: '/admin-console' },
 ];
