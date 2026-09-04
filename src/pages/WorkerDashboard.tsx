@@ -62,19 +62,14 @@ const WorkerDashboard: React.FC = () => {
   }
 
   const { data: machines, isLoading: machinesLoading } = useGetMachinesQuery();
-  const { data: activeSession, isLoading: sessionLoading, refetch } = useGetActiveSessionQuery();
   
-  const [punchIn, { isLoading: punchingIn }] = usePunchInMutation();
-  const [punchOut, { isLoading: punchingOut }] = usePunchOutMutation();
   const [machineClockIn, { isLoading: clockingIn }] = useMachineClockInMutation();
   const [machineClockOut, { isLoading: clockingOut }] = useMachineClockOutMutation();
   const [createMaterialLog, { isLoading: creatingMaterial }] = useCreateMaterialLogMutation();
   const { data: activeMachineLogs, refetch: refetchMachineLogs } = useGetDailyMachineLogsQuery();
   const { data: staffList } = useGetStaffListQuery();
   const { data: vendorsList } = useGetVendorsQuery();
-  const { data: activeOutLogs, refetch: refetchActiveOutLogs } = useGetActiveOutLogsQuery(undefined, {
-    skip: !activeSession
-  });
+  const { data: activeOutLogs, refetch: refetchActiveOutLogs } = useGetActiveOutLogsQuery();
   
   const { data: projectsData } = useGetProjectsQuery();
   const [selectedMachine, setSelectedMachine] = useState('');
@@ -318,7 +313,7 @@ const WorkerDashboard: React.FC = () => {
     window.location.reload();
   };
 
-  if (sessionLoading || machinesLoading) return <Box sx={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
+  if (machinesLoading) return <Box sx={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 10 }}>
@@ -343,64 +338,8 @@ const WorkerDashboard: React.FC = () => {
         {/* Left Column: Main Steps */}
         <Box sx={{ flex: 1, maxWidth: { md: 600 } }}>
         
-        {/* Step 1: Punch In / Out Card */}
-        <Paper elevation={2} sx={{ p: 3, borderRadius: 4, mb: 4 }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AccessTimeIcon /> Step 1: Factory Attendance
-          </Typography>
-          <Divider sx={{ mb: 3 }} />
-
-          {activeSession ? (
-            <Box sx={{ textAlign: 'center' }}>
-              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, px: 3, py: 1, bgcolor: 'success.light', color: 'success.dark', borderRadius: 8, mb: 2, fontWeight: 'bold' }}>
-                <CheckCircleIcon fontSize="small" /> PUNCHED IN
-              </Box>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-                Your shift started at <strong>{new Date(activeSession.checkIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</strong>
-              </Typography>
-              <Button 
-                variant="contained" 
-                color="error" 
-                size="large" 
-                fullWidth 
-                startIcon={punchingOut ? <CircularProgress size={20} color="inherit" /> : <LogoutIcon />}
-                onClick={handlePunchOut}
-                disabled={punchingOut}
-                sx={{ borderRadius: 3, py: 1.5, fontSize: '1.1rem', fontWeight: 'bold' }}
-              >
-                {punchingOut ? 'Ending Shift...' : 'END SHIFT (PUNCH OUT)'}
-              </Button>
-            </Box>
-          ) : (
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                You must punch in with a selfie to record your daily attendance.
-              </Typography>
-              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-                 <Box sx={{ width: 140 }}>
-                   <ImageUploadBox label="YOUR SELFIE" previewUrl={attendancePhoto} onClick={() => startCamera('attendance')} />
-                 </Box>
-              </Box>
-              <Button 
-                variant="contained" 
-                color="success" 
-                size="large" 
-                fullWidth 
-                startIcon={punchingIn ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
-                onClick={handlePunchIn}
-                disabled={punchingIn || !attendancePhoto}
-                sx={{ borderRadius: 3, py: 1.5, fontSize: '1.1rem', fontWeight: 'bold', boxShadow: '0 8px 16px rgba(46,125,50,0.2)' }}
-              >
-                {punchingIn ? 'Starting Shift...' : 'START SHIFT (PUNCH IN)'}
-              </Button>
-            </Box>
-          )}
-        </Paper>
-
-        {/* Active Machine Logs Removed per request */}
-
         {/* Action Buttons for Machine Work */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 4, opacity: activeSession ? 1 : 0.5, pointerEvents: activeSession ? 'auto' : 'none' }}>
+        <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
           <Button 
             variant="contained" 
             color="success" 
