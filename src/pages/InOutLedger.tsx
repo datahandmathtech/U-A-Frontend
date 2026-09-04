@@ -421,7 +421,7 @@ const InOutLedger: React.FC = () => {
                             const pBaseStage = p.stage?.split(' ')[0] || '';
                             const pStageIndex = stageOrder.indexOf(pBaseStage);
                             if (pStageIndex > logStageIndex) return true;
-                            if (pStageIndex === logStageIndex && p.status === 'Completed') return true;
+                            if (pStageIndex === logStageIndex && p.status?.toLowerCase() === 'completed') return true;
                             return false;
                           });
                           if (allPassed) return false;
@@ -460,12 +460,29 @@ const InOutLedger: React.FC = () => {
                             return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id;
                           }).join(', ');
                         }}>
-                          {slabs.find((s: any) => s.id === split.slabId)?.pieces?.map((p: any) => (
-                            <MenuItem key={p.id} value={p.id}>
-                              <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
-                              <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber} - ${p.stage}`} />
-                            </MenuItem>
-                          ))}
+                          {(() => {
+                            const slab = slabs.find((s: any) => s.id === split.slabId);
+                            if (!slab || !slab.pieces) return null;
+                            const logStage = selectedLog?.stage?.split(' ')[0] || '';
+                            const stageOrder = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                            const logStageIndex = stageOrder.indexOf(logStage);
+                            
+                            const validPieces = slab.pieces.filter((p: any) => {
+                              if (logStageIndex < 0) return true;
+                              const pBaseStage = p.stage?.split(' ')[0] || '';
+                              const pStageIndex = stageOrder.indexOf(pBaseStage);
+                              if (pStageIndex > logStageIndex) return false;
+                              if (pStageIndex === logStageIndex && p.status?.toLowerCase() === 'completed') return false;
+                              return true;
+                            });
+
+                            return validPieces.map((p: any) => (
+                              <MenuItem key={p.id} value={p.id}>
+                                <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
+                                <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber} - ${p.stage}`} />
+                              </MenuItem>
+                            ));
+                          })()}
                         </Select>
                       </FormControl>
                     )}
