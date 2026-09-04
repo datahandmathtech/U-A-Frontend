@@ -65,6 +65,7 @@ const Projects: React.FC = () => {
           totalPieces: formData.products ? formData.products.reduce((acc: number, p: any) => acc + (p.pieces || 0), 0) : 0,
           projectId: `U-A-${Math.floor(100 + Math.random() * 900)}`,
           status: 'production',
+          isDirectWorkOrder: true,
           deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : undefined,
           startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
           deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined,
