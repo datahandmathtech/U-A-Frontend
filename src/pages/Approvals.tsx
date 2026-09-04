@@ -484,8 +484,10 @@ const Approvals: React.FC = () => {
                       <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
                         <Typography sx={{ fontWeight: 900, color: '#333' }}>{log.quantityProduced}</Typography>
                       </td>
-                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                        <Typography sx={{ fontWeight: 800, color: '#1976d2', fontSize: '0.85rem' }}>{log.productName || '—'}</Typography>
+                      <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', maxWidth: '250px' }}>
+                        <Typography sx={{ fontWeight: 800, color: '#1976d2', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={log.productName || ''}>
+                          {log.productName || '—'}
+                        </Typography>
                       </td>
                       <td style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
                         {log.project ? <Typography sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.9rem' }}>{log.project.projectId || log.project.name}</Typography> : <span style={{ color: '#aaa' }}>—</span>}
