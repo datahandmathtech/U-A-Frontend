@@ -77,10 +77,22 @@ const InOutLedger: React.FC = () => {
   const activeProjectId = projectSplits[0]?.projectId;
   const { data: slabs } = useGetSlabsQuery(activeProjectId, { skip: !activeProjectId });
 
-  const handleApproveClick = (log: any) => {
-    setSelectedLog(log);
-    setProjectSplits([{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]);
-    setApprovalDialogOpen(true);
+  const handleApproveClick = async (log: any) => {
+    if (window.confirm("Are you sure you want to approve this log?")) {
+      try {
+        await approveLog({ 
+          id: log.id, 
+          data: { 
+            approvalStatus: 'approved',
+            splits: [{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]
+          } 
+        }).unwrap();
+        setToast({ open: true, message: 'Log Approved successfully', severity: 'success' });
+        refetch();
+      } catch (err: any) {
+        setToast({ open: true, message: err?.data?.message || 'Approval failed', severity: 'error' });
+      }
+    }
   };
 
   const handleRejectClick = async (logId: string) => {

@@ -568,13 +568,6 @@ const ManagerDashboard: React.FC = () => {
             </Typography>
             
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {materialType === 'OUT' && dialogOrigin === 'Material Tracking' && (
-                <FormControlLabel 
-                  control={<Switch checked={requiresMachine} onChange={(e) => setRequiresMachine(e.target.checked)} />} 
-                  label="Requires Machine? (If false, directly complete the piece log)" 
-                  sx={{ mb: 1 }}
-                />
-              )}
 
               {materialType === 'IN' && (
                 <Box>
@@ -649,49 +642,8 @@ const ManagerDashboard: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>1. Select Client & Stone</Typography>
-                        <TextField 
-                          select
-                          label="Select Project / Client" 
-                          fullWidth 
-                          value={selectedProjectId}
-                          onChange={(e) => {
-                            setSelectedProjectId(e.target.value);
-                            setSelectedProductId('');
-                          }}
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                        >
-                          <MenuItem value="" disabled>-- Select Project --</MenuItem>
-                          {projectsData?.map((p: any) => (
-                            <MenuItem key={p.id} value={p.id}>{p.name} ({p.clientName})</MenuItem>
-                          ))}
-                        </TextField>
-
-                        {selectedProjectId && (
-                          <TextField 
-                            select
-                            label="Select Stone / Product" 
-                            fullWidth 
-                            value={selectedProductId}
-                            onChange={(e) => setSelectedProductId(e.target.value)}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                          >
-                            <MenuItem value="" disabled>-- Select Stone --</MenuItem>
-                            {projectsData?.find((p: any) => p.id === selectedProjectId)?.products?.map((prod: any) => (
-                              <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
-                            ))}
-                          </TextField>
-                        )}
-
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Who is taking this material?</Typography>
-                        <RadioGroup row value={assigneeType} onChange={(e) => setAssigneeType(e.target.value as any)}>
-                          <FormControlLabel value="vendor" control={<Radio />} label="Vendor" />
-                          <FormControlLabel value="worker" control={<Radio />} label="Staff/Worker" />
-                          <FormControlLabel value="self" control={<Radio />} label="Self (Me)" />
-                        </RadioGroup>
-
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 2 }}>
-                          3. Fill Details
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                          1st Stage
                         </Typography>
                         {assigneeType === 'vendor' && (
                           <>
@@ -732,7 +684,7 @@ const ManagerDashboard: React.FC = () => {
                                         <MenuItem value="Production">Production</MenuItem>
                                         <MenuItem value="Polishing">Polishing</MenuItem>
                                         <MenuItem value="Packing">Packing</MenuItem>
-                                        <MenuItem value="Dispatch">Dispatch</MenuItem>
+                                        <MenuItem value="Spare Parts">Spare Parts</MenuItem>
                                       </TextField>
                                       <TextField 
                                         fullWidth 
