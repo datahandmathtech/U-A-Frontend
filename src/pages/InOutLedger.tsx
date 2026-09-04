@@ -78,19 +78,25 @@ const InOutLedger: React.FC = () => {
   const { data: slabs } = useGetSlabsQuery(activeProjectId, { skip: !activeProjectId });
 
   const handleApproveClick = async (log: any) => {
-    if (window.confirm("Are you sure you want to approve this log?")) {
-      try {
-        await approveLog({ 
-          id: log.id, 
-          data: { 
-            approvalStatus: 'approved',
-            splits: [{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]
-          } 
-        }).unwrap();
-        setToast({ open: true, message: 'Log Approved successfully', severity: 'success' });
-        refetch();
-      } catch (err: any) {
-        setToast({ open: true, message: err?.data?.message || 'Approval failed', severity: 'error' });
+    if (log.transactionType === 'IN') {
+      setSelectedLog(log);
+      setProjectSplits([{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]);
+      setApprovalDialogOpen(true);
+    } else {
+      if (window.confirm("Are you sure you want to approve this OUT log?")) {
+        try {
+          await approveLog({ 
+            id: log.id, 
+            data: { 
+              approvalStatus: 'approved',
+              splits: [{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]
+            } 
+          }).unwrap();
+          setToast({ open: true, message: 'Log Approved successfully', severity: 'success' });
+          refetch();
+        } catch (err: any) {
+          setToast({ open: true, message: err?.data?.message || 'Approval failed', severity: 'error' });
+        }
       }
     }
   };
@@ -300,40 +306,54 @@ const InOutLedger: React.FC = () => {
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={currentTab} onChange={(e, val) => setCurrentTab(val)}>
-          <Tab label="Purchase / In-Out History" sx={{ fontWeight: 'bold' }} />
+          <Tab label="Factory Out" sx={{ fontWeight: 'bold' }} />
+          <Tab label="Factory In" sx={{ fontWeight: 'bold' }} />
           <Tab label="Vendors / Suppliers" sx={{ fontWeight: 'bold' }} />
         </Tabs>
       </Box>
 
-      {currentTab === 1 && (
+      {currentTab === 2 && (
         <VendorsList hideHeader={true} selectedMonth={selectedMonth} selectedFY={selectedFY} />
       )}
 
-      {currentTab === 0 && (
+      {(currentTab === 0 || currentTab === 1) && (
         <Box>
-          {allLogs.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4 }}>
-              <FolderSpecialIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2, opacity: 0.5 }} />
-              <Typography variant="h6" color="textSecondary">No material logs found for this financial year.</Typography>
-            </Paper>
-          ) : (
-            <Box>
-              {(selectedMonth === 'All' ? fyMonths : fyMonths.filter(m => `${m.label} ${m.year}` === selectedMonth))
-                .map(m => {
-                  const monthKey = `${m.label} ${m.year}`;
-                  const logs = groupedByMonth[monthKey];
-                  if (!logs || logs.length === 0) return null;
-                  return (
-                    <Box key={monthKey} sx={{ mb: 5 }}>
-                      <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 3, color: '#333', borderBottom: '2px solid #eee', pb: 1 }}>
-                        {monthKey}
-                      </Typography>
-                      {renderUnifiedLogGrid(logs)}
-                    </Box>
-                  );
-                })}
-            </Box>
-          )}
+          {(() => {
+            const tabLogs = allLogs.filter(log => currentTab === 0 ? log.transactionType === 'OUT' : log.transactionType === 'IN');
+            if (tabLogs.length === 0) return (
+              <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4 }}>
+                <FolderSpecialIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2, opacity: 0.5 }} />
+                <Typography variant="h6" color="textSecondary">No material logs found for this tab.</Typography>
+              </Paper>
+            );
+            
+            const grouped = tabLogs.reduce((acc: any, log: any) => {
+              const d = new Date(log.createdAt);
+              const monthStr = `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
+              if (!acc[monthStr]) acc[monthStr] = [];
+              acc[monthStr].push(log);
+              return acc;
+            }, {});
+
+            return (
+              <Box>
+                {(selectedMonth === 'All' ? fyMonths : fyMonths.filter(m => `${m.label} ${m.year}` === selectedMonth))
+                  .map(m => {
+                    const monthKey = `${m.label} ${m.year}`;
+                    const logs = grouped[monthKey];
+                    if (!logs || logs.length === 0) return null;
+                    return (
+                      <Box key={monthKey} sx={{ mb: 5 }}>
+                        <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 3, color: '#333', borderBottom: '2px solid #eee', pb: 1 }}>
+                          {monthKey}
+                        </Typography>
+                        {renderUnifiedLogGrid(logs)}
+                      </Box>
+                    );
+                  })}
+              </Box>
+            );
+          })()}
         </Box>
       )}
 
