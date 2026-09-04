@@ -439,7 +439,7 @@ const ManagerDashboard: React.FC = () => {
         transactionType: materialType,
         startPhotos: materialPhotos,
         workerId: assigneeType === 'worker' ? selectedStaffId : (assigneeType === 'self' || isStageCompletion ? (user?.id || user?._id) : undefined),
-        vendors: !isStageCompletion ? vendorRows : [],
+        vendors: !isStageCompletion && materialType === 'OUT' ? vendorRows : [],
         vendorName: undefined,
         vehicleNumber: vehicleNumber || undefined,
         boxCode: finalBoxCode,
@@ -581,11 +581,14 @@ const ManagerDashboard: React.FC = () => {
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                   >
                     <MenuItem value="" disabled>-- Select Pending Assignment --</MenuItem>
-                    {activeOutLogs?.filter((log: any) => dialogOrigin === 'Material Tracking' || log.stage === materialStage).map((log: any) => (
-                      <MenuItem key={log.id} value={log.id}>
-                        {log.project?.name || 'No Client'} | {log.productName || 'Unknown Stone'} | {log.stage} - {log.quantityProduced - (log.returnedQty || 0)} qty pending ({log.worker?.name || log.vendorName})
-                      </MenuItem>
-                    ))}
+                    {activeOutLogs?.filter((log: any) => dialogOrigin === 'Material Tracking' || log.stage === materialStage).map((log: any) => {
+                      const prefix = [log.project?.name, log.productName].filter(Boolean).join(' | ');
+                      return (
+                        <MenuItem key={log.id} value={log.id}>
+                          {prefix ? `${prefix} | ` : ''}{log.stage} - {log.quantityProduced - (log.returnedQty || 0)} qty pending ({log.worker?.name || log.vendorName})
+                        </MenuItem>
+                      );
+                    })}
                   </TextField>
                 </Box>
               )}
