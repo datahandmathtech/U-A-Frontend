@@ -185,11 +185,15 @@ const Approvals: React.FC = () => {
         </Paper>
       ) : (
         <Box>
-          {(() => {
             const combinedPendingLogs = (() => {
               if (!pendingLogs) return [];
               return (pendingLogs || [])
-                .filter((log: any) => log.stage !== 'Material Tracking' && !log.transactionType)
+                .filter((log: any) => {
+                  if (log.stage === 'Material Tracking') return false;
+                  // Vendor IN/OUT belongs to In/Out Ledger, not Approvals
+                  if (log.vendorId || (log.vendorName && log.vendorName !== 'Unknown')) return false;
+                  return true;
+                })
                 .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             })();
 
@@ -428,10 +432,16 @@ const Approvals: React.FC = () => {
                   </Box>
                 )}
 
-                {detailedSections.every(section => section === null) && selectedStageFilter && otherStageLogs.length === 0 ? (
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1, fontStyle: 'italic' }}>
-                    No pending approvals for the selected stage.
-                  </Typography>
+                {detailedSections.every(section => section === null) && otherStageLogs.length === 0 ? (
+                  <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px dashed #ccc', bgcolor: '#fafafa', mb: 4 }}>
+                    <CheckCircleIcon sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
+                    <Typography variant="h6" color="textSecondary" sx={{ fontWeight: 'bold' }}>
+                      {selectedStageFilter ? `No pending approvals for ${selectedStageFilter}` : 'No Pending Approvals'}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      All worker and manager tasks have been approved.
+                    </Typography>
+                  </Paper>
                 ) : (
                   detailedSections
                 )}
