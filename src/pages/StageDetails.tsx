@@ -241,11 +241,9 @@ const StageDetails = () => {
         <TableRow key={p.id} hover>
           {stageFormatted === 'Production' && <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography fontWeight="bold">{mName}</Typography></TableCell>}
           <TableCell sx={{ whiteSpace: 'nowrap', minWidth: 200 }}>
-             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography fontWeight="bold" color="secondary.main">{p.productName || p.pieceNumber}</Typography>
-                {(p.productName || '').includes('(Full Slab)') && <Chip size="small" label="Full Slab" color="primary" sx={{ height: 20, fontSize: '0.7rem' }} />}
-                {(p.productName || '').includes('(Cut Piece)') && <Chip size="small" label="Cut Piece" color="secondary" sx={{ height: 20, fontSize: '0.7rem' }} />}
-             </Box>
+             <Typography fontWeight="bold" color="secondary.main">
+                {(p.productName || p.pieceNumber || '').replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim()}
+             </Typography>
           </TableCell>
           <TableCell sx={{ whiteSpace: 'nowrap' }}>{p.size ? p.size.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : 'N/A'}</TableCell>
           {stageFormatted === 'Production' && (
@@ -519,7 +517,7 @@ const StageDetails = () => {
                     const lastPieceNum = piecesData[piecesData.length - 1]?.pieceNumber || maxNum;
                     setPiecesData([...piecesData, { 
                       pieceNumber: lastPieceNum + 1,
-                      name: `${slab.name}.${lastPieceNum + 1} (Cut Piece)`,
+                      name: `${slab.name}.${lastPieceNum + 1}`,
                       l: 0, w: 0 
                     }]);
                   }}>
@@ -547,7 +545,7 @@ const StageDetails = () => {
                         
                         const newPieces = Array.from({ length: count }).map((_, idx) => ({
                           pieceNumber: lastPieceNum + idx + 1,
-                          name: `${slab.name}.${lastPieceNum + idx + 1} (Cut Piece)`,
+                          name: `${slab.name}.${lastPieceNum + idx + 1}`,
                           l: 0, w: 0
                         }));
                         setPiecesData([...piecesData, ...newPieces]);
