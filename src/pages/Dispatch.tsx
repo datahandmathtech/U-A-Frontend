@@ -6,6 +6,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useGetProjectsQuery, useSavePackingItemsMutation, useGetPackingItemsQuery } from '../store/apiSlice';
+import { getBase64ImageFromUrl } from '../utils/pdfGenerator';
 
 interface PackingRow {
   id: number;
@@ -76,10 +77,15 @@ const Dispatch: React.FC = () => {
 
     const doc = new jsPDF();
     
-    // Header
+    // Header Logo & Text
+    const logoBase64 = await getBase64ImageFromUrl('/logo.png');
+    if (logoBase64) {
+      doc.addImage(logoBase64 as string, 'PNG', 15, 10, 45, 18);
+    }
+
     doc.setFontSize(22);
     doc.setTextColor(179, 139, 54); // Gold #B38B36
-    doc.text('UNNATI ARTS', 105, 20, { align: 'center' });
+    doc.text('UNNATI ARTS', logoBase64 ? 120 : 105, 20, { align: 'center' });
     
     doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);

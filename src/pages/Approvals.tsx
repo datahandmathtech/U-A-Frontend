@@ -1045,7 +1045,9 @@ const Approvals: React.FC = () => {
                   >
                     <MenuItem value="">-- Clear Selection --</MenuItem>
                     {matchedSlabs.map((s: any) => (
-                      <MenuItem key={s.id} value={s.id}>Slab: {s.name} {s.size ? `(${s.size})` : ''}</MenuItem>
+                      <MenuItem key={s.id} value={s.id}>
+                        Slab: {s.name} ({s.pieces?.length || 0} pcs) {s.size && s.size.trim() !== '0L x 0W' ? `- ${s.size}` : ''}
+                      </MenuItem>
                     ))}
                   </TextField>
                 );

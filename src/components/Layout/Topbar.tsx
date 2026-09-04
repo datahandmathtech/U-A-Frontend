@@ -148,9 +148,12 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
         >
           <MenuIcon />
         </IconButton>
-        <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-          Unnati Arts ERP
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexGrow: 1 }}>
+          <img src="/logo.png" alt="Unnati Arts" style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
+          <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold', color: 'text.primary', display: { xs: 'none', sm: 'block' } }}>
+            ERP
+          </Typography>
+        </Box>
         <Box>
           <IconButton
             size="large"

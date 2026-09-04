@@ -318,14 +318,14 @@ const WorkerDashboard: React.FC = () => {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 10 }}>
       {/* Header */}
-      <Paper elevation={0} sx={{ p: 3, bgcolor: 'primary.main', color: 'white', borderBottomRadius: 24, mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Paper elevation={0} sx={{ p: 3, bgcolor: 'primary.main', color: 'white', borderBottomRadius: 24, mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-            {user?.name?.charAt(0) || 'W'}
-          </Avatar>
+          <Box sx={{ bgcolor: 'white', px: 1.5, py: 0.8, borderRadius: 2, display: 'flex', alignItems: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
+            <img src="/logo.png" alt="Unnati Arts" style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
+          </Box>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{user?.name || 'Worker Portal'}</Typography>
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>ID: {user?.staffId || '-'}</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>{user?.name || 'Worker Portal'}</Typography>
+            <Typography variant="caption" sx={{ opacity: 0.9 }}>ID: {user?.staffId || '-'}</Typography>
           </Box>
         </Box>
         <Button variant="contained" color="error" onClick={handleLogout} sx={{ borderRadius: 8, boxShadow: 'none' }}>

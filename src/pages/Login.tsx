@@ -33,9 +33,13 @@ const Login: React.FC = () => {
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
-      <Paper elevation={3} sx={{ p: 4, width: '100%', maxWidth: 400 }}>
-        <Typography variant="h4" fontWeight="bold" align="center" mb={3}>Unnati Arts ERP</Typography>
-        <Typography variant="body1" align="center" color="text.secondary" mb={4}>Sign in to your account</Typography>
+      <Paper elevation={4} sx={{ p: 4, width: '100%', maxWidth: 420, borderRadius: 4, textAlign: 'center' }}>
+        <Box sx={{ mb: 2.5, display: 'flex', justifyContent: 'center' }}>
+          <img src="/logo.png" alt="Unnati Arts" style={{ height: 55, maxWidth: '85%', objectFit: 'contain' }} />
+        </Box>
+        <Typography variant="body1" align="center" color="text.secondary" mb={4} fontWeight={500}>
+          Enterprise ERP System
+        </Typography>
         
         <Box component="form" onSubmit={handleLogin}>
           <TextField 

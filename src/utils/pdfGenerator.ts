@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // Helper to convert image URL to base64
-const getBase64ImageFromUrl = async (imageUrl) => {
+export const getBase64ImageFromUrl = async (imageUrl: string) => {
   try {
     const res = await fetch(imageUrl);
     const blob = await res.blob();
@@ -18,17 +18,22 @@ const getBase64ImageFromUrl = async (imageUrl) => {
   }
 };
 
-export const generateReceiptPDF = (project: any, advanceAmount: number) => {
+export const generateReceiptPDF = async (project: any, advanceAmount: number) => {
   const doc = new jsPDF();
   
+  const logoBase64 = await getBase64ImageFromUrl('/logo.png');
+  if (logoBase64) {
+    doc.addImage(logoBase64 as string, 'PNG', 15, 10, 45, 18);
+  }
+
   // Header
   doc.setFontSize(22);
   doc.setTextColor(179, 139, 54); // #B38B36 (Gold)
-  doc.text('UNNATI ARTS', 105, 20, { align: 'center' });
+  doc.text('UNNATI ARTS', logoBase64 ? 120 : 105, 20, { align: 'center' });
   
   doc.setFontSize(10);
   doc.setTextColor(100, 100, 100);
-  doc.text('Fine Stone Craftsmanship', 105, 26, { align: 'center' });
+  doc.text('Fine Stone Craftsmanship', logoBase64 ? 120 : 105, 26, { align: 'center' });
   
   doc.setLineWidth(0.5);
   doc.line(20, 30, 190, 30);
@@ -72,12 +77,17 @@ export const generateReceiptPDF = (project: any, advanceAmount: number) => {
   doc.save('Receipt_' + project.projectId + '.pdf');
 };
 
-export const generateWorkOrderPDF = (project: any, advanceAmount: number) => {
+export const generateWorkOrderPDF = async (project: any, advanceAmount: number) => {
   const doc = new jsPDF();
   
+  const logoBase64 = await getBase64ImageFromUrl('/logo.png');
+  if (logoBase64) {
+    doc.addImage(logoBase64 as string, 'PNG', 15, 10, 45, 18);
+  }
+
   doc.setFontSize(22);
   doc.setTextColor(179, 139, 54);
-  doc.text('UNNATI ARTS - WORK ORDER', 105, 20, { align: 'center' });
+  doc.text('UNNATI ARTS - WORK ORDER', logoBase64 ? 125 : 105, 20, { align: 'center' });
   
   doc.setLineWidth(0.5);
   doc.line(20, 30, 190, 30);
@@ -147,16 +157,21 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   doc.setFillColor(220, 220, 220); // Light Gray
   doc.rect(20, 15, 190, 30, 'F');
   
-  // Header Text - Left (Logo substitute)
-  doc.setFontSize(36);
-  doc.setTextColor(0, 0, 0);
-  doc.setFont(undefined, 'bold');
-  doc.text('UA', 25, 36);
-  doc.setFontSize(16);
-  doc.text('Unnati', 50, 30);
-  doc.setFontSize(14);
-  doc.setFont(undefined, 'normal');
-  doc.text('Arts', 50, 36);
+  // Header Text - Left (Logo)
+  const logoBase64 = await getBase64ImageFromUrl('/logo.png');
+  if (logoBase64) {
+    doc.addImage(logoBase64 as string, 'PNG', 24, 18, 52, 24);
+  } else {
+    doc.setFontSize(36);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'bold');
+    doc.text('UA', 25, 36);
+    doc.setFontSize(16);
+    doc.text('Unnati', 50, 30);
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'normal');
+    doc.text('Arts', 50, 36);
+  }
 
   // Header Text - Right (Company Info)
   doc.setFontSize(10);

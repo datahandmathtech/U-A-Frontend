@@ -431,13 +431,35 @@ const InOutLedger: React.FC = () => {
                       return matchedSlabs.length > 1 && (
                         <TextField select label="Select Slab (Optional)" fullWidth size="small" value={split.slabId || ''} onChange={(e) => {
                           const newSplits = [...projectSplits];
-                          newSplits[idx].slabId = e.target.value;
-                          newSplits[idx].pieceIds = [];
+                          const selectedSlabId = e.target.value;
+                          newSplits[idx].slabId = selectedSlabId;
+
+                          const targetSlab = slabs?.find((s: any) => s.id === selectedSlabId);
+                          if (targetSlab && targetSlab.pieces && targetSlab.pieces.length > 0) {
+                            const logStage = selectedLog?.stage?.split(' ')[0] || '';
+                            const stageOrder = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                            const logStageIndex = stageOrder.indexOf(logStage);
+
+                            const validPieces = targetSlab.pieces.filter((p: any) => {
+                              if (logStageIndex < 0) return true;
+                              const pBaseStage = p.stage?.split(' ')[0] || '';
+                              const pStageIndex = stageOrder.indexOf(pBaseStage);
+                              if (pStageIndex > logStageIndex) return false;
+                              if (pStageIndex === logStageIndex && p.status?.toLowerCase() === 'completed') return false;
+                              return true;
+                            });
+
+                            newSplits[idx].pieceIds = validPieces.slice(0, split.qty || validPieces.length).map((p: any) => p.id);
+                          } else {
+                            newSplits[idx].pieceIds = [];
+                          }
                           setProjectSplits(newSplits);
                         }}>
                           <MenuItem value="">-- Clear Selection --</MenuItem>
                           {matchedSlabs.map((s: any) => (
-                            <MenuItem key={s.id} value={s.id}>Slab: {s.name} {s.size ? `(${s.size})` : ''}</MenuItem>
+                            <MenuItem key={s.id} value={s.id}>
+                              Slab: {s.name} ({s.pieces?.length || 0} pcs) {s.size && s.size.trim() !== '0L x 0W' ? `- ${s.size}` : ''}
+                            </MenuItem>
                           ))}
                         </TextField>
                       );

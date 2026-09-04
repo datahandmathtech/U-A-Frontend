@@ -70,13 +70,21 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
       display: 'flex',
       flexDirection: 'column'
     }}>
-      <Toolbar sx={{ display: 'flex', alignItems: 'center', p: 3, mt: 1 }}>
-        <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1, borderRadius: 2, mr: 2 }}>
-          <ShieldIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-        </Box>
-        <Box>
-           <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#FFFFFF', lineHeight: 1.1 }}>UNNATI ARTS</Typography>
-           <Typography variant="caption" sx={{ color: 'primary.main', letterSpacing: 1 }}>ENTERPRISE</Typography>
+      <Toolbar sx={{ display: 'flex', alignItems: 'center', px: 2, py: 2, mt: 0.5 }}>
+        <Box 
+          sx={{ 
+            bgcolor: '#FFFFFF', 
+            px: 2, 
+            py: 1, 
+            borderRadius: 3, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            width: '100%',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)' 
+          }}
+        >
+          <img src="/logo.png" alt="Unnati Arts" style={{ height: 38, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
         </Box>
       </Toolbar>
       
