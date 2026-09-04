@@ -173,7 +173,7 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                   <ListItemText primary={pageType === 'crm' ? "← Back to Pipeline" : "← Back to Projects"} />
                 </MenuItem>
                 
-                {!project?.isDirectWorkOrder && (
+                {!(project?.isDirectWorkOrder || (project && project.quotations && project.quotations.length === 0 && !['enquiry', 'design_sharing', 'quotation', 'advance_payment'].includes(project.status))) && (
                   <>
                     <Divider />
                     <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
