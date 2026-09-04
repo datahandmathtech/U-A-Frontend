@@ -443,49 +443,52 @@ const InOutLedger: React.FC = () => {
                       );
                     })()}
 
-                    {split.slabId && slabs && (
-                      <FormControl fullWidth size="small">
-                        <InputLabel>Select Piece(s)</InputLabel>
-                        <Select multiple value={split.pieceIds || []} onChange={(e) => {
-                          const val = e.target.value as string[];
-                          const newSplits = [...projectSplits];
-                          newSplits[idx].pieceIds = val;
-                          newSplits[idx].qty = val.length > 0 ? val.length : newSplits[idx].qty;
-                          setProjectSplits(newSplits);
-                        }} input={<OutlinedInput label="Select Piece(s)" />} renderValue={(selected: any) => {
-                          if (!selected || selected.length === 0) return <em>Select Pieces</em>;
-                          const slab = slabs.find((s: any) => s.id === split.slabId);
-                          return selected.map((id: string) => {
-                            const piece = slab?.pieces?.find((p: any) => p.id === id);
-                            return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id;
-                          }).join(', ');
-                        }}>
-                          {(() => {
-                            const slab = slabs.find((s: any) => s.id === split.slabId);
-                            if (!slab || !slab.pieces) return null;
-                            const logStage = selectedLog?.stage?.split(' ')[0] || '';
-                            const stageOrder = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                            const logStageIndex = stageOrder.indexOf(logStage);
-                            
-                            const validPieces = slab.pieces.filter((p: any) => {
-                              if (logStageIndex < 0) return true;
-                              const pBaseStage = p.stage?.split(' ')[0] || '';
-                              const pStageIndex = stageOrder.indexOf(pBaseStage);
-                              if (pStageIndex > logStageIndex) return false;
-                              if (pStageIndex === logStageIndex && p.status?.toLowerCase() === 'completed') return false;
-                              return true;
-                            });
+                    {(() => {
+                      if (!split.slabId || !slabs) return null;
+                      const slab = slabs.find((s: any) => s.id === split.slabId);
+                      if (!slab || !slab.pieces || slab.pieces.length === 0) return null;
 
-                            return validPieces.map((p: any) => (
+                      const logStage = selectedLog?.stage?.split(' ')[0] || '';
+                      const stageOrder = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                      const logStageIndex = stageOrder.indexOf(logStage);
+                      
+                      const validPieces = slab.pieces.filter((p: any) => {
+                        if (logStageIndex < 0) return true;
+                        const pBaseStage = p.stage?.split(' ')[0] || '';
+                        const pStageIndex = stageOrder.indexOf(pBaseStage);
+                        if (pStageIndex > logStageIndex) return false;
+                        if (pStageIndex === logStageIndex && p.status?.toLowerCase() === 'completed') return false;
+                        return true;
+                      });
+
+                      if (validPieces.length === 0) return null;
+
+                      return (
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Select Piece(s)</InputLabel>
+                          <Select multiple value={split.pieceIds || []} onChange={(e) => {
+                            const val = e.target.value as string[];
+                            const newSplits = [...projectSplits];
+                            newSplits[idx].pieceIds = val;
+                            newSplits[idx].qty = val.length > 0 ? val.length : newSplits[idx].qty;
+                            setProjectSplits(newSplits);
+                          }} input={<OutlinedInput label="Select Piece(s)" />} renderValue={(selected: any) => {
+                            if (!selected || selected.length === 0) return <em>Select Pieces</em>;
+                            return selected.map((id: string) => {
+                              const piece = slab.pieces.find((p: any) => p.id === id);
+                              return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id;
+                            }).join(', ');
+                          }}>
+                            {validPieces.map((p: any) => (
                               <MenuItem key={p.id} value={p.id}>
                                 <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
                                 <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber} - ${p.stage}`} />
                               </MenuItem>
-                            ));
-                          })()}
-                        </Select>
-                      </FormControl>
-                    )}
+                            ))}
+                          </Select>
+                        </FormControl>
+                      );
+                    })()}
 
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
