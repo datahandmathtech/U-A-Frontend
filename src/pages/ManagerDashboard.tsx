@@ -211,6 +211,7 @@ const ManagerDashboard: React.FC = () => {
   const [redoSubmitting, setRedoSubmitting] = useState(false);
 
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   
@@ -969,7 +970,8 @@ const ManagerDashboard: React.FC = () => {
                       <Box 
                         component="img" 
                         src={log.startPhotos?.machine || log.startPhotos?.unit} 
-                        sx={{ width: 48, height: 48, borderRadius: 2, objectFit: 'cover', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }} 
+                        onClick={() => setPreviewPhoto(log.startPhotos?.machine || log.startPhotos?.unit)}
+                        sx={{ width: 48, height: 48, borderRadius: 2, objectFit: 'cover', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer' }} 
                       />
                     )}
                     <Box>
@@ -1217,6 +1219,19 @@ const ManagerDashboard: React.FC = () => {
             Capture Photo
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Preview Photo Dialog */}
+      <Dialog open={!!previewPhoto} onClose={() => setPreviewPhoto(null)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Photo Preview
+          <IconButton onClick={() => setPreviewPhoto(null)}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ textAlign: 'center', p: 3 }}>
+          {previewPhoto && (
+            <img src={previewPhoto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '8px' }} />
+          )}
+        </DialogContent>
       </Dialog>
     </Box>
     </Box>
