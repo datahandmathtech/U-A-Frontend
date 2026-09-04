@@ -45,18 +45,23 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
   const dbStep = project ? getStepIndex(project.status) : 0;
 
   const renderMenuItem = (label: string, stepIndex: number, viewParam: number) => {
-    const isCompleted = dbStep > stepIndex;
+    const isDirectSkipped = project?.isDirectWorkOrder && stepIndex < 5;
+    const isCompleted = !isDirectSkipped && dbStep > stepIndex;
     const isCurrent = dbStep === stepIndex;
     
     return (
       <MenuItem onClick={() => { handleMenuClose(); navigate(`/${isProjectActive ? 'projects' : 'crm'}/${projectId}?view=${viewParam}`); }} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.5, pl: 3 }}>
          {isCompleted ? <CheckCircleIcon color="success" fontSize="small" sx={{ mt: 0.2 }} /> : isCurrent ? <RadioButtonCheckedIcon color="primary" fontSize="small" sx={{ mt: 0.2 }} /> : <RadioButtonUncheckedIcon color="disabled" fontSize="small" sx={{ mt: 0.2 }} />}
          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="body2" fontWeight={isCurrent ? 'bold' : 'medium'} color={isCompleted || isCurrent ? 'text.primary' : 'text.secondary'}>{label}</Typography>
+            <Typography variant="body2" fontWeight={isCurrent ? 'bold' : 'medium'} color={isCompleted || isCurrent ? 'text.primary' : 'text.secondary'}>
+              {label}
+            </Typography>
             {isCompleted ? (
               <Typography variant="caption" color="success.main">Completed</Typography>
             ) : isCurrent ? (
               <Typography variant="caption" color="primary.main">In Progress</Typography>
+            ) : isDirectSkipped ? (
+              <Typography variant="caption" color="text.disabled">Skipped (Direct Work Order)</Typography>
             ) : null}
          </Box>
       </MenuItem>
@@ -173,30 +178,26 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                   <ListItemText primary={pageType === 'crm' ? "← Back to Pipeline" : "← Back to Projects"} />
                 </MenuItem>
                 
-                {!(project?.isDirectWorkOrder || (project && project.quotations && project.quotations.length === 0 && !['enquiry', 'design_sharing', 'quotation', 'advance_payment'].includes(project.status))) && (
-                  <>
-                    <Divider />
-                    <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
-                      <Box 
-                        onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}`); }} 
-                        sx={{ flexGrow: 1, py: 1, pl: 2, cursor: 'pointer' }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>CRM Details</Typography>
-                      </Box>
-                      <IconButton onClick={(e) => { e.stopPropagation(); handleCrmToggle(e); }} size="small" sx={{ mr: 1 }}>
-                        {crmOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                      </IconButton>
-                    </MenuItem>
-                    <Collapse in={crmOpen} timeout="auto" unmountOnExit>
-                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        {renderMenuItem("Enquiry Details", 0, 0)}
-                        {renderMenuItem("Reference Design", 1, 1)}
-                        {renderMenuItem("Costing & Quotation", 2, 2)}
-                        {renderMenuItem("Advance Payment", 3, 3)}
-                      </Box>
-                    </Collapse>
-                  </>
-                )}
+                <Divider />
+                <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
+                  <Box 
+                    onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}`); }} 
+                    sx={{ flexGrow: 1, py: 1, pl: 2, cursor: 'pointer' }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>CRM Details</Typography>
+                  </Box>
+                  <IconButton onClick={(e) => { e.stopPropagation(); handleCrmToggle(e); }} size="small" sx={{ mr: 1 }}>
+                    {crmOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                  </IconButton>
+                </MenuItem>
+                <Collapse in={crmOpen} timeout="auto" unmountOnExit>
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    {renderMenuItem("Enquiry Details", 0, 0)}
+                    {renderMenuItem("Reference Design", 1, 1)}
+                    {renderMenuItem("Costing & Quotation", 2, 2)}
+                    {renderMenuItem("Advance Payment", 3, 3)}
+                  </Box>
+                </Collapse>
 
                 {isProjectActive && (
                   <>
