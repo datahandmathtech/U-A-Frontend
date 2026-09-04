@@ -75,18 +75,16 @@ const Projects: React.FC = () => {
         if (formData.length && formData.width && formData.totalPieces > 0) {
            await createSlab({
              projectId: createdProject.id,
-             data: {
-               name: formData.description || 'Direct Slab',
+             name: formData.description || 'Direct Slab',
+             size: `${formData.length}L x ${formData.width}W${formData.thickness ? ` | ${formData.thickness}MM` : ''}`,
+             cost: 0,
+             requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'],
+             pieces: Array.from({ length: parseInt(formData.totalPieces) }).map((_, i) => ({
+               pieceNumber: i + 1,
                size: `${formData.length}L x ${formData.width}W${formData.thickness ? ` | ${formData.thickness}MM` : ''}`,
-               cost: 0,
-               requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'],
-               pieces: Array.from({ length: parseInt(formData.totalPieces) }).map((_, i) => ({
-                 pieceNumber: i + 1,
-                 size: `${formData.length}L x ${formData.width}W${formData.thickness ? ` | ${formData.thickness}MM` : ''}`,
-                 status: 'pending',
-                 stage: 'Production'
-               }))
-             }
+               status: 'pending',
+               stage: 'Production'
+             }))
            }).unwrap();
         }
         
