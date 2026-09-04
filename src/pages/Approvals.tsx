@@ -185,6 +185,7 @@ const Approvals: React.FC = () => {
         </Paper>
       ) : (
         <Box>
+          {(() => {
             const combinedPendingLogs = (() => {
               if (!pendingLogs) return [];
               return (pendingLogs || [])
