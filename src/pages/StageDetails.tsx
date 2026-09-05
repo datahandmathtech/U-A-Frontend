@@ -84,20 +84,65 @@ const StageDetails = () => {
   };
 
   const handlePieceChange = (index: number, field: string, value: number | string) => {
-    const newData = [...piecesData];
-    newData[index] = { ...newData[index], [field]: value };
-    setPiecesData(newData);
+    setPiecesData(prev => {
+      const newData = [...prev];
+      newData[index] = { ...newData[index], [field]: value };
+      return newData;
+    });
   };
 
   const handleSavePieces = async () => {
     setIsSaving(true);
+    
+    // --- SIZE VALIDATION ---
+    let slabArea = 0;
+    if (slab.size) {
+      const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/i);
+      const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/i);
+      if (lMatch && wMatch) {
+        slabArea = parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
+      }
+    }
+
+    if (slabArea > 0) {
+      let existingArea = 0;
+      (slab.pieces || []).forEach((p: any) => {
+        if (p.size) {
+           const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
+           const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
+           if (lMatch && wMatch) {
+             existingArea += parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
+           }
+        }
+      });
+
+      const newArea = piecesData.reduce((sum, p) => sum + ((p.l || 0) * (p.w || 0)), 0);
+      
+      // Round to 2 decimal places to avoid floating point precision issues
+      const totalArea = Math.round((existingArea + newArea) * 100) / 100;
+      const roundedSlabArea = Math.round(slabArea * 100) / 100;
+
+      if (totalArea > roundedSlabArea) {
+        alert(`Cannot add pieces. Total size exceeds original slab size.\nSlab Size: ${roundedSlabArea.toFixed(2)}\nUsed Size: ${existingArea.toFixed(2)}\nNew Pieces Size: ${newArea.toFixed(2)}\nRemaining: ${(roundedSlabArea - existingArea).toFixed(2)}`);
+        setIsSaving(false);
+        return;
+      }
+    }
+    // --- END VALIDATION ---
+
     try {
-      const formattedPieces = piecesData.map(p => ({
-        name: p.name,
-        size: p.t ? `${p.l}L x ${p.w}W | ${p.t}MM` : `${p.l}L x ${p.w}W`,
-        length: p.l,
-        width: p.w,
-      }));
+      const formattedPieces = piecesData.map(p => {
+        const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
+        const finalName = p.pieceNumber ? `${base}.${p.pieceNumber}` : (p.name || base);
+        return {
+          name: finalName,
+          pieceNumber: (p.pieceNumber && !isNaN(Number(p.pieceNumber))) ? Number(p.pieceNumber) : undefined,
+          size: p.t ? `${p.l}L x ${p.w}W | ${p.t}MM` : `${p.l}L x ${p.w}W`,
+          length: p.l,
+          width: p.w,
+          thickness: p.t
+        };
+      });
       await addPieces({ 
         slabId: slab.id, 
         data: { 
@@ -177,6 +222,44 @@ const StageDetails = () => {
 
   const handleEditPieceSave = async () => {
     if (!editingPiece) return;
+    
+    // --- SIZE VALIDATION ---
+    let slabArea = 0;
+    if (slab.size) {
+      const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/i);
+      const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/i);
+      if (lMatch && wMatch) slabArea = parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
+    }
+    
+    if (slabArea > 0) {
+      let otherPiecesArea = 0;
+      (slab.pieces || []).forEach((p: any) => {
+        if (p.id !== editingPiece.id && p.size) {
+           const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
+           const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
+           if (lMatch && wMatch) {
+             otherPiecesArea += parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
+           }
+        }
+      });
+      
+      let newArea = 0;
+      if (editingPiece.size) {
+         const lMatch = editingPiece.size.match(/(\d+(?:\.\d+)?)L/i);
+         const wMatch = editingPiece.size.match(/(\d+(?:\.\d+)?)W/i);
+         if (lMatch && wMatch) newArea = parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
+      }
+      
+      const totalArea = Math.round((otherPiecesArea + newArea) * 100) / 100;
+      const roundedSlabArea = Math.round(slabArea * 100) / 100;
+
+      if (totalArea > roundedSlabArea) {
+         alert(`Cannot update piece. Total size exceeds original slab size.\nSlab Size: ${roundedSlabArea.toFixed(2)}\nOther Pieces Size: ${otherPiecesArea.toFixed(2)}\nThis Piece Size: ${newArea.toFixed(2)}\nRemaining: ${(roundedSlabArea - otherPiecesArea).toFixed(2)}`);
+         return;
+      }
+    }
+    // --- END VALIDATION ---
+
     try {
       const { id, ...data } = editingPiece;
       await updatePiece({ id, data }).unwrap();
@@ -245,7 +328,18 @@ const StageDetails = () => {
                 {String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim()}
              </Typography>
           </TableCell>
-          <TableCell sx={{ whiteSpace: 'nowrap' }}>{p.size ? String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : 'N/A'}</TableCell>
+          <TableCell sx={{ whiteSpace: 'nowrap' }}>
+            {p.sourceMaterial?.inventory ? (
+              <Typography fontWeight="bold" sx={{ color: '#0284C7' }}>
+                {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
+              </Typography>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 'bold', pl: 1 }}>-</Typography>
+            )}
+          </TableCell>
+          <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>
+            {p.size ? String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : 'N/A'}
+          </TableCell>
           {stageFormatted === 'Production' && (
             <>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>{startDate}</TableCell>
@@ -358,24 +452,48 @@ const StageDetails = () => {
           </Box>
         </Box>
         {stageFormatted === 'Production' && (
-          <Tooltip title="Do you want to cut this slab into pieces?" arrow placement="left">
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#F5F8FF', p: 1.5, px: 3, borderRadius: 3, border: '1px solid #D0D9EB', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+            <Typography variant="h6" fontWeight="900" color="#1A3B70">
+              Break Slab ?
+            </Typography>
             <ToggleButtonGroup
-              color="primary"
               value={cutPiecesOption}
               exclusive
               onChange={(e, val) => {
-                if (val !== null) {
-                  setCutPiecesOption(val);
-                } else {
-                  setCutPiecesOption(null);
+                if (val !== null) setCutPiecesOption(val);
+                else setCutPiecesOption(null);
+              }}
+              sx={{ 
+                bgcolor: 'white', 
+                '& .MuiToggleButton-root': { 
+                  py: 0.5, 
+                  px: 4, 
+                  fontWeight: '900', 
+                  border: '1px solid #D0D9EB',
+                  color: '#666',
+                  transition: 'all 0.2s'
+                },
+                '& .MuiToggleButton-root:hover': {
+                  bgcolor: '#EBF0FA'
+                },
+                '& .MuiToggleButton-root[value="yes"].Mui-selected': {
+                  bgcolor: '#2e7d32',
+                  color: 'white !important',
+                  borderColor: '#2e7d32',
+                  boxShadow: '0 2px 6px rgba(46,125,50,0.3)'
+                },
+                '& .MuiToggleButton-root[value="no"].Mui-selected': {
+                  bgcolor: '#1976d2',
+                  color: 'white !important',
+                  borderColor: '#1976d2',
+                  boxShadow: '0 2px 6px rgba(25,118,210,0.3)'
                 }
               }}
-              sx={{ bgcolor: 'white' }}
             >
-              <ToggleButton value="yes" sx={{ px: 4, fontWeight: 'bold' }}>YES</ToggleButton>
-              <ToggleButton value="no" sx={{ px: 4, fontWeight: 'bold' }}>NO</ToggleButton>
+              <ToggleButton value="yes">YES</ToggleButton>
+              <ToggleButton value="no">NO</ToggleButton>
             </ToggleButtonGroup>
-          </Tooltip>
+          </Box>
         )}
       </Box>
 
@@ -446,11 +564,12 @@ const StageDetails = () => {
               <Table size="small">
                   <TableHead sx={{ bgcolor: '#F5F5F5' }}>
                     <TableRow>
-                        <TableCell sx={{ fontWeight: 'bold' }}>Piece Name</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>Length (L)</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>Width (W)</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>Thickness (MM)</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>Total Area (L x W)</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', width: '28%' }}>Piece Name</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Serial No</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Length (L)</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Width (W)</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Thickness (MM)</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Total Area (L x W)</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }} align="center">Action</TableCell>
                     </TableRow>
                   </TableHead>
@@ -460,10 +579,30 @@ const StageDetails = () => {
                         <TableCell>
                           <TextField 
                             size="small" 
-                            value={p.name}
-                            onChange={(e) => handlePieceChange(idx, 'name', e.target.value)}
+                            value={p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name)}
+                            onChange={(e) => {
+                              const newBase = e.target.value;
+                              handlePieceChange(idx, 'baseName', newBase);
+                              handlePieceChange(idx, 'name', `${newBase}.${p.pieceNumber}`);
+                            }}
                             fullWidth
+                            placeholder="Piece Name"
                             sx={{ bgcolor: 'white' }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <TextField 
+                            size="small" 
+                            type="text" 
+                            value={p.pieceNumber !== undefined ? p.pieceNumber : ''}
+                            onChange={(e) => {
+                              const newNum = e.target.value;
+                              handlePieceChange(idx, 'pieceNumber', newNum);
+                              const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
+                              handlePieceChange(idx, 'name', `${base}.${newNum}`);
+                            }}
+                            sx={{ width: 85, bgcolor: 'white' }}
+                            placeholder="e.g. 1A"
                           />
                         </TableCell>
                         <TableCell>
@@ -513,12 +652,15 @@ const StageDetails = () => {
                     if (existingPieces.length > 0) {
                       maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
                     }
+                    let lastPieceNum = parseInt(piecesData[piecesData.length - 1]?.pieceNumber as any);
+                    if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
                     
-                    const lastPieceNum = piecesData[piecesData.length - 1]?.pieceNumber || maxNum;
+                    const nextNum = lastPieceNum + 1;
                     setPiecesData([...piecesData, { 
-                      pieceNumber: lastPieceNum + 1,
-                      name: `${slab.name}.${lastPieceNum + 1}`,
-                      l: 0, w: 0 
+                      pieceNumber: nextNum,
+                      baseName: slab.name,
+                      name: `${slab.name}.${nextNum}`,
+                      l: 0, w: 0, t: 0
                     }]);
                   }}>
                     + Add 1 Piece
@@ -541,13 +683,18 @@ const StageDetails = () => {
                         if (existingPieces.length > 0) {
                           maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
                         }
-                        const lastPieceNum = piecesData[piecesData.length - 1]?.pieceNumber || maxNum;
+                        let lastPieceNum = parseInt(piecesData[piecesData.length - 1]?.pieceNumber as any);
+                        if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
                         
-                        const newPieces = Array.from({ length: count }).map((_, idx) => ({
-                          pieceNumber: lastPieceNum + idx + 1,
-                          name: `${slab.name}.${lastPieceNum + idx + 1}`,
-                          l: 0, w: 0
-                        }));
+                        const newPieces = Array.from({ length: count }).map((_, idx) => {
+                          const nextNum = lastPieceNum + idx + 1;
+                          return {
+                            pieceNumber: nextNum,
+                            baseName: slab.name,
+                            name: `${slab.name}.${nextNum}`,
+                            l: 0, w: 0, t: 0
+                          };
+                        });
                         setPiecesData([...piecesData, ...newPieces]);
                         qtyInput.value = '';
                       }
@@ -726,7 +873,8 @@ const StageDetails = () => {
                 <TableRow>
                   {stageFormatted === 'Production' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Machine Name</TableCell>}
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Product Name</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Size (L x W)</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Used Slab</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Actual Size</TableCell>
                   {stageFormatted === 'Production' && (
                     <>
                       <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Start Time</TableCell>

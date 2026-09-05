@@ -17,8 +17,34 @@ const InventoryLedger = () => {
 
   if (isLoadingInv || isLoadingLogs) return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
 
-  // Filter inventory by supplier
-  const supplierInventory = (allInventory || []).filter((item: any) => item.supplier === decodedSupplier);
+  // Filter inventory by supplier or project
+  const supplierInventory = (allInventory || []).filter((item: any) => {
+    if (item.supplier && item.supplier.toLowerCase() === decodedSupplier.toLowerCase()) return true;
+    const proj1 = item.projectMaterials?.[0]?.project;
+    const proj2 = item.slabs?.[0]?.project;
+    const p = proj1 || proj2;
+    if (p) {
+      const projDisplay = `${p.projectId ? p.projectId + ' – ' : ''}${p.name}`.toLowerCase();
+      const projDisplayDash = `${p.projectId ? p.projectId + ' - ' : ''}${p.name}`.toLowerCase();
+      const dec = decodedSupplier.toLowerCase();
+      if (
+        projDisplay === dec ||
+        projDisplayDash === dec ||
+        (p.name && p.name.toLowerCase() === dec) ||
+        (p.projectId && p.projectId.toLowerCase() === dec) ||
+        p.id === decodedSupplier ||
+        (p.clientName && p.clientName.toLowerCase() === dec)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  const projectInfo = supplierInventory[0]?.projectMaterials?.[0]?.project || supplierInventory[0]?.slabs?.[0]?.project;
+  const pageTitle = projectInfo 
+    ? (projectInfo.projectId ? `${projectInfo.projectId} – ${projectInfo.name}` : projectInfo.name)
+    : decodedSupplier;
 
   // Calculate used quantity for each inventory item
   const inventoryStats = supplierInventory.map((item: any) => {
@@ -41,15 +67,32 @@ const InventoryLedger = () => {
     const wb = XLSX.utils.book_new();
 
     // 1. Create Summary Sheet
-    const summaryData = inventoryStats.map((item: any) => ({
-      'Date': new Date(item.createdAt).toLocaleDateString(),
-      'Material Name': item.itemName || '',
-      'Block No': item.blockNumber || 'N/A',
-      'L x W x T': item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A',
-      'Procure': `${item.procure.toFixed(2)} ${item.unit}`,
-      'Used': `${item.used.toFixed(2)} ${item.unit}`,
-      'Balance': `${item.balance.toFixed(2)} ${item.unit}`
-    }));
+    const summaryData = inventoryStats.map((item: any) => {
+      let detectedUnit = 'Inches';
+      if (item?.length && item?.width && item?.procure) {
+        const sqFtFromInches = (Number(item.length) * Number(item.width)) / 144;
+        if (Math.abs(sqFtFromInches - Number(item.procure)) < 0.05) {
+          detectedUnit = 'Inches';
+        } else if (Math.abs((Number(item.length) * Number(item.width)) - Number(item.procure)) < 0.05) {
+          detectedUnit = 'Sq. Feet';
+        } else if (item.unit === 'sq_ft' || item.unit === 'feet') {
+          detectedUnit = 'Sq. Feet';
+        }
+      } else if (item?.unit === 'sq_ft' || item?.unit === 'feet') {
+        detectedUnit = 'Sq. Feet';
+      }
+
+      return {
+        'Date': new Date(item.createdAt).toLocaleDateString(),
+        'Material Name': item.itemName || '',
+        'Block No': item.blockNumber || 'N/A',
+        'Unit': detectedUnit,
+        'L x W x T': item.type !== 'consumable' ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}` : 'N/A',
+        'Procure': `${item.procure.toFixed(2)}`,
+        'Used': `${item.used.toFixed(2)}`,
+        'Balance': `${item.balance.toFixed(2)}`
+      };
+    });
     
     const summaryWs = XLSX.utils.json_to_sheet(summaryData);
     
@@ -58,6 +101,7 @@ const InventoryLedger = () => {
       {wch: 12}, // Date
       {wch: 20}, // Material Name
       {wch: 10}, // Block No
+      {wch: 10}, // Unit
       {wch: 20}, // L x W x T
       {wch: 15}, // Procure
       {wch: 15}, // Used
@@ -126,7 +170,7 @@ const InventoryLedger = () => {
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h4" sx={{ color: '#333', mb: 1 }}>{decodedSupplier}</Typography>
+          <Typography variant="h4" sx={{ color: '#333', mb: 1 }}>{pageTitle}</Typography>
           <Typography variant="subtitle1" color="text.secondary">Inventory Items Summary</Typography>
         </Box>
         <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportExcel} color="primary" sx={{ fontWeight: 'bold' }}>
@@ -141,6 +185,7 @@ const InventoryLedger = () => {
               <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Material Name</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Block No</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Unit</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>L x W x T</TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>Procure</TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: 'error.main' }}>Used</TableCell>
@@ -150,26 +195,44 @@ const InventoryLedger = () => {
           </TableHead>
           <TableBody>
             {inventoryStats.length === 0 ? (
-              <TableRow><TableCell colSpan={8} align="center">No items found for this supplier.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} align="center">No items found.</TableCell></TableRow>
             ) : (
-              inventoryStats.map((item: any) => (
+              inventoryStats.map((item: any) => {
+                let detectedUnit = 'Inches';
+                if (item?.length && item?.width && item?.procure) {
+                  const sqFtFromInches = (Number(item.length) * Number(item.width)) / 144;
+                  if (Math.abs(sqFtFromInches - Number(item.procure)) < 0.05) {
+                    detectedUnit = 'Inches';
+                  } else if (Math.abs((Number(item.length) * Number(item.width)) - Number(item.procure)) < 0.05) {
+                    detectedUnit = 'Sq. Feet';
+                  } else if (item.unit === 'sq_ft' || item.unit === 'feet') {
+                    detectedUnit = 'Sq. Feet';
+                  }
+                } else if (item?.unit === 'sq_ft' || item?.unit === 'feet') {
+                  detectedUnit = 'Sq. Feet';
+                }
+
+                return (
                 <TableRow key={item.id} hover sx={{ cursor: 'pointer', transition: 'bgcolor 0.2s', '&:hover': { bgcolor: '#f5f5f5' } }} onClick={() => navigate(`/inventory/item/${item.id}`)}>
                   <TableCell>{new Date(item.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>{item.itemName}</TableCell>
                   <TableCell>{item.blockNumber || 'N/A'}</TableCell>
+                  <TableCell sx={{ fontWeight: 500, color: 'primary.main' }}>
+                    {detectedUnit}
+                  </TableCell>
                   <TableCell>
                     {item.type !== 'consumable' 
                       ? `${item.length || 0} x ${item.width || 0} x ${item.thickness || 0}`
                       : 'N/A'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                    {item.procure.toFixed(2)} {item.unit}
+                    {item.procure.toFixed(2)}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                    {item.used.toFixed(2)} {item.unit}
+                    {item.used.toFixed(2)}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                    {item.balance.toFixed(2)} {item.unit}
+                    {item.balance.toFixed(2)}
                   </TableCell>
                   <TableCell align="center">
                     <Button variant="outlined" size="small" endIcon={<VisibilityIcon />}>
@@ -177,8 +240,9 @@ const InventoryLedger = () => {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              );
+            })
+          )}
           </TableBody>
         </Table>
       </TableContainer>

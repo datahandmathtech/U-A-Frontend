@@ -73,19 +73,19 @@ const ManagerDashboard: React.FC = () => {
   const [machineClockOut, { isLoading: clockingOut }] = useMachineClockOutMutation();
   const [createMaterialLog, { isLoading: creatingMaterial }] = useCreateMaterialLogMutation();
   const { data: activeMachineLogs, refetch: refetchMachineLogs } = useGetDailyMachineLogsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 2000,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: staffList } = useGetStaffListQuery();
   const { data: vendorsList } = useGetVendorsQuery();
   const { data: activeOutLogs, refetch: refetchActiveOutLogs } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 2000,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: rejectedLogs, refetch: refetchRejectedLogs } = useGetRejectedLogsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 2000,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });

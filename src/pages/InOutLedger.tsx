@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Card, CardContent, Chip, CircularProgress, Grid, CardMedia, Dialog, Button, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select, OutlinedInput, Checkbox, ListItemText, Snackbar, Alert, IconButton, FormControlLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab } from '@mui/material';
+import { Box, Typography, Paper, Card, CardContent, Chip, CircularProgress, Grid, CardMedia, Dialog, Button, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select, OutlinedInput, Checkbox, ListItemText, Snackbar, Alert, IconButton, FormControlLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Autocomplete } from '@mui/material';
 import VendorsList from './VendorsList';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import OutputIcon from '@mui/icons-material/Output';
@@ -18,16 +18,20 @@ import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 
 const InOutLedger: React.FC = () => {
   const { data: activeOutLogsData, isLoading: outLogsLoading, refetch } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 2000,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: pendingLogs, isLoading: pendingLoading } = useGetPendingApprovalsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 2000,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
-  const { data: approvedLogsData, isLoading: approvedLoading } = useGetApprovedLogsQuery(undefined);
+  const { data: approvedLogsData, isLoading: approvedLoading } = useGetApprovedLogsQuery(undefined, {
+    pollingInterval: 2000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true
+  });
   const { data: projects } = useGetProjectsQuery();
   const [approveLog, { isLoading: isApproving }] = useApproveMaterialLogMutation();
   const [deleteProductionLog] = useDeleteProductionLogMutation();
@@ -82,7 +86,7 @@ const InOutLedger: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
   const [selectedFY, setSelectedFY] = useState<string>(currentFY);
 
-  const activeProjectId = projectSplits[0]?.projectId;
+  const activeProjectId = projectSplits.find(s => !!s.projectId)?.projectId || selectedLog?.projectId;
   const { data: slabs } = useGetSlabsQuery(activeProjectId, { skip: !activeProjectId });
 
   const handleApproveClick = async (log: any) => {
@@ -383,142 +387,207 @@ const InOutLedger: React.FC = () => {
               <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4, p: 2, border: '1px solid #eee', borderRadius: 2 }}>
 
 
-                <TextField select label="Assign Project" fullWidth size="small" value={split.projectId} onChange={(e) => {
-                  const newSplits = [...projectSplits];
-                  newSplits[idx].projectId = e.target.value;
-                  const proj = projects?.find((p: any) => p.id === e.target.value);
-                  const defaultSlabProd = proj?.products?.find((p: any) => p.category.toLowerCase() === 'slab');
-                  if (defaultSlabProd) {
-                    newSplits[idx].productId = defaultSlabProd.id;
-                    newSplits[idx].productName = defaultSlabProd.category;
-                    const matchedSlabs = slabs ? slabs.filter((s: any) => s.projectId === e.target.value && s.name.startsWith(defaultSlabProd.category)) : [];
-                    if (matchedSlabs.length === 1) {
-                      newSplits[idx].slabId = matchedSlabs[0].id;
-                    } else {
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <TextField 
+                    select 
+                    label="Assign Project" 
+                    fullWidth 
+                    size="small" 
+                    value={split.projectId} 
+                    onChange={(e) => {
+                      const newSplits = [...projectSplits];
+                      newSplits[idx].projectId = e.target.value;
+                      newSplits[idx].productId = '';
+                      newSplits[idx].productName = '';
                       newSplits[idx].slabId = '';
-                    }
-                  } else {
-                    newSplits[idx].productId = '';
-                    newSplits[idx].productName = '';
-                    newSplits[idx].slabId = '';
-                  }
-                  newSplits[idx].pieceIds = [];
-                  setProjectSplits(newSplits);
-                }}>
-                  <MenuItem value="" disabled>Select Project</MenuItem>
-                  {projects?.map((p: any) => (
-                    <MenuItem key={p.id} value={p.id}>{p.projectId} - {p.clientName}</MenuItem>
-                  ))}
-                </TextField>
-
-                <TextField label="Quantity to Apply" type="number" fullWidth size="small" value={split.qty || ''} onChange={(e) => {
-                  const newSplits = [...projectSplits];
-                  newSplits[idx].qty = Number(e.target.value);
-                  setProjectSplits(newSplits);
-                }} />
-
-
-                    {(() => {
-                      const matchedSlabs = split.projectId ? projectSlabs.filter((s: any) => {
-                        if (split.productName && !s.name.startsWith(split.productName)) return false;
-                        const logStage = selectedLog?.stage?.split(' ')[0] || '';
-                        const stageOrder = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                        const logStageIndex = stageOrder.indexOf(logStage);
-                        if (s.pieces && s.pieces.length > 0 && logStageIndex >= 0) {
-                          const allPassed = s.pieces.every((p: any) => {
-                            const pBaseStage = p.stage?.split(' ')[0] || '';
-                            const pStageIndex = stageOrder.indexOf(pBaseStage);
-                            if (pStageIndex > logStageIndex) return true;
-                            if (pStageIndex === logStageIndex && p.status?.toLowerCase() === 'completed') return true;
-                            return false;
-                          });
-                          if (allPassed) return false;
-                        }
-                        return true;
-                      }) : [];
-                      return matchedSlabs.length > 1 && (
-                        <TextField select label="Select Slab (Optional)" fullWidth size="small" value={split.slabId || ''} onChange={(e) => {
-                          const newSplits = [...projectSplits];
-                          const selectedSlabId = e.target.value;
-                          newSplits[idx].slabId = selectedSlabId;
-
-                          const targetSlab = slabs?.find((s: any) => s.id === selectedSlabId);
-                          if (targetSlab && targetSlab.pieces && targetSlab.pieces.length > 0) {
-                            const logStage = selectedLog?.stage?.split(' ')[0] || '';
-                            const stageOrder = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                            const logStageIndex = stageOrder.indexOf(logStage);
-
-                            const validPieces = targetSlab.pieces.filter((p: any) => {
-                              if (logStageIndex < 0) return true;
-                              const pBaseStage = p.stage?.split(' ')[0] || '';
-                              const pStageIndex = stageOrder.indexOf(pBaseStage);
-                              if (pStageIndex > logStageIndex) return false;
-                              if (pStageIndex === logStageIndex && p.status?.toLowerCase() === 'completed') return false;
-                              return true;
-                            });
-
-                            newSplits[idx].pieceIds = validPieces.slice(0, split.qty || validPieces.length).map((p: any) => p.id);
-                          } else {
-                            newSplits[idx].pieceIds = [];
-                          }
-                          setProjectSplits(newSplits);
-                        }}>
-                          <MenuItem value="">-- Clear Selection --</MenuItem>
-                          {matchedSlabs.map((s: any) => (
-                            <MenuItem key={s.id} value={s.id}>
-                              Slab: {s.name} ({s.pieces?.length || 0} pcs) {s.size && s.size.trim() !== '0L x 0W' ? `- ${s.size}` : ''}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      );
-                    })()}
-
-                    {(() => {
-                      if (!split.slabId || !slabs) return null;
-                      const slab = slabs.find((s: any) => s.id === split.slabId);
-                      if (!slab || !slab.pieces || slab.pieces.length === 0) return null;
-
-                      const logStage = selectedLog?.stage?.split(' ')[0] || '';
-                      const stageOrder = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                      const logStageIndex = stageOrder.indexOf(logStage);
+                      newSplits[idx].pieceIds = [];
                       
-                      const validPieces = slab.pieces.filter((p: any) => {
-                        if (logStageIndex < 0) return true;
-                        const pBaseStage = p.stage?.split(' ')[0] || '';
-                        const pStageIndex = stageOrder.indexOf(pBaseStage);
-                        if (pStageIndex > logStageIndex) return false;
-                        if (pStageIndex === logStageIndex && p.status?.toLowerCase() === 'completed') return false;
-                        return true;
-                      });
+                      const matched = slabs?.filter((s: any) => s.projectId === e.target.value);
+                      if (matched && matched.length === 1) {
+                        newSplits[idx].slabId = matched[0].id;
+                        newSplits[idx].productName = matched[0].name;
+                      }
 
-                      if (validPieces.length === 0) return null;
+                      setProjectSplits(newSplits);
+                    }}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  >
+                    <MenuItem value="" disabled>Select Project</MenuItem>
+                    {projects?.map((p: any) => (
+                      <MenuItem key={p.id} value={p.id}>{p.projectId} – {p.name || ''} ({p.clientName})</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
 
-                      return (
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Select Piece(s)</InputLabel>
-                          <Select multiple value={split.pieceIds || []} onChange={(e) => {
-                            const val = e.target.value as string[];
+                {/* Dynamically extract slabs for this project */}
+                {(() => {
+                  const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                  const cleanLogStage = (selectedLog?.stage || '').replace(' Work', '').trim();
+                  const logStageIdx = stages.indexOf(cleanLogStage);
+
+                  const isPieceEligible = (p: any) => {
+                    if (logStageIdx === -1) {
+                      return p.status !== 'completed';
+                    }
+
+                    const pStage = (p.stage || 'Production').replace(' Work', '').trim();
+                    const pStageIdx = stages.indexOf(pStage);
+
+                    // If piece has already progressed past this stage, it's done!
+                    if (pStageIdx > logStageIdx) return false;
+
+                    // If piece is at this stage:
+                    if (pStageIdx === logStageIdx) {
+                      // If already completed in this stage, it should NOT appear!
+                      if (p.status === 'completed') return false;
+                      // If pending or active, it's currently being worked on!
+                      return true;
+                    }
+
+                    // If piece is at the previous stage:
+                    // It can only enter this stage if it completed the immediately preceding stage:
+                    if (pStageIdx === logStageIdx - 1 && p.status === 'completed') {
+                      return true;
+                    }
+
+                    return false;
+                  };
+
+                  // Filter slabs for this project:
+                  // Only include slabs that either have no pieces generated yet, OR have at least 1 eligible piece for this stage!
+                  const projectSlabs = slabs ? slabs.filter((s: any) => {
+                    if (s.projectId !== split.projectId) return false;
+                    if (s.pieces && s.pieces.length > 0) {
+                      const eligible = s.pieces.filter(isPieceEligible);
+                      return eligible.length > 0;
+                    }
+                    return true;
+                  }) : [];
+
+                  if (projectSlabs.length === 0) {
+                    return (
+                      <Box sx={{ p: 1.5, bgcolor: '#FFF8E1', borderRadius: 2, border: '1px dashed #FFE082' }}>
+                        <Typography variant="body2" color="#B26A00" fontWeight={500}>
+                          Notice: No pending pieces found for stage <strong>{selectedLog?.stage || 'this stage'}</strong> under this project. (All items are already completed).
+                        </Typography>
+                      </Box>
+                    );
+                  }
+
+                  const currentSlab = projectSlabs.find((s: any) => s.id === split.slabId) || (projectSlabs.length === 1 ? projectSlabs[0] : null);
+                  if (projectSlabs.length === 1 && !split.slabId) {
+                    split.slabId = projectSlabs[0].id;
+                    split.productName = projectSlabs[0].name;
+                  }
+
+                  const eligiblePiecesForSlab = currentSlab?.pieces ? currentSlab.pieces.filter(isPieceEligible) : [];
+
+                  return (
+                    <>
+                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                        <Autocomplete
+                          fullWidth
+                          size="small"
+                          options={projectSlabs}
+                          getOptionLabel={(option: any) => {
+                            const pendingCount = option.pieces ? option.pieces.filter(isPieceEligible).length : 0;
+                            return `${option.name} (${pendingCount} Pending Pieces)`;
+                          }}
+                          value={projectSlabs.find((s: any) => s.id === split.slabId) || null}
+                          onChange={(e, newValue: any) => {
                             const newSplits = [...projectSplits];
-                            newSplits[idx].pieceIds = val;
-                            newSplits[idx].qty = val.length > 0 ? val.length : newSplits[idx].qty;
+                            if (newValue) {
+                              newSplits[idx].slabId = newValue.id;
+                              newSplits[idx].productName = newValue.name;
+                            } else {
+                              newSplits[idx].slabId = '';
+                              newSplits[idx].productName = '';
+                            }
+                            newSplits[idx].pieceIds = [];
                             setProjectSplits(newSplits);
-                          }} input={<OutlinedInput label="Select Piece(s)" />} renderValue={(selected: any) => {
-                            if (!selected || selected.length === 0) return <em>Select Pieces</em>;
-                            return selected.map((id: string) => {
-                              const piece = slab.pieces.find((p: any) => p.id === id);
-                              return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id;
-                            }).join(', ');
-                          }}>
-                            {validPieces.map((p: any) => (
-                              <MenuItem key={p.id} value={p.id}>
-                                <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
-                                <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber}`} />
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      );
-                    })()}
+                          }}
+                          renderInput={(params) => (
+                            <TextField 
+                              {...params} 
+                              label="Search Product / Slab *" 
+                              placeholder="Type name..."
+                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                            />
+                          )}
+                        />
+                      </Box>
+
+                      {/* Pieces Dropdown */}
+                      {split.slabId && eligiblePiecesForSlab.length > 0 && (
+                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                          <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
+                            <InputLabel id={`select-piece-label-${idx}`}>Select Piece(s) (Optional)</InputLabel>
+                            <Select
+                              labelId={`select-piece-label-${idx}`}
+                              multiple
+                              value={split.pieceIds || []}
+                              onChange={(e) => {
+                                const newSplits = [...projectSplits];
+                                const val = e.target.value as string[];
+                                newSplits[idx].pieceIds = val;
+                                newSplits[idx].qty = val.length > 0 ? val.length : newSplits[idx].qty;
+
+                                const slab = projectSlabs.find((s: any) => s.id === newSplits[idx].slabId);
+                                if (val.length > 0) {
+                                  const pieceNames = val.map((id: string) => {
+                                    const piece = slab?.pieces?.find((p: any) => p.id === id);
+                                    return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
+                                  });
+                                  newSplits[idx].productName = slab ? `${slab.name} - ${pieceNames.join(', ')}` : pieceNames.join(', ');
+                                } else {
+                                  newSplits[idx].productName = slab?.name || '';
+                                }
+
+                                setProjectSplits(newSplits);
+                              }}
+                              input={<OutlinedInput label="Select Piece(s) (Optional)" />}
+                              renderValue={(selected: any) => {
+                                if (!selected || selected.length === 0) return <em>Select Pieces</em>;
+                                const slab = projectSlabs.find((s: any) => s.id === split.slabId);
+                                return selected.map((id: string) => {
+                                  const piece = slab?.pieces?.find((p: any) => p.id === id);
+                                  return piece ? `${(piece.productName || `Piece ${piece.pieceNumber}`).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${piece.size ? `(${piece.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}` : id;
+                                }).join(', ');
+                              }}
+                            >
+                              {eligiblePiecesForSlab.map((p: any) => (
+                                <MenuItem key={p.id} value={p.id}>
+                                  <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
+                                  <ListItemText 
+                                    primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}`} 
+                                    secondary={`Stage: ${p.stage || 'Production'} • ${p.status === 'completed' ? 'Ready for next stage' : 'In Progress'}`}
+                                    sx={{ color: '#ed6c02', fontWeight: 'bold' }} 
+                                  />
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Box>
+                      )}
+                    </>
+                  );
+                })()}
+
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <TextField 
+                    label="Quantity to Apply" 
+                    type="number" 
+                    fullWidth 
+                    size="small" 
+                    value={split.qty || ''} 
+                    onChange={(e) => {
+                      const newSplits = [...projectSplits];
+                      newSplits[idx].qty = Number(e.target.value);
+                      setProjectSplits(newSplits);
+                    }} 
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  />
+                </Box>
 
 
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>

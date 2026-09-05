@@ -49,15 +49,33 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                         <TableCell><strong>Source</strong></TableCell>
                         <TableCell><strong>Material Name</strong></TableCell>
                         <TableCell><strong>Block No.</strong></TableCell>
+                        <TableCell><strong>Unit</strong></TableCell>
                         <TableCell><strong>L x W x T</strong></TableCell>
-                        <TableCell><strong>Qty</strong></TableCell>
+                        <TableCell><strong>Qty (Sq.Ft)</strong></TableCell>
                         <TableCell align="center"><strong>Actions</strong></TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {materialsLoading ? (
-                        <TableRow><TableCell colSpan={6} align="center"><CircularProgress size={24} sx={{ my: 2 }} /></TableCell></TableRow>
-                      ) : projectMaterials && projectMaterials.length > 0 ? projectMaterials.map((pm: any) => (
+                        <TableRow><TableCell colSpan={7} align="center"><CircularProgress size={24} sx={{ my: 2 }} /></TableCell></TableRow>
+                      ) : projectMaterials && projectMaterials.length > 0 ? projectMaterials.map((pm: any) => {
+                        const inv = pm.inventory;
+                        const qtyNum = Number(pm.quantity || 0);
+                        let detectedUnit = 'Inches';
+                        if (inv?.length && inv?.width && qtyNum) {
+                          const sqFtFromInches = (Number(inv.length) * Number(inv.width)) / 144;
+                          if (Math.abs(sqFtFromInches - qtyNum) < 0.05) {
+                            detectedUnit = 'Inches';
+                          } else if (Math.abs((Number(inv.length) * Number(inv.width)) - qtyNum) < 0.05) {
+                            detectedUnit = 'Sq. Feet';
+                          } else if (inv.unit === 'sq_ft' || inv.unit === 'feet') {
+                            detectedUnit = 'Sq. Feet';
+                          }
+                        } else if (inv?.unit === 'sq_ft' || inv?.unit === 'feet') {
+                          detectedUnit = 'Sq. Feet';
+                        }
+
+                        return (
                         <TableRow key={pm.id} hover>
                           <TableCell>
                             {pm.inventory?.jobWorkType === 'client' ? (
@@ -68,8 +86,11 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                           </TableCell>
                           <TableCell>{pm.inventory?.itemName}</TableCell>
                           <TableCell>{pm.inventory?.blockNumber || '-'}</TableCell>
+                          <TableCell sx={{ fontWeight: 500, color: 'primary.main' }}>
+                            {detectedUnit}
+                          </TableCell>
                           <TableCell>{[pm.inventory?.length, pm.inventory?.width, pm.inventory?.thickness].filter(Boolean).join(' x ') || '-'}</TableCell>
-                          <TableCell>{pm.quantity} {pm.inventory?.unit}</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold' }}>{qtyNum.toFixed(2)}</TableCell>
                           <TableCell align="center">
                             <IconButton color="primary" size="small" onClick={async () => {
                               if (isEditingRef.current) return;
@@ -78,7 +99,7 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                                 setClientSlabs([{
                                   materialName: pm.inventory?.itemName || '',
                                   blockNo: pm.inventory?.blockNumber || '',
-                                  unit: 'inch',
+                                  unit: detectedUnit === 'Inches' ? 'inch' : 'feet',
                                   length: pm.inventory?.length || '',
                                   width: pm.inventory?.width || '',
                                   thickness: pm.inventory?.thickness || '',
@@ -102,8 +123,9 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                             </IconButton>
                           </TableCell>
                         </TableRow>
-                      )) : (
-                        <TableRow><TableCell colSpan={6} align="center"><Typography color="textSecondary" sx={{ py: 3 }}>No materials reserved yet.</Typography></TableCell></TableRow>
+                      );
+                    }) : (
+                        <TableRow><TableCell colSpan={7} align="center"><Typography color="textSecondary" sx={{ py: 3 }}>No materials reserved yet.</Typography></TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>

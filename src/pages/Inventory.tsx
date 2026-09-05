@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import { useGetInventoryQuery, useGetInventoryLogsQuery } from '../store/apiSlice';
+import { useGetInventoryQuery, useGetInventoryLogsQuery, useGetProjectsQuery } from '../store/apiSlice';
 import { MaterialPlanningModal } from '../components/MaterialPlanningModal';
 
 const MONTHS = [
@@ -35,6 +35,7 @@ const Inventory: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<number | ''>(''); 
 
   const { data: inventory, isLoading } = useGetInventoryQuery();
+  const { data: projects } = useGetProjectsQuery();
   
   // Dialog state
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
@@ -67,18 +68,47 @@ const Inventory: React.FC = () => {
     return filtered;
   }, [inventory, activeTab, selectedFY, selectedMonth]);
 
-  const groupedBySupplier = useMemo(() => {
-    return filteredMaterials.reduce((acc: any, item: any) => {
-      const sup = item.supplier || 'Unknown';
-      if (!acc[sup]) acc[sup] = [];
-      acc[sup].push(item);
+  const supplierRows = useMemo(() => {
+    const map = filteredMaterials.reduce((acc: any, item: any) => {
+      // Resolve client name for both tabs
+      const pRel = item.projectMaterials?.[0]?.project || item.slabs?.[0]?.project;
+      let matchedClient = pRel?.clientName;
+      if (!matchedClient && projects && item.supplier) {
+        const matchedProj = projects.find(
+          (p: any) =>
+            (p.clientName && p.clientName.trim().toLowerCase() === item.supplier.trim().toLowerCase()) ||
+            (p.name && p.name.trim().toLowerCase() === item.supplier.trim().toLowerCase())
+        );
+        if (matchedProj?.clientName) {
+          matchedClient = matchedProj.clientName;
+        }
+      }
+
+      const clientName = matchedClient || item.supplier || (activeTab === 0 ? 'Unnati Arts' : 'Unknown Client');
+      const key = clientName.trim().toLowerCase();
+      const displayName = clientName;
+      const ledgerIdentifier = clientName;
+
+      if (!acc[key]) {
+        acc[key] = {
+          key,
+          displayName,
+          ledgerIdentifier,
+          items: [],
+          latestDate: item.createdAt
+        };
+      }
+      acc[key].items.push(item);
+      if (new Date(item.createdAt).getTime() > new Date(acc[key].latestDate).getTime()) {
+        acc[key].latestDate = item.createdAt;
+      }
       return acc;
     }, {});
-  }, [filteredMaterials]);
 
-  const handleRowClick = (supplier: string, items: any[]) => {
-    navigate(`/inventory/ledger/${encodeURIComponent(supplier)}`);
-  };
+    return Object.values(map).sort((a: any, b: any) => 
+      new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime()
+    );
+  }, [filteredMaterials, activeTab, projects]);
 
   const handleCloseDialog = () => {
     setSelectedSupplier(null);
@@ -140,7 +170,7 @@ const Inventory: React.FC = () => {
 
       {isLoading ? (
         <Typography variant="h6" sx={{ color: 'text.secondary' }}>Loading inventory...</Typography>
-      ) : filteredMaterials.length === 0 ? (
+      ) : supplierRows.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, bgcolor: '#FAFAFA', border: '2px dashed #E0E0E0' }}>
           <Typography variant="h5" color="text.secondary">No materials found for the selected filter.</Typography>
         </Paper>
@@ -154,20 +184,11 @@ const Inventory: React.FC = () => {
                 </TableCell>
                 <TableCell sx={{ py: 2.5 }}>
                   <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>
-                    {activeTab === 0 ? 'Vendor / Source' : 'Client Name'}
+                    Project Name
                   </Typography>
                 </TableCell>
                 <TableCell sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>Material Name</Typography>
-                </TableCell>
-                <TableCell sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>Block No</Typography>
-                </TableCell>
-                <TableCell sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>L x W x T</Typography>
-                </TableCell>
-                <TableCell align="right" sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>Stock / Quantity</Typography>
+                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>Total Pieces</Typography>
                 </TableCell>
                 <TableCell align="center" sx={{ py: 2.5 }}>
                   <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>Actions</Typography>
@@ -175,50 +196,38 @@ const Inventory: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredMaterials.map((item: any) => (
-                <TableRow 
-                  key={item.id} 
-                  hover 
-                  onClick={() => navigate(`/inventory/ledger/${encodeURIComponent(item.supplier || 'Unnati Arts')}`)}
-                  sx={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
-                >
-                  <TableCell sx={{ py: 2.5 }}>
-                    <Typography sx={{ fontSize: '1rem', color: '#555' }}>
-                      {new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ py: 2.5 }}>
-                    <Typography fontWeight="bold" color="primary.main" sx={{ fontSize: '1.05rem' }}>
-                      {item.supplier || 'Unnati Arts'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ py: 2.5 }}>
-                    <Typography fontWeight="bold" sx={{ fontSize: '1.05rem', color: '#222' }}>
-                      {item.itemName}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ py: 2.5 }}>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 600, color: '#444' }}>
-                      {item.blockNumber ? `Block ${item.blockNumber}` : '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ py: 2.5 }}>
-                    <Typography sx={{ fontSize: '0.95rem', color: '#666' }}>
-                      {[item.length, item.width, item.thickness].filter(Boolean).join(' x ') || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right" sx={{ py: 2.5 }}>
-                    <Typography fontWeight="bold" sx={{ fontSize: '1.05rem', color: 'success.main' }}>
-                      {item.quantity !== undefined ? Number(item.quantity).toFixed(2) : '0.00'} {item.unit || 'sq_ft'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center" sx={{ py: 2.5 }}>
-                    <Button variant="outlined" size="small" sx={{ borderRadius: 2 }}>
-                      View Ledger
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {supplierRows.map((row: any) => {
+                const blockList = Array.from(new Set(row.items.map((it: any) => it.blockNumber).filter(Boolean)));
+                return (
+                  <TableRow 
+                    key={row.key} 
+                    hover 
+                    onClick={() => navigate(`/inventory/ledger/${encodeURIComponent(row.ledgerIdentifier)}`)}
+                    sx={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
+                  >
+                    <TableCell sx={{ py: 2.5 }}>
+                      <Typography sx={{ fontSize: '1rem', color: '#555' }}>
+                        {new Date(row.latestDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 2.5 }}>
+                      <Typography fontWeight="bold" color="primary.main" sx={{ fontSize: '1.05rem' }}>
+                        {row.displayName}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 2.5 }}>
+                      <Typography fontWeight="bold" sx={{ fontSize: '1.05rem', color: '#222' }}>
+                        {row.items.length} {row.items.length === 1 ? 'Piece' : 'Pieces'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center" sx={{ py: 2.5 }}>
+                      <Button variant="outlined" size="small" sx={{ borderRadius: 2 }}>
+                        View Ledger
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -230,7 +239,7 @@ const Inventory: React.FC = () => {
         onClose={handleCloseDialog}
         maxWidth="lg"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 4, minHeight: '60vh', bgcolor: '#FAFAFA' } }}
+        slotProps={{ paper: { sx: { borderRadius: 4, minHeight: '60vh', bgcolor: '#FAFAFA' } } }}
       >
         <DialogTitle sx={{ bgcolor: '#FFF', borderBottom: '1px solid #E0E0E0', p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>

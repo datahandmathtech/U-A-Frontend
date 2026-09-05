@@ -14,20 +14,24 @@ import EditIcon from '@mui/icons-material/Edit';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 
 const Approvals: React.FC = () => {
-  const { data: pendingLogs, isLoading, refetch } = useGetPendingApprovalsQuery(undefined, {
-    pollingInterval: 3000,
+  const { data: pendingLogs, isLoading, refetch: refetchPending } = useGetPendingApprovalsQuery(undefined, {
+    pollingInterval: 2000,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
-  const { data: approvedLogs, refetch: refetchApproved } = useGetApprovedLogsQuery(undefined);
+  const { data: approvedLogs, refetch: refetchApproved } = useGetApprovedLogsQuery(undefined, {
+    pollingInterval: 2000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true
+  });
   const { data: projects } = useGetProjectsQuery();
   const { data: machineLogs } = useGetMachineLogsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 2000,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: activeOutLogs } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 2000,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
@@ -522,33 +526,66 @@ const Approvals: React.FC = () => {
                 
                 {/* Dynamically extract slabs for this project */}
                 {(() => {
+                  const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                  const cleanLogStage = (selectedLog?.stage || '').replace(' Work', '').trim();
+                  const logStageIdx = stages.indexOf(cleanLogStage);
+
+                  const isPieceEligible = (p: any) => {
+                    if (logStageIdx === -1) {
+                      return p.status !== 'completed';
+                    }
+
+                    const pStage = (p.stage || 'Production').replace(' Work', '').trim();
+                    const pStageIdx = stages.indexOf(pStage);
+
+                    // If piece has already progressed past this stage, it's done!
+                    if (pStageIdx > logStageIdx) return false;
+
+                    // If piece is at this stage:
+                    if (pStageIdx === logStageIdx) {
+                      // If already completed in this stage, it should NOT appear!
+                      if (p.status === 'completed') return false;
+                      // If pending or active, it's currently being worked on!
+                      return true;
+                    }
+
+                    // If piece is at the previous stage:
+                    // It can only enter this stage if it completed the immediately preceding stage:
+                    if (pStageIdx === logStageIdx - 1 && p.status === 'completed') {
+                      return true;
+                    }
+
+                    return false;
+                  };
+
+                  // Filter slabs for this project:
+                  // Only include slabs that either have no pieces generated yet, OR have at least 1 eligible piece for this stage!
                   const projectSlabs = slabs ? slabs.filter((s: any) => {
                     if (s.projectId !== split.projectId) return false;
-                    
-                    // If slab has pieces, hide it if ALL pieces are already completed for this stage
                     if (s.pieces && s.pieces.length > 0) {
-                      const eligiblePieces = s.pieces.filter((p: any) => {
-                        const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                        const logStage = selectedLog?.stage?.replace(' Work', '') || '';
-                        const pStageIdx = stages.indexOf(p.stage);
-                        const logStageIdx = stages.indexOf(logStage);
-                        
-                        if (logStageIdx === -1) return true;
-                        if (pStageIdx === logStageIdx && p.status === 'completed') return false;
-                        if (pStageIdx > logStageIdx) return false;
-                        if (pStageIdx < logStageIdx) {
-                          if (pStageIdx === logStageIdx - 1 && p.status === 'completed') return true;
-                          return false;
-                        }
-                        return true;
-                      });
-                      return eligiblePieces.length > 0;
+                      const eligible = s.pieces.filter(isPieceEligible);
+                      return eligible.length > 0;
                     }
-                    
-                    // Keep slabs that have no pieces yet
                     return true;
                   }) : [];
-                  if (projectSlabs.length === 0) return null;
+
+                  if (projectSlabs.length === 0) {
+                    return (
+                      <Box sx={{ p: 1.5, bgcolor: '#FFF8E1', borderRadius: 2, border: '1px dashed #FFE082' }}>
+                        <Typography variant="body2" color="#B26A00" fontWeight={500}>
+                          Notice: No pending pieces found for stage <strong>{selectedLog?.stage || 'this stage'}</strong> under this project. (All items are already completed).
+                        </Typography>
+                      </Box>
+                    );
+                  }
+
+                  const currentSlab = projectSlabs.find((s: any) => s.id === split.slabId) || (projectSlabs.length === 1 ? projectSlabs[0] : null);
+                  if (projectSlabs.length === 1 && !split.slabId) {
+                    split.slabId = projectSlabs[0].id;
+                    split.productName = projectSlabs[0].name;
+                  }
+
+                  const eligiblePiecesForSlab = currentSlab?.pieces ? currentSlab.pieces.filter(isPieceEligible) : [];
                   
                   return (
                     <>
@@ -557,7 +594,10 @@ const Approvals: React.FC = () => {
                           fullWidth
                           size="small"
                           options={projectSlabs}
-                          getOptionLabel={(option: any) => `${option.name} (${option.pieces?.length || 0} Pieces)`}
+                          getOptionLabel={(option: any) => {
+                            const pendingCount = option.pieces ? option.pieces.filter(isPieceEligible).length : 0;
+                            return `${option.name} (${pendingCount} Pending Pieces)`;
+                          }}
                           value={projectSlabs.find((s: any) => s.id === split.slabId) || null}
                           onChange={(e, newValue: any) => {
                             const newSplits = [...projectSplits];
@@ -583,7 +623,7 @@ const Approvals: React.FC = () => {
                       </Box>
                       
                       {/* Pieces Dropdown */}
-                      {split.slabId && selectedLog?.stage !== 'Packing' && selectedLog?.stage !== 'Dispatch' && projectSlabs.find((s: any) => s.id === split.slabId)?.pieces?.length > 0 && (
+                      {split.slabId && eligiblePiecesForSlab.length > 0 && (
                         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                           <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
                             <InputLabel id={`select-piece-label-${idx}`}>Select Piece(s) (Optional)</InputLabel>
@@ -620,27 +660,14 @@ const Approvals: React.FC = () => {
                                 }).join(', ');
                               }}
                             >
-                              {projectSlabs
-                                .find((s: any) => s.id === split.slabId)
-                                ?.pieces?.filter((p: any) => {
-                                  const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                                  const logStage = selectedLog?.stage?.replace(' Work', '') || '';
-                                  const pStageIdx = stages.indexOf(p.stage);
-                                  const logStageIdx = stages.indexOf(logStage);
-                                  
-                                  if (logStageIdx === -1) return true;
-                                  if (pStageIdx === logStageIdx && p.status === 'completed') return false;
-                                  if (pStageIdx > logStageIdx) return false;
-                                  if (pStageIdx < logStageIdx) {
-                                    if (pStageIdx === logStageIdx - 1 && p.status === 'completed') return true;
-                                    return false;
-                                  }
-                                  return true;
-                                })
-                                .map((p: any) => (
+                              {eligiblePiecesForSlab.map((p: any) => (
                                 <MenuItem key={p.id} value={p.id}>
                                   <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
-                                  <ListItemText primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} sx={{ color: '#ed6c02', fontWeight: 'bold' }} />
+                                  <ListItemText 
+                                    primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} 
+                                    secondary={`Stage: ${p.stage || 'Production'} • ${p.status === 'completed' ? 'Ready for next stage' : 'In Progress'}`}
+                                    sx={{ color: '#ed6c02', fontWeight: 'bold' }} 
+                                  />
                                 </MenuItem>
                               ))}
                             </Select>

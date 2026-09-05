@@ -147,9 +147,13 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/inventory/logs/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Inventory']
     }),
-    deductInventory: builder.mutation<any, { inventoryId: string, usedQuantity: number, wasteQuantity: number, projectName: string, date: string }>({
+    deductInventory: builder.mutation<any, { inventoryId: string, usedQuantity: number, wasteQuantity: number, projectName: string, projectId?: string, slabId?: string, pieceId?: string, pieceName?: string, length?: number | string, width?: number | string, thickness?: number | string, date: string }>({
       query: (body) => ({ url: '/inventory/deduct', method: 'POST', body }),
-      invalidatesTags: ['Inventory', 'Waste']
+      invalidatesTags: ['Inventory', 'Waste', 'Production', 'Project']
+    }),
+    getProjectHierarchy: builder.query<any[], void>({
+      query: () => '/slabs/project-hierarchy',
+      providesTags: ['Production', 'Project']
     }),
     createInventory: builder.mutation<any, Partial<any>>({
       query: (body) => ({ url: '/inventory', method: 'POST', body }),
@@ -558,6 +562,7 @@ export const {
   useMachineClockOutMutation,
   useGetSlabsQuery,
   useGetAllSlabNamesQuery,
+  useGetProjectHierarchyQuery,
   useGetAllPiecesQuery,
   useAddPiecesMutation,
   useCreateSlabMutation,
