@@ -242,10 +242,10 @@ const StageDetails = () => {
           {stageFormatted === 'Production' && <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography fontWeight="bold">{mName}</Typography></TableCell>}
           <TableCell sx={{ whiteSpace: 'nowrap', minWidth: 200 }}>
              <Typography fontWeight="bold" color="secondary.main">
-                {(p.productName || p.pieceNumber || '').replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim()}
+                {String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim()}
              </Typography>
           </TableCell>
-          <TableCell sx={{ whiteSpace: 'nowrap' }}>{p.size ? p.size.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : 'N/A'}</TableCell>
+          <TableCell sx={{ whiteSpace: 'nowrap' }}>{p.size ? String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : 'N/A'}</TableCell>
           {stageFormatted === 'Production' && (
             <>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>{startDate}</TableCell>

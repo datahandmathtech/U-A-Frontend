@@ -15,18 +15,27 @@ document.addEventListener('wheel', (event) => {
     (target as HTMLInputElement).blur();
   }
 }, { passive: true });
-// Register PWA Service Worker
+// PWA Service Worker handling
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then((reg) => {
-        console.log('Unnati Arts PWA Service Worker Registered:', reg.scope);
-      })
-      .catch((err) => {
-        console.warn('PWA Service Worker Registration Failed:', err);
-      });
-  });
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // Unregister any active service workers on localhost to ensure fast, unhindered development
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    });
+  } else {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((reg) => {
+          console.log('Unnati Arts PWA Service Worker Registered:', reg.scope);
+        })
+        .catch((err) => {
+          console.warn('PWA Service Worker Registration Failed:', err);
+        });
+    });
+  }
 }
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
