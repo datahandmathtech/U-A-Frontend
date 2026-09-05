@@ -29,6 +29,7 @@ if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')
         .then((reg) => {
+          reg.update();
           console.log('Unnati Arts PWA Service Worker Registered:', reg.scope);
         })
         .catch((err) => {

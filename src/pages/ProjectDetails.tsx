@@ -841,7 +841,6 @@ const ProjectDetails: React.FC = () => {
     try {
       await updateProject({ id: id as string, data: { status: newStatus } }).unwrap();
       setActiveStep(getStepIndex(newStatus));
-      refetch();
     } catch (err) {
       console.error(err);
     }
@@ -859,7 +858,6 @@ const ProjectDetails: React.FC = () => {
       }).unwrap();
       setActiveStep(getStepIndex('quotation'));
       setViewingStepOverride(null);
-      refetch();
     } catch (err) {
       console.error("Failed to proceed to costing", err);
       setSnackbarMessage("Error saving data before proceeding.");
