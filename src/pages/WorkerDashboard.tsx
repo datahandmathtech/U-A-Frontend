@@ -309,8 +309,8 @@ const WorkerDashboard: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.reload();
+    dispatch(logout());
+    navigate('/login');
   };
 
   if (machinesLoading) return <Box sx={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
