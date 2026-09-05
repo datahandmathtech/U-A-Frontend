@@ -64,7 +64,11 @@ const LiveFeed: React.FC = () => {
   const handleNextDay = () => setSelectedDate(prev => new Date(prev.getTime() + 24*60*60*1000));
 
   const { data: machines, isLoading: machinesLoading } = useGetMachinesQuery();
-  const { data: liveFeedData, isLoading: liveFeedLoading, refetch } = useGetLiveFeedQuery(formatYMD(selectedDate));
+  const { data: liveFeedData, isLoading: liveFeedLoading, refetch } = useGetLiveFeedQuery(formatYMD(selectedDate), {
+    pollingInterval: 4000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true
+  });
   const { data: projects } = useGetProjectsQuery();
   const [approveLog, { isLoading: isApproving }] = useApproveMachineLogMutation();
   const [rejectLog, { isLoading: isRejecting }] = useRejectMachineLogMutation();

@@ -17,8 +17,16 @@ import { useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLo
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 
 const InOutLedger: React.FC = () => {
-  const { data: activeOutLogsData, isLoading: outLogsLoading, refetch } = useGetActiveOutLogsQuery(undefined);
-  const { data: pendingLogs, isLoading: pendingLoading } = useGetPendingApprovalsQuery(undefined);
+  const { data: activeOutLogsData, isLoading: outLogsLoading, refetch } = useGetActiveOutLogsQuery(undefined, {
+    pollingInterval: 3000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true
+  });
+  const { data: pendingLogs, isLoading: pendingLoading } = useGetPendingApprovalsQuery(undefined, {
+    pollingInterval: 3000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true
+  });
   const { data: approvedLogsData, isLoading: approvedLoading } = useGetApprovedLogsQuery(undefined);
   const { data: projects } = useGetProjectsQuery();
   const [approveLog, { isLoading: isApproving }] = useApproveMaterialLogMutation();

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Box, Typography, Avatar } from '@mui/material';
+import { Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Box, Typography, Avatar, Badge } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import WorkIcon from '@mui/icons-material/Work';
@@ -30,6 +30,7 @@ import StoreIcon from '@mui/icons-material/Store';
 import RecyclingIcon from '@mui/icons-material/Recycling';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/authSlice';
+import { useGetPendingApprovalsQuery } from '../../store/apiSlice';
 
 const ALL_MENU_ITEMS = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
@@ -47,6 +48,11 @@ const ALL_MENU_ITEMS = [
 
 const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawerWidth }) => {
   const user = useSelector((state: any) => state.auth.user);
+  const { data: pendingApprovals } = useGetPendingApprovalsQuery(undefined, {
+    pollingInterval: 5000,
+    refetchOnFocus: true
+  });
+  const pendingCount = pendingApprovals?.length || 0;
 
   const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
   const [isStandalone, setIsStandalone] = React.useState(false);
@@ -135,6 +141,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
                 {item.icon}
               </ListItemIcon>
               <ListItemText primary={<Typography sx={{ fontSize: '0.9rem', fontWeight: 500 }}>{item.text}</Typography>} />
+              {item.text === 'Approvals' && pendingCount > 0 && (
+                <Badge badgeContent={pendingCount} color="error" sx={{ mr: 1 }} />
+              )}
             </ListItemButton>
           </ListItem>
         ))}

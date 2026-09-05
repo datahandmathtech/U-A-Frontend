@@ -62,18 +62,33 @@ const ManagerDashboard: React.FC = () => {
   }
 
   const { data: machines, isLoading: machinesLoading } = useGetMachinesQuery();
-  const { data: activeSession, isLoading: sessionLoading, refetch } = useGetActiveSessionQuery();
+  const { data: activeSession, isLoading: sessionLoading, refetch } = useGetActiveSessionQuery(undefined, {
+    pollingInterval: 10000,
+    refetchOnFocus: true
+  });
   
   const [punchIn, { isLoading: punchingIn }] = usePunchInMutation();
   const [punchOut, { isLoading: punchingOut }] = usePunchOutMutation();
   const [machineClockIn, { isLoading: clockingIn }] = useMachineClockInMutation();
   const [machineClockOut, { isLoading: clockingOut }] = useMachineClockOutMutation();
   const [createMaterialLog, { isLoading: creatingMaterial }] = useCreateMaterialLogMutation();
-  const { data: activeMachineLogs, refetch: refetchMachineLogs } = useGetDailyMachineLogsQuery();
+  const { data: activeMachineLogs, refetch: refetchMachineLogs } = useGetDailyMachineLogsQuery(undefined, {
+    pollingInterval: 3000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true
+  });
   const { data: staffList } = useGetStaffListQuery();
   const { data: vendorsList } = useGetVendorsQuery();
-  const { data: activeOutLogs, refetch: refetchActiveOutLogs } = useGetActiveOutLogsQuery(undefined);
-  const { data: rejectedLogs, refetch: refetchRejectedLogs } = useGetRejectedLogsQuery();
+  const { data: activeOutLogs, refetch: refetchActiveOutLogs } = useGetActiveOutLogsQuery(undefined, {
+    pollingInterval: 3000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true
+  });
+  const { data: rejectedLogs, refetch: refetchRejectedLogs } = useGetRejectedLogsQuery(undefined, {
+    pollingInterval: 3000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true
+  });
   const [approveMaterialLog] = useApproveMaterialLogMutation();
 
   const openRedoDialog = (log: any) => {
