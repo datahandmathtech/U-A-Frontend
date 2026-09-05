@@ -29,7 +29,7 @@ export const apiSlice = createApi({
   refetchOnFocus: true,
   refetchOnReconnect: true,
   keepUnusedDataFor: 60,
-  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste'],
+  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste', 'Machine'],
   endpoints: (builder) => ({
     // VENDOR ENDPOINTS
     getVendors: builder.query<any[], { month?: string, fy?: string } | void>({
@@ -171,7 +171,7 @@ export const apiSlice = createApi({
     }),
     getMachines: builder.query<any[], void>({
       query: () => '/machines',
-      providesTags: ['Inventory'] // Reusing for simplicity or can create Machine tag
+      providesTags: ['Machine']
     }),
     getLiveFeed: builder.query<any[], string | void>({
       query: (date) => date ? `/live-feed?date=${date}` : '/live-feed',
@@ -288,14 +288,14 @@ export const apiSlice = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Production'],
+      invalidatesTags: ['Machine', 'Production'],
     }),
     deleteMachine: builder.mutation<any, string>({
       query: (id) => ({
         url: `/machines/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Production'],
+      invalidatesTags: ['Machine', 'Production'],
     }),
     updateProductionLog: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({

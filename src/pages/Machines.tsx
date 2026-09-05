@@ -7,13 +7,14 @@ import { useGetMachinesQuery, useAddMachineMutation, useDeleteMachineMutation } 
 
 const Machines: React.FC = () => {
   const { data: machines, isLoading } = useGetMachinesQuery();
-  const [addMachine] = useAddMachineMutation();
+  const [addMachine, { isLoading: isAdding }] = useAddMachineMutation();
   const [deleteMachine] = useDeleteMachineMutation();
 
   const [open, setOpen] = useState(false);
   const [newMachine, setNewMachine] = useState({ name: '', type: 'CNC', hourlyCost: '', maintenanceIntervalHours: '200' });
 
   const handleAdd = async () => {
+    if (!newMachine.name.trim()) return;
     try {
       await addMachine(newMachine).unwrap();
       setOpen(false);
@@ -128,8 +129,10 @@ const Machines: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAdd}>Add</Button>
+          <Button onClick={() => setOpen(false)} disabled={isAdding}>Cancel</Button>
+          <Button variant="contained" onClick={handleAdd} disabled={isAdding || !newMachine.name.trim()}>
+            {isAdding ? 'Adding...' : 'Add'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
