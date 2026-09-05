@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useRouteError } from 'react-router-dom';
 import { styled } from '@mui/system';
 
 // Fancy background with gradient & subtle animation
@@ -28,8 +28,11 @@ const AnimatedCircle = styled('div')({
 export default function NotFound() {
   const navigate = useNavigate();
   const location = useLocation();
+  const error: any = useRouteError();
 
+  const isRouteError = !!error;
   const goHome = () => navigate('/');
+  const reload = () => window.location.reload();
 
   return (
     <>
@@ -52,30 +55,43 @@ export default function NotFound() {
           color: '#fff',
         }}
       >
-        <Typography variant="h1" sx={{ fontWeight: 700, mb: 2, fontSize: { xs: '4rem', md: '6rem' } }}>
-          404
+        <Typography variant="h1" sx={{ fontWeight: 700, mb: 2, fontSize: { xs: '3rem', md: '5rem' } }}>
+          {isRouteError ? 'Error' : '404'}
         </Typography>
         <Typography variant="h5" sx={{ mb: 3 }}>
-          Oops! The page <code>{location.pathname}</code> could not be found.
+          {isRouteError
+            ? (error?.statusText || error?.message || 'An unexpected error occurred while loading this page.')
+            : <>Oops! The page <code>{location.pathname}</code> could not be found.</>}
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={goHome}
-          sx={{
-            mt: 2,
-            px: 4,
-            py: 1.5,
-            fontWeight: 600,
-            background: 'linear-gradient(45deg, hsl(210, 70%, 60%), hsl(210, 70%, 40%))',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            ':hover': {
-              background: 'linear-gradient(45deg, hsl(210, 80%, 65%), hsl(210, 80%, 45%))',
-            },
-          }}
-        >
-          Go to Dashboard
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {isRouteError && (
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={reload}
+              sx={{ px: 3, py: 1.5, fontWeight: 600, borderColor: 'rgba(255,255,255,0.4)' }}
+            >
+              Reload Page
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={goHome}
+            sx={{
+              px: 4,
+              py: 1.5,
+              fontWeight: 600,
+              background: 'linear-gradient(45deg, hsl(210, 70%, 60%), hsl(210, 70%, 40%))',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              ':hover': {
+                background: 'linear-gradient(45deg, hsl(210, 80%, 65%), hsl(210, 80%, 45%))',
+              },
+            }}
+          >
+            Go to Dashboard
+          </Button>
+        </Box>
       </Box>
     </>
   );

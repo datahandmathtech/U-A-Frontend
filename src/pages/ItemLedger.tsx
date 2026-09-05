@@ -5,16 +5,22 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
-import { useDeductInventoryMutation, useUpdateInventoryLogMutation, useDeleteInventoryLogMutation, useGetAllSlabNamesQuery } from '../store/apiSlice';
-import { useEffect } from 'react';
+import { useDeductInventoryMutation, useUpdateInventoryLogMutation, useDeleteInventoryLogMutation, useGetAllSlabNamesQuery, useGetItemLogsQuery } from '../store/apiSlice';
 
 const ItemLedger = () => {
   const { itemId } = useParams<{ itemId: string }>();
   const navigate = useNavigate();
-  
-  const [logs, setLogs] = useState<any[]>([]);
-  const [inventory, setInventory] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const { data: itemLogsData, isLoading, refetch } = useGetItemLogsQuery(itemId || '', { skip: !itemId });
+
+  // Safely extract logs & inventory whether backend returns { item, logs } or [ ...logs ]
+  const logs: any[] = Array.isArray(itemLogsData) 
+    ? itemLogsData 
+    : (itemLogsData?.logs && Array.isArray(itemLogsData.logs) ? itemLogsData.logs : []);
+
+  const inventory: any = (!Array.isArray(itemLogsData) && itemLogsData?.item)
+    ? itemLogsData.item 
+    : (logs.length > 0 && logs[0]?.inventory ? logs[0].inventory : null);
 
   const [openDeduct, setOpenDeduct] = useState(false);
   const [deductForm, setDeductForm] = useState({ length: '', width: '', date: new Date().toISOString().substring(0,10), productName: '' });
@@ -25,29 +31,6 @@ const ItemLedger = () => {
   const [deductInventory] = useDeductInventoryMutation();
   const [updateLog] = useUpdateInventoryLogMutation();
   const [deleteLog] = useDeleteInventoryLogMutation();
-
-  const fetchLogs = async () => {
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/inventory/item-logs/${itemId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setLogs(data);
-      if (data.length > 0 && data[0].inventory) {
-        setInventory(data[0].inventory);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLogs();
-  }, [itemId]);
 
   const [deductError, setDeductError] = useState('');
 
@@ -75,7 +58,7 @@ const ItemLedger = () => {
       }).unwrap();
       setOpenDeduct(false);
       setDeductForm({ length: '', width: '', date: new Date().toISOString().substring(0,10), productName: '' });
-      fetchLogs();
+      refetch();
     } catch (error: any) {
       console.error(error);
       setDeductError(error?.data?.message || 'Failed to deduct stock');
@@ -117,7 +100,7 @@ const ItemLedger = () => {
       }).unwrap();
       
       setOpenEdit(false);
-      fetchLogs();
+      refetch();
     } catch (error) {
       console.error(error);
     }
@@ -127,18 +110,24 @@ const ItemLedger = () => {
     if (window.confirm('Are you sure you want to delete this log? The quantity will be added back to the inventory.')) {
       try {
         await deleteLog(id).unwrap();
-        fetchLogs();
+        refetch();
       } catch (error) {
         console.error(error);
       }
     }
   };
 
-  if (isLoading) return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Typography variant="h6" color="text.secondary">Loading ledger...</Typography>
+      </Box>
+    );
+  }
 
   // Compute Balance dynamically
   let currentBalance = 0;
-  const ledgerRows = logs.map(log => {
+  const ledgerRows = Array.isArray(logs) ? logs.map(log => {
     const previousBalance = currentBalance;
     if (log.type === 'IN') {
       currentBalance += Number(log.quantity);
@@ -150,7 +139,7 @@ const ItemLedger = () => {
       previousBalance,
       balance: currentBalance
     };
-  });
+  }) : [];
 
   return (
     <Box sx={{ p: 4, maxWidth: 1200, margin: '0 auto' }}>
