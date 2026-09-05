@@ -170,31 +170,35 @@ const AdminConsole: React.FC = () => {
         </DialogTitle>
         <DialogContent sx={{ p: 3 }}>
           <Grid container spacing={3} sx={{ mt: 0 }}>
-            <Grid item xs={12} sm={6}>
+            <Grid xs={12} sm={6}>
               <TextField 
                 label="Full Name" 
                 fullWidth 
                 variant="outlined" 
                 value={formData.name} 
                 onChange={e => setFormData({...formData, name: e.target.value})}
-                InputProps={{ sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } }}
-                InputLabelProps={{ sx: { color: 'text.secondary' } }}
+                slotProps={{
+                  input: { sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } },
+                  inputLabel: { sx: { color: 'text.secondary' } }
+                }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid xs={12} sm={6}>
               <TextField 
                 label="System Username / Unique ID" 
                 fullWidth 
                 variant="outlined" 
                 value={formData.staffId} 
                 onChange={e => setFormData({...formData, staffId: e.target.value})}
-                InputProps={{ sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } }}
-                InputLabelProps={{ sx: { color: 'text.secondary' } }}
+                slotProps={{
+                  input: { sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } },
+                  inputLabel: { sx: { color: 'text.secondary' } },
+                  formHelperText: { sx: { color: 'text.secondary' } }
+                }}
                 helperText="They will use this to log in."
-                FormHelperTextProps={{ sx: { color: 'text.secondary' } }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <TextField 
                 label="Access Password" 
                 fullWidth 
@@ -203,8 +207,10 @@ const AdminConsole: React.FC = () => {
                 value={formData.password} 
                 onChange={e => setFormData({...formData, password: e.target.value})}
                 placeholder={isEditing ? 'Leave blank to keep unchanged' : ''}
-                InputProps={{ sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } }}
-                InputLabelProps={{ sx: { color: 'text.secondary' } }}
+                slotProps={{
+                  input: { sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } },
+                  inputLabel: { sx: { color: 'text.secondary' } }
+                }}
               />
             </Grid>
           </Grid>
@@ -214,7 +220,7 @@ const AdminConsole: React.FC = () => {
             {MODULES.map((mod, index) => {
               const isChecked = formData.modulesAccess.includes(mod.path);
               return (
-                <Grid item xs={12} sm={6} md={4} key={index}>
+                <Grid xs={12} sm={6} md={4} key={index}>
                   <Box 
                     onClick={() => handleToggleModule(mod.path)}
                     sx={{ 

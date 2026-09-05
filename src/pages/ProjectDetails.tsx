@@ -2690,7 +2690,7 @@ const ProjectDetails: React.FC = () => {
             <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>Required Production Stages:</Typography>
             <Grid container spacing={1}>
               {['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(stage => (
-                <Grid item xs={6} sm={4} key={stage}>
+                <Grid xs={6} sm={4} key={stage}>
                   <FormControlLabel
                     control={
                       <Checkbox 

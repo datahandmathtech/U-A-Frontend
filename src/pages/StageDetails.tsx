@@ -381,7 +381,7 @@ const StageDetails = () => {
 
       {/* SUMMARY BOXES */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={4}>
+        <Grid xs={12} md={4}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ViewModuleIcon sx={{ color: '#1976d2' }} />
@@ -392,7 +392,7 @@ const StageDetails = () => {
             </Box>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid xs={12} md={4}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CheckCircleIcon sx={{ color: '#388e3c' }} />
@@ -403,7 +403,7 @@ const StageDetails = () => {
             </Box>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid xs={12} md={4}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#fff3e0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <PendingActionsIcon sx={{ color: '#f57c00' }} />

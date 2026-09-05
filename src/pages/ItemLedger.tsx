@@ -49,10 +49,23 @@ const ItemLedger = () => {
     fetchLogs();
   }, [itemId]);
 
+  const [deductError, setDeductError] = useState('');
+
   const handleDeductSubmit = async () => {
     try {
+      setDeductError('');
       const usedArea = (Number(deductForm.length) || 0) * (Number(deductForm.width) || 0);
       
+      if (usedArea <= 0) {
+        setDeductError('Please enter valid length and width');
+        return;
+      }
+
+      if (usedArea > (inventory?.quantity || 0)) {
+        setDeductError(`Not enough stock available! Remaining stock is only ${(inventory?.quantity || 0).toFixed(2)} ${inventory?.unit || 'sq_ft'}`);
+        return;
+      }
+
       await deductInventory({
         inventoryId: itemId as string,
         usedQuantity: usedArea,
@@ -63,8 +76,9 @@ const ItemLedger = () => {
       setOpenDeduct(false);
       setDeductForm({ length: '', width: '', date: new Date().toISOString().substring(0,10), productName: '' });
       fetchLogs();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      setDeductError(error?.data?.message || 'Failed to deduct stock');
     }
   };
 
@@ -210,13 +224,19 @@ const ItemLedger = () => {
       <Dialog open={openDeduct} onClose={() => setOpenDeduct(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold', bgcolor: '#f8f9fa' }}>Deduct Stock for Block {inventory?.blockNumber}</DialogTitle>
         <DialogContent sx={{ p: 3 }}>
-          <Alert severity="info" sx={{ mb: 3 }}>Available Balance: {inventory?.quantity?.toFixed(2)} {inventory?.unit}</Alert>
+          <Alert severity="info" sx={{ mb: 2 }}>Available Balance: {inventory?.quantity?.toFixed(2)} {inventory?.unit}</Alert>
+          {deductError && <Alert severity="error" sx={{ mb: 2 }}>{deductError}</Alert>}
+          {Number(deductForm.length) > 0 && Number(deductForm.width) > 0 && (Number(deductForm.length) * Number(deductForm.width)) > (inventory?.quantity || 0) && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Entered area ({((Number(deductForm.length) * Number(deductForm.width))).toFixed(2)} {inventory?.unit}) exceeds available balance ({(inventory?.quantity || 0).toFixed(2)} {inventory?.unit})!
+            </Alert>
+          )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
             <TextField
               label="Date"
               type="date"
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
               value={deductForm.date}
               onChange={(e) => setDeductForm({ ...deductForm, date: e.target.value })}
             />
@@ -242,7 +262,12 @@ const ItemLedger = () => {
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>
           <Button onClick={() => setOpenDeduct(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleDeductSubmit} disabled={!(Number(deductForm.length) > 0 && Number(deductForm.width) > 0)}>
+          <Button 
+            variant="contained" 
+            color="error" 
+            onClick={handleDeductSubmit} 
+            disabled={!(Number(deductForm.length) > 0 && Number(deductForm.width) > 0) || ((Number(deductForm.length) * Number(deductForm.width)) > (inventory?.quantity || 0))}
+          >
             Confirm Deduction
           </Button>
         </DialogActions>
@@ -257,7 +282,7 @@ const ItemLedger = () => {
               label="Date"
               type="date"
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
               value={editForm?.date || ''}
               onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
             />

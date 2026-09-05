@@ -294,11 +294,11 @@ const HR: React.FC = () => {
                 ))}
               </TextField>
               <TextField 
-                label="Check-In Time (e.g. 2026-08-15T09:00)" fullWidth required type="datetime-local" InputLabelProps={{ shrink: true }}
+                label="Check-In Time (e.g. 2026-08-15T09:00)" fullWidth required type="datetime-local" slotProps={{ inputLabel: { shrink: true } }}
                 value={manualAttData.checkIn} onChange={(e) => setManualAttData({...manualAttData, checkIn: e.target.value})}
               />
               <TextField 
-                label="Check-Out Time (Optional)" fullWidth type="datetime-local" InputLabelProps={{ shrink: true }}
+                label="Check-Out Time (Optional)" fullWidth type="datetime-local" slotProps={{ inputLabel: { shrink: true } }}
                 value={manualAttData.checkOut} onChange={(e) => setManualAttData({...manualAttData, checkOut: e.target.value})}
               />
             </Box>

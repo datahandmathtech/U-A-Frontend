@@ -164,7 +164,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
           <TextField
             label="Date (Backdate allowed)"
             type="date"
-            InputLabelProps={{ shrink: true }}
+            slotProps={{ inputLabel: { shrink: true } }}
             fullWidth
             value={formData.date}
             onChange={(e) => setFormData({ ...formData, date: e.target.value })}
