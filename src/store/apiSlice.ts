@@ -7,7 +7,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const baseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
   prepareHeaders: (headers, { getState }) => {
-    const token = (getState() as any).auth.token;
+    const token = (getState() as any).auth.token || sessionStorage.getItem('token') || localStorage.getItem('token');
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
@@ -26,8 +26,9 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  refetchOnFocus: true,
+  refetchOnFocus: false,
   refetchOnReconnect: true,
+  keepUnusedDataFor: 300, // 5 minutes cache retention for instant page transitions
   tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste'],
   endpoints: (builder) => ({
     // VENDOR ENDPOINTS

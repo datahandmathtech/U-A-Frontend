@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, TextField, Button, Paper, CircularProgress } from '@mui/material';
+import { Box, Typography, TextField, Button, Paper, CircularProgress, FormControlLabel, Checkbox } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useLoginMutation } from '../store/apiSlice';
@@ -8,6 +8,7 @@ import { setCredentials } from '../store/authSlice';
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [login, { isLoading, error }] = useLoginMutation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -16,7 +17,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     try {
       const response = await login({ email, password }).unwrap();
-      dispatch(setCredentials({ user: response.user, token: response.token }));
+      dispatch(setCredentials({ user: response.user, token: response.token, rememberMe }));
       
       // Redirect based on role
       if (response.user.role === 'manager') {
@@ -44,10 +45,11 @@ const Login: React.FC = () => {
         <Box component="form" onSubmit={handleLogin}>
           <TextField 
             fullWidth 
-            label="Email Address" 
+            label="Email or Staff ID" 
             variant="outlined" 
             margin="normal"
             value={email}
+            autoComplete="username"
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
           />
@@ -58,11 +60,30 @@ const Login: React.FC = () => {
             variant="outlined" 
             margin="normal"
             value={password}
+            autoComplete="current-password"
             onChange={(e) => setPassword(e.target.value)}
             disabled={isLoading}
           />
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', mt: 0.5 }}>
+            <FormControlLabel
+              control={
+                <Checkbox 
+                  checked={rememberMe} 
+                  onChange={(e) => setRememberMe(e.target.checked)} 
+                  color="primary" 
+                  size="small" 
+                />
+              }
+              label={
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+                  Remember me (Keep me signed in)
+                </Typography>
+              }
+            />
+          </Box>
           
-          {error && <Typography color="error" variant="body2" align="center">Invalid credentials</Typography>}
+          {error && <Typography color="error" variant="body2" align="center" sx={{ mt: 1 }}>Invalid credentials</Typography>}
           
           <Button 
             type="submit" 
@@ -70,7 +91,8 @@ const Login: React.FC = () => {
             color="primary" 
             size="large" 
             disabled={isLoading}
-            sx={{ mt: 2 }}
+            sx={{ mt: 2.5, py: 1.2, fontWeight: 600 }}
+            fullWidth
           >
             {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Login'}
           </Button>

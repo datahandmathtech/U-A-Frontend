@@ -5,6 +5,8 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { logout } from '../../store/authSlice';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -18,6 +20,7 @@ interface TopbarProps {
 const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [crmOpen, setCrmOpen] = React.useState(false);
@@ -121,8 +124,8 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
 
   const handleLogout = () => {
     handleMenuClose();
-    localStorage.removeItem('token');
-    window.location.reload();
+    dispatch(logout());
+    navigate('/login');
   };
 
   return (

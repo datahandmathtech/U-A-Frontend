@@ -28,7 +28,8 @@ interface SidebarProps {
 
 import StoreIcon from '@mui/icons-material/Store';
 import RecyclingIcon from '@mui/icons-material/Recycling';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { logout } from '../../store/authSlice';
 
 const ALL_MENU_ITEMS = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
@@ -75,9 +76,10 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
     }
   };
 
+  const dispatch = useDispatch();
+
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    dispatch(logout());
     window.location.href = '/login';
   };
 
