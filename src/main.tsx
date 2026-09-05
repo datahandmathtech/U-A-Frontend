@@ -26,15 +26,17 @@ if ('serviceWorker' in navigator) {
     });
   } else {
     window.addEventListener('load', () => {
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
       navigator.serviceWorker
         .register('/sw.js')
         .then((reg) => {
           reg.update();
-          console.log('Unnati Arts PWA Service Worker Registered:', reg.scope);
         })
-        .catch((err) => {
-          console.warn('PWA Service Worker Registration Failed:', err);
-        });
+        .catch(() => {});
     });
   }
 }
