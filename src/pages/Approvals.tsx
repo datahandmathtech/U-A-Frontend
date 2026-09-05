@@ -640,7 +640,7 @@ const Approvals: React.FC = () => {
                                 .map((p: any) => (
                                 <MenuItem key={p.id} value={p.id}>
                                   <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
-                                  <ListItemText primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''} - ${p.stage}`} sx={{ color: '#ed6c02', fontWeight: 'bold' }} />
+                                  <ListItemText primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} sx={{ color: '#ed6c02', fontWeight: 'bold' }} />
                                 </MenuItem>
                               ))}
                             </Select>
@@ -970,7 +970,7 @@ const Approvals: React.FC = () => {
                         }).map((p: any) => (
                       <MenuItem key={p.id} value={p.id}>
                         <Checkbox checked={(editingHistoryLog.pieceIds || []).indexOf(p.id) > -1} />
-                        <ListItemText primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''} - ${p.stage}`} />
+                        <ListItemText primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} />
                       </MenuItem>
                     ))}
                   </Select>

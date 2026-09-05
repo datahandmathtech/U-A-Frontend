@@ -512,7 +512,7 @@ const InOutLedger: React.FC = () => {
                             {validPieces.map((p: any) => (
                               <MenuItem key={p.id} value={p.id}>
                                 <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
-                                <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber} - ${p.stage}`} />
+                                <ListItemText primary={`${p.productName || 'Piece ' + p.pieceNumber}`} />
                               </MenuItem>
                             ))}
                           </Select>
