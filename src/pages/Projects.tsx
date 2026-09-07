@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, TablePagination, IconButton } from '@mui/material';
+import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, TablePagination, IconButton, Grid, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -28,7 +28,7 @@ const Projects: React.FC = () => {
         description: project.description || '',
         status: project.status || 'work_order',
         totalPieces: project.totalPieces || 0,
-        products: [{ name: '', length: '', width: '', thickness: '', pieces: 0 }],
+        products: [{ name: '', length: '', width: '', thickness: '', unit: 'inch' }],
         deliveryDate: project.deliveryDate ? new Date(project.deliveryDate).toISOString().split('T')[0] : '',
         startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
         deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
@@ -36,7 +36,7 @@ const Projects: React.FC = () => {
       });
     } else {
       setEditingProjectId(null);
-      setFormData({ name: '', clientName: '', description: '', status: 'work_order', totalPieces: 0, products: [{ name: '', length: '', width: '', thickness: '', pieces: 0 }], deliveryDate: '', startDate: '', deadline: '', clientHandle: '' });
+      setFormData({ name: '', clientName: '', description: '', status: 'work_order', totalPieces: 0, products: [{ name: '', length: '', width: '', thickness: '', unit: 'inch' }], deliveryDate: '', startDate: '', deadline: '', clientHandle: '' });
     }
     setOpen(true);
   };
@@ -63,7 +63,7 @@ const Projects: React.FC = () => {
       } else {
         const createdProject = await createProject({ 
           ...formData,
-          totalPieces: formData.products ? formData.products.reduce((acc: number, p: any) => acc + (p.pieces || 0), 0) : 0,
+          totalPieces: 0,
           projectId: `U-A-${Math.floor(100 + Math.random() * 900)}`,
           status: 'production',
           isDirectWorkOrder: true,
@@ -72,22 +72,24 @@ const Projects: React.FC = () => {
           deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined,
         }).unwrap();
         
-        // Create slabs for each product
+        // Create slabs for each product without automatically creating internal pieces
         if (formData.products && formData.products.length > 0) {
            for (const prod of formData.products) {
-             if (prod.name && prod.pieces > 0) {
+             if (prod.name && (prod.length || prod.width)) {
+               const unitLabel = prod.unit === 'feet' || prod.unit === 'sq_ft' ? 'Feet' : 'Inch';
+               const calcSqFt = (prod.unit === 'feet' || prod.unit === 'sq_ft'
+                 ? ((parseFloat(prod.length) || 0) * (parseFloat(prod.width) || 0))
+                 : (((parseFloat(prod.length) || 0) * (parseFloat(prod.width) || 0)) / 144)
+               ).toFixed(2);
+
+               const sizeFormatted = `${prod.length || 0}L x ${prod.width || 0}W ${unitLabel}${prod.thickness ? ` | ${prod.thickness}MM` : ''} (${calcSqFt} Sq.Ft)`;
+               
                await createSlab({
                  projectId: createdProject.id,
                  name: prod.name,
-                 size: `${prod.length}L x ${prod.width}W${prod.thickness ? ` | ${prod.thickness}MM` : ''}`,
+                 size: sizeFormatted,
                  cost: 0,
-                 requiredStages: ['Production', 'Polishing', 'Packing', 'Dispatch'],
-                 pieces: Array.from({ length: parseInt(prod.pieces) }).map((_, i) => ({
-                   pieceNumber: i + 1,
-                   size: `${prod.length}L x ${prod.width}W${prod.thickness ? ` | ${prod.thickness}MM` : ''}`,
-                   status: 'pending',
-                   stage: 'Production'
-                 }))
+                 requiredStages: ['Production', 'Polishing', 'Packing', 'Dispatch']
                }).unwrap();
              }
            }
@@ -274,85 +276,119 @@ const Projects: React.FC = () => {
                 <Button 
                   size="small" 
                   startIcon={<AddIcon />} 
-                  onClick={() => setFormData({ ...formData, products: [...(formData.products || []), { name: '', length: '', width: '', thickness: '', pieces: 0 }] })}
+                  onClick={() => setFormData({ ...formData, products: [...(formData.products || []), { name: '', length: '', width: '', thickness: '', unit: 'inch' }] })}
                 >
                   Add Item
                 </Button>
               </Box>
             )}
 
-            {!editingProjectId && formData.products?.map((prod: any, index: number) => (
-              <Box key={index} sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2, border: '1px solid #eee', borderRadius: 2, position: 'relative' }}>
-                {formData.products.length > 1 && (
-                  <IconButton 
-                    size="small" 
-                    color="error" 
-                    sx={{ position: 'absolute', top: -10, right: -10, bgcolor: '#fff', boxShadow: 1, '&:hover': { bgcolor: '#ffebee' } }}
-                    onClick={() => {
-                      const newProds = [...formData.products];
-                      newProds.splice(index, 1);
-                      setFormData({ ...formData, products: newProds });
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                )}
-                <TextField 
-                  label="Product Name / Material Name" 
-                  fullWidth 
-                  size="small"
-                  value={prod.name} 
-                  onChange={(e) => {
-                    const newProds = [...formData.products];
-                    newProds[index].name = e.target.value;
-                    setFormData({...formData, products: newProds});
-                  }} 
-                />
-                <Box sx={{ display: 'flex', gap: 1 }}>
+            {!editingProjectId && formData.products?.map((prod: any, index: number) => {
+              const isFeet = prod.unit === 'feet' || prod.unit === 'sq_ft';
+              const l = parseFloat(prod.length) || 0;
+              const w = parseFloat(prod.width) || 0;
+              const area = isFeet ? (l * w) : ((l * w) / 144);
+
+              return (
+                <Box key={index} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, p: 2, border: '1px solid #e0e0e0', bgcolor: '#fafafa', borderRadius: 2, position: 'relative' }}>
+                  {formData.products.length > 1 && (
+                    <IconButton 
+                      size="small" 
+                      color="error" 
+                      sx={{ position: 'absolute', top: -10, right: -10, bgcolor: '#fff', boxShadow: 1, '&:hover': { bgcolor: '#ffebee' } }}
+                      onClick={() => {
+                        const newProds = [...formData.products];
+                        newProds.splice(index, 1);
+                        setFormData({ ...formData, products: newProds });
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  )}
                   <TextField 
-                    label="Length (L)" 
+                    label="Product Name / Material Name" 
+                    fullWidth 
                     size="small"
-                    value={prod.length} 
+                    value={prod.name} 
                     onChange={(e) => {
                       const newProds = [...formData.products];
-                      newProds[index].length = e.target.value;
+                      newProds[index].name = e.target.value;
                       setFormData({...formData, products: newProds});
                     }} 
                   />
-                  <TextField 
-                    label="Width (W)" 
-                    size="small"
-                    value={prod.width} 
-                    onChange={(e) => {
-                      const newProds = [...formData.products];
-                      newProds[index].width = e.target.value;
-                      setFormData({...formData, products: newProds});
-                    }} 
-                  />
-                  <TextField 
-                    label="Thickness (MM)" 
-                    size="small"
-                    value={prod.thickness} 
-                    onChange={(e) => {
-                      const newProds = [...formData.products];
-                      newProds[index].thickness = e.target.value;
-                      setFormData({...formData, products: newProds});
-                    }} 
-                  />
-                  <TextField 
-                    label="Pieces" 
-                    type="number"
-                    size="small"
-                    value={prod.pieces} 
-                    onChange={(e) => {
-                      const newProds = [...formData.products];
-                      newProds[index].pieces = parseInt(e.target.value) || 0;
-                      setFormData({...formData, products: newProds});
-                    }} 
-                  />
+                  <Grid container spacing={1.5} alignItems="center">
+                    <Grid item xs={6} sm={3}>
+                      <TextField 
+                        label="Length (L)" 
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={prod.length} 
+                        onChange={(e) => {
+                          const newProds = [...formData.products];
+                          newProds[index].length = e.target.value;
+                          setFormData({...formData, products: newProds});
+                        }} 
+                      />
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <TextField 
+                        label="Width (W)" 
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={prod.width} 
+                        onChange={(e) => {
+                          const newProds = [...formData.products];
+                          newProds[index].width = e.target.value;
+                          setFormData({...formData, products: newProds});
+                        }} 
+                      />
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Unit</InputLabel>
+                        <Select
+                          label="Unit"
+                          value={prod.unit || 'inch'}
+                          onChange={(e) => {
+                            const newProds = [...formData.products];
+                            newProds[index].unit = e.target.value;
+                            setFormData({...formData, products: newProds});
+                          }}
+                        >
+                          <MenuItem value="inch">Inch</MenuItem>
+                          <MenuItem value="feet">Sq.Ft (Feet)</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <TextField 
+                        label="Thickness (MM)" 
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={prod.thickness} 
+                        onChange={(e) => {
+                          const newProds = [...formData.products];
+                          newProds[index].thickness = e.target.value;
+                          setFormData({...formData, products: newProds});
+                        }} 
+                      />
+                    </Grid>
+                  </Grid>
+                  {l > 0 && w > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                      <Chip 
+                        size="small" 
+                        label={`Area: ${area.toFixed(2)} Sq.Ft`} 
+                        sx={{ bgcolor: '#fff', border: '1px solid #d59853', color: '#b37731', fontWeight: 'bold' }}
+                      />
+                    </Box>
+                  )}
                 </Box>
-              </Box>
-            ))}
+              );
+            })}
 
             <Box sx={{ display: 'flex', gap: 2, mt: editingProjectId ? 0 : 1 }}>
               {editingProjectId && (
