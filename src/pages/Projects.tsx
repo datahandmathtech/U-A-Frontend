@@ -49,10 +49,11 @@ const Projects: React.FC = () => {
     try {
       const existingProject = projectsData?.find((p: any) => p.id === editingProjectId);
       if (editingProjectId && existingProject) {
+        const { products, ...updatePayload } = formData;
         await updateProject({ 
           id: editingProjectId, 
           data: {
-            ...formData, 
+            ...updatePayload, 
             totalPieces: parseInt(formData.totalPieces) || 0,
             deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : undefined,
             startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
