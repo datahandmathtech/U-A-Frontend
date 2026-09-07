@@ -339,7 +339,8 @@ const ProjectDetails: React.FC = () => {
   const [syncSlabs] = useSyncSlabsMutation();
 
   const user = useSelector((state: any) => state.auth.user);
-  const hasCrmAccess = !user?.modulesAccess || user.modulesAccess.length === 0 || user.modulesAccess.includes('/crm');
+  const isSuperAdmin = user?.role === 'admin' && (!user?.modulesAccess || user.modulesAccess.length === 0);
+  const hasCrmAccess = isSuperAdmin || (Array.isArray(user?.modulesAccess) && user.modulesAccess.includes('/crm'));
   const isCrmView = location.pathname.includes('/crm') && hasCrmAccess;
 
   const [activeStep, setActiveStep] = useState(0);

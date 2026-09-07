@@ -23,7 +23,8 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
   const dispatch = useDispatch();
 
   const user = useSelector((state: any) => state.auth.user);
-  const hasCrmAccess = !user?.modulesAccess || user.modulesAccess.length === 0 || user.modulesAccess.includes('/crm');
+  const isSuperAdmin = user?.role === 'admin' && (!user?.modulesAccess || user.modulesAccess.length === 0);
+  const hasCrmAccess = isSuperAdmin || (Array.isArray(user?.modulesAccess) && user.modulesAccess.includes('/crm'));
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [crmOpen, setCrmOpen] = React.useState(false);
@@ -188,7 +189,7 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                   <ListItemText primary={pageType === 'crm' ? "← Back to Pipeline" : "← Back to Projects"} />
                 </MenuItem>
                 
-                {pageType === 'crm' && hasCrmAccess && (
+                {hasCrmAccess && (
                   <>
                     <Divider />
                     <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
