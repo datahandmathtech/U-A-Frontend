@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
@@ -337,6 +338,10 @@ const ProjectDetails: React.FC = () => {
   const [deleteSlab] = useDeleteSlabMutation();
   const [syncSlabs] = useSyncSlabsMutation();
 
+  const user = useSelector((state: any) => state.auth.user);
+  const hasCrmAccess = !user?.modulesAccess || user.modulesAccess.length === 0 || user.modulesAccess.includes('/crm');
+  const isCrmView = location.pathname.includes('/crm') && hasCrmAccess;
+
   const [activeStep, setActiveStep] = useState(0);
   const [viewingStepOverride, setViewingStepOverride] = useState<number | null>(null);
 
@@ -348,8 +353,18 @@ const ProjectDetails: React.FC = () => {
   const viewParam = queryParams.get('view');
 
   React.useEffect(() => {
-    setViewingStepOverride(viewParam !== null ? parseInt(viewParam, 10) : null);
-  }, [viewParam]);
+    if (viewParam !== null) {
+      const parsedView = parseInt(viewParam, 10);
+      if (isCrmView) {
+        setViewingStepOverride(parsedView);
+      } else {
+        // In Active Work Orders, only allow production steps (>= 4)
+        setViewingStepOverride(parsedView >= 4 ? parsedView : 4);
+      }
+    } else {
+      setViewingStepOverride(null);
+    }
+  }, [viewParam, isCrmView]);
   const [designFinalizedDate, setDesignFinalizedDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -950,30 +965,37 @@ const ProjectDetails: React.FC = () => {
   if (isLoading) return <Typography sx={{ p: 4 }}>Loading Project Details...</Typography>;
   if (!project) return <Typography sx={{ p: 4 }}>Project not found.</Typography>;
 
-  const isCrmView = location.pathname.includes('/crm');
   const isProjectActive = project ? ['shop_drawing', 'material_planning', 'production', 'work_order', 'completed'].includes(project.status) : false;
   const currentSteps = isCrmView ? crmSteps : projectSteps;
   const displayActiveStep = isCrmView
     ? (activeStep < 4 ? activeStep : 4)
     : (activeStep >= 4 ? activeStep - 4 : 0);
-  const stepToRender = viewingStepOverride !== null 
-    ? viewingStepOverride 
-    : (isCrmView ? Math.min(3, activeStep) : Math.max(4, activeStep));
+  
+  // In Active Work Orders, stepToRender MUST ALWAYS be >= 4 (Shop Drawing, Material Planning, Production Pipeline)
+  const stepToRender = isCrmView
+    ? (viewingStepOverride !== null ? Math.min(3, viewingStepOverride) : Math.min(3, activeStep))
+    : (viewingStepOverride !== null && viewingStepOverride >= 4 ? viewingStepOverride : Math.max(4, activeStep));
 
   const handleGoBackStep = () => {
+    if (!isCrmView) {
+      if (viewingStepOverride !== null) {
+        setViewingStepOverride(null);
+        return;
+      }
+      navigate('/projects');
+      return;
+    }
+
     if (viewingStepOverride !== null) {
       setViewingStepOverride(null);
       return;
     }
-    const currentStepVal = isCrmView ? Math.min(3, activeStep) : Math.max(4, activeStep);
+    const currentStepVal = Math.min(3, activeStep);
     
-    if (currentStepVal === 0) navigate(-1);
+    if (currentStepVal === 0) navigate('/crm');
     else if (currentStepVal === 1) handleNextStage('enquiry');
     else if (currentStepVal === 2) handleNextStage('design_sharing');
     else if (currentStepVal === 3) handleNextStage('quotation');
-    else if (currentStepVal === 4) handleNextStage('advance_payment');
-    else if (currentStepVal === 5) handleNextStage('shop_drawing');
-    else if (currentStepVal === 6) handleNextStage('material_planning');
   };
 
   return (
@@ -985,15 +1007,17 @@ const ProjectDetails: React.FC = () => {
           sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'transparent' } }}
           disableRipple
         >
-          Back
+          {isCrmView ? 'Back' : 'Back to Work Orders'}
         </Button>
-        <IconButton 
-          onClick={() => navigate('/crm')} 
-          title="Back to Pipeline"
-          sx={{ bgcolor: '#FFFDF5', color: '#B38B36', border: '1px solid #E8E1D5', '&:hover': { bgcolor: '#F0E6D2' } }}
-        >
-          <FilterListIcon />
-        </IconButton>
+        {isCrmView && hasCrmAccess && (
+          <IconButton 
+            onClick={() => navigate('/crm')} 
+            title="Back to Pipeline"
+            sx={{ bgcolor: '#FFFDF5', color: '#B38B36', border: '1px solid #E8E1D5', '&:hover': { bgcolor: '#F0E6D2' } }}
+          >
+            <FilterListIcon />
+          </IconButton>
+        )}
       </Box>
 
       
