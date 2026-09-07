@@ -5,7 +5,7 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../store/authSlice';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
@@ -21,6 +21,9 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  const user = useSelector((state: any) => state.auth.user);
+  const hasCrmAccess = !user?.modulesAccess || user.modulesAccess.length === 0 || user.modulesAccess.includes('/crm');
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [crmOpen, setCrmOpen] = React.useState(false);
@@ -51,9 +54,10 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
     const isDirectSkipped = project?.isDirectWorkOrder && stepIndex < 5;
     const isCompleted = !isDirectSkipped && dbStep > stepIndex;
     const isCurrent = dbStep === stepIndex;
+    const targetPath = (pageType === 'projects' || isProjectActive) ? `/projects/${projectId}` : `/crm/${projectId}`;
     
     return (
-      <MenuItem onClick={() => { handleMenuClose(); navigate(`/${isProjectActive ? 'projects' : 'crm'}/${projectId}?view=${viewParam}`); }} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.5, pl: 3 }}>
+      <MenuItem onClick={() => { handleMenuClose(); navigate(`${targetPath}?view=${viewParam}`); }} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.5, pl: 3 }}>
          {isCompleted ? <CheckCircleIcon color="success" fontSize="small" sx={{ mt: 0.2 }} /> : isCurrent ? <RadioButtonCheckedIcon color="primary" fontSize="small" sx={{ mt: 0.2 }} /> : <RadioButtonUncheckedIcon color="disabled" fontSize="small" sx={{ mt: 0.2 }} />}
          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
             <Typography variant="body2" fontWeight={isCurrent ? 'bold' : 'medium'} color={isCompleted || isCurrent ? 'text.primary' : 'text.secondary'}>
@@ -184,28 +188,32 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                   <ListItemText primary={pageType === 'crm' ? "← Back to Pipeline" : "← Back to Projects"} />
                 </MenuItem>
                 
-                <Divider />
-                <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
-                  <Box 
-                    onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}`); }} 
-                    sx={{ flexGrow: 1, py: 1, pl: 2, cursor: 'pointer' }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>CRM Details</Typography>
-                  </Box>
-                  <IconButton onClick={(e) => { e.stopPropagation(); handleCrmToggle(e); }} size="small" sx={{ mr: 1 }}>
-                    {crmOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                  </IconButton>
-                </MenuItem>
-                <Collapse in={crmOpen} timeout="auto" unmountOnExit>
-                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    {renderMenuItem("Enquiry Details", 0, 0)}
-                    {renderMenuItem("Reference Design", 1, 1)}
-                    {renderMenuItem("Costing & Quotation", 2, 2)}
-                    {renderMenuItem("Advance Payment", 3, 3)}
-                  </Box>
-                </Collapse>
+                {pageType === 'crm' && hasCrmAccess && (
+                  <>
+                    <Divider />
+                    <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
+                      <Box 
+                        onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}`); }} 
+                        sx={{ flexGrow: 1, py: 1, pl: 2, cursor: 'pointer' }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>CRM Details</Typography>
+                      </Box>
+                      <IconButton onClick={(e) => { e.stopPropagation(); handleCrmToggle(e); }} size="small" sx={{ mr: 1 }}>
+                        {crmOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                      </IconButton>
+                    </MenuItem>
+                    <Collapse in={crmOpen} timeout="auto" unmountOnExit>
+                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        {renderMenuItem("Enquiry Details", 0, 0)}
+                        {renderMenuItem("Reference Design", 1, 1)}
+                        {renderMenuItem("Costing & Quotation", 2, 2)}
+                        {renderMenuItem("Advance Payment", 3, 3)}
+                      </Box>
+                    </Collapse>
+                  </>
+                )}
 
-                {isProjectActive && (
+                {(isProjectActive || pageType === 'projects') && (
                   <>
                     <Divider />
                     <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
