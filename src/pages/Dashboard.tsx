@@ -6,13 +6,12 @@ import {
   Button,
   Grid,
   Chip,
-  FormControl,
-  InputLabel,
   Select,
   MenuItem,
   Card,
   Avatar,
-  CircularProgress
+  CircularProgress,
+  Skeleton
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,11 +23,7 @@ import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
 import LiveTvRoundedIcon from '@mui/icons-material/LiveTvRounded';
-import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import FilterAltRoundedIcon from '@mui/icons-material/FilterAltRounded';
-import PendingActionsRoundedIcon from '@mui/icons-material/PendingActionsRounded';
-import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
-import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
@@ -42,7 +37,7 @@ interface DashboardCardProps {
   colorHint?: string;
   bgHint?: string;
   borderHint?: string;
-  onClick?: () => void;
+  loading?: boolean;
 }
 
 const DashboardCard: React.FC<DashboardCardProps> = ({
@@ -53,10 +48,9 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   colorHint = '#C89F5A',
   bgHint = '#FFF4E5',
   borderHint = '#FFE0B2',
-  onClick
+  loading = false
 }) => (
   <Card
-    onClick={onClick}
     sx={{
       p: 2.5,
       borderRadius: 3.5,
@@ -66,15 +60,13 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      cursor: onClick ? 'pointer' : 'default',
+      cursor: 'default',
+      userSelect: 'none',
       transition: 'all 0.2s ease',
-      '&:hover': onClick
-        ? {
-            transform: 'translateY(-2px)',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.06)',
-            borderColor: colorHint
-          }
-        : {}
+      '&:hover': {
+        boxShadow: '0 4px 14px rgba(0,0,0,0.04)',
+        borderColor: '#CBD5E1'
+      }
     }}
   >
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
@@ -94,9 +86,13 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
         <Icon sx={{ fontSize: 20 }} />
       </Avatar>
     </Box>
-    <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1, mb: 0.5 }}>
-      {value}
-    </Typography>
+    {loading ? (
+      <Skeleton variant="text" width="60%" height={40} />
+    ) : (
+      <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1, mb: 0.5 }}>
+        {value}
+      </Typography>
+    )}
     {subtitle && (
       <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500 }}>
         {subtitle}
@@ -113,7 +109,10 @@ const Dashboard: React.FC = () => {
   const [selectedFY, setSelectedFY] = useState<string>(currentFY);
   const [selectedMonth, setSelectedMonth] = useState<number | ''>('');
 
-  const { data: summary, isLoading } = useGetDashboardSummaryQuery({ fy: selectedFY, month: selectedMonth });
+  const { data: summary, isLoading, isFetching } = useGetDashboardSummaryQuery(
+    { fy: selectedFY, month: selectedMonth },
+    { refetchOnFocus: false }
+  );
   const navigate = useNavigate();
 
   return (
@@ -135,8 +134,9 @@ const Dashboard: React.FC = () => {
               Executive Dashboard
             </Typography>
             <Chip
-              label="Live Overview"
+              label={isFetching ? 'Updating...' : 'Live Overview'}
               size="small"
+              icon={isFetching ? <CircularProgress size={12} sx={{ color: '#059669' }} /> : undefined}
               sx={{
                 bgcolor: '#ECFDF5',
                 color: '#059669',
@@ -222,191 +222,175 @@ const Dashboard: React.FC = () => {
         </Box>
       </Box>
 
-      {isLoading ? (
-        <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '1px solid #E2E8F0' }}>
-          <CircularProgress sx={{ color: '#C89F5A', mb: 2 }} />
-          <Typography variant="body1" sx={{ color: '#64748B', fontWeight: 600 }}>
-            Loading dashboard analytics...
-          </Typography>
-        </Paper>
-      ) : (
-        <>
-          {/* 2. Primary KPI Metric Cards */}
-          <Grid container spacing={2.5} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DashboardCard
-                icon={FilterAltRoundedIcon}
-                title="Total Enquiries"
-                value={summary?.totalLeads || 0}
-                subtitle="Active pipeline leads"
-                colorHint="#6366F1"
-                bgHint="#EEF2FF"
-                borderHint="#C7D2FE"
-                onClick={() => navigate('/crm')}
-              />
-            </Grid>
+      {/* 2. Primary KPI Metric Cards - Static Analytical Display without navigation */}
+      <Grid container spacing={2.5} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <DashboardCard
+            icon={FilterAltRoundedIcon}
+            title="Total Enquiries"
+            value={summary?.totalLeads || 0}
+            subtitle="Active pipeline leads"
+            colorHint="#6366F1"
+            bgHint="#EEF2FF"
+            borderHint="#C7D2FE"
+            loading={isLoading}
+          />
+        </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DashboardCard
-                icon={DashboardRoundedIcon}
-                title="Active Work Orders"
-                value={summary?.activeProjects || 0}
-                subtitle="Live production orders"
-                colorHint="#C89F5A"
-                bgHint="#FFF4E5"
-                borderHint="#FFE0B2"
-                onClick={() => navigate('/projects')}
-              />
-            </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <DashboardCard
+            icon={DashboardRoundedIcon}
+            title="Active Work Orders"
+            value={summary?.activeProjects || 0}
+            subtitle="Live production orders"
+            colorHint="#C89F5A"
+            bgHint="#FFF4E5"
+            borderHint="#FFE0B2"
+            loading={isLoading}
+          />
+        </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DashboardCard
-                icon={LocalShippingRoundedIcon}
-                title="Dispatch Ready"
-                value={summary?.readyForDispatch || 0}
-                subtitle="Completed pieces for loading"
-                colorHint="#0284C7"
-                bgHint="#F0F9FF"
-                borderHint="#BAE6FD"
-                onClick={() => navigate('/projects')}
-              />
-            </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <DashboardCard
+            icon={LocalShippingRoundedIcon}
+            title="Dispatch Ready"
+            value={summary?.readyForDispatch || 0}
+            subtitle="Completed pieces for loading"
+            colorHint="#0284C7"
+            bgHint="#F0F9FF"
+            borderHint="#BAE6FD"
+            loading={isLoading}
+          />
+        </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DashboardCard
-                icon={MonetizationOnRoundedIcon}
-                title="Net Profit"
-                value={`₹${summary?.profitability?.netProfit?.toLocaleString() || 0}`}
-                subtitle="Revenue minus total costs"
-                colorHint="#059669"
-                bgHint="#ECFDF5"
-                borderHint="#A7F3D0"
-              />
-            </Grid>
-          </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <DashboardCard
+            icon={MonetizationOnRoundedIcon}
+            title="Net Profit"
+            value={`₹${summary?.profitability?.netProfit?.toLocaleString() || 0}`}
+            subtitle="Revenue minus total costs"
+            colorHint="#059669"
+            bgHint="#ECFDF5"
+            borderHint="#A7F3D0"
+            loading={isLoading}
+          />
+        </Grid>
+      </Grid>
 
-          {/* 3. Financial & Cost Summary Strip */}
-          <Grid container spacing={2.5} sx={{ mb: 4 }}>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DashboardCard
-                icon={AccountBalanceWalletRoundedIcon}
-                title="Advance Payments"
-                value={`₹${summary?.pendingInvoicesTotal?.toLocaleString() || 0}`}
-                subtitle="Received from clients"
-                colorHint="#059669"
-                bgHint="#ECFDF5"
-                borderHint="#A7F3D0"
-              />
-            </Grid>
+      {/* 3. Financial & Cost Summary Strip */}
+      <Grid container spacing={2.5} sx={{ mb: 4 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <DashboardCard
+            icon={AccountBalanceWalletRoundedIcon}
+            title="Advance Payments"
+            value={`₹${summary?.pendingInvoicesTotal?.toLocaleString() || 0}`}
+            subtitle="Received from clients"
+            colorHint="#059669"
+            bgHint="#ECFDF5"
+            borderHint="#A7F3D0"
+            loading={isLoading}
+          />
+        </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DashboardCard
-                icon={ReceiptLongRoundedIcon}
-                title="Pending Quotations"
-                value={summary?.pendingQuotations || 0}
-                subtitle="Awaiting client confirmation"
-                colorHint="#D97706"
-                bgHint="#FFFBEB"
-                borderHint="#FDE68A"
-                onClick={() => navigate('/crm')}
-              />
-            </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <DashboardCard
+            icon={ReceiptLongRoundedIcon}
+            title="Pending Quotations"
+            value={summary?.pendingQuotations || 0}
+            subtitle="Awaiting client confirmation"
+            colorHint="#D97706"
+            bgHint="#FFFBEB"
+            borderHint="#FDE68A"
+            loading={isLoading}
+          />
+        </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DashboardCard
-                icon={PrecisionManufacturingRoundedIcon}
-                title="Factory Expenses"
-                value={`₹${summary?.profitability?.factoryExpenses?.toLocaleString() || 0}`}
-                subtitle="Operational maintenance"
-                colorHint="#DC2626"
-                bgHint="#FEF2F2"
-                borderHint="#FCA5A5"
-              />
-            </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <DashboardCard
+            icon={PrecisionManufacturingRoundedIcon}
+            title="Factory Expenses"
+            value={`₹${summary?.profitability?.factoryExpenses?.toLocaleString() || 0}`}
+            subtitle="Operational maintenance"
+            colorHint="#DC2626"
+            bgHint="#FEF2F2"
+            borderHint="#FCA5A5"
+            loading={isLoading}
+          />
+        </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DashboardCard
-                icon={PeopleAltRoundedIcon}
-                title="Labor / Staff Cost"
-                value={`₹${summary?.profitability?.laborCost?.toLocaleString() || 0}`}
-                subtitle="Factory wages & OT"
-                colorHint="#D97706"
-                bgHint="#FFFBEB"
-                borderHint="#FDE68A"
-                onClick={() => navigate('/hr')}
-              />
-            </Grid>
-          </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <DashboardCard
+            icon={PeopleAltRoundedIcon}
+            title="Labor / Staff Cost"
+            value={`₹${summary?.profitability?.laborCost?.toLocaleString() || 0}`}
+            subtitle="Factory wages & OT"
+            colorHint="#D97706"
+            bgHint="#FFFBEB"
+            borderHint="#FDE68A"
+            loading={isLoading}
+          />
+        </Grid>
+      </Grid>
 
-          {/* 4. Quick Action Shortcuts */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 4,
-              bgcolor: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 2 }}>
-              Quick Factory Jump Links
-            </Typography>
-            <Grid container spacing={2}>
-              {[
-                { title: 'Enquiries Pipeline', desc: 'CRM leads & quotations', path: '/crm', icon: FilterAltRoundedIcon, color: '#6366F1', bg: '#EEF2FF' },
-                { title: 'Active Work Orders', desc: 'Slab tracking & pieces', path: '/projects', icon: DashboardRoundedIcon, color: '#C89F5A', bg: '#FFF4E5' },
-                { title: 'Approval Queue', desc: 'Outward pieces verification', path: '/approvals', icon: PendingActionsRoundedIcon, color: '#0284C7', bg: '#F0F9FF' },
-                { title: 'Material Log Book', desc: 'Machine in/out logs', path: '/log-book', icon: MenuBookRoundedIcon, color: '#059669', bg: '#ECFDF5' },
-                { title: 'Stock & Inventory', desc: 'Raw marble & consumables', path: '/inventory', icon: Inventory2RoundedIcon, color: '#D97706', bg: '#FFFBEB' },
-                { title: 'Live Factory Feed', desc: 'Camera & active sessions', path: '/live-feed', icon: LiveTvRoundedIcon, color: '#DC2626', bg: '#FEF2F2' }
-              ].map((item) => {
-                const ItemIcon = item.icon;
-                return (
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.title}>
-                    <Paper
-                      onClick={() => navigate(item.path)}
-                      elevation={0}
-                      sx={{
-                        p: 2,
-                        borderRadius: 3,
-                        bgcolor: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          bgcolor: '#FFFFFF',
-                          borderColor: item.color,
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 6px 16px rgba(0,0,0,0.04)'
-                        }
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ bgcolor: item.bg, color: item.color, width: 38, height: 38 }}>
-                          <ItemIcon sx={{ fontSize: 20 }} />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E293B' }}>
-                            {item.title}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#64748B' }}>
-                            {item.desc}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <ArrowForwardRoundedIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
-                    </Paper>
-                  </Grid>
-                );
-              })}
-            </Grid>
-          </Paper>
-        </>
-      )}
+      {/* 4. Factory Module Information Overview */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3,
+          borderRadius: 4,
+          bgcolor: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 2 }}>
+          Factory Modules Overview
+        </Typography>
+        <Grid container spacing={2}>
+          {[
+            { title: 'Enquiries Pipeline', desc: 'CRM leads & quotations', icon: FilterAltRoundedIcon, color: '#6366F1', bg: '#EEF2FF' },
+            { title: 'Active Work Orders', desc: 'Slab tracking & pieces', icon: DashboardRoundedIcon, color: '#C89F5A', bg: '#FFF4E5' },
+            { title: 'Approval Queue', desc: 'Outward pieces verification', icon: PrecisionManufacturingRoundedIcon, color: '#0284C7', bg: '#F0F9FF' },
+            { title: 'Material Log Book', desc: 'Machine in/out logs', icon: ReceiptLongRoundedIcon, color: '#059669', bg: '#ECFDF5' },
+            { title: 'Stock & Inventory', desc: 'Raw marble & consumables', icon: LocalShippingRoundedIcon, color: '#D97706', bg: '#FFFBEB' },
+            { title: 'Live Factory Feed', desc: 'Camera & active sessions', icon: LiveTvRoundedIcon, color: '#DC2626', bg: '#FEF2F2' }
+          ].map((item) => {
+            const ItemIcon = item.icon;
+            return (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.title}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    borderRadius: 3,
+                    bgcolor: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    cursor: 'default',
+                    userSelect: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Avatar sx={{ bgcolor: item.bg, color: item.color, width: 38, height: 38 }}>
+                      <ItemIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E293B' }}>
+                        {item.title}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748B' }}>
+                        {item.desc}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Paper>
+              </Grid>
+            );
+          })}
+        </Grid>
+      </Paper>
     </Box>
   );
 };
