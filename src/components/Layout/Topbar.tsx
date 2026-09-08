@@ -1,15 +1,39 @@
 import React, { useState } from 'react';
-import { AppBar, Toolbar, IconButton, Typography, Box, Menu, MenuItem, Divider, ListItemText, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
+import {
+  AppBar,
+  Toolbar,
+  IconButton,
+  Typography,
+  Box,
+  Menu,
+  MenuItem,
+  Divider,
+  Collapse,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Avatar,
+  Chip,
+  Tooltip
+} from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import AccountCircle from '@mui/icons-material/AccountCircle';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../store/authSlice';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import RadioButtonCheckedRoundedIcon from '@mui/icons-material/RadioButtonCheckedRounded';
+import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import EventRoundedIcon from '@mui/icons-material/EventRounded';
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
+import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { useGetProjectByIdQuery, useUpdateProjectMutation } from '../../store/apiSlice';
 
 interface TopbarProps {
@@ -27,8 +51,8 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
   const hasCrmAccess = isSuperAdmin || (Array.isArray(user?.modulesAccess) && user.modulesAccess.includes('/crm'));
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [crmOpen, setCrmOpen] = React.useState(false);
-  const [projectOpen, setProjectOpen] = React.useState(false);
+  const [crmOpen, setCrmOpen] = React.useState(true);
+  const [projectOpen, setProjectOpen] = React.useState(true);
 
   // Parse path to see if we are on a project/crm details page
   const match = location.pathname.match(/\/(crm|projects)\/([a-fA-F0-9-]+|[0-9a-fA-F]{24})/);
@@ -51,30 +75,79 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
 
   const dbStep = project ? getStepIndex(project.status) : 0;
 
-  const renderMenuItem = (label: string, stepIndex: number, viewParam: number) => {
+  const renderMenuItem = (label: string, stepNumber: number, stepIndex: number, viewParam: number) => {
     const isDirectSkipped = project?.isDirectWorkOrder && stepIndex < 5;
     const isCompleted = !isDirectSkipped && dbStep > stepIndex;
     const isCurrent = dbStep === stepIndex;
     const targetPath = stepIndex < 4 ? `/crm/${projectId}` : `/projects/${projectId}`;
-    
+
     return (
-      <MenuItem onClick={() => { handleMenuClose(); navigate(`${targetPath}?view=${viewParam}`); }} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.5, pl: 3 }}>
-         {isCompleted ? <CheckCircleIcon color="success" fontSize="small" sx={{ mt: 0.2 }} /> : isCurrent ? <RadioButtonCheckedIcon color="primary" fontSize="small" sx={{ mt: 0.2 }} /> : <RadioButtonUncheckedIcon color="disabled" fontSize="small" sx={{ mt: 0.2 }} />}
-         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="body2" fontWeight={isCurrent ? 'bold' : 'medium'} color={isCompleted || isCurrent ? 'text.primary' : 'text.secondary'}>
+      <MenuItem
+        key={label}
+        onClick={() => {
+          handleMenuClose();
+          navigate(`${targetPath}?view=${viewParam}`);
+        }}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1.5,
+          py: 1.25,
+          px: 2,
+          mx: 1,
+          my: 0.5,
+          borderRadius: 2.5,
+          bgcolor: isCurrent ? '#FFFDF5' : 'transparent',
+          border: '1px solid',
+          borderColor: isCurrent ? '#C89F5A' : 'transparent',
+          transition: 'all 0.15s ease',
+          '&:hover': {
+            bgcolor: isCurrent ? '#FFF8EB' : '#F8FAFC',
+            transform: 'translateX(2px)'
+          }
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {isCompleted ? (
+            <Avatar sx={{ width: 26, height: 26, bgcolor: '#ECFDF5', color: '#10B981' }}>
+              <CheckCircleRoundedIcon sx={{ fontSize: 18 }} />
+            </Avatar>
+          ) : isCurrent ? (
+            <Avatar sx={{ width: 26, height: 26, bgcolor: '#FFF4E5', color: '#C89F5A', border: '1.5px solid #C89F5A' }}>
+              <RadioButtonCheckedRoundedIcon sx={{ fontSize: 18 }} />
+            </Avatar>
+          ) : (
+            <Avatar sx={{ width: 26, height: 26, bgcolor: '#F1F5F9', color: '#94A3B8', fontSize: '0.75rem', fontWeight: 700 }}>
+              {stepNumber}
+            </Avatar>
+          )}
+
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: isCurrent ? 700 : isCompleted ? 600 : 500,
+                color: isCurrent ? '#1E293B' : isCompleted ? '#334155' : '#64748B',
+                fontSize: '0.85rem'
+              }}
+            >
               {label}
             </Typography>
-            {isCompleted ? (
-              <Typography variant="caption" color="success.main">Completed</Typography>
-            ) : isCurrent ? (
-              <Typography variant="caption" color="primary.main">In Progress</Typography>
-            ) : isDirectSkipped ? (
-              <Typography variant="caption" color="text.disabled">Skipped (Direct Work Order)</Typography>
-            ) : null}
-         </Box>
+          </Box>
+        </Box>
+
+        {isCompleted ? (
+          <Chip label="Completed" size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#ECFDF5', color: '#059669' }} />
+        ) : isCurrent ? (
+          <Chip label="In Progress" size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#FFF4E5', color: '#B38B36', border: '1px solid #FFE0B2' }} />
+        ) : isDirectSkipped ? (
+          <Chip label="Skipped" size="small" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600, bgcolor: '#F1F5F9', color: '#94A3B8' }} />
+        ) : null}
       </MenuItem>
     );
   };
+
   const [updateProject] = useUpdateProjectMutation();
   const isProjectActive = project ? ['shop_drawing', 'material_planning', 'production', 'work_order', 'completed'].includes(project.status) : false;
 
@@ -110,8 +183,8 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
-    setCrmOpen(pageType === 'crm');
-    setProjectOpen(pageType === 'projects' || isProjectActive);
+    setCrmOpen(true);
+    setProjectOpen(true);
   };
   const handleMenuClose = () => {
     setAnchorEl(null);
@@ -119,12 +192,12 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
 
   const handleCrmToggle = (event: React.MouseEvent) => {
     event.stopPropagation();
-    setCrmOpen(prev => !prev);
+    setCrmOpen((prev) => !prev);
   };
 
   const handleProjectToggle = (event: React.MouseEvent) => {
     event.stopPropagation();
-    setProjectOpen(prev => !prev);
+    setProjectOpen((prev) => !prev);
   };
 
   const handleLogout = () => {
@@ -139,144 +212,365 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
       sx={{
         width: { sm: `calc(100% - ${drawerWidth}px)` },
         ml: { sm: `${drawerWidth}px` },
-        backgroundColor: 'background.paper',
-        color: 'text.primary',
-        boxShadow: 'none',
-        borderBottom: '1px solid',
-        borderColor: 'divider'
+        backgroundColor: '#FFFFFF',
+        color: '#1E293B',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        borderBottom: '1px solid #E2E8F0'
       }}
     >
-      <Toolbar>
-        <IconButton
-          color="inherit"
-          aria-label="open drawer"
-          edge="start"
-          onClick={handleDrawerToggle}
-          sx={{ mr: 2, display: { sm: 'none' } }}
-        >
-          <MenuIcon />
-        </IconButton>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexGrow: 1 }}>
-          <img src="/logo.png" alt="Unnati Arts" style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
-          <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold', color: 'text.primary', display: { xs: 'none', sm: 'block' } }}>
-            ERP
-          </Typography>
-        </Box>
-        <Box>
+      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', px: { xs: 2, md: 3 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <IconButton
-            size="large"
-            edge="end"
-            aria-label="account of current user"
-            aria-haspopup="true"
             color="inherit"
-            onClick={handleMenuOpen}
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 1, display: { sm: 'none' } }}
           >
-            <AccountCircle />
+            <MenuIcon />
           </IconButton>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px', fontSize: '1.1rem' }}>
+              Unnati Arts
+            </Typography>
+            <Chip
+              label="ERP v2.0"
+              size="small"
+              sx={{
+                bgcolor: '#FFF4E5',
+                color: '#B38B36',
+                fontWeight: 800,
+                fontSize: '0.68rem',
+                height: 20,
+                border: '1px solid #FFE0B2',
+                borderRadius: 1
+              }}
+            />
+          </Box>
+        </Box>
+
+        {/* User Profile & Project Stepper Quick Trigger */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {isProjectPage && project && (
+            <Chip
+              icon={<LayersRoundedIcon sx={{ fontSize: '15px !important', color: '#B38B36 !important' }} />}
+              label={`${project.projectId || 'Project'}: ${project.name || ''}`}
+              size="small"
+              onClick={handleMenuOpen}
+              sx={{
+                bgcolor: '#FFFDF5',
+                color: '#1E293B',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                border: '1px solid #C89F5A',
+                cursor: 'pointer',
+                display: { xs: 'none', md: 'flex' },
+                '&:hover': { bgcolor: '#FFF4E5' }
+              }}
+            />
+          )}
+
+          <Tooltip title="Account & Navigation Menu">
+            <Button
+              onClick={handleMenuOpen}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25,
+                textTransform: 'none',
+                p: 0.5,
+                pl: 1.25,
+                pr: 1.5,
+                borderRadius: 4,
+                bgcolor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                transition: 'all 0.2s ease',
+                '&:hover': { bgcolor: '#F1F5F9', borderColor: '#CBD5E1' }
+              }}
+            >
+              <Avatar
+                sx={{
+                  width: 32,
+                  height: 32,
+                  bgcolor: '#C89F5A',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.85rem'
+                }}
+              >
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </Avatar>
+              <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E293B', lineHeight: 1.1, fontSize: '0.82rem' }}>
+                  {user?.name || 'User Account'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', lineHeight: 1, fontSize: '0.7rem' }}>
+                  {user?.role === 'admin' ? 'Administrator' : 'Staff'}
+                </Typography>
+              </Box>
+              <ExpandMore sx={{ fontSize: 18, color: '#64748B' }} />
+            </Button>
+          </Tooltip>
+
+          {/* User & Project Navigation Popover Menu */}
           <Menu
             anchorEl={anchorEl}
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
             transformOrigin={{ horizontal: 'right', vertical: 'top' }}
             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            slotProps={{
+              paper: {
+                sx: {
+                  width: 360,
+                  maxHeight: '90vh',
+                  borderRadius: 3.5,
+                  p: 0.5,
+                  boxShadow: '0 12px 36px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)',
+                  border: '1px solid #E2E8F0'
+                }
+              }
+            }}
           >
+            {/* User Profile Card Header */}
+            <Box sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 2.5, m: 1, mb: 1.5, border: '1px solid #E2E8F0' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Avatar sx={{ width: 44, height: 44, bgcolor: '#C89F5A', color: '#FFF', fontWeight: 700, fontSize: '1.1rem' }}>
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </Avatar>
+                <Box sx={{ overflow: 'hidden' }}>
+                  <Typography variant="body1" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.2, noWrap: true }}>
+                    {user?.name || 'Logged User'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block', noWrap: true }}>
+                    {user?.email || 'admin@unnatiarts.com'}
+                  </Typography>
+                  <Chip
+                    icon={<ShieldRoundedIcon sx={{ fontSize: '13px !important', color: '#B38B36 !important' }} />}
+                    label={user?.role === 'admin' ? 'Super Administrator' : 'Staff Member'}
+                    size="small"
+                    sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, mt: 0.5, bgcolor: '#FFF4E5', color: '#B38B36' }}
+                  />
+                </Box>
+              </Box>
+            </Box>
+
             {isProjectPage && (
               <>
-                <MenuItem onClick={() => {
-                  handleMenuClose();
-                  navigate(pageType === 'crm' ? '/crm' : '/projects');
-                }} sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                  <ListItemText primary={pageType === 'crm' ? "← Back to Pipeline" : "← Back to Projects"} />
+                {/* Back to pipeline link */}
+                <MenuItem
+                  onClick={() => {
+                    handleMenuClose();
+                    navigate(pageType === 'crm' ? '/crm' : '/projects');
+                  }}
+                  sx={{
+                    mx: 1,
+                    mb: 1,
+                    borderRadius: 2,
+                    bgcolor: '#FFFDF5',
+                    color: '#B38B36',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    border: '1px solid #FFE0B2',
+                    '&:hover': { bgcolor: '#FFF4E5' }
+                  }}
+                >
+                  <ArrowBackRoundedIcon sx={{ fontSize: 16, mr: 1 }} />
+                  {pageType === 'crm' ? 'Back to Enquiries Pipeline' : 'Back to Active Work Orders'}
                 </MenuItem>
-                
+
+                {/* CRM 4-Step Stepper */}
                 {hasCrmAccess && (
-                  <>
-                    <Divider />
-                    <MenuItem onClick={handleCrmToggle} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>CRM Details</Typography>
-                      <IconButton size="small">
-                        {crmOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                      </IconButton>
-                    </MenuItem>
+                  <Box sx={{ mb: 1 }}>
+                    <Box
+                      onClick={handleCrmToggle}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        px: 2,
+                        py: 0.75,
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: '#F8FAFC' }
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        CRM Pipeline Flow (Steps 1–4)
+                      </Typography>
+                      {crmOpen ? <ExpandLess sx={{ fontSize: 18, color: '#94A3B8' }} /> : <ExpandMore sx={{ fontSize: 18, color: '#94A3B8' }} />}
+                    </Box>
+
                     <Collapse in={crmOpen} timeout="auto" unmountOnExit>
                       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        {renderMenuItem("Enquiry Details", 0, 0)}
-                        {renderMenuItem("Reference Design", 1, 1)}
-                        {renderMenuItem("Costing & Quotation", 2, 2)}
-                        {renderMenuItem("Advance Payment", 3, 3)}
+                        {renderMenuItem('1. Enquiry Details', 1, 0, 0)}
+                        {renderMenuItem('2. Reference Design', 2, 1, 1)}
+                        {renderMenuItem('3. Costing & Quotation', 3, 2, 2)}
+                        {renderMenuItem('4. Advance Payment', 4, 3, 3)}
                       </Box>
                     </Collapse>
-                  </>
+                  </Box>
                 )}
 
+                {/* Production 3-Step Stepper */}
                 {(isProjectActive || pageType === 'projects') && (
-                  <>
-                    <Divider />
-                    <MenuItem onClick={handleProjectToggle} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Project Details</Typography>
-                      <IconButton size="small">
-                        {projectOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                      </IconButton>
-                    </MenuItem>
+                  <Box sx={{ mb: 1 }}>
+                    <Divider sx={{ my: 1 }} />
+                    <Box
+                      onClick={handleProjectToggle}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        px: 2,
+                        py: 0.75,
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: '#F8FAFC' }
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Production Execution (Steps 5–7)
+                      </Typography>
+                      {projectOpen ? <ExpandLess sx={{ fontSize: 18, color: '#94A3B8' }} /> : <ExpandMore sx={{ fontSize: 18, color: '#94A3B8' }} />}
+                    </Box>
+
                     <Collapse in={projectOpen} timeout="auto" unmountOnExit>
                       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <MenuItem onClick={handleOpenDateDialog} sx={{ pl: 3, py: 1.5 }}>
-                          <ListItemText primary="Project Start & End Dates" slotProps={{ primary: { fontSize: '0.875rem', fontWeight: 'medium' } }} />
+                        <MenuItem
+                          onClick={handleOpenDateDialog}
+                          sx={{
+                            mx: 1,
+                            my: 0.5,
+                            borderRadius: 2,
+                            py: 1,
+                            px: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            color: '#475569',
+                            '&:hover': { bgcolor: '#F8FAFC' }
+                          }}
+                        >
+                          <EventRoundedIcon sx={{ fontSize: 18, color: '#C89F5A' }} />
+                          Project Start & End Dates
                         </MenuItem>
-                        {renderMenuItem("Shop Drawing & Approval", 4, 4)}
-                        {renderMenuItem("Production", 5, 5)}
-                        {renderMenuItem("Work Order Active", 6, 6)}
+                        {renderMenuItem('5. Shop Drawing & Approval', 5, 4, 4)}
+                        {renderMenuItem('6. Production Tracking', 6, 5, 5)}
+                        {renderMenuItem('7. Work Order Active', 7, 6, 6)}
                       </Box>
                     </Collapse>
-                  </>
+                  </Box>
                 )}
 
-                {/* Back to Active Step goes to /projects/:id if active, else /crm/:id */}
+                {/* Back to Active Step */}
                 {location.search.includes('view=') && (
                   <>
-                    <Divider />
-                    <MenuItem onClick={() => {
-                      handleMenuClose();
-                      navigate(isProjectActive ? `/projects/${projectId}` : `/crm/${projectId}`);
-                    }} sx={{ color: 'secondary.main', fontWeight: 'bold' }}>
-                      <ListItemText primary="Back to Active Step" />
+                    <Divider sx={{ my: 1 }} />
+                    <MenuItem
+                      onClick={() => {
+                        handleMenuClose();
+                        navigate(isProjectActive ? `/projects/${projectId}` : `/crm/${projectId}`);
+                      }}
+                      sx={{
+                        mx: 1,
+                        my: 0.5,
+                        borderRadius: 2,
+                        bgcolor: '#EEF2FF',
+                        color: '#4F46E5',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        '&:hover': { bgcolor: '#E0E7FF' }
+                      }}
+                    >
+                      <ArrowForwardRoundedIcon sx={{ fontSize: 16, mr: 1 }} />
+                      Back to Current Active Stage
                     </MenuItem>
                   </>
                 )}
-                <Divider />
+                <Divider sx={{ my: 1 }} />
               </>
             )}
-            <MenuItem onClick={handleLogout}>
-              <ListItemText primary="Logout" />
+
+            {/* Logout Action */}
+            <MenuItem
+              onClick={handleLogout}
+              sx={{
+                mx: 1,
+                my: 0.5,
+                borderRadius: 2,
+                color: '#EF4444',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                '&:hover': { bgcolor: '#FEF2F2' }
+              }}
+            >
+              <LogoutRoundedIcon sx={{ fontSize: 18 }} />
+              Sign Out
             </MenuItem>
           </Menu>
         </Box>
 
-        <Dialog open={isDateDialogOpen} onClose={() => setIsDateDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Edit Project Dates</DialogTitle>
-          <DialogContent>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
-              <TextField 
-                label="Project Start Date" 
+        {/* Project Dates Dialog */}
+        <Dialog
+          open={isDateDialogOpen}
+          onClose={() => setIsDateDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: 3.5,
+                boxShadow: '0 20px 40px rgba(0,0,0,0.12)'
+              }
+            }
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 800, color: '#1E293B' }}>Edit Project Dates & Timeline</DialogTitle>
+          <DialogContent dividers sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <TextField
+                label="Project Start Date"
                 type="date"
-                fullWidth 
+                fullWidth
+                size="small"
                 slotProps={{ inputLabel: { shrink: true } }}
-                value={dateFormData.startDate} 
-                onChange={(e) => setDateFormData({...dateFormData, startDate: e.target.value})} 
+                value={dateFormData.startDate}
+                onChange={(e) => setDateFormData({ ...dateFormData, startDate: e.target.value })}
               />
-              <TextField 
-                label="Project End Date" 
+              <TextField
+                label="Project Deadline / Delivery Date"
                 type="date"
-                fullWidth 
+                fullWidth
+                size="small"
                 slotProps={{ inputLabel: { shrink: true } }}
-                value={dateFormData.deadline} 
-                onChange={(e) => setDateFormData({...dateFormData, deadline: e.target.value})} 
+                value={dateFormData.deadline}
+                onChange={(e) => setDateFormData({ ...dateFormData, deadline: e.target.value })}
               />
             </Box>
           </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setIsDateDialogOpen(false)} color="inherit">Cancel</Button>
-            <Button variant="contained" onClick={handleSaveDates}>Save</Button>
+          <DialogActions sx={{ p: 2, bgcolor: '#F8FAFC' }}>
+            <Button onClick={() => setIsDateDialogOpen(false)} sx={{ color: '#64748B', fontWeight: 600, textTransform: 'none' }}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSaveDates}
+              sx={{
+                bgcolor: '#C89F5A',
+                color: '#FFF',
+                fontWeight: 700,
+                borderRadius: 2,
+                textTransform: 'none',
+                '&:hover': { bgcolor: '#B38B36' }
+              }}
+            >
+              Save Timeline
+            </Button>
           </DialogActions>
         </Dialog>
       </Toolbar>
