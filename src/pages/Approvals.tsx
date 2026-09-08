@@ -106,10 +106,10 @@ const Approvals: React.FC = () => {
       }
 
       const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
-      const hasPieces = validSplits.some(s => s.pieceIds && s.pieceIds.length > 0);
+      const expectedQty = Number(selectedLog.quantityProduced) || 0;
 
-      if (totalSplitQty !== selectedLog.quantityProduced) {
-        setToast({ open: true, message: `Total assigned item count (${totalSplitQty}) must exactly match the reported item count (${selectedLog.quantityProduced}).`, severity: 'error' });
+      if (expectedQty > 0 && totalSplitQty !== expectedQty) {
+        setToast({ open: true, message: `Total assigned item count (${totalSplitQty}) must exactly match the reported item count (${expectedQty}).`, severity: 'error' });
         return;
       }
 
@@ -127,7 +127,8 @@ const Approvals: React.FC = () => {
       setToast({ open: true, message: 'Approval saved successfully', severity: 'success' });
       refetch();
     } catch (err: any) {
-      setToast({ open: true, message: err?.data?.message || 'Approval failed', severity: 'error' });
+      console.error("Approval submit error:", err);
+      setToast({ open: true, message: err?.data?.message || err?.message || 'Approval failed', severity: 'error' });
     }
   };
 
@@ -543,15 +544,15 @@ const Approvals: React.FC = () => {
 
                     // If piece is at this stage:
                     if (pStageIdx === logStageIdx) {
-                      // If already completed in this stage, it should NOT appear!
+                      // If already completed in this stage, it should NOT appear again for this stage!
                       if (p.status === 'completed') return false;
                       // If pending or active, it's currently being worked on!
                       return true;
                     }
 
-                    // If piece is at the previous stage:
-                    // It can only enter this stage if it completed the immediately preceding stage:
-                    if (pStageIdx === logStageIdx - 1 && p.status === 'completed') {
+                    // If piece is at ANY prior stage (e.g. Production, Polishing, Packing):
+                    // Decoupled pipeline: Any piece completed at any prior stage (or created in production) is eligible!
+                    if (pStageIdx < logStageIdx && (p.status === 'completed' || pStageIdx === 0)) {
                       return true;
                     }
 
@@ -623,57 +624,96 @@ const Approvals: React.FC = () => {
                       </Box>
                       
                       {/* Pieces Dropdown */}
-                      {split.slabId && eligiblePiecesForSlab.length > 0 && (
-                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                          <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
-                            <InputLabel id={`select-piece-label-${idx}`}>Select Piece(s) (Optional)</InputLabel>
-                            <Select
-                              labelId={`select-piece-label-${idx}`}
-                              multiple
-                              value={split.pieceIds || []}
-                              onChange={(e) => {
-                                const newSplits = [...projectSplits];
-                                const val = e.target.value as string[];
-                                newSplits[idx].pieceIds = val;
-                                newSplits[idx].qty = val.length > 0 ? val.length : newSplits[idx].qty;
-                                
-                                const slab = projectSlabs.find((s: any) => s.id === newSplits[idx].slabId);
-                                if (val.length > 0) {
-                                  const pieceNames = val.map((id: string) => {
-                                    const piece = slab?.pieces?.find((p: any) => p.id === id);
-                                    return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
-                                  });
-                                  newSplits[idx].productName = slab ? `${slab.name} - ${pieceNames.join(', ')}` : pieceNames.join(', ');
-                                } else {
-                                  newSplits[idx].productName = slab?.name || '';
-                                }
+                      {split.slabId && eligiblePiecesForSlab.length > 0 && (() => {
+                        const allEligibleIds = eligiblePiecesForSlab.map((p: any) => p.id);
+                        const isAllSelected = allEligibleIds.length > 0 && allEligibleIds.every((id: string) => (split.pieceIds || []).includes(id));
+                        const isIndeterminate = (split.pieceIds || []).length > 0 && !isAllSelected;
 
-                                setProjectSplits(newSplits);
-                              }}
-                              input={<OutlinedInput label="Select Piece(s) (Optional)" />}
-                              renderValue={(selected: any) => {
-                                if (!selected || selected.length === 0) return <em>Select Pieces</em>;
-                                const slab = projectSlabs.find((s: any) => s.id === split.slabId);
-                                return selected.map((id: string) => {
-                                  const piece = slab?.pieces?.find((p: any) => p.id === id);
-                                  return piece ? `${(piece.productName || `Piece ${piece.pieceNumber}`).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${piece.size ? `(${piece.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}` : id;
-                                }).join(', ');
-                              }}
-                            >
-                              {eligiblePiecesForSlab.map((p: any) => (
-                                <MenuItem key={p.id} value={p.id}>
-                                  <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
+                        const updateSelectedPieces = (newPieceIds: string[]) => {
+                          const newSplits = [...projectSplits];
+                          newSplits[idx].pieceIds = newPieceIds;
+                          newSplits[idx].qty = newPieceIds.length > 0 ? newPieceIds.length : newSplits[idx].qty;
+                          
+                          const slab = projectSlabs.find((s: any) => s.id === newSplits[idx].slabId);
+                          if (newPieceIds.length > 0) {
+                            const pieceNames = newPieceIds.map((id: string) => {
+                              const piece = slab?.pieces?.find((p: any) => p.id === id);
+                              return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
+                            });
+                            newSplits[idx].productName = slab ? `${slab.name} - ${pieceNames.join(', ')}` : pieceNames.join(', ');
+                          } else {
+                            newSplits[idx].productName = slab?.name || '';
+                          }
+
+                          setProjectSplits(newSplits);
+                        };
+
+                        return (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>
+                                Piece Selection ({(split.pieceIds || []).length} / {eligiblePiecesForSlab.length} selected)
+                              </Typography>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => updateSelectedPieces(isAllSelected ? [] : allEligibleIds)}
+                                sx={{ textTransform: 'none', py: 0.2, px: 1, fontSize: '0.75rem', borderRadius: 1.5, fontWeight: 'bold', borderColor: '#ed6c02', color: '#ed6c02', '&:hover': { bgcolor: '#FFF3E0' } }}
+                              >
+                                {isAllSelected ? 'Deselect All' : 'Select All'}
+                              </Button>
+                            </Box>
+                            <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
+                              <InputLabel id={`select-piece-label-${idx}`}>Select Piece(s) (Optional)</InputLabel>
+                              <Select
+                                labelId={`select-piece-label-${idx}`}
+                                multiple
+                                value={split.pieceIds || []}
+                                onChange={(e) => {
+                                  const val = e.target.value as string[];
+                                  if (val.includes('__SELECT_ALL__')) {
+                                    updateSelectedPieces(isAllSelected ? [] : allEligibleIds);
+                                  } else {
+                                    updateSelectedPieces(val);
+                                  }
+                                }}
+                                input={<OutlinedInput label="Select Piece(s) (Optional)" />}
+                                renderValue={(selected: any) => {
+                                  const filtered = (selected || []).filter((id: string) => id !== '__SELECT_ALL__');
+                                  if (filtered.length === 0) return <em>Select Pieces</em>;
+                                  const slab = projectSlabs.find((s: any) => s.id === split.slabId);
+                                  return filtered.map((id: string) => {
+                                    const piece = slab?.pieces?.find((p: any) => p.id === id);
+                                    return piece ? `${(piece.productName || `Piece ${piece.pieceNumber}`).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${piece.size ? `(${piece.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}` : id;
+                                  }).join(', ');
+                                }}
+                              >
+                                <MenuItem value="__SELECT_ALL__" sx={{ bgcolor: '#FFF8E1', borderBottom: '1px solid #FFE082', fontWeight: 'bold' }}>
+                                  <Checkbox 
+                                    checked={isAllSelected}
+                                    indeterminate={isIndeterminate}
+                                    sx={{ color: '#ed6c02', '&.Mui-checked': { color: '#ed6c02' }, '&.MuiCheckbox-indeterminate': { color: '#ed6c02' } }}
+                                  />
                                   <ListItemText 
-                                    primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} 
-                                    secondary={`Stage: ${p.stage || 'Production'} • ${p.status === 'completed' ? 'Ready for next stage' : 'In Progress'}`}
-                                    sx={{ color: '#ed6c02', fontWeight: 'bold' }} 
+                                    primary={`Select All (${eligiblePiecesForSlab.length} Pieces)`}
+                                    primaryTypographyProps={{ fontWeight: 'bold', color: '#e65100' }}
                                   />
                                 </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        </Box>
-                      )}
+                                {eligiblePiecesForSlab.map((p: any) => (
+                                  <MenuItem key={p.id} value={p.id}>
+                                    <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
+                                    <ListItemText 
+                                      primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} 
+                                      secondary={`Stage: ${p.stage || 'Production'} • ${p.status === 'completed' ? 'Ready for next stage' : 'In Progress'}`}
+                                      sx={{ color: '#ed6c02', fontWeight: 'bold' }} 
+                                    />
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          </Box>
+                        );
+                      })()}
                     </>
                   );
                 })()}
@@ -947,62 +987,105 @@ const Approvals: React.FC = () => {
                 );
               })()}
 
-              {editingHistoryLog.slabId && slabs && slabs.find((s: any) => s.id === editingHistoryLog.slabId)?.pieces?.length > 0 && (
-                <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
-                  <InputLabel id={`edit-select-piece-label`}>Select Piece(s) (Optional)</InputLabel>
-                  <Select
-                    labelId={`edit-select-piece-label`}
-                    multiple
-                    value={editingHistoryLog.pieceIds || []}
-                    onChange={(e) => {
-                      const val = e.target.value as string[];
-                      
-                      const slab = slabs?.find((s: any) => s.id === editingHistoryLog.slabId);
-                      let newProductName = editingHistoryLog.productName;
-                      if (val.length > 0) {
-                        const pieceNames = val.map((id: string) => {
-                          const piece = slab?.pieces?.find((p: any) => p.id === id);
-                          return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
-                        });
-                        newProductName = slab ? `${slab.name} - ${pieceNames.join(', ')}` : pieceNames.join(', ');
-                      } else {
-                        newProductName = slab?.name || '';
-                      }
-                      
-                      setEditingHistoryLog({ 
-                        ...editingHistoryLog, 
-                        pieceIds: val, 
-                        quantityProduced: val.length > 0 ? val.length : editingHistoryLog.quantityProduced,
-                        productName: newProductName
-                      });
-                    }}
-                    input={<OutlinedInput label="Select Piece(s) (Optional)" />}
-                    renderValue={(selected: any) => {
-                      if (!selected || selected.length === 0) return <em>Select Pieces</em>;
-                      const slab = slabs.find((s: any) => s.id === editingHistoryLog.slabId);
-                      return selected.map((id: string) => {
-                        const piece = slab?.pieces?.find((p: any) => p.id === id);
-                        return piece ? `${(piece.productName || `Piece ${piece.pieceNumber}`).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${piece.size ? `(${piece.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}` : id;
-                      }).join(', ');
-                    }}
-                  >
-                    {slabs.find((s: any) => s.id === editingHistoryLog.slabId)?.pieces?.filter((p: any) => {
-                          const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                          const logStage = editingHistoryLog?.stage?.replace(' Work', '') || '';
-                          const pStageIdx = stages.indexOf(p.stage);
-                          const logStageIdx = stages.indexOf(logStage);
-                          if (pStageIdx > logStageIdx) return false;
-                          if (pStageIdx === logStageIdx && p.status === 'completed') return false;
-                          return true;
-                        }).map((p: any) => (
-                      <MenuItem key={p.id} value={p.id}>
-                        <Checkbox checked={(editingHistoryLog.pieceIds || []).indexOf(p.id) > -1} />
-                        <ListItemText primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} />
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
+              {editingHistoryLog.slabId && slabs && slabs.find((s: any) => s.id === editingHistoryLog.slabId)?.pieces?.length > 0 && (() => {
+                const targetSlab = slabs.find((s: any) => s.id === editingHistoryLog.slabId);
+                const eligiblePieces = targetSlab?.pieces?.filter((p: any) => {
+                  const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                  const logStage = (editingHistoryLog?.stage || '').replace(' Work', '').trim();
+                  const pStage = (p.stage || 'Production').replace(' Work', '').trim();
+                  const pStageIdx = stages.indexOf(pStage);
+                  const logStageIdx = stages.indexOf(logStage);
+                  if (logStageIdx === -1) return true;
+                  if (pStageIdx > logStageIdx) return false;
+                  if (pStageIdx === logStageIdx && p.status === 'completed' && !(editingHistoryLog.pieceIds || []).includes(p.id)) return false;
+                  return true;
+                }) || [];
+
+                const allPieceIds = eligiblePieces.map((p: any) => p.id);
+                const isAllSelected = allPieceIds.length > 0 && allPieceIds.every((id: string) => (editingHistoryLog.pieceIds || []).includes(id));
+                const isIndeterminate = (editingHistoryLog.pieceIds || []).length > 0 && !isAllSelected;
+
+                const updateHistoryPieces = (newPieceIds: string[]) => {
+                  let newProductName = editingHistoryLog.productName;
+                  if (newPieceIds.length > 0) {
+                    const pieceNames = newPieceIds.map((id: string) => {
+                      const piece = targetSlab?.pieces?.find((p: any) => p.id === id);
+                      return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
+                    });
+                    newProductName = targetSlab ? `${targetSlab.name} - ${pieceNames.join(', ')}` : pieceNames.join(', ');
+                  } else {
+                    newProductName = targetSlab?.name || '';
+                  }
+                  setEditingHistoryLog({ 
+                    ...editingHistoryLog, 
+                    pieceIds: newPieceIds, 
+                    quantityProduced: newPieceIds.length > 0 ? newPieceIds.length : editingHistoryLog.quantityProduced,
+                    productName: newProductName
+                  });
+                };
+
+                return (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>
+                        Piece Selection ({(editingHistoryLog.pieceIds || []).length} / {eligiblePieces.length} selected)
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => updateHistoryPieces(isAllSelected ? [] : allPieceIds)}
+                        sx={{ textTransform: 'none', py: 0.2, px: 1, fontSize: '0.75rem', borderRadius: 1.5, fontWeight: 'bold', borderColor: '#ed6c02', color: '#ed6c02', '&:hover': { bgcolor: '#FFF3E0' } }}
+                      >
+                        {isAllSelected ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </Box>
+                    <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
+                      <InputLabel id={`edit-select-piece-label`}>Select Piece(s) (Optional)</InputLabel>
+                      <Select
+                        labelId={`edit-select-piece-label`}
+                        multiple
+                        value={editingHistoryLog.pieceIds || []}
+                        onChange={(e) => {
+                          const val = e.target.value as string[];
+                          if (val.includes('__SELECT_ALL__')) {
+                            updateHistoryPieces(isAllSelected ? [] : allPieceIds);
+                          } else {
+                            updateHistoryPieces(val);
+                          }
+                        }}
+                        input={<OutlinedInput label="Select Piece(s) (Optional)" />}
+                        renderValue={(selected: any) => {
+                          const filtered = (selected || []).filter((id: string) => id !== '__SELECT_ALL__');
+                          if (filtered.length === 0) return <em>Select Pieces</em>;
+                          const slab = slabs.find((s: any) => s.id === editingHistoryLog.slabId);
+                          return filtered.map((id: string) => {
+                            const piece = slab?.pieces?.find((p: any) => p.id === id);
+                            return piece ? `${(piece.productName || `Piece ${piece.pieceNumber}`).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${piece.size ? `(${piece.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}` : id;
+                          }).join(', ');
+                        }}
+                      >
+                        <MenuItem value="__SELECT_ALL__" sx={{ bgcolor: '#FFF8E1', borderBottom: '1px solid #FFE082', fontWeight: 'bold' }}>
+                          <Checkbox 
+                            checked={isAllSelected}
+                            indeterminate={isIndeterminate}
+                            sx={{ color: '#ed6c02', '&.Mui-checked': { color: '#ed6c02' }, '&.MuiCheckbox-indeterminate': { color: '#ed6c02' } }}
+                          />
+                          <ListItemText 
+                            primary={`Select All (${eligiblePieces.length} Pieces)`}
+                            primaryTypographyProps={{ fontWeight: 'bold', color: '#e65100' }}
+                          />
+                        </MenuItem>
+                        {eligiblePieces.map((p: any) => (
+                          <MenuItem key={p.id} value={p.id}>
+                            <Checkbox checked={(editingHistoryLog.pieceIds || []).indexOf(p.id) > -1} />
+                            <ListItemText primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} />
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+                );
+              })()}
 
               <TextField
                 label="Stage"

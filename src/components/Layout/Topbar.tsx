@@ -55,7 +55,7 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
     const isDirectSkipped = project?.isDirectWorkOrder && stepIndex < 5;
     const isCompleted = !isDirectSkipped && dbStep > stepIndex;
     const isCurrent = dbStep === stepIndex;
-    const targetPath = (pageType === 'projects' || isProjectActive) ? `/projects/${projectId}` : `/crm/${projectId}`;
+    const targetPath = stepIndex < 4 ? `/crm/${projectId}` : `/projects/${projectId}`;
     
     return (
       <MenuItem onClick={() => { handleMenuClose(); navigate(`${targetPath}?view=${viewParam}`); }} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.5, pl: 3 }}>
@@ -110,11 +110,11 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
+    setCrmOpen(pageType === 'crm');
+    setProjectOpen(pageType === 'projects' || isProjectActive);
   };
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setCrmOpen(false);
-    setProjectOpen(false);
   };
 
   const handleCrmToggle = (event: React.MouseEvent) => {
@@ -192,14 +192,9 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                 {hasCrmAccess && (
                   <>
                     <Divider />
-                    <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
-                      <Box 
-                        onClick={() => { handleMenuClose(); navigate(`/crm/${projectId}`); }} 
-                        sx={{ flexGrow: 1, py: 1, pl: 2, cursor: 'pointer' }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>CRM Details</Typography>
-                      </Box>
-                      <IconButton onClick={(e) => { e.stopPropagation(); handleCrmToggle(e); }} size="small" sx={{ mr: 1 }}>
+                    <MenuItem onClick={handleCrmToggle} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>CRM Details</Typography>
+                      <IconButton size="small">
                         {crmOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
                       </IconButton>
                     </MenuItem>
@@ -217,14 +212,9 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                 {(isProjectActive || pageType === 'projects') && (
                   <>
                     <Divider />
-                    <MenuItem sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0 }}>
-                      <Box 
-                        onClick={() => { handleMenuClose(); navigate(`/projects/${projectId}`); }} 
-                        sx={{ flexGrow: 1, py: 1, pl: 2, cursor: 'pointer' }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Project Details</Typography>
-                      </Box>
-                      <IconButton onClick={(e) => { e.stopPropagation(); handleProjectToggle(e); }} size="small" sx={{ mr: 1 }}>
+                    <MenuItem onClick={handleProjectToggle} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Project Details</Typography>
+                      <IconButton size="small">
                         {projectOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
                       </IconButton>
                     </MenuItem>

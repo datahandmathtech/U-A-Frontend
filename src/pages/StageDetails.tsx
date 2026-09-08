@@ -405,24 +405,44 @@ const StageDetails = () => {
   
   let completedPieces = 0;
   if (stageFormatted === 'Dispatch') {
+    const directDispatchLogs = productionLogs?.filter((l: any) =>
+      (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') && l.approvalStatus === 'approved' &&
+      (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
+    ) || [];
+    const directQty = directDispatchLogs.reduce((sum: number, l: any) => sum + (l.quantityProduced || 0), 0);
+
     const packedLogs = productionLogs?.filter((l: any) => 
-      l.stage === 'Packing' && l.approvalStatus === 'approved' && 
+      (l.stage === 'Packing' || l.stage === 'Packing Work') && l.approvalStatus === 'approved' && 
       (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
     ) || [];
-    const allDispatchLogs = productionLogs?.filter((l: any) => l.stage === 'Dispatch' && l.approvalStatus === 'approved') || [];
+    const allDispatchLogs = productionLogs?.filter((l: any) => (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') && l.approvalStatus === 'approved') || [];
     
     const dispatchedPackedLogs = packedLogs.filter((pLog: any) => 
        allDispatchLogs.some((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode))
     );
-    
-    completedPieces = dispatchedPackedLogs.reduce((sum: number, l: any) => sum + (l.quantityProduced || 0), 0);
+    const packedDispatchedQty = dispatchedPackedLogs.reduce((sum: number, l: any) => sum + (l.quantityProduced || 0), 0);
+
+    const pieceCompletedCount = (slab.pieces || []).filter((p: any) => {
+      const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
+      return pStage === 'Dispatch' && p.status === 'completed';
+    }).length;
+
+    completedPieces = Math.max(directQty, packedDispatchedQty, pieceCompletedCount);
   } else if (stageFormatted === 'Packing') {
-    completedPieces = productionLogs
-      ?.filter((l: any) => l.stage === 'Packing' && l.approvalStatus === 'approved' && (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id))
+    const directLogsQty = productionLogs
+      ?.filter((l: any) => (l.stage === 'Packing' || l.stage === 'Packing Work') && l.approvalStatus === 'approved' && (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid)))))
       .reduce((sum: number, l: any) => sum + (l.quantityProduced || 0), 0) || 0;
+
+    const pieceCompletedCount = (slab.pieces || []).filter((p: any) => {
+      const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
+      const pStageIdx = BASE_STAGES.indexOf(pStage);
+      return pStageIdx > stageIdx || (pStage === 'Packing' && p.status === 'completed');
+    }).length;
+
+    completedPieces = Math.max(directLogsQty, pieceCompletedCount);
   } else {
     completedPieces = (slab.pieces || []).filter((p: any) => {
-      const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0];
+      const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
       const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
       return pStageIdx > stageIdx || (normalizedPieceStage === stageFormatted && p.status === 'completed');
     }).length;

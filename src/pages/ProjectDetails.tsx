@@ -154,78 +154,77 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
   const getStageStatus = (stageName: string) => {
     const normalizedStageName = stageName.split(' - ')[0];
 
-    // For Packing and Dispatch, rely entirely on logs since piece tracking is bypassed
-    if (normalizedStageName === 'Packing' || normalizedStageName === 'Dispatch') {
-      const targetQty = slab.pieces?.length || matchedProduct?.qty || 0;
-      if (targetQty > 0 && productionLogs) {
-        let sumQty = 0;
-        
-        if (normalizedStageName === 'Dispatch') {
-          const packedLogs = productionLogs.filter((log: any) => 
-            log.approvalStatus === 'approved' &&
-            log.stage === 'Packing' &&
-            (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
-          );
-          const allDispatchLogs = productionLogs.filter((l: any) => l.stage === 'Dispatch' && l.approvalStatus === 'approved');
-          
-          const dispatchedPackedLogs = packedLogs.filter((pLog: any) => 
-             allDispatchLogs.some((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode))
-          );
-          
-          sumQty = dispatchedPackedLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
-        } else {
-          const stageLogs = productionLogs.filter((log: any) => 
-            log.approvalStatus === 'approved' &&
-            log.stage === normalizedStageName &&
-            (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
-          );
-          sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
-        }
-
-        if (sumQty >= targetQty) return 'Completed';
-        if (sumQty > 0) return 'In Progress';
-      }
-      return 'Pending';
+    // If stage is omitted from required stages, return N/A
+    if (requiredStages && requiredStages.length > 0) {
+      const isRequired = requiredStages.some((rs: string) => rs.split(' - ')[0] === normalizedStageName);
+      if (!isRequired) return 'N/A';
     }
 
+    const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const stageIdx = BASE_STAGES.indexOf(normalizedStageName);
+    const targetQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : (matchedProduct?.qty || 0);
+
+    // 1. Piece-level tracking if pieces exist
+    let piecesCompletedInThisStage = 0;
+    let piecesActiveInThisStage = 0;
     if (slab.pieces && slab.pieces.length > 0) {
-      const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-      
-      const stageIdx = BASE_STAGES.indexOf(normalizedStageName);
-      
-      let allPiecesPassed = true;
-      let anyPiecePassed = false;
-      
       for (const p of slab.pieces) {
-        const normalizedPieceStage = p.stage.split(' - ')[0];
+        const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
         const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
-        
-        const isPassed = pStageIdx > stageIdx || (normalizedPieceStage === normalizedStageName && p.status === 'completed');
-        
-        if (!isPassed) {
-          allPiecesPassed = false;
-        } else {
-          anyPiecePassed = true;
+
+        if (pStageIdx > stageIdx) {
+          piecesCompletedInThisStage++;
+        } else if (pStageIdx === stageIdx) {
+          if (p.status === 'completed') {
+            piecesCompletedInThisStage++;
+          } else if (p.status === 'active' || p.status === 'in_progress') {
+            piecesActiveInThisStage++;
+          }
         }
       }
-      
-      if (allPiecesPassed && slab.pieces.length > 0) return 'Completed';
-      if (anyPiecePassed) return 'In Progress';
-      return 'Pending';
+
+      if (piecesCompletedInThisStage >= slab.pieces.length) return 'Completed';
     }
 
-    const targetQty = matchedProduct ? matchedProduct.qty : 0;
+    // 2. Production logs check (for direct slab logs or packed logs)
     if (targetQty > 0 && productionLogs) {
-      const stageLogs = productionLogs.filter((log: any) => 
-        log.transactionType === 'IN' && 
-        log.approvalStatus === 'approved' &&
-        log.stage.includes(stageName.split(' ')[0]) &&
-        (log.productName === slab.name || slab.name.startsWith(log.productName))
-      );
-      const sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+      let sumQty = 0;
+
+      if (normalizedStageName === 'Dispatch') {
+        const directDispatchLogs = productionLogs.filter((log: any) => 
+          log.approvalStatus === 'approved' &&
+          (log.stage === 'Dispatch' || log.stage === 'Dispatch Work') &&
+          (log.slabId === slab.id || log.productId === slab.id || log.productName === slab.name || (log.pieceIds && log.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
+        );
+
+        const packedLogs = productionLogs.filter((log: any) => 
+          log.approvalStatus === 'approved' &&
+          (log.stage === 'Packing' || log.stage === 'Packing Work') &&
+          (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
+        );
+        const allDispatchLogs = productionLogs.filter((l: any) => (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') && l.approvalStatus === 'approved');
+        const dispatchedPackedLogs = packedLogs.filter((pLog: any) => 
+           allDispatchLogs.some((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode))
+        );
+
+        const directQty = directDispatchLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+        const packedDispatchedQty = dispatchedPackedLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+        sumQty = Math.max(directQty, packedDispatchedQty);
+      } else {
+        const stageLogs = productionLogs.filter((log: any) => 
+          log.approvalStatus === 'approved' &&
+          (log.stage === normalizedStageName || log.stage === `${normalizedStageName} Work` || log.stage.startsWith(normalizedStageName)) &&
+          (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id || (log.pieceIds && log.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
+        );
+        sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+      }
+
       if (sumQty >= targetQty) return 'Completed';
-      if (sumQty > 0) return 'In Progress';
+      if (sumQty > 0 || piecesCompletedInThisStage > 0 || piecesActiveInThisStage > 0) return 'In Progress';
+    } else if (piecesCompletedInThisStage > 0 || piecesActiveInThisStage > 0) {
+      return 'In Progress';
     }
+
     return 'Pending';
   };
 
@@ -359,13 +358,16 @@ const ProjectDetails: React.FC = () => {
       if (isCrmView) {
         setViewingStepOverride(parsedView);
       } else {
-        // In Active Work Orders, only allow production steps (>= 4)
-        setViewingStepOverride(parsedView >= 4 ? parsedView : 4);
+        if (parsedView < 4) {
+          navigate(`/crm/${id}?view=${parsedView}`, { replace: true });
+        } else {
+          setViewingStepOverride(parsedView);
+        }
       }
     } else {
       setViewingStepOverride(null);
     }
-  }, [viewParam, isCrmView]);
+  }, [viewParam, isCrmView, id, navigate]);
   const [designFinalizedDate, setDesignFinalizedDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -1044,7 +1046,10 @@ const ProjectDetails: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <InfoIcon sx={{ color: '#B38B36', fontSize: '1.75rem' }} />
                   <Typography variant="body1" color="text.primary" fontWeight="600">
-                    You are viewing a past CRM stage: <span style={{ color: '#B38B36', fontWeight: '800' }}>{crmSteps[viewingStepOverride] || crmSteps[0]}</span>
+                    {isCrmView 
+                      ? <>You are viewing a past CRM stage: <span style={{ color: '#B38B36', fontWeight: '800' }}>{crmSteps[viewingStepOverride] || crmSteps[0]}</span></>
+                      : <>You are viewing a past stage: <span style={{ color: '#B38B36', fontWeight: '800' }}>{steps[viewingStepOverride] || steps[4]}</span></>
+                    }
                   </Typography>
                 </Box>
                 <Button 

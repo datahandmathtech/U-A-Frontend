@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, Paper, TextField, MenuItem, CircularProgress, Alert, Snackbar, Divider, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Chip, Autocomplete, RadioGroup, FormControlLabel, Radio, FormControl, Grid, Switch } from '@mui/material';
-import { useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, useGetActiveSessionQuery, useMachineClockInMutation, useGetDailyMachineLogsQuery, useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, useGetActiveOutLogsQuery, useGetProjectsQuery, useGetVendorsQuery, useGetRejectedLogsQuery, useApproveMaterialLogMutation, useGetPackingItemsQuery, useGetApprovedLogsQuery } from '../store/apiSlice';
+import { useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, useGetActiveSessionQuery, useMachineClockInMutation, useGetDailyMachineLogsQuery, useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, useGetActiveOutLogsQuery, useGetProjectsQuery, useGetVendorsQuery, useGetRejectedLogsQuery, useApproveMaterialLogMutation, useGetPackingItemsQuery, useGetApprovedLogsQuery, useGetSlabsQuery } from '../store/apiSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/authSlice';
 import { useNavigate } from 'react-router-dom';
@@ -178,6 +178,9 @@ const ManagerDashboard: React.FC = () => {
   const { data: projectsData } = useGetProjectsQuery();
   const [selectedMachine, setSelectedMachine] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const { data: projectSlabs } = useGetSlabsQuery(selectedProjectId, { skip: !selectedProjectId });
+  const [selectedSlabId, setSelectedSlabId] = useState('');
+  const [selectedProductName, setSelectedProductName] = useState('');
   const { data: approvedLogs } = useGetApprovedLogsQuery(undefined);
   const packedBoxes = approvedLogs?.filter((log: any) => log.stage === 'Packing' && log.projectId === selectedProjectId) || [];
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -402,6 +405,8 @@ const ManagerDashboard: React.FC = () => {
     setSelectedProductId('');
 
     setSelectedOutLogId('');
+    setSelectedSlabId('');
+    setSelectedProductName('');
     if (type === 'IN' && !isStageCompletion) {
       refetchActiveOutLogs();
     }
@@ -430,21 +435,25 @@ const ManagerDashboard: React.FC = () => {
       showToast('Vehicle Number is required for Dispatch!', 'error');
       return;
     }
-    if (materialStage === 'Dispatch' && (!dispatchBoxCodes || dispatchBoxCodes.length === 0)) {
-      showToast('Box is required for Dispatch!', 'error');
+    if (materialStage === 'Dispatch' && (!dispatchBoxCodes || dispatchBoxCodes.length === 0) && (!materialQuantity || Number(materialQuantity) <= 0)) {
+      showToast('Quantity or Packed Box is required for Dispatch!', 'error');
       return;
     }
 
-    const finalBoxCode = materialStage === 'Dispatch' ? dispatchBoxCodes.join('||') : ((packingBox || packingCode || packingSize) ? `${packingBox}|${packingCode}|${packingSize}` : undefined);
+    const finalBoxCode = materialStage === 'Dispatch' ? (dispatchBoxCodes && dispatchBoxCodes.length > 0 ? dispatchBoxCodes.join('||') : undefined) : ((packingBox || packingCode || packingSize) ? `${packingBox}|${packingCode}|${packingSize}` : undefined);
 
     try {
-      let productName = '';
-      if (selectedProjectId && selectedProductId) {
+      let finalProductName = selectedProductName;
+      if (!finalProductName && selectedProjectId && selectedProductId) {
         const selectedProject = projectsData?.find((p: any) => p.id === selectedProjectId);
         if (selectedProject && selectedProject.products && selectedProject.products.length > 0) {
           const prod = selectedProject.products?.find((p: any) => p.id === selectedProductId);
-          if (prod) productName = prod.name;
+          if (prod) finalProductName = prod.name;
         }
+      }
+      if (!finalProductName && selectedSlabId && projectSlabs) {
+        const slab = projectSlabs.find((s: any) => s.id === selectedSlabId);
+        if (slab) finalProductName = slab.name;
       }
 
       const isStageCompletion = dialogOrigin !== 'Material Tracking';
@@ -463,8 +472,9 @@ const ManagerDashboard: React.FC = () => {
         source: 'Material Tracking',
         requiresMachine: isStageCompletion ? false : (materialType === 'OUT' ? requiresMachine : undefined),
         projectId: materialType === 'OUT' ? (selectedProjectId || undefined) : undefined,
-        productId: materialType === 'OUT' ? (selectedProductId || undefined) : undefined,
-        productName: materialType === 'OUT' ? (productName || undefined) : undefined,
+        productId: materialType === 'OUT' ? (selectedProductId || selectedSlabId || undefined) : undefined,
+        productName: materialType === 'OUT' ? (finalProductName || undefined) : undefined,
+        slabId: materialType === 'OUT' ? (selectedSlabId || undefined) : undefined,
       }).unwrap();
       showToast(
         materialType === 'OUT' 
@@ -635,7 +645,12 @@ const ManagerDashboard: React.FC = () => {
                           label="Select Client (Fetched from Admin)" 
                           fullWidth 
                           value={selectedProjectId}
-                          onChange={(e) => setSelectedProjectId(e.target.value)}
+                          onChange={(e) => {
+                            setSelectedProjectId(e.target.value);
+                            setSelectedSlabId('');
+                            setSelectedProductName('');
+                            setMaterialQuantity('');
+                          }}
                           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                         >
                           <MenuItem value="" disabled>-- Select Client --</MenuItem>
@@ -644,9 +659,42 @@ const ManagerDashboard: React.FC = () => {
                           ))}
                         </TextField>
 
+                        {selectedProjectId && (
+                          <>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Select Main Stone / Product</Typography>
+                            <TextField
+                              select
+                              label="Select Main Stone / Product"
+                              fullWidth
+                              value={selectedSlabId}
+                              onChange={(e) => {
+                                const sId = e.target.value;
+                                setSelectedSlabId(sId);
+                                const slab = projectSlabs?.find((s: any) => s.id === sId);
+                                if (slab) {
+                                  setSelectedProductName(slab.name);
+                                  const totalPieces = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
+                                  setMaterialQuantity(String(totalPieces));
+                                } else {
+                                  setSelectedProductName('');
+                                  setMaterialQuantity('');
+                                }
+                              }}
+                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                            >
+                              <MenuItem value="" disabled>-- Select Main Stone / Product --</MenuItem>
+                              {projectSlabs?.map((s: any) => (
+                                <MenuItem key={s.id} value={s.id}>
+                                  {s.name} ({s.pieces?.length || 1} Pcs)
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </>
+                        )}
+
                         {materialStage !== 'Dispatch' && (
                           <>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>2. Quantity Produced</Typography>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 1 }}>3. Quantity Produced</Typography>
                             <TextField 
                               fullWidth 
                               label="Quantity Produced / Completed" 
@@ -799,40 +847,53 @@ const ManagerDashboard: React.FC = () => {
               )}
 
               {materialStage === 'Dispatch' && (
-                <Autocomplete
-                  multiple
-                  options={packedBoxes}
-                  getOptionLabel={(option: any) => option.boxCode ? option.boxCode.replace(/\|/g, ' / ') : `No Box Code - ${option.productName}`}
-                  value={packedBoxes.filter((b: any) => dispatchBoxCodes.includes(b.boxCode || b.id))}
-                  onChange={(_, newValue) => {
-                    setDispatchBoxCodes(newValue.map((v: any) => v.boxCode || v.id));
-                    const totalQty = newValue.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
-                    setMaterialQuantity(totalQty > 0 ? String(totalQty) : '');
-                  }}
-                  renderInput={(params) => (
-                    <TextField 
-                      {...params} 
-                      label="Select Packed Box(es) (Required)" 
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                <>
+                  {packedBoxes.length > 0 && (
+                    <Autocomplete
+                      multiple
+                      options={packedBoxes}
+                      getOptionLabel={(option: any) => option.boxCode ? option.boxCode.replace(/\|/g, ' / ') : `No Box Code - ${option.productName}`}
+                      value={packedBoxes.filter((b: any) => dispatchBoxCodes.includes(b.boxCode || b.id))}
+                      onChange={(_, newValue) => {
+                        setDispatchBoxCodes(newValue.map((v: any) => v.boxCode || v.id));
+                        const totalQty = newValue.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
+                        if (totalQty > 0) setMaterialQuantity(String(totalQty));
+                      }}
+                      renderInput={(params) => (
+                        <TextField 
+                          {...params} 
+                          label="Select Packed Box(es) (Optional if directly dispatching)" 
+                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                        />
+                      )}
+                      renderTags={(value: readonly any[], getTagProps) =>
+                        value.map((option: any, index: number) => {
+                          const { key, ...tagProps } = getTagProps({ index }) as any;
+                          return (
+                            <Chip variant="outlined" label={option.boxCode ? option.boxCode.split('|')[0] : 'Box'} key={key} {...tagProps} />
+                          );
+                        })
+                      }
+                      renderOption={(props, option: any) => {
+                        const { key, ...restProps } = props as any;
+                        return (
+                          <li key={key} {...restProps}>
+                            {option.boxCode ? option.boxCode.replace(/\|/g, ' / ') : `No Box Code - ${option.productName}`} ({option.quantityProduced} Pcs)
+                          </li>
+                        );
+                      }}
                     />
                   )}
-                  renderTags={(value: readonly any[], getTagProps) =>
-                    value.map((option: any, index: number) => {
-                      const { key, ...tagProps } = getTagProps({ index }) as any;
-                      return (
-                        <Chip variant="outlined" label={option.boxCode ? option.boxCode.split('|')[0] : 'Box'} key={key} {...tagProps} />
-                      );
-                    })
-                  }
-                  renderOption={(props, option: any) => {
-                    const { key, ...restProps } = props as any;
-                    return (
-                      <li key={key} {...restProps}>
-                        {option.boxCode ? option.boxCode.replace(/\|/g, ' / ') : `No Box Code - ${option.productName}`} ({option.quantityProduced} Pcs)
-                      </li>
-                    );
-                  }}
-                />
+                  <TextField 
+                    fullWidth 
+                    label="Quantity Dispatched" 
+                    type="number"
+                    value={materialQuantity}
+                    onChange={(e) => setMaterialQuantity(e.target.value)}
+                    helperText={selectedProductName ? `All pieces of "${selectedProductName}" will be marked as Dispatched.` : "Enter piece count to dispatch directly without packing"}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                  />
+                </>
               )}
 
               {((dialogOrigin === 'Material Tracking' && !(materialType === 'IN' && materialStage === 'Polishing') && !(materialType === 'OUT' && materialStage === 'Packing')) || materialStage === 'Dispatch') && (
