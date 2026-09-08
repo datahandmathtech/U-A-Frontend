@@ -51,8 +51,8 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
   const hasCrmAccess = isSuperAdmin || (Array.isArray(user?.modulesAccess) && user.modulesAccess.includes('/crm'));
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [crmOpen, setCrmOpen] = React.useState(true);
-  const [projectOpen, setProjectOpen] = React.useState(true);
+  const [crmOpen, setCrmOpen] = React.useState(false);
+  const [projectOpen, setProjectOpen] = React.useState(false);
 
   // Parse path to see if we are on a project/crm details page
   const match = location.pathname.match(/\/(crm|projects)\/([a-fA-F0-9-]+|[0-9a-fA-F]{24})/);
@@ -183,8 +183,8 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
-    setCrmOpen(true);
-    setProjectOpen(true);
+    setCrmOpen(false);
+    setProjectOpen(false);
   };
   const handleMenuClose = () => {
     setAnchorEl(null);

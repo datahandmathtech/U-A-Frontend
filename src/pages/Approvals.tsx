@@ -15,29 +15,21 @@ import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 
 const Approvals: React.FC = () => {
   const { data: pendingLogs, isLoading, refetch: refetchPending } = useGetPendingApprovalsQuery(undefined, {
-    pollingInterval: 10000,
-    skipPollingIfUnfocused: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true
+    pollingInterval: 15000,
+    skipPollingIfUnfocused: true
   });
   const { data: approvedLogs, refetch: refetchApproved } = useGetApprovedLogsQuery(undefined, {
-    pollingInterval: 12000,
-    skipPollingIfUnfocused: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true
+    pollingInterval: 30000,
+    skipPollingIfUnfocused: true
   });
   const { data: projects } = useGetProjectsQuery();
   const { data: machineLogs } = useGetMachineLogsQuery(undefined, {
-    pollingInterval: 12000,
-    skipPollingIfUnfocused: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true
+    pollingInterval: 30000,
+    skipPollingIfUnfocused: true
   });
   const { data: activeOutLogs } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 12000,
-    skipPollingIfUnfocused: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true
+    pollingInterval: 30000,
+    skipPollingIfUnfocused: true
   });
   const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
   
@@ -129,7 +121,7 @@ const Approvals: React.FC = () => {
       setApprovalDialogOpen(false);
       setProjectSplits([{projectId: '', qty: 0}]);
       setToast({ open: true, message: 'Approval saved successfully', severity: 'success' });
-      refetch();
+      refetchPending();
     } catch (err: any) {
       console.error("Approval submit error:", err);
       setToast({ open: true, message: err?.data?.message || err?.message || 'Approval failed', severity: 'error' });

@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Card, CardContent, Chip, CircularProgress, Grid, CardMedia, Dialog, Button, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select, OutlinedInput, Checkbox, ListItemText, Snackbar, Alert, IconButton, FormControlLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Autocomplete } from '@mui/material';
+import { 
+  Box, Typography, Paper, Card, CardContent, Chip, CircularProgress, 
+  Grid, Dialog, Button, DialogTitle, DialogContent, DialogActions, 
+  TextField, MenuItem, FormControl, InputLabel, Select, OutlinedInput, 
+  Checkbox, ListItemText, Snackbar, Alert, IconButton, Table, TableBody, 
+  TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Autocomplete, 
+  Avatar, Tooltip 
+} from '@mui/material';
 import VendorsList from './VendorsList';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import OutputIcon from '@mui/icons-material/Output';
@@ -9,31 +16,35 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import HistoryIcon from '@mui/icons-material/History';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
-import { useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetVendorsQuery, useGetStaffListQuery, useEditProductionLogMutation } from '../store/apiSlice';
+import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
+import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
+import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import DirectionsCarRoundedIcon from '@mui/icons-material/DirectionsCarRounded';
+import CloseIcon from '@mui/icons-material/Close';
+import { 
+  useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, 
+  useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, 
+  useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetVendorsQuery, 
+  useGetStaffListQuery, useEditProductionLogMutation 
+} from '../store/apiSlice';
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
+import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 
 const InOutLedger: React.FC = () => {
   const { data: activeOutLogsData, isLoading: outLogsLoading, refetch } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 10000,
-    skipPollingIfUnfocused: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true
+    pollingInterval: 15000,
+    skipPollingIfUnfocused: true
   });
   const { data: pendingLogs, isLoading: pendingLoading } = useGetPendingApprovalsQuery(undefined, {
-    pollingInterval: 10000,
-    skipPollingIfUnfocused: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true
+    pollingInterval: 20000,
+    skipPollingIfUnfocused: true
   });
   const { data: approvedLogsData, isLoading: approvedLoading } = useGetApprovedLogsQuery(undefined, {
-    pollingInterval: 12000,
-    skipPollingIfUnfocused: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true
+    pollingInterval: 30000,
+    skipPollingIfUnfocused: true
   });
   const { data: projects } = useGetProjectsQuery();
   const [approveLog, { isLoading: isApproving }] = useApproveMaterialLogMutation();
@@ -79,8 +90,8 @@ const InOutLedger: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
-  const [selectedStageFilter, setSelectedStageFilter] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState(0);
+  
   const today = new Date();
   const currentYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
   const currentFY = `FY ${currentYear}-${currentYear + 1}`;
@@ -113,16 +124,6 @@ const InOutLedger: React.FC = () => {
           setToast({ open: true, message: err?.data?.message || 'Approval failed', severity: 'error' });
         }
       }
-    }
-  };
-
-  const handleRejectClick = async (logId: string) => {
-    try {
-      await approveLog({ id: logId, data: { approvalStatus: 'rejected' } }).unwrap();
-      setToast({ open: true, message: 'Log Rejected successfully', severity: 'success' });
-      refetch();
-    } catch (err: any) {
-      setToast({ open: true, message: err?.data?.message || 'Failed to reject', severity: 'error' });
     }
   };
 
@@ -170,7 +171,13 @@ const InOutLedger: React.FC = () => {
     }
   };
 
-  if (outLogsLoading || pendingLoading || approvedLoading) return <Box sx={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
+  if (outLogsLoading || pendingLoading || approvedLoading) {
+    return (
+      <Box sx={{ display: 'flex', height: '60vh', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress sx={{ color: '#C89F5A' }} />
+      </Box>
+    );
+  }
 
   // Consolidate logs
   const allLogsMap = new Map();
@@ -186,16 +193,7 @@ const InOutLedger: React.FC = () => {
     })
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  // Group by Month
-  const groupedByMonth = allLogs.reduce((acc: any, log: any) => {
-    const d = new Date(log.createdAt);
-    const monthStr = `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
-    if (!acc[monthStr]) acc[monthStr] = [];
-    acc[monthStr].push(log);
-    return acc;
-  }, {});
-
-  const selectedFYStartYear = parseInt(selectedFY.split(' ')[1].split('-')[0]);
+  const selectedFYStartYear = parseInt(selectedFY.split(' ')[1]?.split('-')[0] || String(currentYear));
   const fyMonths = [
     { label: 'April', year: selectedFYStartYear },
     { label: 'May', year: selectedFYStartYear },
@@ -217,100 +215,212 @@ const InOutLedger: React.FC = () => {
   });
 
   const renderUnifiedLogGrid = (logsToRender: any[]) => (
-    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #eee', borderRadius: 2 }}>
+    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', bgcolor: '#FFFFFF', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
       <Table sx={{ minWidth: 650 }}>
-        <TableHead>
-          <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-            <TableCell sx={{ fontWeight: 'bold' }}>DATE</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>QTY</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>STAGE</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>VEHICLE NO.</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>VENDOR/STAFF</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>TYPE</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>STATUS</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>ACTIONS</TableCell>
+        <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+          <TableRow>
+            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, py: 2 }}>DATE</TableCell>
+            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, py: 2 }}>QTY</TableCell>
+            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, py: 2 }}>STAGE</TableCell>
+            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, py: 2 }}>VEHICLE</TableCell>
+            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, py: 2 }}>VENDOR / ASSIGNEE</TableCell>
+            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, py: 2 }}>TYPE</TableCell>
+            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, py: 2 }}>PROOF</TableCell>
+            <TableCell align="center" sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, py: 2 }}>ACTIONS</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {logsToRender.map((log: any) => (
-            <TableRow key={log.id} sx={{ '&:last-child td, &:last-child th': { border: 0 }, '&:hover': { bgcolor: '#fdfdfd' }, transition: '0.2s', borderBottom: '1px solid #f0f0f0' }}>
-              <TableCell sx={{ color: '#888', fontWeight: 500, borderBottom: 'none' }}>
-                {new Date(log.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </TableCell>
-              
-              <TableCell sx={{ fontWeight: '900', fontSize: '1rem', color: '#222', borderBottom: 'none' }}>
-                {log.quantityProduced}
-              </TableCell>
-              
-              <TableCell sx={{ fontWeight: 'bold', color: '#444', borderBottom: 'none' }}>
-                {log.stage}
-              </TableCell>
-              
-              <TableCell sx={{ fontWeight: 'bold', color: '#111', borderBottom: 'none' }}>
-                {log.vehicleNumber || '—'}
-              </TableCell>
-              
-              <TableCell sx={{ color: '#666', fontWeight: 600, borderBottom: 'none' }}>
-                {log.vendorName || log.worker?.name || '—'}
-              </TableCell>
-              
-              <TableCell sx={{ borderBottom: 'none' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: log.transactionType === 'OUT' ? '#ed6c02' : '#0288d1', fontWeight: '800', fontSize: '0.9rem' }}>
-                  {log.transactionType === 'OUT' ? <OutputIcon fontSize="small" /> : <InputIcon fontSize="small" />}
-                  {log.transactionType === 'OUT' ? 'OUT' : 'IN'}
-                </Box>
-              </TableCell>
+          {logsToRender.map((log: any, idx: number) => {
+            const isOut = log.transactionType === 'OUT';
+            const photoUrl = log.photoUrl || log.startPhotos?.machine || log.startPhotos?.unit;
+            return (
+              <TableRow 
+                key={log.id} 
+                hover 
+                sx={{ 
+                  bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
+                  '&:hover': { bgcolor: '#F1F5F9' },
+                  transition: 'background-color 0.15s ease'
+                }}
+              >
+                <TableCell sx={{ py: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CalendarMonthRoundedIcon sx={{ fontSize: 16, color: '#64748B' }} />
+                    <Typography sx={{ color: '#334155', fontWeight: 600, fontSize: '0.85rem' }}>
+                      {new Date(log.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </Typography>
+                  </Box>
+                </TableCell>
+                
+                <TableCell sx={{ py: 2 }}>
+                  <Chip 
+                    label={`${log.quantityProduced} pcs`} 
+                    size="small" 
+                    sx={{ 
+                      fontWeight: 800, 
+                      fontSize: '0.75rem', 
+                      bgcolor: isOut ? '#FFF7ED' : '#EFF6FF',
+                      color: isOut ? '#C2410C' : '#1D4ED8',
+                      border: '1px solid',
+                      borderColor: isOut ? '#FFEDD5' : '#DBEAFE',
+                      borderRadius: 1.5 
+                    }} 
+                  />
+                </TableCell>
+                
+                <TableCell sx={{ py: 2 }}>
+                  <Typography sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
+                    {log.stage}
+                  </Typography>
+                </TableCell>
+                
+                <TableCell sx={{ py: 2 }}>
+                  <Typography sx={{ fontWeight: 600, color: log.vehicleNumber ? '#0F172A' : '#94A3B8', fontSize: '0.82rem' }}>
+                    {log.vehicleNumber || '—'}
+                  </Typography>
+                </TableCell>
+                
+                <TableCell sx={{ py: 2 }}>
+                  <Typography sx={{ color: '#0F172A', fontWeight: 700, fontSize: '0.85rem' }}>
+                    {log.vendorName || log.worker?.name || 'External Vendor'}
+                  </Typography>
+                </TableCell>
+                
+                <TableCell sx={{ py: 2 }}>
+                  <Chip 
+                    icon={isOut ? <OutputIcon sx={{ fontSize: '13px !important', color: '#EA580C !important' }} /> : <InputIcon sx={{ fontSize: '13px !important', color: '#0284C7 !important' }} />}
+                    label={isOut ? 'OUT' : 'IN'}
+                    size="small"
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: '0.72rem',
+                      borderRadius: 1.5,
+                      bgcolor: isOut ? '#FFF7ED' : '#F0F9FF',
+                      color: isOut ? '#C2410C' : '#0369A1',
+                      border: '1px solid',
+                      borderColor: isOut ? '#FDBA74' : '#BAE6FD'
+                    }}
+                  />
+                </TableCell>
 
-              <TableCell sx={{ borderBottom: 'none' }}>
-                <IconButton onClick={() => setPreviewPhoto(log.photoUrl || log.startPhotos?.machine || 'no-photo')} size="small" color="primary">
-                  <VisibilityIcon />
-                </IconButton>
-              </TableCell>
-
-              <TableCell sx={{ borderBottom: 'none' }}>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  {log.approvalStatus === 'pending' && (
-                    <Button variant="contained" color="success" size="small" onClick={() => handleApproveClick(log)} sx={{ minWidth: 0, p: 0.5 }}>
-                      <CheckCircleIcon fontSize="small" />
-                    </Button>
+                <TableCell sx={{ py: 2 }}>
+                  {photoUrl ? (
+                    <Box 
+                      onClick={() => setPreviewPhoto(photoUrl)}
+                      sx={{ 
+                        width: 36, height: 36, borderRadius: 2, overflow: 'hidden', 
+                        cursor: 'pointer', border: '1px solid #E2E8F0',
+                        '&:hover': { transform: 'scale(1.08)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <img src={getOptimizedUrl(photoUrl)} alt="Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" sx={{ color: '#CBD5E1' }}>No photo</Typography>
                   )}
-                  <IconButton onClick={() => { setSelectedEditLog(log); setEditLogOpen(true); }} size="small" color="primary">
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton onClick={() => handleDeleteLog(log.id)} size="small" color="error">
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              </TableCell>
-            </TableRow>
-          ))}
+                </TableCell>
+
+                <TableCell align="center" sx={{ py: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'center' }}>
+                    {log.approvalStatus === 'pending' && (
+                      <Tooltip title="Approve Log">
+                        <IconButton size="small" onClick={() => handleApproveClick(log)} sx={{ bgcolor: '#ECFDF5', color: '#059669', '&:hover': { bgcolor: '#D1FAE5' } }}>
+                          <CheckCircleIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    <Tooltip title="Edit Log">
+                      <IconButton onClick={() => { setSelectedEditLog(log); setEditLogOpen(true); }} size="small" sx={{ bgcolor: '#F8FAFC', color: '#64748B', '&:hover': { bgcolor: '#F1F5F9' } }}>
+                        <EditIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete Log">
+                      <IconButton onClick={() => handleDeleteLog(log.id)} size="small" sx={{ bgcolor: '#FEF2F2', color: '#DC2626', '&:hover': { bgcolor: '#FEE2E2' } }}>
+                        <DeleteIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableContainer>
   );
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+    <Box sx={{ width: '100%', px: { xs: 0, sm: 0.5, md: 1 } }}>
+      {/* 1. EXECUTIVE HEADER & CONTROLS */}
+      <Box sx={{ mb: 3.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-            <FolderSpecialIcon fontSize="large" color="primary" /> In/Out Ledger
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.5px' }}>
+              In/Out Material Ledger
+            </Typography>
+            <Chip 
+              label="Gate Pass Tracking" 
+              size="small" 
+              sx={{ 
+                bgcolor: '#FFFDF5', 
+                color: '#B38B36', 
+                border: '1px solid #C89F5A', 
+                fontWeight: 800, 
+                fontSize: '0.72rem',
+                borderRadius: 1.5 
+              }} 
+            />
+          </Box>
+          <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+            Audit gate-passes sent to job-work vendors and verify returned materials.
           </Typography>
-          <Typography variant="body1" color="textSecondary" sx={{ ml: 6 }}>Track material sent to vendors and stock returned after processing</Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setManualEntryOpen(true)}>
-            + Manual Entry
+
+        {/* Action Button & Filters */}
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={() => setManualEntryOpen(true)}
+            sx={{ 
+              fontWeight: 800, 
+              py: 1, 
+              px: 2.5,
+              borderRadius: 2.5,
+              textTransform: 'none',
+              fontSize: '0.88rem',
+              bgcolor: '#0F172A',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 14px rgba(15, 23, 42, 0.25)',
+              '&:hover': { bgcolor: '#1E293B' }
+            }}
+          >
+            + New Gate Pass
           </Button>
-          <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#fff' }}>
-            <Select value={selectedFY} onChange={(e) => setSelectedFY(e.target.value)}>
+
+          <FormControl size="small" sx={{ minWidth: 140, bgcolor: '#FFF' }}>
+            <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Financial Year</InputLabel>
+            <Select 
+              value={selectedFY} 
+              label="Financial Year"
+              onChange={(e) => setSelectedFY(e.target.value)}
+              sx={{ borderRadius: 2, fontSize: '0.85rem' }}
+            >
               {fyOptions.map(fy => (
                 <MenuItem key={fy} value={fy}>{fy}</MenuItem>
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#fff' }}>
-            <Select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} displayEmpty>
+
+          <FormControl size="small" sx={{ minWidth: 130, bgcolor: '#FFF' }}>
+            <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Month</InputLabel>
+            <Select 
+              value={selectedMonth} 
+              label="Month"
+              onChange={(e) => setSelectedMonth(e.target.value)} 
+              sx={{ borderRadius: 2, fontSize: '0.85rem' }}
+            >
               <MenuItem value="All">All Months</MenuItem>
               {fyMonths.map(m => (
                 <MenuItem key={`${m.label} ${m.year}`} value={`${m.label} ${m.year}`}>{m.label}</MenuItem>
@@ -320,14 +430,118 @@ const InOutLedger: React.FC = () => {
         </Box>
       </Box>
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={currentTab} onChange={(e, val) => setCurrentTab(val)}>
-          <Tab label="Factory Out" sx={{ fontWeight: 'bold' }} />
-          <Tab label="Factory In" sx={{ fontWeight: 'bold' }} />
-          <Tab label="Vendors / Suppliers" sx={{ fontWeight: 'bold' }} />
-        </Tabs>
-      </Box>
+      {/* 2. KPI SUMMARY METRIC CARDS */}
+      <Grid container spacing={2} sx={{ mb: 3.5 }}>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+            <Avatar sx={{ bgcolor: '#FFF7ED', color: '#EA580C', width: 44, height: 44 }}>
+              <OutputIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Active Outward Gate Passes
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#C2410C', mt: 0.2 }}>
+                {activeOutLogs.length}
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
 
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+            <Avatar sx={{ bgcolor: '#F0F9FF', color: '#0284C7', width: 44, height: 44 }}>
+              <InputIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Inward Returns
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0369A1', mt: 0.2 }}>
+                {completedMaterialLogs.filter((l: any) => l.transactionType === 'IN').length}
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+            <Avatar sx={{ bgcolor: '#FFFDF5', color: '#B38B36', width: 44, height: 44 }}>
+              <BusinessRoundedIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Vendor Directory
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
+                {vendorsData?.length || 0} <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>Partners</span>
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* 3. LUXURY TABS NAVIGATION */}
+      <Paper elevation={0} sx={{ p: 0.75, borderRadius: 3, bgcolor: '#F1F5F9', mb: 3, display: 'inline-flex', border: '1px solid #E2E8F0' }}>
+        <Tabs 
+          value={currentTab} 
+          onChange={(e, val) => setCurrentTab(val)} 
+          textColor="inherit"
+          TabIndicatorProps={{ style: { display: 'none' } }}
+          sx={{ minHeight: 'unset' }}
+        >
+          <Tab 
+            label="Material Outward (Factory OUT)" 
+            sx={{ 
+              fontWeight: 800, 
+              fontSize: '0.85rem', 
+              py: 1, 
+              px: 2.5,
+              minHeight: 'unset',
+              textTransform: 'none',
+              borderRadius: 2.5,
+              transition: 'all 0.15s ease',
+              color: currentTab === 0 ? '#FFFFFF !important' : '#64748B',
+              bgcolor: currentTab === 0 ? '#0F172A' : 'transparent',
+              boxShadow: currentTab === 0 ? '0 2px 8px rgba(15, 23, 42, 0.15)' : 'none'
+            }} 
+          />
+          <Tab 
+            label="Material Inward (Factory IN)" 
+            sx={{ 
+              fontWeight: 800, 
+              fontSize: '0.85rem', 
+              py: 1, 
+              px: 2.5,
+              minHeight: 'unset',
+              textTransform: 'none',
+              borderRadius: 2.5,
+              transition: 'all 0.15s ease',
+              color: currentTab === 1 ? '#FFFFFF !important' : '#64748B',
+              bgcolor: currentTab === 1 ? '#0F172A' : 'transparent',
+              boxShadow: currentTab === 1 ? '0 2px 8px rgba(15, 23, 42, 0.15)' : 'none'
+            }} 
+          />
+          <Tab 
+            label="Vendors & Job-Workers" 
+            sx={{ 
+              fontWeight: 800, 
+              fontSize: '0.85rem', 
+              py: 1, 
+              px: 2.5,
+              minHeight: 'unset',
+              textTransform: 'none',
+              borderRadius: 2.5,
+              transition: 'all 0.15s ease',
+              color: currentTab === 2 ? '#FFFFFF !important' : '#64748B',
+              bgcolor: currentTab === 2 ? '#0F172A' : 'transparent',
+              boxShadow: currentTab === 2 ? '0 2px 8px rgba(15, 23, 42, 0.15)' : 'none'
+            }} 
+          />
+        </Tabs>
+      </Paper>
+
+      {/* 4. TAB CONTENTS */}
       {currentTab === 2 && (
         <VendorsList hideHeader={true} selectedMonth={selectedMonth} selectedFY={selectedFY} />
       )}
@@ -337,9 +551,14 @@ const InOutLedger: React.FC = () => {
           {(() => {
             const tabLogs = allLogs.filter(log => currentTab === 0 ? log.transactionType === 'OUT' : log.transactionType === 'IN');
             if (tabLogs.length === 0) return (
-              <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4 }}>
-                <FolderSpecialIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2, opacity: 0.5 }} />
-                <Typography variant="h6" color="textSecondary">No material logs found for this tab.</Typography>
+              <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 3.5, bgcolor: '#FFFFFF', border: '1px dashed #CBD5E1' }}>
+                <FolderSpecialIcon sx={{ fontSize: 48, color: '#94A3B8', mb: 1.5 }} />
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                  No gate passes found
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
+                  No {currentTab === 0 ? 'Outward' : 'Inward'} logs recorded for the selected period.
+                </Typography>
               </Paper>
             );
             
@@ -359,8 +578,9 @@ const InOutLedger: React.FC = () => {
                     const logs = grouped[monthKey];
                     if (!logs || logs.length === 0) return null;
                     return (
-                      <Box key={monthKey} sx={{ mb: 5 }}>
-                        <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 3, color: '#333', borderBottom: '2px solid #eee', pb: 1 }}>
+                      <Box key={monthKey} sx={{ mb: 4 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1.5, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CalendarMonthRoundedIcon sx={{ fontSize: 18, color: '#B38B36' }} />
                           {monthKey}
                         </Typography>
                         {renderUnifiedLogGrid(logs)}
@@ -373,93 +593,74 @@ const InOutLedger: React.FC = () => {
         </Box>
       )}
 
-      {/* Approval Dialog */}
-      <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>
+      {/* 5. APPROVAL DIALOG */}
+      <Dialog 
+        open={approvalDialogOpen} 
+        onClose={() => setApprovalDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A', borderBottom: '1px solid #E2E8F0', pb: 2 }}>
           Approve Material Log
           {selectedLog && (
-            <Typography variant="caption" display="block" sx={{ color: 'text.secondary', mt: 0.5 }}>
-              Stage: {selectedLog.stage} • Item(s): {selectedLog.quantityProduced}
+            <Typography variant="caption" display="block" sx={{ color: '#64748B', mt: 0.5, fontWeight: 600 }}>
+              Stage: {selectedLog.stage} • Quantity: {selectedLog.quantityProduced}
             </Typography>
           )}
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent sx={{ pt: 2.5 }}>
           {projectSplits.map((split, idx) => {
-            const projectProducts = split.projectId ? (projects?.find((p: any) => p.id === split.projectId)?.products || []) : [];
             const projectSlabs = split.projectId ? (slabs?.filter((s: any) => s.projectId === split.projectId) || []) : [];
             return (
-              <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4, p: 2, border: '1px solid #eee', borderRadius: 2 }}>
+              <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3, p: 2.5, border: '1px solid #E2E8F0', borderRadius: 3, bgcolor: '#F8FAFC' }}>
+                <TextField 
+                  select 
+                  label="Assign Project" 
+                  fullWidth 
+                  size="small" 
+                  value={split.projectId} 
+                  onChange={(e) => {
+                    const newSplits = [...projectSplits];
+                    newSplits[idx].projectId = e.target.value;
+                    newSplits[idx].productId = '';
+                    newSplits[idx].productName = '';
+                    newSplits[idx].slabId = '';
+                    newSplits[idx].pieceIds = [];
+                    
+                    const matched = slabs?.filter((s: any) => s.projectId === e.target.value);
+                    if (matched && matched.length === 1) {
+                      newSplits[idx].slabId = matched[0].id;
+                      newSplits[idx].productName = matched[0].name;
+                    }
 
+                    setProjectSplits(newSplits);
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                >
+                  <MenuItem value="" disabled>Select Project</MenuItem>
+                  {projects?.map((p: any) => (
+                    <MenuItem key={p.id} value={p.id}>{p.projectId} – {p.name || ''} ({p.clientName})</MenuItem>
+                  ))}
+                </TextField>
 
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <TextField 
-                    select 
-                    label="Assign Project" 
-                    fullWidth 
-                    size="small" 
-                    value={split.projectId} 
-                    onChange={(e) => {
-                      const newSplits = [...projectSplits];
-                      newSplits[idx].projectId = e.target.value;
-                      newSplits[idx].productId = '';
-                      newSplits[idx].productName = '';
-                      newSplits[idx].slabId = '';
-                      newSplits[idx].pieceIds = [];
-                      
-                      const matched = slabs?.filter((s: any) => s.projectId === e.target.value);
-                      if (matched && matched.length === 1) {
-                        newSplits[idx].slabId = matched[0].id;
-                        newSplits[idx].productName = matched[0].name;
-                      }
-
-                      setProjectSplits(newSplits);
-                    }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  >
-                    <MenuItem value="" disabled>Select Project</MenuItem>
-                    {projects?.map((p: any) => (
-                      <MenuItem key={p.id} value={p.id}>{p.projectId} – {p.name || ''} ({p.clientName})</MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-
-                {/* Dynamically extract slabs for this project */}
+                {/* Slabs Autocomplete */}
                 {(() => {
                   const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
                   const cleanLogStage = (selectedLog?.stage || '').replace(' Work', '').trim();
                   const logStageIdx = stages.indexOf(cleanLogStage);
 
                   const isPieceEligible = (p: any) => {
-                    if (logStageIdx === -1) {
-                      return p.status !== 'completed';
-                    }
-
+                    if (logStageIdx === -1) return p.status !== 'completed';
                     const pStage = (p.stage || 'Production').replace(' Work', '').trim();
                     const pStageIdx = stages.indexOf(pStage);
-
-                    // If piece has already progressed past this stage, it's done!
                     if (pStageIdx > logStageIdx) return false;
-
-                    // If piece is at this stage:
-                    if (pStageIdx === logStageIdx) {
-                      // If already completed in this stage, it should NOT appear again for this stage!
-                      if (p.status === 'completed') return false;
-                      // If pending or active, it's currently being worked on!
-                      return true;
-                    }
-
-                    // If piece is at ANY prior stage (e.g. Production, Polishing, Packing):
-                    // Decoupled pipeline: Any piece completed at any prior stage (or created in production) is eligible!
-                    if (pStageIdx < logStageIdx && (p.status === 'completed' || pStageIdx === 0)) {
-                      return true;
-                    }
-
+                    if (pStageIdx === logStageIdx) return p.status !== 'completed';
+                    if (pStageIdx < logStageIdx) return p.status === 'completed';
                     return false;
                   };
 
-                  // Filter slabs for this project:
-                  // Only include slabs that either have no pieces generated yet, OR have at least 1 eligible piece for this stage!
-                  const projectSlabs = slabs ? slabs.filter((s: any) => {
+                  const filteredSlabs = slabs ? slabs.filter((s: any) => {
                     if (s.projectId !== split.projectId) return false;
                     if (s.pieces && s.pieces.length > 0) {
                       const eligible = s.pieces.filter(isPieceEligible);
@@ -468,60 +669,58 @@ const InOutLedger: React.FC = () => {
                     return true;
                   }) : [];
 
-                  if (projectSlabs.length === 0) {
+                  if (filteredSlabs.length === 0 && split.projectId) {
                     return (
-                      <Box sx={{ p: 1.5, bgcolor: '#FFF8E1', borderRadius: 2, border: '1px dashed #FFE082' }}>
-                        <Typography variant="body2" color="#B26A00" fontWeight={500}>
-                          Notice: No pending pieces found for stage <strong>{selectedLog?.stage || 'this stage'}</strong> under this project. (All items are already completed).
+                      <Box sx={{ p: 1.5, bgcolor: '#FFFDF5', borderRadius: 2, border: '1px dashed #FDE68A' }}>
+                        <Typography variant="body2" color="#B45309" fontWeight={600}>
+                          Notice: No pending pieces found for stage <strong>{selectedLog?.stage || 'this stage'}</strong> under this project.
                         </Typography>
                       </Box>
                     );
                   }
 
-                  const currentSlab = projectSlabs.find((s: any) => s.id === split.slabId) || (projectSlabs.length === 1 ? projectSlabs[0] : null);
-                  if (projectSlabs.length === 1 && !split.slabId) {
-                    split.slabId = projectSlabs[0].id;
-                    split.productName = projectSlabs[0].name;
+                  const currentSlab = filteredSlabs.find((s: any) => s.id === split.slabId) || (filteredSlabs.length === 1 ? filteredSlabs[0] : null);
+                  if (filteredSlabs.length === 1 && !split.slabId) {
+                    split.slabId = filteredSlabs[0].id;
+                    split.productName = filteredSlabs[0].name;
                   }
 
                   const eligiblePiecesForSlab = currentSlab?.pieces ? currentSlab.pieces.filter(isPieceEligible) : [];
 
                   return (
                     <>
-                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                        <Autocomplete
-                          fullWidth
-                          size="small"
-                          options={projectSlabs}
-                          getOptionLabel={(option: any) => {
-                            const pendingCount = option.pieces ? option.pieces.filter(isPieceEligible).length : 0;
-                            return `${option.name} (${pendingCount} Pending Pieces)`;
-                          }}
-                          value={projectSlabs.find((s: any) => s.id === split.slabId) || null}
-                          onChange={(e, newValue: any) => {
-                            const newSplits = [...projectSplits];
-                            if (newValue) {
-                              newSplits[idx].slabId = newValue.id;
-                              newSplits[idx].productName = newValue.name;
-                            } else {
-                              newSplits[idx].slabId = '';
-                              newSplits[idx].productName = '';
-                            }
-                            newSplits[idx].pieceIds = [];
-                            setProjectSplits(newSplits);
-                          }}
-                          renderInput={(params) => (
-                            <TextField 
-                              {...params} 
-                              label="Search Product / Slab *" 
-                              placeholder="Type name..."
-                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                            />
-                          )}
-                        />
-                      </Box>
+                      <Autocomplete
+                        fullWidth
+                        size="small"
+                        options={filteredSlabs}
+                        getOptionLabel={(option: any) => {
+                          const pendingCount = option.pieces ? option.pieces.filter(isPieceEligible).length : 0;
+                          return `${option.name} (${pendingCount} Pending Pieces)`;
+                        }}
+                        value={filteredSlabs.find((s: any) => s.id === split.slabId) || null}
+                        onChange={(e, newValue: any) => {
+                          const newSplits = [...projectSplits];
+                          if (newValue) {
+                            newSplits[idx].slabId = newValue.id;
+                            newSplits[idx].productName = newValue.name;
+                          } else {
+                            newSplits[idx].slabId = '';
+                            newSplits[idx].productName = '';
+                          }
+                          newSplits[idx].pieceIds = [];
+                          setProjectSplits(newSplits);
+                        }}
+                        renderInput={(params) => (
+                          <TextField 
+                            {...params} 
+                            label="Search Product / Slab *" 
+                            placeholder="Type name..."
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                          />
+                        )}
+                      />
 
-                      {/* Pieces Dropdown */}
+                      {/* Pieces Selection */}
                       {split.slabId && eligiblePiecesForSlab.length > 0 && (() => {
                         const allEligibleIds = eligiblePiecesForSlab.map((p: any) => p.id);
                         const isAllSelected = allEligibleIds.length > 0 && allEligibleIds.every((id: string) => (split.pieceIds || []).includes(id));
@@ -532,7 +731,7 @@ const InOutLedger: React.FC = () => {
                           newSplits[idx].pieceIds = newPieceIds;
                           newSplits[idx].qty = newPieceIds.length > 0 ? newPieceIds.length : newSplits[idx].qty;
 
-                          const slab = projectSlabs.find((s: any) => s.id === newSplits[idx].slabId);
+                          const slab = filteredSlabs.find((s: any) => s.id === newSplits[idx].slabId);
                           if (newPieceIds.length > 0) {
                             const pieceNames = newPieceIds.map((id: string) => {
                               const piece = slab?.pieces?.find((p: any) => p.id === id);
@@ -549,14 +748,14 @@ const InOutLedger: React.FC = () => {
                         return (
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>
+                              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>
                                 Piece Selection ({(split.pieceIds || []).length} / {eligiblePiecesForSlab.length} selected)
                               </Typography>
                               <Button
                                 size="small"
                                 variant="outlined"
                                 onClick={() => updateSelectedPieces(isAllSelected ? [] : allEligibleIds)}
-                                sx={{ textTransform: 'none', py: 0.2, px: 1, fontSize: '0.75rem', borderRadius: 1.5, fontWeight: 'bold', borderColor: '#ed6c02', color: '#ed6c02', '&:hover': { bgcolor: '#FFF3E0' } }}
+                                sx={{ textTransform: 'none', py: 0.2, px: 1, fontSize: '0.75rem', borderRadius: 1.5, fontWeight: 700, borderColor: '#EA580C', color: '#EA580C', '&:hover': { bgcolor: '#FFF7ED' } }}
                               >
                                 {isAllSelected ? 'Deselect All' : 'Select All'}
                               </Button>
@@ -579,31 +778,34 @@ const InOutLedger: React.FC = () => {
                                 renderValue={(selected: any) => {
                                   const filtered = (selected || []).filter((id: string) => id !== '__SELECT_ALL__');
                                   if (filtered.length === 0) return <em>Select Pieces</em>;
-                                  const slab = projectSlabs.find((s: any) => s.id === split.slabId);
+                                  const slab = filteredSlabs.find((s: any) => s.id === split.slabId);
                                   return filtered.map((id: string) => {
                                     const piece = slab?.pieces?.find((p: any) => p.id === id);
                                     return piece ? `${(piece.productName || `Piece ${piece.pieceNumber}`).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${piece.size ? `(${piece.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}` : id;
                                   }).join(', ');
                                 }}
                               >
-                                <MenuItem value="__SELECT_ALL__" sx={{ bgcolor: '#FFF8E1', borderBottom: '1px solid #FFE082', fontWeight: 'bold' }}>
+                                <MenuItem value="__SELECT_ALL__" sx={{ bgcolor: '#FFF7ED', borderBottom: '1px solid #FFEDD5', fontWeight: 800 }}>
                                   <Checkbox 
                                     checked={isAllSelected}
                                     indeterminate={isIndeterminate}
-                                    sx={{ color: '#ed6c02', '&.Mui-checked': { color: '#ed6c02' }, '&.MuiCheckbox-indeterminate': { color: '#ed6c02' } }}
+                                    sx={{ color: '#EA580C', '&.Mui-checked': { color: '#EA580C' } }}
                                   />
                                   <ListItemText 
-                                    primary={`Select All (${eligiblePiecesForSlab.length} Pieces)`}
-                                    primaryTypographyProps={{ fontWeight: 'bold', color: '#e65100' }}
+                                    primary={
+                                      <Typography sx={{ fontWeight: 800, color: '#C2410C', fontSize: '0.85rem' }}>
+                                        {`Select All (${eligiblePiecesForSlab.length} Pieces)`}
+                                      </Typography>
+                                    }
                                   />
                                 </MenuItem>
                                 {eligiblePiecesForSlab.map((p: any) => (
                                   <MenuItem key={p.id} value={p.id}>
                                     <Checkbox checked={(split.pieceIds || []).indexOf(p.id) > -1} />
                                     <ListItemText 
-                                      primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\\d+MM)/i, ' | $1')})` : ''}`} 
+                                      primary={`${(p.productName || 'Piece ' + p.pieceNumber).replace(' (Cut Piece)', '').replace(' (Full Slab)', '')} ${p.size ? `(${p.size.replace(/ x (\d+MM)/i, ' | $1')})` : ''}`} 
                                       secondary={`Stage: ${p.stage || 'Production'} • ${p.status === 'completed' ? 'Ready for next stage' : 'In Progress'}`}
-                                      sx={{ color: '#ed6c02', fontWeight: 'bold' }} 
+                                      sx={{ color: '#C2410C', fontWeight: 600 }} 
                                     />
                                   </MenuItem>
                                 ))}
@@ -630,39 +832,69 @@ const InOutLedger: React.FC = () => {
                     }} 
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                   />
-                </Box>
-
-
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <IconButton color="error" onClick={() => {
-                    const newSplits = projectSplits.filter((_, i) => i !== idx);
-                    setProjectSplits(newSplits);
-                  }} disabled={projectSplits.length === 1}>
-                    <DeleteIcon />
-                  </IconButton>
+                  {projectSplits.length > 1 && (
+                    <IconButton color="error" onClick={() => setProjectSplits(projectSplits.filter((_, i) => i !== idx))}>
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
                 </Box>
               </Box>
             );
           })}
           
-          <Button startIcon={<AddIcon />} onClick={() => setProjectSplits([...projectSplits, { projectId: '', qty: 0 }])}>
-            Add Project Split
+          <Button startIcon={<AddIcon />} onClick={() => setProjectSplits([...projectSplits, { projectId: '', qty: 0 }])} sx={{ textTransform: 'none', fontWeight: 700 }}>
+            + Add Project Split
           </Button>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setApprovalDialogOpen(false)} color="inherit">Cancel</Button>
-          <Button variant="contained" color="success" onClick={submitApproval} disabled={!projectSplits.some(s => s.projectId && s.qty > 0) || isApproving}>
+        <DialogActions sx={{ p: 2.5, borderTop: '1px solid #E2E8F0', gap: 1 }}>
+          <Button onClick={() => setApprovalDialogOpen(false)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={submitApproval} 
+            disabled={!projectSplits.some(s => s.projectId && s.qty > 0) || isApproving}
+            sx={{ 
+              borderRadius: 2, 
+              bgcolor: '#059669', 
+              color: '#FFFFFF', 
+              fontWeight: 800, 
+              textTransform: 'none',
+              px: 3,
+              '&:hover': { bgcolor: '#047857' }
+            }}
+          >
             {isApproving ? 'Approving...' : 'Confirm Approval'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!previewPhoto} onClose={() => setPreviewPhoto(null)} maxWidth="lg" fullWidth PaperProps={{ style: { backgroundColor: 'transparent', boxShadow: 'none' } } as any}>
-        <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', p: 2 }} onClick={() => setPreviewPhoto(null)}>
-          {previewPhoto ? <img src={previewPhoto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} /> : null}
+      {/* 6. PHOTO PREVIEW FULLSCREEN DIALOG */}
+      <Dialog 
+        open={Boolean(previewPhoto)} 
+        onClose={() => setPreviewPhoto(null)} 
+        maxWidth="lg" 
+        fullWidth 
+        slotProps={{ paper: { sx: { bgcolor: 'transparent', boxShadow: 'none' } } }}
+      >
+        <Box sx={{ position: 'relative', textAlign: 'center' }}>
+          <IconButton 
+            onClick={() => setPreviewPhoto(null)} 
+            sx={{ position: 'absolute', top: -40, right: -40, color: '#fff', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
+          >
+            <CloseIcon fontSize="large" />
+          </IconButton>
+          {previewPhoto && (
+            <img 
+              src={getFullQualityUrl(previewPhoto)} 
+              alt="Preview" 
+              style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }} 
+            />
+          )}
         </Box>
       </Dialog>
 
+      {/* 7. MANUAL ENTRY / EDIT LOG DIALOG */}
       <ManagerStyleEntryDialog
         open={manualEntryOpen || editLogOpen}
         isEditMode={editLogOpen}

@@ -1,8 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { 
+  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, 
+  TableHead, TableRow, Tabs, Tab, Dialog, DialogTitle, DialogContent, 
+  DialogActions, Button, IconButton, FormControl, InputLabel, Select, 
+  MenuItem, Grid, Chip, Avatar
+} from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
+import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { useGetInventoryQuery, useGetInventoryLogsQuery, useGetProjectsQuery } from '../store/apiSlice';
 import { MaterialPlanningModal } from '../components/MaterialPlanningModal';
 
@@ -95,10 +105,12 @@ const Inventory: React.FC = () => {
           displayName,
           ledgerIdentifier,
           items: [],
-          latestDate: item.createdAt
+          latestDate: item.createdAt,
+          totalQty: 0
         };
       }
       acc[key].items.push(item);
+      acc[key].totalQty += (item.quantity || 0);
       if (new Date(item.createdAt).getTime() > new Date(acc[key].latestDate).getTime()) {
         acc[key].latestDate = item.createdAt;
       }
@@ -110,34 +122,70 @@ const Inventory: React.FC = () => {
     );
   }, [filteredMaterials, activeTab, projects]);
 
+  const totalPiecesCount = filteredMaterials.length;
+  const totalStockQuantity = filteredMaterials.reduce((sum: number, it: any) => sum + (it.quantity || 0), 0);
+
   const handleCloseDialog = () => {
     setSelectedSupplier(null);
     setSupplierItems([]);
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+    <Box sx={{ width: '100%', px: { xs: 0, sm: 0.5, md: 1 } }}>
+      {/* 1. EXECUTIVE HEADER & CONTROLS */}
+      <Box sx={{ mb: 3.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Inventory Management</Typography>
-          <Typography variant="body1" color="textSecondary" sx={{ mt: 1 }}>View Unnati Materials and Client Materials.</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.5px' }}>
+              Inventory Management
+            </Typography>
+            <Chip 
+              label="Stock Vault" 
+              size="small" 
+              sx={{ 
+                bgcolor: '#FFFDF5', 
+                color: '#B38B36', 
+                border: '1px solid #C89F5A', 
+                fontWeight: 800, 
+                fontSize: '0.72rem',
+                borderRadius: 1.5 
+              }} 
+            />
+          </Box>
+          <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+            Track factory raw material stock, company inventory slabs, and client job-work batches.
+          </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+
+        {/* Action Button & Filters */}
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
           <Button 
             variant="contained" 
-            color="success" 
             startIcon={<AssignmentIcon />} 
             onClick={() => setPlanningModalOpen(true)}
-            sx={{ fontWeight: 'bold', py: 1 }}
+            sx={{ 
+              fontWeight: 800, 
+              py: 1, 
+              px: 2.5,
+              borderRadius: 2.5,
+              textTransform: 'none',
+              fontSize: '0.88rem',
+              bgcolor: '#059669',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+              '&:hover': { bgcolor: '#047857' }
+            }}
           >
-            Material Planning & Procurement
+            Material Planning
           </Button>
-          <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#FFF' }}>
-            <InputLabel>Financial Year</InputLabel>
+
+          <FormControl size="small" sx={{ minWidth: 140, bgcolor: '#FFF' }}>
+            <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Financial Year</InputLabel>
             <Select
               value={selectedFY}
               label="Financial Year"
               onChange={(e) => setSelectedFY(e.target.value)}
+              sx={{ borderRadius: 2, fontSize: '0.85rem' }}
             >
               <MenuItem value="2024-2025">2024-2025</MenuItem>
               <MenuItem value="2025-2026">2025-2026</MenuItem>
@@ -145,12 +193,14 @@ const Inventory: React.FC = () => {
               <MenuItem value="2027-2028">2027-2028</MenuItem>
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 150, bgcolor: '#FFF' }}>
-            <InputLabel>Month</InputLabel>
+
+          <FormControl size="small" sx={{ minWidth: 130, bgcolor: '#FFF' }}>
+            <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Month</InputLabel>
             <Select
               value={selectedMonth}
               label="Month"
               onChange={(e) => setSelectedMonth(e.target.value === '' ? '' : Number(e.target.value))}
+              sx={{ borderRadius: 2, fontSize: '0.85rem' }}
             >
               <MenuItem value=""><em>All Months</em></MenuItem>
               {MONTHS.map((m) => (
@@ -161,79 +211,213 @@ const Inventory: React.FC = () => {
         </Box>
       </Box>
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
-        <Tabs value={activeTab} onChange={handleTabChange} textColor="primary" indicatorColor="primary">
-          <Tab label="Unnati Material" sx={{ fontWeight: 'bold', fontSize: '1.1rem', py: 2 }} />
-          <Tab label="Client Material" sx={{ fontWeight: 'bold', fontSize: '1.1rem', py: 2 }} />
-        </Tabs>
-      </Box>
+      {/* 2. KPI SUMMARY METRIC CARDS */}
+      <Grid container spacing={2} sx={{ mb: 3.5 }}>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+            <Avatar sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', width: 44, height: 44 }}>
+              <LayersRoundedIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Tracked Stock Batches
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
+                {supplierRows.length}
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
 
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+            <Avatar sx={{ bgcolor: '#FFFDF5', color: '#B38B36', width: 44, height: 44 }}>
+              <Inventory2RoundedIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Total Items / Slabs
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
+                {totalPiecesCount}
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+            <Avatar sx={{ bgcolor: '#ECFDF5', color: '#059669', width: 44, height: 44 }}>
+              <BusinessRoundedIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Total Available Stock
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#059669', mt: 0.2 }}>
+                {totalStockQuantity.toLocaleString('en-IN')} <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Units / Sq.Ft</span>
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* 3. LUXURY TABS NAVIGATION */}
+      <Paper elevation={0} sx={{ p: 0.75, borderRadius: 3, bgcolor: '#F1F5F9', mb: 3, display: 'inline-flex', border: '1px solid #E2E8F0' }}>
+        <Tabs 
+          value={activeTab} 
+          onChange={handleTabChange} 
+          textColor="inherit"
+          TabIndicatorProps={{ style: { display: 'none' } }}
+          sx={{ minHeight: 'unset' }}
+        >
+          <Tab 
+            label="Unnati Material Stock" 
+            sx={{ 
+              fontWeight: 800, 
+              fontSize: '0.85rem', 
+              py: 1, 
+              px: 2.5,
+              minHeight: 'unset',
+              textTransform: 'none',
+              borderRadius: 2.5,
+              transition: 'all 0.15s ease',
+              color: activeTab === 0 ? '#FFFFFF !important' : '#64748B',
+              bgcolor: activeTab === 0 ? '#0F172A' : 'transparent',
+              boxShadow: activeTab === 0 ? '0 2px 8px rgba(15, 23, 42, 0.15)' : 'none'
+            }} 
+          />
+          <Tab 
+            label="Client Material (Job Work)" 
+            sx={{ 
+              fontWeight: 800, 
+              fontSize: '0.85rem', 
+              py: 1, 
+              px: 2.5,
+              minHeight: 'unset',
+              textTransform: 'none',
+              borderRadius: 2.5,
+              transition: 'all 0.15s ease',
+              color: activeTab === 1 ? '#FFFFFF !important' : '#64748B',
+              bgcolor: activeTab === 1 ? '#0F172A' : 'transparent',
+              boxShadow: activeTab === 1 ? '0 2px 8px rgba(15, 23, 42, 0.15)' : 'none'
+            }} 
+          />
+        </Tabs>
+      </Paper>
+
+      {/* 4. DATA TABLE */}
       {isLoading ? (
-        <Typography variant="h6" sx={{ color: 'text.secondary' }}>Loading inventory...</Typography>
+        <Box sx={{ p: 6, textAlign: 'center' }}>
+          <Typography variant="body1" sx={{ color: '#64748B', fontWeight: 600 }}>Loading inventory records...</Typography>
+        </Box>
       ) : supplierRows.length === 0 ? (
-        <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, bgcolor: '#FAFAFA', border: '2px dashed #E0E0E0' }}>
-          <Typography variant="h5" color="text.secondary">No materials found for the selected filter.</Typography>
+        <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 3.5, bgcolor: '#FFFFFF', border: '1px dashed #CBD5E1' }}>
+          <Inventory2RoundedIcon sx={{ fontSize: 48, color: '#94A3B8', mb: 1.5 }} />
+          <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B' }}>
+            No materials found
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
+            No inventory matches the selected filter for {activeTab === 0 ? 'Unnati Stock' : 'Client Material'}.
+          </Typography>
         </Paper>
       ) : (
-        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 4, overflow: 'hidden' }}>
-          <Table size="medium">
-            <TableHead sx={{ bgcolor: '#F5F5F5' }}>
-              <TableRow>
-                <TableCell sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>Date</Typography>
-                </TableCell>
-                <TableCell sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>
-                    Project Name
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>Total Pieces</Typography>
-                </TableCell>
-                <TableCell align="center" sx={{ py: 2.5 }}>
-                  <Typography fontWeight="bold" sx={{ fontSize: '1.05rem' }}>Actions</Typography>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {supplierRows.map((row: any) => {
-                const blockList = Array.from(new Set(row.items.map((it: any) => it.blockNumber).filter(Boolean)));
-                return (
-                  <TableRow 
-                    key={row.key} 
-                    hover 
-                    onClick={() => navigate(`/inventory/ledger/${encodeURIComponent(row.ledgerIdentifier)}`)}
-                    sx={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
-                  >
-                    <TableCell sx={{ py: 2.5 }}>
-                      <Typography sx={{ fontSize: '1rem', color: '#555' }}>
-                        {new Date(row.latestDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 2.5 }}>
-                      <Typography fontWeight="bold" color="primary.main" sx={{ fontSize: '1.05rem' }}>
-                        {row.displayName}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 2.5 }}>
-                      <Typography fontWeight="bold" sx={{ fontSize: '1.05rem', color: '#222' }}>
-                        {row.items.length} {row.items.length === 1 ? 'Piece' : 'Pieces'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center" sx={{ py: 2.5 }}>
-                      <Button variant="outlined" size="small" sx={{ borderRadius: 2 }}>
-                        View Ledger
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3.5, overflow: 'hidden', bgcolor: '#FFFFFF', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+          <TableContainer>
+            <Table size="medium">
+              <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 2 }}>
+                    Latest Entry Date
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 2 }}>
+                    {activeTab === 0 ? 'Category / Project Identifier' : 'Client / Project Name'}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 2 }}>
+                    Total Items
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 2 }}>
+                    Available Stock
+                  </TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 2 }}>
+                    Action
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {supplierRows.map((row: any, idx: number) => {
+                  return (
+                    <TableRow 
+                      key={row.key} 
+                      hover 
+                      onClick={() => navigate(`/inventory/ledger/${encodeURIComponent(row.ledgerIdentifier)}`)}
+                      sx={{ 
+                        cursor: 'pointer', 
+                        transition: 'background-color 0.15s ease',
+                        bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
+                        '&:hover': { bgcolor: '#F1F5F9' }
+                      }}
+                    >
+                      <TableCell sx={{ py: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CalendarMonthRoundedIcon sx={{ fontSize: 16, color: '#64748B' }} />
+                          <Typography sx={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                            {new Date(row.latestDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ py: 2 }}>
+                        <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>
+                          {row.displayName}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 2 }}>
+                        <Chip 
+                          label={`${row.items.length} ${row.items.length === 1 ? 'Piece' : 'Pieces'}`}
+                          size="small"
+                          sx={{ 
+                            bgcolor: '#EFF6FF', 
+                            color: '#1D4ED8', 
+                            fontWeight: 700, 
+                            fontSize: '0.75rem', 
+                            borderRadius: 1.5,
+                            border: '1px solid #DBEAFE'
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ py: 2 }}>
+                        <Typography sx={{ fontWeight: 800, color: '#059669', fontSize: '0.92rem' }}>
+                          {row.totalQty.toLocaleString('en-IN')} <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Units</span>
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={{ py: 2 }}>
+                        <Button 
+                          variant="outlined" 
+                          size="small" 
+                          endIcon={<ArrowForwardRoundedIcon sx={{ fontSize: 16 }} />}
+                          sx={{ 
+                            borderRadius: 2, 
+                            textTransform: 'none', 
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            borderColor: '#CBD5E1',
+                            color: '#0F172A',
+                            '&:hover': { borderColor: '#B38B36', bgcolor: '#FFFDF5' }
+                          }}
+                        >
+                          View Ledger
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
       )}
 
-      {/* Details Dialog */}
+      {/* 5. DETAILS DIALOG */}
       <Dialog 
         open={Boolean(selectedSupplier)} 
         onClose={handleCloseDialog}
@@ -241,16 +425,16 @@ const Inventory: React.FC = () => {
         fullWidth
         slotProps={{ paper: { sx: { borderRadius: 4, minHeight: '60vh', bgcolor: '#FAFAFA' } } }}
       >
-        <DialogTitle sx={{ bgcolor: '#FFF', borderBottom: '1px solid #E0E0E0', p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ bgcolor: '#FFF', borderBottom: '1px solid #E2E8F0', p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h5" fontWeight="bold" color="primary.main">
+            <Typography variant="h5" fontWeight="bold" color="#0F172A">
               {selectedSupplier}
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            <Typography variant="body2" color="#64748B" sx={{ mt: 0.5 }}>
               Material Ledger (In / Out History)
             </Typography>
           </Box>
-          <IconButton onClick={handleCloseDialog} size="large" sx={{ bgcolor: '#F5F5F5' }}>
+          <IconButton onClick={handleCloseDialog} size="large" sx={{ bgcolor: '#F8FAFC' }}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -258,17 +442,17 @@ const Inventory: React.FC = () => {
           {isLoadingLogs ? (
             <Typography align="center" sx={{ mt: 5 }}>Loading ledger...</Typography>
           ) : (
-            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 3 }}>
+            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3 }}>
               <Table size="medium">
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#F5F5F5' }}>
-                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Date</strong></TableCell>
-                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Material Name</strong></TableCell>
-                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Block No</strong></TableCell>
-                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>L x W x T</strong></TableCell>
-                    <TableCell align="center" sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>IN (+)</strong></TableCell>
-                    <TableCell align="center" sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>OUT (-)</strong></TableCell>
-                    <TableCell sx={{ py: 2, borderBottom: '2px solid #E8E1D5' }}><strong>Remarks</strong></TableCell>
+                <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                  <TableRow>
+                    <TableCell sx={{ py: 2, fontWeight: 800, color: '#475569' }}>Date</TableCell>
+                    <TableCell sx={{ py: 2, fontWeight: 800, color: '#475569' }}>Material Name</TableCell>
+                    <TableCell sx={{ py: 2, fontWeight: 800, color: '#475569' }}>Block No</TableCell>
+                    <TableCell sx={{ py: 2, fontWeight: 800, color: '#475569' }}>L x W x T</TableCell>
+                    <TableCell align="center" sx={{ py: 2, fontWeight: 800, color: '#475569' }}>IN (+)</TableCell>
+                    <TableCell align="center" sx={{ py: 2, fontWeight: 800, color: '#475569' }}>OUT (-)</TableCell>
+                    <TableCell sx={{ py: 2, fontWeight: 800, color: '#475569' }}>Remarks</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -277,37 +461,37 @@ const Inventory: React.FC = () => {
                     return (
                       <TableRow key={log.id || idx} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
                         <TableCell sx={{ py: 2.5 }}>
-                          <Typography sx={{ fontSize: '1.05rem', color: '#555' }}>
+                          <Typography sx={{ fontSize: '0.9rem', color: '#555' }}>
                             {new Date(log.createdAt).toLocaleDateString('en-GB')}
                           </Typography>
                         </TableCell>
                         <TableCell sx={{ py: 2.5 }}>
-                          <Typography fontWeight="500" sx={{ fontSize: '1.05rem' }}>{item.itemName || '-'}</Typography>
+                          <Typography fontWeight="700" sx={{ fontSize: '0.92rem', color: '#0F172A' }}>{item.itemName || '-'}</Typography>
                         </TableCell>
                         <TableCell sx={{ py: 2.5 }}>
-                          <Typography fontWeight="bold" sx={{ fontSize: '1.1rem' }}>{item.blockNumber || '-'}</Typography>
+                          <Typography fontWeight="bold" sx={{ fontSize: '0.92rem' }}>{item.blockNumber || '-'}</Typography>
                         </TableCell>
                         <TableCell sx={{ py: 2.5 }}>
-                          <Typography sx={{ fontSize: '1.05rem' }}>
+                          <Typography sx={{ fontSize: '0.88rem', color: '#475569' }}>
                             {[item.length, item.width, item.thickness].filter(Boolean).join(' x ') || '-'}
                           </Typography>
                         </TableCell>
                         <TableCell align="center" sx={{ py: 2.5 }}>
                           {log.type === 'IN' ? (
-                            <Typography fontWeight="bold" sx={{ fontSize: '1.15rem', color: 'success.main' }}>
+                            <Typography fontWeight="bold" sx={{ fontSize: '0.95rem', color: '#059669' }}>
                               + {log.quantity.toFixed(2)} {item.unit}
                             </Typography>
                           ) : '-'}
                         </TableCell>
                         <TableCell align="center" sx={{ py: 2.5 }}>
                           {log.type === 'OUT' ? (
-                            <Typography fontWeight="bold" sx={{ fontSize: '1.15rem', color: 'error.main' }}>
+                            <Typography fontWeight="bold" sx={{ fontSize: '0.95rem', color: '#DC2626' }}>
                               - {log.quantity.toFixed(2)} {item.unit}
                             </Typography>
                           ) : '-'}
                         </TableCell>
                         <TableCell sx={{ py: 2.5 }}>
-                          <Typography sx={{ fontSize: '1.05rem', color: '#666' }}>{log.remarks || '-'}</Typography>
+                          <Typography sx={{ fontSize: '0.88rem', color: '#64748B' }}>{log.remarks || '-'}</Typography>
                         </TableCell>
                       </TableRow>
                     );
@@ -317,8 +501,8 @@ const Inventory: React.FC = () => {
             </TableContainer>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 3, bgcolor: '#FFF', borderTop: '1px solid #E0E0E0' }}>
-          <Button variant="outlined" size="large" onClick={handleCloseDialog} sx={{ borderRadius: 2, px: 4 }}>
+        <DialogActions sx={{ p: 3, bgcolor: '#FFF', borderTop: '1px solid #E2E8F0' }}>
+          <Button variant="outlined" size="large" onClick={handleCloseDialog} sx={{ borderRadius: 2, px: 4, textTransform: 'none', fontWeight: 700 }}>
             Close Window
           </Button>
         </DialogActions>

@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, IconButton, TextField, 
   Switch, FormControlLabel, Breadcrumbs, Link, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, Select, MenuItem, Grid
+  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, Select, MenuItem, Grid, LinearProgress, InputAdornment, Avatar
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -12,8 +12,20 @@ import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import StraightenRoundedIcon from '@mui/icons-material/StraightenRounded';
+import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
+import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import DirectionsCarRoundedIcon from '@mui/icons-material/DirectionsCarRounded';
+import SearchIcon from '@mui/icons-material/Search';
+import CircleIcon from '@mui/icons-material/Circle';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
+import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
+import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
+import AddIcon from '@mui/icons-material/Add';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import { 
   useGetProjectByIdQuery, 
   useGetSlabsQuery,
@@ -55,6 +67,7 @@ const StageDetails = () => {
   const [piecesData, setPiecesData] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const renderPhoto = (url?: string, label?: string) => {
     if (!url) return <span style={{ color: '#ccc', fontSize: '0.75rem', marginRight: 4 }}>-</span>;
@@ -277,17 +290,34 @@ const StageDetails = () => {
   const qtyToProcess = matchedProductForUI?.qty ? Number(matchedProductForUI.qty) : 1;
 
   const renderTableRows = () => {
-    if (!slab.pieces || slab.pieces.length === 0) {
+    const piecesList = slab.pieces || [];
+    const filteredPieces = piecesList.filter((p: any) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const pName = String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).toLowerCase();
+      const mName = (logs.find((l: any) => l.pieceIds?.includes(p.id))?.machine?.name || '').toLowerCase();
+      const vendor = String(p.vendorName || '').toLowerCase();
+      const size = String(p.size || '').toLowerCase();
+      return pName.includes(q) || mName.includes(q) || vendor.includes(q) || size.includes(q);
+    });
+
+    if (filteredPieces.length === 0) {
       return (
         <TableRow key="empty">
-          <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-            No products (slabs) found under production.
+          <TableCell colSpan={10} align="center" sx={{ py: 6, color: '#94A3B8' }}>
+            <LayersRoundedIcon sx={{ fontSize: 40, color: '#CBD5E1', mb: 1, display: 'block', mx: 'auto' }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
+              {searchQuery ? 'No matching pieces found' : 'No products (slabs) found under production.'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+              {searchQuery ? 'Try clearing the search query.' : 'Use the "Break Slab" option above to generate tracked pieces.'}
+            </Typography>
           </TableCell>
         </TableRow>
       );
     }
 
-    return slab.pieces.map((p: any) => {
+    return filteredPieces.map((p: any, idx: number) => {
       // Find production log associated with this piece
       let pLog = logs.find((log: any) => log.pieceIds?.includes(p.id));
       
@@ -300,8 +330,8 @@ const StageDetails = () => {
       const mLog = pLog?.parentLogId ? machineLogs?.find((m: any) => m.id === pLog.parentLogId) : null;
       const mName = mLog?.machine?.name || pLog?.machine?.name || '-';
       
-      const startDate = mLog?.startTime ? new Date(mLog.startTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
-      const endDate = mLog?.endTime ? new Date(mLog.endTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
+      const startDate = mLog?.startTime ? new Date(mLog.startTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
+      const endDate = mLog?.endTime ? new Date(mLog.endTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
       
       // Polishing/Packing/Dispatch Logs Extraction
       const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(p.id)) || [];
@@ -312,86 +342,156 @@ const StageDetails = () => {
       const formatDateTime = (dateString?: string) => {
         if (!dateString) return '-';
         const d = new Date(dateString);
-        return `${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })} | ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+        return `${d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })} | ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
       };
       
       const outDate = formatDateTime(outLog?.createdAt);
       const inDate = formatDateTime(inLog?.createdAt);
+
+      const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const pieceIdx = stages.indexOf(p.stage || 'Production');
+      const viewIdx = stages.indexOf(stageFormatted);
       
-      const getSinglePhoto = (log: any) => log?.startPhotos?.machine || log?.startPhotos?.unit || log?.startPhotos?.software || undefined;
+      let displayStatus = 'pending';
+      if (pieceIdx > viewIdx) displayStatus = 'completed';
+      else if (pieceIdx === viewIdx) displayStatus = p.status;
 
       return (
-        <TableRow key={p.id} hover>
-          {stageFormatted === 'Production' && <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography fontWeight="bold">{mName}</Typography></TableCell>}
-          <TableCell sx={{ whiteSpace: 'nowrap', minWidth: 200 }}>
-             <Typography fontWeight="bold" color="secondary.main">
+        <TableRow key={p.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
+          {stageFormatted === 'Production' && (
+            <TableCell sx={{ py: 2 }}>
+              {mName !== '-' ? (
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
+                  <PrecisionManufacturingRoundedIcon sx={{ fontSize: 16, color: '#64748B' }} />
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.82rem' }}>{mName}</Typography>
+                </Box>
+              ) : (
+                <Typography variant="caption" sx={{ color: '#94A3B8' }}>Unassigned</Typography>
+              )}
+            </TableCell>
+          )}
+          <TableCell sx={{ py: 2, minWidth: 180 }}>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.9rem' }}>
                 {String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim()}
-             </Typography>
-          </TableCell>
-          <TableCell sx={{ whiteSpace: 'nowrap' }}>
-            {p.sourceMaterial?.inventory ? (
-              <Typography fontWeight="bold" sx={{ color: '#0284C7' }}>
-                {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
               </Typography>
+              {p.pieceNumber && (
+                <Chip 
+                  label={`Piece #${p.pieceNumber}`} 
+                  size="small" 
+                  sx={{ 
+                    mt: 0.5, 
+                    bgcolor: '#EFF6FF', 
+                    color: '#1D4ED8', 
+                    fontWeight: 700, 
+                    fontSize: '0.7rem', 
+                    height: 20, 
+                    borderRadius: 1, 
+                    border: '1px solid #DBEAFE' 
+                  }} 
+                />
+              )}
+            </Box>
+          </TableCell>
+          <TableCell sx={{ py: 2 }}>
+            {p.sourceMaterial?.inventory ? (
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
+                <LayersRoundedIcon sx={{ fontSize: 15, color: '#0284C7' }} />
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0284C7', fontSize: '0.82rem' }}>
+                  {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
+                </Typography>
+              </Box>
             ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 'bold', pl: 1 }}>-</Typography>
+              <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
             )}
           </TableCell>
-          <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>
-            {p.size ? String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : 'N/A'}
+          <TableCell sx={{ py: 2 }}>
+            {p.size ? (
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
+                <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>
+                  {String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
+                </Typography>
+              </Box>
+            ) : (
+              <Typography variant="caption" sx={{ color: '#94A3B8' }}>Standard</Typography>
+            )}
           </TableCell>
           {stageFormatted === 'Production' && (
             <>
-              <TableCell sx={{ whiteSpace: 'nowrap' }}>{startDate}</TableCell>
-              <TableCell sx={{ whiteSpace: 'nowrap' }}>{endDate}</TableCell>
+              <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                <Typography variant="body2" sx={{ fontSize: '0.82rem', color: startDate !== '-' ? '#334155' : '#94A3B8', fontWeight: startDate !== '-' ? 600 : 400 }}>
+                  {startDate}
+                </Typography>
+              </TableCell>
+              <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                <Typography variant="body2" sx={{ fontSize: '0.82rem', color: endDate !== '-' ? '#334155' : '#94A3B8', fontWeight: endDate !== '-' ? 600 : 400 }}>
+                  {endDate}
+                </Typography>
+              </TableCell>
             </>
           )}
           {['Polishing', 'Packing'].includes(stageFormatted) && (
-            <>
-              <TableCell sx={{ whiteSpace: 'nowrap', color: '#2e7d32', fontWeight: 'bold' }}>{inDate}</TableCell>
-            </>
+            <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+              <Typography variant="body2" sx={{ fontSize: '0.82rem', color: inDate !== '-' ? '#059669' : '#94A3B8', fontWeight: inDate !== '-' ? 700 : 400 }}>
+                {inDate}
+              </Typography>
+            </TableCell>
           )}
           {stageFormatted === 'Dispatch' && (
-            <>
-              <TableCell sx={{ whiteSpace: 'nowrap', color: '#d32f2f', fontWeight: 'bold' }}>{outDate}</TableCell>
-            </>
+            <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+              <Typography variant="body2" sx={{ fontSize: '0.82rem', color: outDate !== '-' ? '#DC2626' : '#94A3B8', fontWeight: outDate !== '-' ? 700 : 400 }}>
+                {outDate}
+              </Typography>
+            </TableCell>
           )}
-          <TableCell sx={{ whiteSpace: 'nowrap' }}>
-            {(() => {
-              const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-              const pieceIdx = stages.indexOf(p.stage || 'Production');
-              const viewIdx = stages.indexOf(stageFormatted);
-              
-              let displayStatus = 'pending';
-              if (pieceIdx > viewIdx) displayStatus = 'completed';
-              else if (pieceIdx === viewIdx) displayStatus = p.status;
-              
-              return (
-                <Chip 
-                   label={displayStatus === 'completed' ? 'Completed' : displayStatus === 'pending' ? 'Not Started' : 'Under Process'} 
-                   size="small" 
-                   sx={{ 
-                     fontWeight: 'bold', 
-                     px: 1,
-                     borderRadius: 2,
-                     ...(displayStatus === 'completed' ? { bgcolor: '#E8F5E9', color: '#2E7D32' } : 
-                         displayStatus === 'pending' ? { bgcolor: '#F5F5F5', color: '#616161' } : 
-                         { bgcolor: '#FFF8E1', color: '#F57F17' })
-                   }}
-                />
-              );
-            })()}
+          <TableCell sx={{ py: 2 }}>
+            <Chip 
+              icon={displayStatus === 'completed' ? <CheckCircleRoundedIcon sx={{ fontSize: '14px !important', color: '#059669 !important' }} /> : displayStatus === 'pending' ? <CircleIcon sx={{ fontSize: '8px !important', color: '#94A3B8 !important' }} /> : <CircleIcon sx={{ fontSize: '10px !important', color: '#D97706 !important' }} />}
+              label={displayStatus === 'completed' ? 'Completed' : displayStatus === 'pending' ? 'Not Started' : 'Under Process'} 
+              size="small" 
+              sx={{ 
+                fontWeight: 800, 
+                fontSize: '0.72rem',
+                height: 24,
+                px: 0.5,
+                borderRadius: 1.5,
+                ...(displayStatus === 'completed' ? { bgcolor: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' } : 
+                    displayStatus === 'pending' ? { bgcolor: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' } : 
+                    { bgcolor: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A' })
+              }}
+            />
           </TableCell>
-          <TableCell align="right">
-             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-               <Tooltip title="View Logs & History">
-                 <IconButton sx={{ color: 'info.main' }} size="small" onClick={() => setViewPiece(p)}>
-                   <VisibilityIcon fontSize="small" />
-                 </IconButton>
-               </Tooltip>
-               <IconButton color="primary" size="small" onClick={() => setEditingPiece(p)}><EditIcon fontSize="small" /></IconButton>
-               <IconButton color="error" size="small" onClick={() => handleDeletePiece(p.id)}><DeleteIcon fontSize="small" /></IconButton>
-             </Box>
+          <TableCell align="right" sx={{ py: 2 }}>
+            <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
+              <Tooltip title="View Timeline & Photos">
+                <IconButton 
+                  size="small" 
+                  onClick={() => setViewPiece(p)}
+                  sx={{ color: '#0284C7', bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', '&:hover': { bgcolor: '#E0F2FE' } }}
+                >
+                  <VisibilityIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Edit Piece Spec">
+                <IconButton 
+                  size="small" 
+                  onClick={() => setEditingPiece(p)}
+                  sx={{ color: '#475569', bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', '&:hover': { bgcolor: '#F1F5F9' } }}
+                >
+                  <EditIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Delete Piece">
+                <IconButton 
+                  size="small" 
+                  onClick={() => handleDeletePiece(p.id)}
+                  sx={{ color: '#DC2626', bgcolor: '#FEF2F2', border: '1px solid #FECACA', '&:hover': { bgcolor: '#FEE2E2' } }}
+                >
+                  <DeleteIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </TableCell>
         </TableRow>
       );
@@ -434,48 +534,90 @@ const StageDetails = () => {
       .reduce((sum: number, l: any) => sum + (l.quantityProduced || 0), 0) || 0;
 
     const pieceCompletedCount = (slab.pieces || []).filter((p: any) => {
-      const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
-      const pStageIdx = BASE_STAGES.indexOf(pStage);
-      return pStageIdx > stageIdx || (pStage === 'Packing' && p.status === 'completed');
+      const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
+      const hasCompletedLog = p.logs && p.logs.some((l: any) => {
+        const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+        return (lStage === 'Packing' || lStage.startsWith('Packing')) && (l.status === 'completed' || l.status === 'approved');
+      });
+      return hasCompletedLog || (normalizedPieceStage === 'Packing' && p.status === 'completed');
     }).length;
 
     completedPieces = Math.max(directLogsQty, pieceCompletedCount);
   } else {
     completedPieces = (slab.pieces || []).filter((p: any) => {
       const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
-      const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
-      return pStageIdx > stageIdx || (normalizedPieceStage === stageFormatted && p.status === 'completed');
+      const hasCompletedLog = p.logs && p.logs.some((l: any) => {
+        const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+        return (lStage === stageFormatted || lStage.startsWith(stageFormatted)) && (l.status === 'completed' || l.status === 'approved');
+      });
+      return hasCompletedLog || (normalizedPieceStage === stageFormatted && p.status === 'completed');
     }).length;
   }
   
-  const pendingPieces = totalPieces - completedPieces;
+  const pendingPieces = Math.max(0, totalPieces - completedPieces);
+  const progressPercent = totalPieces > 0 ? Math.min(100, Math.round((completedPieces / totalPieces) * 100)) : 0;
 
   return (
-    <Box sx={{ p: 4, maxWidth: '100%', margin: '0 auto' }}>
-      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <Box sx={{ p: { xs: 1, sm: 1.5, md: 2 }, maxWidth: '100%', width: '100%', margin: '0 auto' }}>
+      {/* HEADER & NAVIGATION */}
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={() => navigate(-1)} sx={{ bgcolor: 'rgba(0,0,0,0.04)' }}>
+          <IconButton 
+            onClick={() => navigate(-1)} 
+            sx={{ 
+              bgcolor: '#FFFFFF', 
+              border: '1px solid #CBD5E1', 
+              color: '#1E293B',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+              '&:hover': { bgcolor: '#F8FAFC', borderColor: '#94A3B8' } 
+            }}
+          >
             <ArrowBackIcon />
           </IconButton>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="h4" fontWeight="900" color="#222">
-                {stageFormatted} Details
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1E293B', letterSpacing: '-0.3px' }}>
+                {stageFormatted} Tracking Workspace
               </Typography>
-              {slab.size && <Chip label={slab.size} size="medium" sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5' }} />}
+              <Chip 
+                label={`Stage ${stageIdx + 1} of 4`} 
+                size="small" 
+                sx={{ 
+                  bgcolor: '#EFF6FF', 
+                  color: '#1D4ED8', 
+                  fontWeight: 700, 
+                  fontSize: '0.72rem', 
+                  border: '1px solid #DBEAFE',
+                  borderRadius: '6px'
+                }} 
+              />
+              {slab.size && (
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.4 }}>
+                  <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.82rem' }}>
+                    Slab Spec: {slab.size}
+                  </Typography>
+                </Box>
+              )}
             </Box>
-            <Breadcrumbs sx={{ mt: 1 }}>
-              <Link color="inherit" sx={{ cursor: 'pointer' }} onClick={() => navigate('/projects')}>Projects</Link>
-              <Link color="inherit" sx={{ cursor: 'pointer' }} onClick={() => navigate(`/projects/${projectId}`)}>{project?.name}</Link>
-              <Typography color="text.primary">{slab.name}</Typography>
+            <Breadcrumbs sx={{ mt: 1, '& .MuiBreadcrumbs-separator': { color: '#94A3B8' } }}>
+              <Link color="inherit" sx={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#64748B', '&:hover': { color: '#0284C7' } }} onClick={() => navigate('/projects')}>Projects</Link>
+              <Link color="inherit" sx={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#64748B', '&:hover': { color: '#0284C7' } }} onClick={() => navigate(`/projects/${projectId}`)}>{project?.name || 'Project'}</Link>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#1E293B' }}>{slab.name}</Typography>
             </Breadcrumbs>
           </Box>
         </Box>
+
         {stageFormatted === 'Production' && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#F5F8FF', p: 1.5, px: 3, borderRadius: 3, border: '1px solid #D0D9EB', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
-            <Typography variant="h6" fontWeight="900" color="#1A3B70">
-              Break Slab ?
-            </Typography>
+          <Paper elevation={0} sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#FFFFFF', p: 1.25, px: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.2 }}>
+                Break Slab Spec?
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B', fontSize: '0.72rem' }}>
+                Split into custom piece matrix
+              </Typography>
+            </Box>
             <ToggleButtonGroup
               value={cutPiecesOption}
               exclusive
@@ -484,271 +626,438 @@ const StageDetails = () => {
                 else setCutPiecesOption(null);
               }}
               sx={{ 
-                bgcolor: 'white', 
+                bgcolor: '#F8FAFC', 
+                p: 0.5,
+                borderRadius: 2,
                 '& .MuiToggleButton-root': { 
-                  py: 0.5, 
-                  px: 4, 
-                  fontWeight: '900', 
-                  border: '1px solid #D0D9EB',
-                  color: '#666',
-                  transition: 'all 0.2s'
+                  py: 0.4, 
+                  px: 2.5, 
+                  fontWeight: 800, 
+                  fontSize: '0.78rem',
+                  border: 'none',
+                  borderRadius: 1.5,
+                  color: '#64748B',
+                  transition: 'all 0.15s ease'
                 },
                 '& .MuiToggleButton-root:hover': {
-                  bgcolor: '#EBF0FA'
+                  bgcolor: '#E2E8F0'
                 },
                 '& .MuiToggleButton-root[value="yes"].Mui-selected': {
-                  bgcolor: '#2e7d32',
-                  color: 'white !important',
-                  borderColor: '#2e7d32',
-                  boxShadow: '0 2px 6px rgba(46,125,50,0.3)'
+                  bgcolor: '#059669',
+                  color: '#FFFFFF !important',
+                  boxShadow: '0 2px 6px rgba(5,150,105,0.3)'
                 },
                 '& .MuiToggleButton-root[value="no"].Mui-selected': {
-                  bgcolor: '#1976d2',
-                  color: 'white !important',
-                  borderColor: '#1976d2',
-                  boxShadow: '0 2px 6px rgba(25,118,210,0.3)'
+                  bgcolor: '#1E293B',
+                  color: '#FFFFFF !important',
+                  boxShadow: '0 2px 6px rgba(30,41,59,0.3)'
                 }
               }}
             >
               <ToggleButton value="yes">YES</ToggleButton>
               <ToggleButton value="no">NO</ToggleButton>
             </ToggleButtonGroup>
-          </Box>
+          </Paper>
         )}
       </Box>
 
-      {/* SUMMARY BOXES */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid xs={12} md={4}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ViewModuleIcon sx={{ color: '#1976d2' }} />
-            </Box>
+      {/* EXECUTIVE KPI SUMMARY CARDS */}
+      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 2.5, 
+              borderRadius: 3.5, 
+              bgcolor: '#FFFFFF', 
+              border: '1px solid #E2E8F0', 
+              boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 2 
+            }}
+          >
+            <Avatar sx={{ width: 52, height: 52, borderRadius: 2.5, bgcolor: '#EFF6FF', color: '#1D4ED8' }}>
+              <ViewModuleIcon sx={{ fontSize: 28 }} />
+            </Avatar>
             <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>Total Pieces</Typography>
-              <Typography variant="h4" fontWeight="900" color="#222" sx={{ lineHeight: 1 }}>{totalPieces}</Typography>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Total Stage Pieces
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.25 }}>
+                {totalPieces}
+              </Typography>
             </Box>
           </Paper>
         </Grid>
-        <Grid xs={12} md={4}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CheckCircleIcon sx={{ color: '#388e3c' }} />
-            </Box>
+
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 2.5, 
+              borderRadius: 3.5, 
+              bgcolor: '#FFFFFF', 
+              border: '1px solid #E2E8F0', 
+              boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 2 
+            }}
+          >
+            <Avatar sx={{ width: 52, height: 52, borderRadius: 2.5, bgcolor: '#ECFDF5', color: '#059669' }}>
+              <CheckCircleRoundedIcon sx={{ fontSize: 28 }} />
+            </Avatar>
             <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>Completed Pieces</Typography>
-              <Typography variant="h4" fontWeight="900" color="#388e3c" sx={{ lineHeight: 1 }}>{completedPieces}</Typography>
+              <Typography variant="caption" sx={{ color: '#059669', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Completed Pieces
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#059669', mt: 0.25 }}>
+                {completedPieces}
+              </Typography>
             </Box>
           </Paper>
         </Grid>
-        <Grid xs={12} md={4}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 4, bgcolor: '#f4f6f8', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#fff3e0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PendingActionsIcon sx={{ color: '#f57c00' }} />
-            </Box>
+
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 2.5, 
+              borderRadius: 3.5, 
+              bgcolor: '#FFFFFF', 
+              border: '1px solid #E2E8F0', 
+              boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 2 
+            }}
+          >
+            <Avatar sx={{ width: 52, height: 52, borderRadius: 2.5, bgcolor: '#FFFBEB', color: '#D97706' }}>
+              <PendingActionsIcon sx={{ fontSize: 28 }} />
+            </Avatar>
             <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5 }}>Pending Pieces</Typography>
-              <Typography variant="h4" fontWeight="900" color="#f57c00" sx={{ lineHeight: 1 }}>{pendingPieces}</Typography>
+              <Typography variant="caption" sx={{ color: '#D97706', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Pending / In Process
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#D97706', mt: 0.25 }}>
+                {pendingPieces}
+              </Typography>
             </Box>
           </Paper>
         </Grid>
       </Grid>
 
+      {/* STAGE COMPLETION PROGRESS BAR */}
+      <Paper elevation={0} sx={{ p: 2, px: 3, mb: 4, borderRadius: 3, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Workstation Stage Progress
+          </Typography>
+          <Typography variant="caption" sx={{ fontWeight: 800, color: '#059669', fontSize: '0.8rem' }}>
+            {completedPieces} of {totalPieces} Pieces Finished ({progressPercent}%)
+          </Typography>
+        </Box>
+        <LinearProgress 
+          variant="determinate" 
+          value={progressPercent} 
+          sx={{ 
+            height: 8, 
+            borderRadius: 4, 
+            bgcolor: '#F1F5F9',
+            '& .MuiLinearProgress-bar': { bgcolor: '#059669', borderRadius: 4 } 
+          }} 
+        />
+      </Paper>
+
+      {/* PROCESS FULL SLAB PROMPT */}
       {cutPiecesOption === 'no' && stageFormatted === 'Production' && (
-        <Paper elevation={0} sx={{ p: 3, mb: 4, borderRadius: 4, border: '1px dashed #ccc', bgcolor: '#fff' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Paper elevation={0} sx={{ p: 3.5, mb: 4, borderRadius: 3.5, border: '2px dashed #CBD5E1', bgcolor: '#FFFFFF' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box>
-              <Typography variant="subtitle1" fontWeight="bold" color="primary">Process Normal (Full Slab)</Typography>
-              <Typography variant="body2" color="text.secondary">This will create exactly 1 full-size piece and add it to the tracking items below.</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                Process Single Full Slab
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
+                This creates exactly 1 full-size piece corresponding to the slab specification and moves it into the tracking queue.
+              </Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button variant="outlined" color="inherit" onClick={() => setCutPiecesOption(null)}>Cancel</Button>
-              <Button variant="contained" color="primary" size="large" onClick={handleProcessSingleFullSlab} disabled={isSaving}>
-                {isSaving ? 'Processing...' : 'Save Normal Entry'}
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <Button variant="outlined" onClick={() => setCutPiecesOption(null)} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#64748B' }}>
+                Cancel
+              </Button>
+              <Button 
+                variant="contained" 
+                onClick={handleProcessSingleFullSlab} 
+                disabled={isSaving}
+                sx={{ 
+                  borderRadius: 2.5, 
+                  bgcolor: '#1E293B', 
+                  color: '#FFFFFF', 
+                  fontWeight: 800, 
+                  textTransform: 'none',
+                  px: 3,
+                  '&:hover': { bgcolor: '#0F172A' } 
+                }}
+              >
+                {isSaving ? 'Processing...' : 'Confirm Full Slab Entry'}
               </Button>
             </Box>
           </Box>
         </Paper>
       )}
 
+      {/* GENERATE CUSTOM PIECES MATRIX */}
       {cutPiecesOption === 'yes' && stageFormatted === 'Production' && (
-        <Paper elevation={0} sx={{ p: 4, mb: 4, borderRadius: 4, border: '1px solid #E0E0E0', bgcolor: '#FFFDF5' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" fontWeight="bold" color="#B38B36">Generate Custom Pieces</Typography>
-            <Button color="inherit" onClick={() => { setCutPiecesOption(null); setPiecesData([]); }}>Cancel</Button>
+        <Paper elevation={0} sx={{ p: { xs: 2.5, md: 4 }, mb: 4, borderRadius: 4, border: '1px solid #FDE68A', bgcolor: '#FFFDF5', boxShadow: '0 4px 20px rgba(217, 119, 6, 0.04)' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AutoAwesomeRoundedIcon sx={{ color: '#D97706', fontSize: 20 }} />
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#92400E' }}>
+                  Generate Custom Sub-Pieces Matrix
+                </Typography>
+              </Box>
+              <Typography variant="body2" sx={{ color: '#78350F', mt: 0.5 }}>
+                Configure individual cut dimensions and serial numbers. The system validates total area against the original slab.
+              </Typography>
+            </Box>
+            <Button size="small" onClick={() => { setCutPiecesOption(null); setPiecesData([]); }} sx={{ color: '#78350F', fontWeight: 700, textTransform: 'none' }}>
+              Close Generator
+            </Button>
           </Box>
-          <Typography variant="body2" color="text.secondary" mb={3}>Add rows manually to create custom pieces. They will be added to your tracking list.</Typography>
 
-          <Box>
-            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 2 }}>
-              <Table size="small">
-                  <TableHead sx={{ bgcolor: '#F5F5F5' }}>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold', width: '28%' }}>Piece Name</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', width: '12%' }}>Serial No</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Length (L)</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Width (W)</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Thickness (MM)</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Total Area (L x W)</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }} align="center">Action</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {piecesData.map((p, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell>
-                          <TextField 
-                            size="small" 
-                            value={p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name)}
-                            onChange={(e) => {
-                              const newBase = e.target.value;
-                              handlePieceChange(idx, 'baseName', newBase);
-                              handlePieceChange(idx, 'name', `${newBase}.${p.pieceNumber}`);
-                            }}
-                            fullWidth
-                            placeholder="Piece Name"
-                            sx={{ bgcolor: 'white' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField 
-                            size="small" 
-                            type="text" 
-                            value={p.pieceNumber !== undefined ? p.pieceNumber : ''}
-                            onChange={(e) => {
-                              const newNum = e.target.value;
-                              handlePieceChange(idx, 'pieceNumber', newNum);
-                              const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
-                              handlePieceChange(idx, 'name', `${base}.${newNum}`);
-                            }}
-                            sx={{ width: 85, bgcolor: 'white' }}
-                            placeholder="e.g. 1A"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField 
-                            size="small" type="number" 
-                            value={p.l === 0 ? '' : p.l}
-                            onChange={(e) => handlePieceChange(idx, 'l', Number(e.target.value))}
-                            sx={{ bgcolor: 'white' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField 
-                            size="small" type="number" 
-                            value={p.w === 0 ? '' : p.w}
-                            onChange={(e) => handlePieceChange(idx, 'w', Number(e.target.value))}
-                            sx={{ bgcolor: 'white' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField 
-                            size="small" type="number" 
-                            value={p.t === 0 ? '' : p.t}
-                            onChange={(e) => handlePieceChange(idx, 't', Number(e.target.value))}
-                            sx={{ bgcolor: 'white' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography fontWeight="bold" color="primary">
-                            {(p.l * p.w).toFixed(2)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <IconButton size="small" color="error" onClick={() => handleRemovePiece(idx)}>
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <Button variant="outlined" color="primary" onClick={() => {
-                    const existingPieces = slab.pieces || [];
-                    let maxNum = 0;
-                    if (existingPieces.length > 0) {
-                      maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
-                    }
-                    let lastPieceNum = parseInt(piecesData[piecesData.length - 1]?.pieceNumber as any);
-                    if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
-                    
-                    const nextNum = lastPieceNum + 1;
-                    setPiecesData([...piecesData, { 
-                      pieceNumber: nextNum,
-                      baseName: slab.name,
-                      name: `${slab.name}.${nextNum}`,
-                      l: 0, w: 0, t: 0
-                    }]);
-                  }}>
-                    + Add 1 Piece
-                  </Button>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2, pl: 3, borderLeft: '1px solid #E0E0E0' }}>
-                    <Typography variant="body2" color="text.secondary">Or add multiple:</Typography>
-                    <TextField 
-                      size="small" 
-                      type="number" 
-                      placeholder="Qty" 
-                      id="bulk-add-qty"
-                      sx={{ width: 70, bgcolor: 'white' }}
-                    />
-                    <Button variant="contained" color="primary" onClick={() => {
-                      const qtyInput = document.getElementById('bulk-add-qty') as HTMLInputElement;
-                      const count = parseInt(qtyInput?.value || '0');
-                      if (count > 0) {
-                        const existingPieces = slab.pieces || [];
-                        let maxNum = 0;
-                        if (existingPieces.length > 0) {
-                          maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
-                        }
-                        let lastPieceNum = parseInt(piecesData[piecesData.length - 1]?.pieceNumber as any);
-                        if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
-                        
-                        const newPieces = Array.from({ length: count }).map((_, idx) => {
-                          const nextNum = lastPieceNum + idx + 1;
-                          return {
-                            pieceNumber: nextNum,
-                            baseName: slab.name,
-                            name: `${slab.name}.${nextNum}`,
-                            l: 0, w: 0, t: 0
-                          };
-                        });
-                        setPiecesData([...piecesData, ...newPieces]);
-                        qtyInput.value = '';
+          <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', mb: 3 }}>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '28%' }}>Piece Name</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '12%' }}>Serial No</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Length (L)</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Width (W)</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Thickness (MM)</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Area (Sq.Ft)</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }} align="center">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {piecesData.map((p, idx) => (
+                  <TableRow key={idx} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
+                    <TableCell sx={{ py: 1.25 }}>
+                      <TextField 
+                        size="small" 
+                        value={p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name)}
+                        onChange={(e) => {
+                          const newBase = e.target.value;
+                          handlePieceChange(idx, 'baseName', newBase);
+                          handlePieceChange(idx, 'name', `${newBase}.${p.pieceNumber}`);
+                        }}
+                        fullWidth
+                        placeholder="Piece Name"
+                        slotProps={{ input: { sx: { borderRadius: 1.5, bgcolor: '#FFFFFF' } } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
+                      <TextField 
+                        size="small" 
+                        type="text" 
+                        value={p.pieceNumber !== undefined ? p.pieceNumber : ''}
+                        onChange={(e) => {
+                          const newNum = e.target.value;
+                          handlePieceChange(idx, 'pieceNumber', newNum);
+                          const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
+                          handlePieceChange(idx, 'name', `${base}.${newNum}`);
+                        }}
+                        sx={{ width: 85 }}
+                        placeholder="e.g. 1"
+                        slotProps={{ input: { sx: { borderRadius: 1.5, bgcolor: '#FFFFFF' } } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
+                      <TextField 
+                        size="small" type="number" 
+                        value={p.l === 0 ? '' : p.l}
+                        onChange={(e) => handlePieceChange(idx, 'l', Number(e.target.value))}
+                        slotProps={{ input: { sx: { borderRadius: 1.5, bgcolor: '#FFFFFF' } } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
+                      <TextField 
+                        size="small" type="number" 
+                        value={p.w === 0 ? '' : p.w}
+                        onChange={(e) => handlePieceChange(idx, 'w', Number(e.target.value))}
+                        slotProps={{ input: { sx: { borderRadius: 1.5, bgcolor: '#FFFFFF' } } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
+                      <TextField 
+                        size="small" type="number" 
+                        value={p.t === 0 ? '' : p.t}
+                        onChange={(e) => handlePieceChange(idx, 't', Number(e.target.value))}
+                        slotProps={{ input: { sx: { borderRadius: 1.5, bgcolor: '#FFFFFF' } } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
+                      <Chip 
+                        label={`${(p.l * p.w).toFixed(2)} Sq.Ft`} 
+                        size="small" 
+                        sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 800, fontSize: '0.72rem' }} 
+                      />
+                    </TableCell>
+                    <TableCell align="center" sx={{ py: 1.25 }}>
+                      <IconButton size="small" onClick={() => handleRemovePiece(idx)} sx={{ color: '#DC2626', '&:hover': { bgcolor: '#FEE2E2' } }}>
+                        <DeleteIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Paper>
+
+          {/* Matrix Actions Toolbar */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Button 
+                variant="outlined" 
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  const existingPieces = slab.pieces || [];
+                  let maxNum = 0;
+                  if (existingPieces.length > 0) {
+                    maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
+                  }
+                  let lastPieceNum = parseInt(piecesData[piecesData.length - 1]?.pieceNumber as any);
+                  if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
+                  
+                  const nextNum = lastPieceNum + 1;
+                  setPiecesData([...piecesData, { 
+                    pieceNumber: nextNum,
+                    baseName: slab.name,
+                    name: `${slab.name}.${nextNum}`,
+                    l: 0, w: 0, t: 0
+                  }]);
+                }}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#1E293B', bgcolor: '#FFFFFF' }}
+              >
+                + Add 1 Piece
+              </Button>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pl: 2, borderLeft: '1px solid #E2E8F0' }}>
+                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>Bulk Quantity:</Typography>
+                <TextField 
+                  size="small" 
+                  type="number" 
+                  placeholder="Qty" 
+                  id="bulk-add-qty"
+                  sx={{ width: 70, bgcolor: '#FFFFFF', '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
+                />
+                <Button 
+                  variant="contained" 
+                  size="small"
+                  onClick={() => {
+                    const qtyInput = document.getElementById('bulk-add-qty') as HTMLInputElement;
+                    const count = parseInt(qtyInput?.value || '0');
+                    if (count > 0) {
+                      const existingPieces = slab.pieces || [];
+                      let maxNum = 0;
+                      if (existingPieces.length > 0) {
+                        maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
                       }
-                    }}>Add</Button>
-                    <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, pl: 3, borderLeft: '1px solid #E0E0E0' }}>
-                      <Button variant="outlined" color="primary" onClick={() => {
-                        if (piecesData.length > 1) {
-                          const firstPiece = piecesData[0];
-                          const newData = piecesData.map((p, i) => i === 0 ? p : { ...p, l: firstPiece.l, w: firstPiece.w, t: firstPiece.t });
-                          setPiecesData(newData);
-                        }
-                      }}>
-                        Copy First Row Size to All
-                      </Button>
-                    </Box>
-                  </Box>
-                </Box>
-                <Button variant="contained" color="success" size="large" onClick={() => {
-                  handleSavePieces();
-                  setCutPiecesOption(null);
-                }} disabled={isSaving || piecesData.length === 0}>
-                  {isSaving ? 'Saving...' : 'Save Pieces'}
+                      let lastPieceNum = parseInt(piecesData[piecesData.length - 1]?.pieceNumber as any);
+                      if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
+                      
+                      const newPieces = Array.from({ length: count }).map((_, idx) => {
+                        const nextNum = lastPieceNum + idx + 1;
+                        return {
+                          pieceNumber: nextNum,
+                          baseName: slab.name,
+                          name: `${slab.name}.${nextNum}`,
+                          l: 0, w: 0, t: 0
+                        };
+                      });
+                      setPiecesData([...piecesData, ...newPieces]);
+                      qtyInput.value = '';
+                    }
+                  }}
+                  sx={{ borderRadius: 1.5, bgcolor: '#1E293B', color: '#FFFFFF', fontWeight: 700, textTransform: 'none' }}
+                >
+                  Generate
                 </Button>
               </Box>
+
+              <Button 
+                variant="outlined" 
+                startIcon={<ContentCopyRoundedIcon />}
+                onClick={() => {
+                  if (piecesData.length > 1) {
+                    const firstPiece = piecesData[0];
+                    const newData = piecesData.map((p, i) => i === 0 ? p : { ...p, l: firstPiece.l, w: firstPiece.w, t: firstPiece.t });
+                    setPiecesData(newData);
+                  }
+                }}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#1E293B', bgcolor: '#FFFFFF' }}
+              >
+                Copy Row 1 Size to All
+              </Button>
             </Box>
+
+            <Button 
+              variant="contained" 
+              onClick={() => {
+                handleSavePieces();
+                setCutPiecesOption(null);
+              }} 
+              disabled={isSaving || piecesData.length === 0}
+              sx={{ 
+                borderRadius: 2.5, 
+                bgcolor: '#059669', 
+                color: '#FFFFFF', 
+                fontWeight: 800, 
+                textTransform: 'none',
+                px: 3.5,
+                boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                '&:hover': { bgcolor: '#047857' }
+              }}
+            >
+              {isSaving ? 'Saving...' : 'Save Pieces to Table'}
+            </Button>
+          </Box>
         </Paper>
       )}
 
-      <Paper elevation={0} sx={{ p: 0, mt: 4, borderRadius: 4, border: '1px solid #E0E0E0', overflow: 'hidden' }}>
-        <Box sx={{ p: 3, bgcolor: '#FAFAFA', borderBottom: '1px solid #E0E0E0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" fontWeight="bold">{stageFormatted} Tracking Table</Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField size="small" placeholder="Search Machine or Product..." sx={{ bgcolor: 'white', width: 250 }} />
+      {/* MAIN TRACKING TABLE PAPER */}
+      <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)' }}>
+        {/* Table Header Bar */}
+        <Box sx={{ p: 2.5, px: 3, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.1rem' }}>
+              {stageFormatted} Tracking Table
+            </Typography>
+            <Chip 
+              label={`${totalPieces} Tracked Items`} 
+              size="small" 
+              sx={{ bgcolor: '#FFFFFF', border: '1px solid #CBD5E1', color: '#475569', fontWeight: 700, fontSize: '0.72rem' }} 
+            />
           </Box>
+
+          <TextField 
+            size="small" 
+            placeholder="Search piece, machine, or size..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: '#94A3B8', fontSize: 18 }} />
+                  </InputAdornment>
+                ),
+                sx: { borderRadius: 2, bgcolor: '#FFFFFF', fontSize: '0.85rem' }
+              }
+            }}
+            sx={{ width: { xs: '100%', sm: 280 } }}
+          />
         </Box>
 
         {/* Packing & Dispatch: Log-based table */}
@@ -757,14 +1066,38 @@ const StageDetails = () => {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Date</TableCell>
-                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Box</TableCell>}
-                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Code</TableCell>}
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Pieces</TableCell>
-                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Size</TableCell>}
-                  {stageFormatted === 'Dispatch' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Vehicle Number</TableCell>}
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Photo</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }} align="right">Action</TableCell>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    Date & Time
+                  </TableCell>
+                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                      Box Number
+                    </TableCell>
+                  )}
+                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                      Box Code
+                    </TableCell>
+                  )}
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    Pieces Count
+                  </TableCell>
+                  {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                      Box Spec / Size
+                    </TableCell>
+                  )}
+                  {stageFormatted === 'Dispatch' && (
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                      Vehicle Number
+                    </TableCell>
+                  )}
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    Photo
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }} align="right">
+                    Action
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -772,7 +1105,6 @@ const StageDetails = () => {
                   let displayLogs: any[] = [];
                   
                   if (stageFormatted === 'Dispatch') {
-                    // For Dispatch, show ALL Packed boxes, and match them with any Dispatch logs
                     const packedLogs = productionLogs?.filter((l: any) =>
                       l.stage === 'Packing' &&
                       l.approvalStatus === 'approved' &&
@@ -785,10 +1117,9 @@ const StageDetails = () => {
                     ) || [];
 
                     displayLogs = packedLogs.map((pLog: any) => {
-                      // Find if this packed box was dispatched
                       const dLog = dispatchLogs.find((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode));
                       return {
-                        id: pLog.id, // Use pLog id for key
+                        id: pLog.id,
                         isDispatched: !!dLog,
                         dispatchLogId: dLog?.id,
                         createdAt: dLog ? dLog.createdAt : pLog.createdAt,
@@ -796,7 +1127,7 @@ const StageDetails = () => {
                         vehicleNumber: dLog ? dLog.vehicleNumber : null,
                         quantityProduced: pLog.quantityProduced,
                         photo: dLog ? (dLog.startPhotos?.machine || dLog.startPhotos?.unit || dLog.startPhotos?.software || dLog.startPhotos?.endPhoto) : null,
-                        logToDelete: dLog?.id || pLog.id // Action deletes the dispatch log if exists, else the packing log
+                        logToDelete: dLog?.id || pLog.id
                       };
                     });
                   } else {
@@ -807,60 +1138,116 @@ const StageDetails = () => {
                     ) || [];
                   }
 
+                  if (searchQuery.trim()) {
+                    const q = searchQuery.toLowerCase();
+                    displayLogs = displayLogs.filter((l: any) => 
+                      String(l.boxCode || '').toLowerCase().includes(q) ||
+                      String(l.vehicleNumber || '').toLowerCase().includes(q)
+                    );
+                  }
+
                   if (displayLogs.length === 0) {
                     return (
                       <TableRow>
-                        <TableCell colSpan={stageFormatted === 'Packing' || stageFormatted === 'Dispatch' ? 8 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                          No entries yet.
+                        <TableCell colSpan={stageFormatted === 'Packing' || stageFormatted === 'Dispatch' ? 8 : 5} align="center" sx={{ py: 6, color: '#94A3B8' }}>
+                          <Inventory2RoundedIcon sx={{ fontSize: 40, color: '#CBD5E1', mb: 1, display: 'block', mx: 'auto' }} />
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
+                            {searchQuery ? 'No matching logs found' : 'No stage entries recorded yet.'}
+                          </Typography>
                         </TableCell>
                       </TableRow>
                     );
                   }
 
-                  return displayLogs.map((log: any) => {
+                  return displayLogs.map((log: any, idx: number) => {
                     const logDate = new Date(log.createdAt);
-                    const formattedDate = `${logDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })} | ${logDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+                    const formattedDate = `${logDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })} | ${logDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
                     const photo = stageFormatted === 'Dispatch' ? log.photo : (log.startPhotos?.machine || log.startPhotos?.unit || log.startPhotos?.software || log.startPhotos?.endPhoto);
                     
                     return (
-                      <TableRow key={log.id} hover sx={{ opacity: stageFormatted === 'Dispatch' && !log.isDispatched ? 0.7 : 1 }}>
-                        <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>
-                          {stageFormatted === 'Dispatch' && !log.isDispatched ? '-' : formattedDate}
+                      <TableRow key={log.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, opacity: stageFormatted === 'Dispatch' && !log.isDispatched ? 0.7 : 1 }}>
+                        <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>
+                            {stageFormatted === 'Dispatch' && !log.isDispatched ? '-' : formattedDate}
+                          </Typography>
                         </TableCell>
                         
-                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>{log.boxCode?.split('|')[0] || '-'}</TableCell>}
-                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ whiteSpace: 'nowrap' }}>{log.boxCode?.split('|')[1] || '-'}</TableCell>}
-                        
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                          <Chip label={`${log.quantityProduced || log.pieceIds?.length || 0} Pieces`} size="small" sx={{ fontWeight: 'bold', bgcolor: '#E3F2FD', color: '#1565c0' }} />
-                        </TableCell>
-                        
-                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary', fontSize: '0.85rem' }}>{log.boxCode?.split('|')[2] || '-'}</TableCell>}
-
-                        {stageFormatted === 'Dispatch' && (
-                          <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: log.isDispatched ? '#1565c0' : 'text.secondary' }}>
-                            {log.isDispatched ? log.vehicleNumber || '-' : '-'}
+                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
+                          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, bgcolor: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 1.5, px: 1, py: 0.3 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#166534' }}>
+                                {log.boxCode?.split('|')[0] || '-'}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        )}
+                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
+                          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
+                              {log.boxCode?.split('|')[1] || '-'}
+                            </Typography>
                           </TableCell>
                         )}
                         
-                        <TableCell>
-                          {photo ? (
-                            <img
-                              src={photo}
-                              alt="Entry Photo"
-                              onClick={() => setPreviewPhotoUrl(photo)}
-                              style={{ width: 44, height: 44, borderRadius: 6, cursor: 'pointer', objectFit: 'cover', border: '1px solid #ddd' }}
-                            />
-                          ) : <Typography variant="body2" color="text.secondary">-</Typography>}
+                        <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                          <Chip 
+                            label={`${log.quantityProduced || log.pieceIds?.length || 0} Pieces`} 
+                            size="small" 
+                            sx={{ fontWeight: 700, bgcolor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #DBEAFE', height: 22 }} 
+                          />
                         </TableCell>
                         
-                        <TableCell align="right">
-                          {!(stageFormatted === 'Dispatch' && !log.isDispatched) && (
+                        {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
+                          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.82rem', fontWeight: 500 }}>
+                              {log.boxCode?.split('|')[2] || '-'}
+                            </Typography>
+                          </TableCell>
+                        )}
+
+                        {stageFormatted === 'Dispatch' && (
+                          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                            {log.isDispatched ? (
+                              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#EFF6FF', border: '1px solid #DBEAFE', borderRadius: 1.5, px: 1, py: 0.4 }}>
+                                <DirectionsCarRoundedIcon sx={{ fontSize: 16, color: '#1D4ED8' }} />
+                                <Typography variant="caption" sx={{ fontWeight: 800, color: '#1D4ED8' }}>
+                                  {log.vehicleNumber || '-'}
+                                </Typography>
+                              </Box>
+                            ) : (
+                              <Chip label="Awaiting Truck" size="small" sx={{ bgcolor: '#FFFBEB', color: '#D97706', fontSize: '0.7rem', height: 20 }} />
+                            )}
+                          </TableCell>
+                        )}
+                        
+                        <TableCell sx={{ py: 2 }}>
+                          {photo ? (
+                            <Box 
+                              onClick={() => setPreviewPhotoUrl(photo)} 
+                              sx={{ 
+                                width: 44, 
+                                height: 44, 
+                                borderRadius: 2, 
+                                overflow: 'hidden', 
+                                border: '1px solid #E2E8F0', 
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                '&:hover': { transform: 'scale(1.08)', borderColor: '#0284C7' } 
+                              }}
+                            >
+                              <img src={photo} alt="Entry Photo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </Box>
+                          ) : (
+                            <Typography variant="caption" sx={{ color: '#CBD5E1' }}>No Photo</Typography>
+                          )}
+                        </TableCell>
+                        
+                        <TableCell align="right" sx={{ py: 2 }}>
+                          {!(stageFormatted === 'Dispatch' && !log.isDispatched) ? (
                             <IconButton 
-                              color="error" 
                               size="small" 
                               onClick={async () => {
-                                if (window.confirm('Are you sure you want to delete this entry?')) {
+                                if (window.confirm('Are you sure you want to delete this log entry?')) {
                                   try {
                                     const idToDelete = stageFormatted === 'Dispatch' ? log.logToDelete : log.id;
                                     await deleteProductionLog(idToDelete).unwrap();
@@ -870,12 +1257,12 @@ const StageDetails = () => {
                                   }
                                 }
                               }}
+                              sx={{ color: '#DC2626', bgcolor: '#FEF2F2', border: '1px solid #FECACA', '&:hover': { bgcolor: '#FEE2E2' } }}
                             >
-                              <DeleteIcon fontSize="small" />
+                              <DeleteIcon sx={{ fontSize: 16 }} />
                             </IconButton>
-                          )}
-                          {(stageFormatted === 'Dispatch' && !log.isDispatched) && (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
+                          ) : (
+                            <Typography variant="caption" sx={{ color: '#CBD5E1' }}>—</Typography>
                           )}
                         </TableCell>
                       </TableRow>
@@ -891,21 +1278,41 @@ const StageDetails = () => {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  {stageFormatted === 'Production' && <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Machine Name</TableCell>}
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Product Name</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Used Slab</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Actual Size</TableCell>
+                  {stageFormatted === 'Production' && (
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                      Machine / Workstation
+                    </TableCell>
+                  )}
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    Product / Piece Name
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    Used Raw Block
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    Actual Dimensions
+                  </TableCell>
                   {stageFormatted === 'Production' && (
                     <>
-                      <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Start Time</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>End Time</TableCell>
+                      <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                        Start Time
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                        End Time
+                      </TableCell>
                     </>
                   )}
                   {stageFormatted === 'Polishing' && (
-                    <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Completed Date</TableCell>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                      Completed Date
+                    </TableCell>
                   )}
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F5F5F5', color: '#333', whiteSpace: 'nowrap', py: 2 }} align="right">Action</TableCell>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    Live Status
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }} align="right">
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -916,34 +1323,64 @@ const StageDetails = () => {
         )}
       </Paper>
 
-      <Dialog open={!!editingPiece} onClose={() => setEditingPiece(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Tracking Item</DialogTitle>
-        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 3 }}>
+      {/* EDIT TRACKING PIECE DIALOG */}
+      <Dialog 
+        open={!!editingPiece} 
+        onClose={() => setEditingPiece(null)} 
+        maxWidth="sm" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B' }}>Edit Piece Specification</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2.5 }}>
           <TextField 
-            label="Item Name" 
+            label="Product / Piece Name" 
             value={editingPiece?.productName || editingPiece?.pieceNumber || ''} 
             onChange={e => setEditingPiece({ ...editingPiece, productName: e.target.value })} 
             fullWidth 
+            slotProps={{ input: { sx: { borderRadius: 2 } } }}
           />
           <TextField 
-            label="Size (e.g. 20L x 10W)" 
+            label="Size Spec (e.g. 20L x 10W | 18MM)" 
             value={editingPiece?.size || ''} 
             onChange={e => setEditingPiece({ ...editingPiece, size: e.target.value })} 
             fullWidth 
+            slotProps={{ input: { sx: { borderRadius: 2 } } }}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 2, px: 3 }}>
-          <Button onClick={() => setEditingPiece(null)}>Cancel</Button>
-          <Button variant="contained" onClick={handleEditPieceSave}>Save Changes</Button>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setEditingPiece(null)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleEditPieceSave}
+            sx={{ 
+              borderRadius: 2, 
+              bgcolor: '#1E293B', 
+              color: '#FFFFFF', 
+              fontWeight: 800, 
+              textTransform: 'none',
+              px: 3,
+              '&:hover': { bgcolor: '#0F172A' }
+            }}
+          >
+            Save Changes
+          </Button>
         </DialogActions>
       </Dialog>
 
-      {/* View Piece History Dialog */}
-      <Dialog open={!!viewPiece} onClose={() => setViewPiece(null)} maxWidth="lg" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <VisibilityIcon color="primary" /> Timeline & History: {viewPiece?.productName || viewPiece?.pieceNumber}
+      {/* VIEW PIECE TIMELINE & HISTORY DIALOG */}
+      <Dialog 
+        open={!!viewPiece} 
+        onClose={() => setViewPiece(null)} 
+        maxWidth="lg" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B', display: 'flex', alignItems: 'center', gap: 1.5, fontSize: '1.2rem' }}>
+          <VisibilityIcon sx={{ color: '#0284C7' }} /> 
+          Timeline & Audit Trail: {viewPiece?.productName || viewPiece?.pieceNumber}
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={{ p: 3.5, bgcolor: '#FAFAFA' }}>
           {(() => {
             const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(viewPiece?.id)) || [];
             
@@ -955,7 +1392,6 @@ const StageDetails = () => {
               l.productId === viewPiece?.id || linkedMachineLogIds.includes(l.id)
             ) || [];
             
-            // Format pieceMachineLogs to match the table structure (these represent Machine Start)
             const formattedMachineLogs = pieceMachineLogs.map((ml: any) => ({
               ...ml,
               id: `${ml.id}-start`,
@@ -973,7 +1409,6 @@ const StageDetails = () => {
               }
             }));
 
-            // Format pieceProductionLogs (IN/OUT logs)
             const formattedProductionLogs = pieceProductionLogs.map((l: any) => {
               if (l.stage === 'Production Work') {
                 const parentMl = machineLogs?.find((ml: any) => ml.id === l.parentLogId);
@@ -993,7 +1428,6 @@ const StageDetails = () => {
               };
             });
 
-            // Combine and filter by the current stage view
             let combinedLogs = [...formattedProductionLogs, ...formattedMachineLogs].filter((log: any) => {
               if (stageFormatted === 'Production') {
                 return log.stage === 'Production Work' || log.stage === 'Production Work (Machine)' || log.stage === 'Production';
@@ -1001,7 +1435,6 @@ const StageDetails = () => {
               return log.stage === stageFormatted || log.stage === `${stageFormatted} Work`;
             });
 
-            // Sort by date ascending (oldest first, so we see start then end)
             combinedLogs.sort((a: any, b: any) => {
               const dateA = new Date(a.startTime || a.createdAt).getTime();
               const dateB = new Date(b.startTime || b.createdAt).getTime();
@@ -1010,81 +1443,84 @@ const StageDetails = () => {
 
             if (combinedLogs.length === 0) {
               return (
-                <Box sx={{ p: 4, textAlign: 'center' }}>
-                  <Typography color="text.secondary">No logs or tracking history found for this item.</Typography>
+                <Box sx={{ p: 6, textAlign: 'center' }}>
+                  <ScheduleRoundedIcon sx={{ fontSize: 44, color: '#CBD5E1', mb: 1.5, display: 'block', mx: 'auto' }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
+                    No audit logs or tracking history found for this item.
+                  </Typography>
                 </Box>
               );
             }
 
             return (
-              <Box sx={{ position: 'relative', ml: 2, borderLeft: '2px solid #e0e0e0', pl: 4, display: 'flex', flexDirection: 'column', gap: 4, py: 2 }}>
+              <Box sx={{ position: 'relative', ml: 2, borderLeft: '2px solid #E2E8F0', pl: 4, display: 'flex', flexDirection: 'column', gap: 3, py: 1 }}>
                 {combinedLogs.map((log: any, i: number) => {
                   const isOut = log.displayType === 'Material OUT' || log.displayType === 'Machine Start';
                   return (
-                  <Box key={i} sx={{ position: 'relative' }}>
-                    <Box sx={{ 
-                      position: 'absolute', 
-                      left: -43, 
-                      top: 20, 
-                      width: 16, 
-                      height: 16, 
-                      borderRadius: '50%', 
-                      bgcolor: isOut ? '#ed6c02' : '#0288d1',
-                      border: '3px solid #fff',
-                      boxShadow: '0 0 0 2px ' + (isOut ? '#ed6c02' : '#0288d1')
-                    }} />
-                    <Paper sx={{ 
-                      p: 3, 
-                      borderRadius: 3, 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'flex-start',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
-                      border: '1px solid #f0f0f0',
-                      bgcolor: '#fff',
-                      transition: 'transform 0.2s',
-                      '&:hover': { transform: 'translateY(-2px)' }
-                    }}>
-                      <Box>
-                         <Typography variant="caption" sx={{ color: '#888', fontWeight: 700, display: 'block', mb: 1, letterSpacing: 0.5 }}>
-                           {new Date(log.startTime || log.createdAt).toLocaleString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
-                         </Typography>
-                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                           <Typography variant="h6" fontWeight="900" sx={{ color: isOut ? '#ed6c02' : '#0288d1' }}>
-                             {log.displayType}
+                    <Box key={i} sx={{ position: 'relative' }}>
+                      <Box sx={{ 
+                        position: 'absolute', 
+                        left: -41, 
+                        top: 20, 
+                        width: 16, 
+                        height: 16, 
+                        borderRadius: '50%', 
+                        bgcolor: isOut ? '#D97706' : '#0284C7',
+                        border: '3px solid #FFFFFF',
+                        boxShadow: '0 0 0 2px ' + (isOut ? '#FDE68A' : '#BAE6FD')
+                      }} />
+                      <Paper sx={{ 
+                        p: 3, 
+                        borderRadius: 3.5, 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'flex-start',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                        border: '1px solid #E2E8F0',
+                        bgcolor: '#FFFFFF',
+                        flexWrap: 'wrap',
+                        gap: 2
+                      }}>
+                        <Box>
+                           <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 800, display: 'block', mb: 0.75, letterSpacing: '0.5px' }}>
+                             {new Date(log.startTime || log.createdAt).toLocaleString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
                            </Typography>
-                           {log.approvalStatus === 'approved' && <Chip size="small" label="Approved" color="success" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 'bold' }} />}
-                           {log.approvalStatus === 'pending' && <Chip size="small" label="Pending" color="warning" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 'bold' }} />}
-                         </Box>
-                         <Typography variant="subtitle1" color="text.primary" fontWeight="bold">
-                           {log.stage}
-                         </Typography>
-                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                           Worker/Vendor: <Typography component="span" fontWeight="bold" color="secondary.main">{typeof log.worker === 'object' ? log.worker?.name : log.worker || log.vendorName || 'Unknown'}</Typography>
-                         </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        {(log.startPhotos?.machine || log.machinePhotoUrl) && (
-                          <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.machine || log.machinePhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.2s', '&:hover': { opacity: 0.8, transform: 'scale(1.05)' }}}>
-                             <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#666', mb: 0.5, fontWeight: 'bold' }}>Machine</Typography>
-                             <img src={log.startPhotos?.machine || log.machinePhotoUrl} alt="Machine" style={{ width: 100, height: 100, borderRadius: 12, objectFit: 'cover', border: '2px solid #eee' }} />
-                          </Box>
-                        )}
-                        {(log.startPhotos?.unit || log.unitPhotoUrl) && (
-                          <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.unit || log.unitPhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.2s', '&:hover': { opacity: 0.8, transform: 'scale(1.05)' }}}>
-                             <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#666', mb: 0.5, fontWeight: 'bold' }}>Unit</Typography>
-                             <img src={log.startPhotos?.unit || log.unitPhotoUrl} alt="Unit" style={{ width: 100, height: 100, borderRadius: 12, objectFit: 'cover', border: '2px solid #eee' }} />
-                          </Box>
-                        )}
-                        {(log.startPhotos?.software || log.softwarePhotoUrl) && (
-                          <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.software || log.softwarePhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.2s', '&:hover': { opacity: 0.8, transform: 'scale(1.05)' }}}>
-                             <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#666', mb: 0.5, fontWeight: 'bold' }}>Software</Typography>
-                             <img src={log.startPhotos?.software || log.softwarePhotoUrl} alt="Software" style={{ width: 100, height: 100, borderRadius: 12, objectFit: 'cover', border: '2px solid #eee' }} />
-                          </Box>
-                        )}
-                      </Box>
-                    </Paper>
-                  </Box>
+                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                             <Typography variant="h6" sx={{ fontWeight: 800, color: isOut ? '#D97706' : '#0284C7' }}>
+                               {log.displayType}
+                             </Typography>
+                             {log.approvalStatus === 'approved' && <Chip size="small" label="Approved" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 800, fontSize: '0.7rem', height: 22, border: '1px solid #A7F3D0' }} />}
+                             {log.approvalStatus === 'pending' && <Chip size="small" label="Pending" sx={{ bgcolor: '#FFFBEB', color: '#D97706', fontWeight: 800, fontSize: '0.7rem', height: 22, border: '1px solid #FDE68A' }} />}
+                           </Box>
+                           <Typography variant="subtitle2" sx={{ color: '#1E293B', fontWeight: 700 }}>
+                             {log.stage}
+                           </Typography>
+                           <Typography variant="body2" sx={{ color: '#64748B', mt: 0.75 }}>
+                             Worker / Vendor: <strong style={{ color: '#1E293B' }}>{typeof log.worker === 'object' ? log.worker?.name : log.worker || log.vendorName || 'Unknown'}</strong>
+                           </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                          {(log.startPhotos?.machine || log.machinePhotoUrl) && (
+                            <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.machine || log.machinePhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
+                               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#64748B', mb: 0.5, fontWeight: 700 }}>Machine</Typography>
+                               <img src={log.startPhotos?.machine || log.machinePhotoUrl} alt="Machine" style={{ width: 90, height: 90, borderRadius: 10, objectFit: 'cover', border: '1px solid #E2E8F0' }} />
+                            </Box>
+                          )}
+                          {(log.startPhotos?.unit || log.unitPhotoUrl) && (
+                            <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.unit || log.unitPhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
+                               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#64748B', mb: 0.5, fontWeight: 700 }}>Unit</Typography>
+                               <img src={log.startPhotos?.unit || log.unitPhotoUrl} alt="Unit" style={{ width: 90, height: 90, borderRadius: 10, objectFit: 'cover', border: '1px solid #E2E8F0' }} />
+                            </Box>
+                          )}
+                          {(log.startPhotos?.software || log.softwarePhotoUrl) && (
+                            <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.software || log.softwarePhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
+                               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#64748B', mb: 0.5, fontWeight: 700 }}>Software</Typography>
+                               <img src={log.startPhotos?.software || log.softwarePhotoUrl} alt="Software" style={{ width: 90, height: 90, borderRadius: 10, objectFit: 'cover', border: '1px solid #E2E8F0' }} />
+                            </Box>
+                          )}
+                        </Box>
+                      </Paper>
+                    </Box>
                   );
                 })}
               </Box>
@@ -1092,18 +1528,25 @@ const StageDetails = () => {
           })()}
         </DialogContent>
         <DialogActions sx={{ p: 2, px: 3 }}>
-          <Button onClick={() => setViewPiece(null)} variant="outlined">Close</Button>
+          <Button onClick={() => setViewPiece(null)} sx={{ borderRadius: 2, color: '#1E293B', fontWeight: 700, textTransform: 'none' }}>Close</Button>
         </DialogActions>
       </Dialog>
-      {/* Photo Preview Dialog */}
-      <Dialog open={!!previewPhotoUrl} onClose={() => setPreviewPhotoUrl(null)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+      {/* PHOTO PREVIEW DIALOG */}
+      <Dialog 
+        open={!!previewPhotoUrl} 
+        onClose={() => setPreviewPhotoUrl(null)} 
+        maxWidth="md" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 4, overflow: 'hidden' } } }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800, color: '#1E293B' }}>
           Photo Preview
           <IconButton onClick={() => setPreviewPhotoUrl(null)}><CloseIcon /></IconButton>
         </DialogTitle>
-        <DialogContent sx={{ textAlign: 'center', p: 3, bgcolor: '#f5f5f5' }}>
+        <DialogContent sx={{ textAlign: 'center', p: 3, bgcolor: '#F8FAFC' }}>
           {previewPhotoUrl && (
-            <img src={previewPhotoUrl} alt="Preview" style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+            <img src={previewPhotoUrl} alt="Preview" style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
           )}
         </DialogContent>
       </Dialog>

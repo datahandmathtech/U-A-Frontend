@@ -59,7 +59,7 @@ const Layout: React.FC = () => {
       <Sidebar mobileOpen={mobileOpen} handleDrawerToggle={handleDrawerToggle} drawerWidth={drawerWidth} />
       <Box
         component="main"
-        sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}
+        sx={{ flexGrow: 1, p: { xs: 1, sm: 1.5, md: 2 }, width: { sm: `calc(100% - ${drawerWidth}px)` }, minWidth: 0 }}
       >
         <Toolbar />
         <Suspense fallback={<PageLoader />}>

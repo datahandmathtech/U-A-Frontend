@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel } from '@mui/material';
+import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel, Card, Tooltip } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -21,6 +21,30 @@ import SyncIcon from '@mui/icons-material/Sync';
 import DownloadIcon from '@mui/icons-material/Download';
 import CircleIcon from '@mui/icons-material/Circle';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import CallRoundedIcon from '@mui/icons-material/CallRounded';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded';
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded';
+import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
+import CalculateRoundedIcon from '@mui/icons-material/CalculateRounded';
+import LocalShippingRoundedIcon from '@mui/icons-material/LocalShippingRounded';
+import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
+import CollectionsRoundedIcon from '@mui/icons-material/CollectionsRounded';
+import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import ZoomInRoundedIcon from '@mui/icons-material/ZoomInRounded';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
+import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
+import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
+import StraightenRoundedIcon from '@mui/icons-material/StraightenRounded';
+import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
+import BrushRoundedIcon from '@mui/icons-material/BrushRounded';
+import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import { 
   useGetProjectByIdQuery, useUpdateProjectMutation, useCreateQuotationMutation, 
   useCreateInvoiceMutation, useUploadFilesMutation, useGetDrawingsQuery, 
@@ -92,46 +116,154 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumn
   const isLocked = slab.status !== 'pending';
 
   return (
-    <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
-      <TableCell sx={{ color: '#444' }}>
+    <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
+      <TableCell sx={{ py: 2 }}>
         <Box>
-          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{slab.name}</Typography>
-          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 'bold', display: 'inline-block', mt: 0.5, bgcolor: 'primary.50', px: 1, borderRadius: 1 }}>{slab.pieces?.length || 0} Pieces</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{slab.name}</Typography>
+          <Chip 
+            label={`${slab.pieces?.length || 0} Pieces`} 
+            size="small" 
+            sx={{ 
+              mt: 0.5, 
+              bgcolor: '#EFF6FF', 
+              color: '#1D4ED8', 
+              fontWeight: 700, 
+              fontSize: '0.72rem', 
+              height: 22, 
+              borderRadius: 1.5, 
+              border: '1px solid #DBEAFE' 
+            }} 
+          />
         </Box>
       </TableCell>
-      <TableCell sx={{ color: '#666' }}>
-        <Typography variant="body2">{dimensionStr}</Typography>
+      <TableCell sx={{ py: 2 }}>
+        {dimensionStr ? (
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
+            <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
+            <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>{dimensionStr}</Typography>
+          </Box>
+        ) : (
+          <Typography variant="caption" sx={{ color: '#94A3B8' }}>Standard Spec</Typography>
+        )}
       </TableCell>
       {STAGES.filter(stage => activeColumns.includes(stage)).map(stage => (
-        <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
+        <TableCell key={stage} sx={{ verticalAlign: 'middle', py: 2 }}>
           {stage === 'Polishing' ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Checkbox size="small" disabled={isLocked} checked={requiredStages.includes('Polishing - Honed') || requiredStages.includes('Polishing')} onChange={(e) => handleToggleStage('Polishing - Honed', e)} sx={{ p: 0 }} />
-                <Typography variant="caption">Honed</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Checkbox size="small" disabled={isLocked} checked={requiredStages.includes('Polishing - Mirror')} onChange={(e) => handleToggleStage('Polishing - Mirror', e)} sx={{ p: 0 }} />
-                <Typography variant="caption">Mirror</Typography>
-              </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {(() => {
+                const isHoned = requiredStages.includes('Polishing - Honed') || requiredStages.includes('Polishing');
+                return (
+                  <Box 
+                    onClick={isLocked ? undefined : (e) => handleToggleStage('Polishing - Honed', e)}
+                    sx={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: 0.75, 
+                      px: 1.25, py: 0.4, borderRadius: 1.5, 
+                      bgcolor: isHoned ? '#F0FDF4' : '#F8FAFC', 
+                      border: '1px solid', borderColor: isHoned ? '#86EFAC' : '#E2E8F0', 
+                      cursor: isLocked ? 'default' : 'pointer',
+                      transition: 'all 0.15s ease',
+                      '&:hover': isLocked ? {} : { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
+                    }}
+                  >
+                    <Checkbox size="small" disabled={isLocked} checked={isHoned} sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} />
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: isHoned ? '#166534' : '#64748B', fontSize: '0.75rem' }}>Honed</Typography>
+                  </Box>
+                );
+              })()}
+              {(() => {
+                const isMirror = requiredStages.includes('Polishing - Mirror');
+                return (
+                  <Box 
+                    onClick={isLocked ? undefined : (e) => handleToggleStage('Polishing - Mirror', e)}
+                    sx={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: 0.75, 
+                      px: 1.25, py: 0.4, borderRadius: 1.5, 
+                      bgcolor: isMirror ? '#F0FDF4' : '#F8FAFC', 
+                      border: '1px solid', borderColor: isMirror ? '#86EFAC' : '#E2E8F0', 
+                      cursor: isLocked ? 'default' : 'pointer',
+                      transition: 'all 0.15s ease',
+                      '&:hover': isLocked ? {} : { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
+                    }}
+                  >
+                    <Checkbox size="small" disabled={isLocked} checked={isMirror} sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} />
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: isMirror ? '#166534' : '#64748B', fontSize: '0.75rem' }}>Mirror</Typography>
+                  </Box>
+                );
+              })()}
             </Box>
           ) : (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Checkbox size="small" disabled={isLocked} checked={requiredStages.includes(stage)} onChange={(e) => handleToggleStage(stage, e)} sx={{ p: 0 }} />
-              <Typography variant="caption">{stage}</Typography>
-            </Box>
+            (() => {
+              const isChecked = requiredStages.includes(stage);
+              return (
+                <Box 
+                  onClick={isLocked ? undefined : (e) => handleToggleStage(stage, e)}
+                  sx={{ 
+                    display: 'inline-flex', alignItems: 'center', gap: 0.75, 
+                    px: 1.5, py: 0.6, borderRadius: 1.75, 
+                    bgcolor: isChecked ? '#F0FDF4' : '#F8FAFC', 
+                    border: '1px solid', borderColor: isChecked ? '#86EFAC' : '#E2E8F0', 
+                    cursor: isLocked ? 'default' : 'pointer',
+                    transition: 'all 0.15s ease',
+                    '&:hover': isLocked ? {} : { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
+                  }}
+                >
+                  <Checkbox size="small" disabled={isLocked} checked={isChecked} sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: isChecked ? '#166534' : '#64748B', fontSize: '0.78rem' }}>{stage}</Typography>
+                </Box>
+              );
+            })()
           )}
         </TableCell>
       ))}
-      <TableCell align="center" sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
-        {isLocked ? (
-           <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'bold' }}>Active</Typography>
-        ) : (
-           <Typography variant="caption" sx={{ color: 'text.secondary' }}>Pending</Typography>
-        )}
-        <Box>
-          <IconButton color="primary" size="small" disabled={isLocked} onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
-          <IconButton color="error" size="small" onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}><DeleteIcon fontSize="small" /></IconButton>
+      <TableCell align="center" sx={{ py: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <Chip 
+            label={isLocked ? 'Active' : 'Planning'} 
+            size="small" 
+            sx={{ 
+              fontWeight: 800, 
+              fontSize: '0.7rem', 
+              height: 22, 
+              bgcolor: isLocked ? '#DCFCE7' : '#FEF3C7', 
+              color: isLocked ? '#15803D' : '#B45309', 
+              border: '1px solid',
+              borderColor: isLocked ? '#86EFAC' : '#FDE68A'
+            }} 
+          />
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title={isLocked ? "Slab is in active production" : "Edit Slab Details"}>
+              <span>
+                <IconButton 
+                  size="small" 
+                  disabled={isLocked} 
+                  onClick={(e) => { e.stopPropagation(); onEdit(slab); }}
+                  sx={{ 
+                    color: '#0284C7', 
+                    bgcolor: '#F0F9FF', 
+                    border: '1px solid #BAE6FD', 
+                    '&:hover': { bgcolor: '#E0F2FE' },
+                    '&.Mui-disabled': { bgcolor: '#F8FAFC', borderColor: '#E2E8F0', color: '#CBD5E1' }
+                  }}
+                >
+                  <EditIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Delete Slab">
+              <IconButton 
+                size="small" 
+                onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}
+                sx={{ 
+                  color: '#DC2626', 
+                  bgcolor: '#FEF2F2', 
+                  border: '1px solid #FECACA', 
+                  '&:hover': { bgcolor: '#FEE2E2' } 
+                }}
+              >
+                <DeleteIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
       </TableCell>
     </TableRow>
@@ -172,14 +304,27 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
         const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
         const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
 
-        if (pStageIdx > stageIdx) {
+        // Check if piece has an approved/completed log specifically for this stage
+        const hasCompletedStageLog = p.logs && p.logs.some((l: any) => {
+          const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+          return (lStage === normalizedStageName || lStage.startsWith(normalizedStageName)) && (l.status === 'completed' || l.status === 'approved');
+        });
+
+        // Check if there is an approved productionLog matching this piece for this stage
+        const hasApprovedProductionLog = productionLogs && productionLogs.some((l: any) => {
+          if (l.approvalStatus !== 'approved') return false;
+          const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+          if (lStage !== normalizedStageName && !lStage.startsWith(normalizedStageName)) return false;
+          return (l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
+        });
+
+        // Or if the piece's current stage is this stage and it is completed
+        const isCurrentStageCompleted = normalizedPieceStage === normalizedStageName && p.status === 'completed';
+
+        if (hasCompletedStageLog || hasApprovedProductionLog || isCurrentStageCompleted) {
           piecesCompletedInThisStage++;
-        } else if (pStageIdx === stageIdx) {
-          if (p.status === 'completed') {
-            piecesCompletedInThisStage++;
-          } else if (p.status === 'active' || p.status === 'in_progress') {
-            piecesActiveInThisStage++;
-          }
+        } else if (pStageIdx === stageIdx && (p.status === 'active' || p.status === 'in_progress')) {
+          piecesActiveInThisStage++;
         }
       }
 
@@ -228,50 +373,108 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
     return 'Pending';
   };
 
-  const renderStatusIcon = (status: string) => {
-    if (status === 'Completed') return <CheckCircleIcon sx={{ fontSize: 18, color: '#4caf50' }} />;
-    if (status === 'In Progress') return <CircleIcon sx={{ fontSize: 16, color: '#ffb300' }} />;
-    return <CircleIcon sx={{ fontSize: 16, color: '#d1c4e9' }} />;
+  const renderStatusBadge = (status: string, label: string, onClickRoute: () => void) => {
+    let bgcolor = '#F8FAFC';
+    let borderColor = '#E2E8F0';
+    let color = '#64748B';
+    let icon = <CircleIcon sx={{ fontSize: 8, color: '#94A3B8' }} />;
+
+    if (status === 'Completed') {
+      bgcolor = '#ECFDF5';
+      borderColor = '#A7F3D0';
+      color = '#065F46';
+      icon = <CheckCircleRoundedIcon sx={{ fontSize: 16, color: '#059669' }} />;
+    } else if (status === 'In Progress') {
+      bgcolor = '#FFFBEB';
+      borderColor = '#FDE68A';
+      color = '#92400E';
+      icon = <CircleIcon sx={{ fontSize: 10, color: '#D97706' }} />;
+    }
+
+    return (
+      <Tooltip title={`Click to open live ${label} tracking`}>
+        <Box 
+          onClick={onClickRoute}
+          sx={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            gap: 0.9, 
+            px: 1.5, 
+            py: 0.7, 
+            borderRadius: 2, 
+            bgcolor, 
+            border: '1px solid', 
+            borderColor, 
+            cursor: 'pointer', 
+            transition: 'all 0.15s ease',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+            '&:hover': { 
+              borderColor: '#3B82F6', 
+              boxShadow: '0 3px 10px rgba(59, 130, 246, 0.15)',
+              transform: 'translateY(-1px)'
+            } 
+          }}
+        >
+          {icon}
+          <Typography variant="caption" sx={{ fontWeight: 700, color, fontSize: '0.78rem' }}>
+            {label}
+          </Typography>
+          <OpenInNewRoundedIcon sx={{ fontSize: 12, color: '#94A3B8', opacity: 0.6 }} />
+        </Box>
+      </Tooltip>
+    );
   };
 
   const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
 
   return (
-    <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F0F7F0' } }}>
-      <TableCell sx={{ color: '#444' }}>
+    <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
+      <TableCell sx={{ py: 2 }}>
         <Box>
-          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{slab.name}</Typography>
-          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 'bold', display: 'inline-block', mt: 0.5, bgcolor: 'primary.50', px: 1, borderRadius: 1 }}>{slab.pieces?.length || 0} Pieces</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{slab.name}</Typography>
+          <Chip 
+            label={`${slab.pieces?.length || 0} Pieces`} 
+            size="small" 
+            sx={{ 
+              mt: 0.5, 
+              bgcolor: '#EFF6FF', 
+              color: '#1D4ED8', 
+              fontWeight: 700, 
+              fontSize: '0.72rem', 
+              height: 22, 
+              borderRadius: 1.5, 
+              border: '1px solid #DBEAFE' 
+            }} 
+          />
         </Box>
       </TableCell>
-      <TableCell sx={{ color: '#666' }}>
-        <Typography variant="body2">{dimensionStr}</Typography>
+      <TableCell sx={{ py: 2 }}>
+        {dimensionStr ? (
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
+            <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
+            <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>{dimensionStr}</Typography>
+          </Box>
+        ) : (
+          <Typography variant="caption" sx={{ color: '#94A3B8' }}>Standard Spec</Typography>
+        )}
       </TableCell>
       {STAGES.filter(stage => activeColumns.includes(stage)).map(stage => {
         if (stage === 'Polishing') {
           const hasHoned = requiredStages.includes('Polishing - Honed') || requiredStages.includes('Polishing');
           const hasMirror = requiredStages.includes('Polishing - Mirror');
-          if (!hasHoned && !hasMirror) return <TableCell key={stage}></TableCell>;
+          if (!hasHoned && !hasMirror) return <TableCell key={stage} sx={{ py: 2 }}><Typography variant="caption" sx={{ color: '#CBD5E1' }}>—</Typography></TableCell>;
           return (
-            <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {hasHoned && (
-                  <Box 
-                    onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/polishing`)}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
-                  >
-                    {renderStatusIcon(getStageStatus('Polishing - Honed'))}
-                    <Typography variant="body2" sx={{ color: '#444' }}>Honed</Typography>
-                  </Box>
+            <TableCell key={stage} sx={{ verticalAlign: 'middle', py: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                {hasHoned && renderStatusBadge(
+                  getStageStatus('Polishing - Honed'), 
+                  `Honed: ${getStageStatus('Polishing - Honed')}`, 
+                  () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/polishing`)
                 )}
-                {hasMirror && (
-                  <Box 
-                    onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/polishing`)}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
-                  >
-                    {renderStatusIcon(getStageStatus('Polishing - Mirror'))}
-                    <Typography variant="body2" sx={{ color: '#444' }}>Mirror</Typography>
-                  </Box>
+                {hasMirror && renderStatusBadge(
+                  getStageStatus('Polishing - Mirror'), 
+                  `Mirror: ${getStageStatus('Polishing - Mirror')}`, 
+                  () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/polishing`)
                 )}
               </Box>
             </TableCell>
@@ -279,24 +482,54 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
         }
 
         const isRequired = requiredStages.includes(stage);
-        if (!isRequired) return <TableCell key={stage}></TableCell>;
+        if (!isRequired) {
+          return (
+            <TableCell key={stage} sx={{ py: 2 }}>
+              <Chip label="Skipped" size="small" sx={{ bgcolor: '#F1F5F9', color: '#94A3B8', fontSize: '0.7rem', height: 20 }} />
+            </TableCell>
+          );
+        }
 
         const status = getStageStatus(stage);
         return (
-          <TableCell key={stage} sx={{ verticalAlign: 'top', pt: 2 }}>
-            <Box 
-              onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)}
-              sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.7 } }}
-            >
-              {renderStatusIcon(status)}
-              <Typography variant="body2" sx={{ color: '#444' }}>{status}</Typography>
-            </Box>
+          <TableCell key={stage} sx={{ verticalAlign: 'middle', py: 2 }}>
+            {renderStatusBadge(
+              status, 
+              status, 
+              () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)
+            )}
           </TableCell>
         );
       })}
-      <TableCell align="center">
-        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 'bold', display: 'block', mb: 1 }}>Active</Typography>
-        <IconButton color="primary" size="small" onClick={(e) => { e.stopPropagation(); onEdit(slab); }}><EditIcon fontSize="small" /></IconButton>
+      <TableCell align="center" sx={{ py: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
+          <Chip 
+            label="In Production" 
+            size="small" 
+            sx={{ 
+              fontWeight: 800, 
+              fontSize: '0.7rem', 
+              height: 22, 
+              bgcolor: '#ECFDF5', 
+              color: '#059669', 
+              border: '1px solid #A7F3D0' 
+            }} 
+          />
+          <Tooltip title="Edit Slab Specification">
+            <IconButton 
+              size="small" 
+              onClick={(e) => { e.stopPropagation(); onEdit(slab); }}
+              sx={{ 
+                color: '#0284C7', 
+                bgcolor: '#F0F9FF', 
+                border: '1px solid #BAE6FD', 
+                '&:hover': { bgcolor: '#E0F2FE' } 
+              }}
+            >
+              <EditIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </TableCell>
     </TableRow>
   );
@@ -1002,8 +1235,8 @@ const ProjectDetails: React.FC = () => {
   };
 
   return (
-    <Box sx={{ width: '100%', px: { xs: 2, md: 4 } }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <Box sx={{ width: '100%', px: { xs: 0, sm: 0.5, md: 1 } }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
         <Button 
           startIcon={<ArrowBackIcon />} 
           onClick={handleGoBackStep} 
@@ -1024,7 +1257,7 @@ const ProjectDetails: React.FC = () => {
       </Box>
 
       
-      <Box sx={{ display: 'flex', gap: 4, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'flex-start' }}>
+      <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'flex-start', width: '100%' }}>
         {/* LEFT MAIN COLUMN */}
         <Box sx={{ flex: 1, width: '100%', minWidth: 0 }}>
           {/* CONTENT AREA */}
@@ -1074,84 +1307,352 @@ const ProjectDetails: React.FC = () => {
             
             {/* STEP 0: ENQUIRY DETAILS */}
             {stepToRender === 0 && (
-              <Paper elevation={0} sx={{ p: 5, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 3, md: 4.5 },
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: 4,
+                  boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)'
+                }}
+              >
+                {/* Header Strip */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
                   <Box>
-                    <Typography variant="h5" fontWeight="bold" color="text.primary">Enquiry Details</Typography>
-                    <Typography variant="body2" color="text.secondary" mt={1}>Review the initial requirements and client information.</Typography>
-                  </Box>
-                  <Button variant="outlined" startIcon={<EditIcon />} onClick={() => {
-                    setEditFormData({
-                      name: project.name || '',
-                      clientName: project.clientName || '',
-                      clientContact: project.clientContact || '',
-                      enquirySource: project.enquirySource || '',
-                      location: project.location || '',
-                      description: project.description || '',
-                      createdAt: project.createdAt ? new Date(project.createdAt).toISOString().split('T')[0] : '',
-                      customerPhoto: project.customerPhoto || ''
-                    });
-                    setIsEditDialogOpen(true);
-                  }}>Edit Details</Button>
-                </Box>
-                
-                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 4, mb: 4 }}>
-                  {project.customerPhoto && (
-                    <Box sx={{ gridColumn: 'span 3', display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-                      <Typography variant="subtitle1" fontWeight="bold">Client Photos</Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        {project.customerPhoto.split(',').filter(Boolean).map((photoUrl, idx) => (
-                          <Avatar 
-                            key={idx}
-                            src={photoUrl} 
-                            alt={`Client Photo ${idx + 1}`} 
-                            variant="rounded"
-                            onClick={() => setPreviewFileUrl(photoUrl)}
-                            sx={{ width: 100, height: 100, border: '2px solid #E8E1D5', boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.05)', cursor: 'pointer', '&:hover': { opacity: 0.8 } }} 
-                          />
-                        ))}
-                      </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
+                        Enquiry & Client Intake
+                      </Typography>
+                      <Chip
+                        label="CRM Stage 1"
+                        size="small"
+                        sx={{
+                          bgcolor: '#FFF4E5',
+                          color: '#B38B36',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          border: '1px solid #FFE0B2',
+                          borderRadius: '6px'
+                        }}
+                      />
                     </Box>
-                  )}                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Enquiry ID / Project</Typography>
-                    <Typography variant="body1" fontWeight={500} mt={0.5} color="primary.main">{project.projectId}</Typography>
-                    <Typography variant="body2">{project.name}</Typography>
+                    <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+                      Initial client discovery, communication coordinates, and design scope.
+                    </Typography>
                   </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Client Name</Typography>
-                    <Typography variant="body1" fontWeight={500} mt={0.5}>{project.clientName || 'N/A'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Contact Number</Typography>
-                    <Typography variant="body1" fontWeight={500} mt={0.5}>{project.clientContact || 'N/A'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Source</Typography>
-                    <Typography variant="body1" fontWeight={500} mt={0.5}>{project.enquirySource || 'N/A'}</Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Date</Typography>
-                    <Typography variant="body1" fontWeight={500} mt={0.5}>{new Date(project.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}</Typography>
-                  </Box>
+
+                  <Button
+                    variant="outlined"
+                    startIcon={<EditIcon sx={{ fontSize: '18px !important' }} />}
+                    onClick={() => {
+                      setEditFormData({
+                        name: project.name || '',
+                        clientName: project.clientName || '',
+                        clientContact: project.clientContact || '',
+                        enquirySource: project.enquirySource || '',
+                        location: project.location || '',
+                        description: project.description || '',
+                        createdAt: project.createdAt ? new Date(project.createdAt).toISOString().split('T')[0] : '',
+                        customerPhoto: project.customerPhoto || ''
+                      });
+                      setIsEditDialogOpen(true);
+                    }}
+                    sx={{
+                      borderRadius: 2.5,
+                      borderColor: '#CBD5E1',
+                      color: '#1E293B',
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      px: 2.5,
+                      py: 0.9,
+                      '&:hover': { borderColor: '#B38B36', bgcolor: '#FFFDF5' }
+                    }}
+                  >
+                    Edit Details
+                  </Button>
                 </Box>
 
-                <Divider sx={{ mb: 4 }} />
+                {/* 4 Executive KPI Info Cards */}
+                <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+                  {/* Card 1: Client Profile */}
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        bgcolor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                          <Avatar sx={{ width: 28, height: 28, bgcolor: '#EEF2FF', color: '#6366F1' }}>
+                            <PersonRoundedIcon sx={{ fontSize: 16 }} />
+                          </Avatar>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Client Name
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.2, mb: 1 }}>
+                          {project.clientName || 'Unnamed Client'}
+                        </Typography>
+                      </Box>
+                      
+                      {project.clientContact ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                          <Chip
+                            icon={<CallRoundedIcon sx={{ fontSize: '14px !important', color: '#0284C7 !important' }} />}
+                            label={project.clientContact}
+                            size="small"
+                            component="a"
+                            href={`tel:${project.clientContact}`}
+                            clickable
+                            sx={{
+                              bgcolor: '#F0F9FF',
+                              color: '#0284C7',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              border: '1px solid #BAE6FD',
+                              borderRadius: 1.5
+                            }}
+                          />
+                          <IconButton
+                            size="small"
+                            component="a"
+                            href={`https://wa.me/${project.clientContact.replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            sx={{
+                              bgcolor: '#DCFCE7',
+                              color: '#16A34A',
+                              width: 28,
+                              height: 28,
+                              border: '1px solid #86EFAC',
+                              '&:hover': { bgcolor: '#BBF7D0' }
+                            }}
+                          >
+                            <WhatsAppIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Box>
+                      ) : (
+                        <Typography variant="caption" sx={{ color: '#94A3B8' }}>No contact provided</Typography>
+                      )}
+                    </Card>
+                  </Grid>
 
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>Requirements / Scope of Work</Typography>
-                  <Typography variant="body1" mt={1} sx={{ p: 2, bgcolor: '#F9F9F9', borderRadius: 2, border: '1px solid #EEEEEE', minHeight: 100 }}>
-                    {project.description || 'No specific requirements listed.'}
+                  {/* Card 2: Project Identification */}
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        bgcolor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                          <Avatar sx={{ width: 28, height: 28, bgcolor: '#FFF4E5', color: '#B38B36' }}>
+                            <LayersRoundedIcon sx={{ fontSize: 16 }} />
+                          </Avatar>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Project ID & Title
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={project.projectId}
+                          size="small"
+                          sx={{
+                            bgcolor: '#1E293B',
+                            color: '#FFFFFF',
+                            fontWeight: 800,
+                            fontSize: '0.75rem',
+                            mb: 1,
+                            borderRadius: 1.5
+                          }}
+                        />
+                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1E293B' }}>
+                          {project.name}
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, mt: 1 }}>
+                        Status: <span style={{ color: '#B38B36', textTransform: 'capitalize' }}>{project.status?.replace('_', ' ')}</span>
+                      </Typography>
+                    </Card>
+                  </Grid>
+
+                  {/* Card 3: Source & Timeline */}
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        bgcolor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                          <Avatar sx={{ width: 28, height: 28, bgcolor: '#ECFDF5', color: '#059669' }}>
+                            <CalendarMonthRoundedIcon sx={{ fontSize: 16 }} />
+                          </Avatar>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Source & Date
+                          </Typography>
+                        </Box>
+                        <Box sx={{ mb: 1 }}>
+                          <Chip
+                            icon={<LocalOfferRoundedIcon sx={{ fontSize: '13px !important' }} />}
+                            label={project.enquirySource || 'Direct Enquiry'}
+                            size="small"
+                            sx={{
+                              bgcolor: '#F1F5F9',
+                              color: '#475569',
+                              fontWeight: 700,
+                              fontSize: '0.72rem',
+                              borderRadius: 1.5
+                            }}
+                          />
+                        </Box>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E293B' }}>
+                          {new Date(project.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ color: '#94A3B8' }}>Logged in CRM</Typography>
+                    </Card>
+                  </Grid>
+
+                  {/* Card 4: Location & Handled By */}
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        bgcolor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                          <Avatar sx={{ width: 28, height: 28, bgcolor: '#FEF2F2', color: '#DC2626' }}>
+                            <LocationOnRoundedIcon sx={{ fontSize: 16 }} />
+                          </Avatar>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Site Location & Owner
+                          </Typography>
+                        </Box>
+                        <Typography variant="body1" sx={{ fontWeight: 800, color: '#1E293B', mb: 0.5 }}>
+                          {project.location || 'Site Location Not Specified'}
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                        Handler: <span style={{ color: '#1E293B' }}>{project.clientHandle || project.assignedTo?.name || 'Unassigned'}</span>
+                      </Typography>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                {/* Client Inspiration Photos */}
+                {project.customerPhoto && (
+                  <Box sx={{ mb: 3.5, p: 2.5, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px solid #E2E8F0' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CollectionsRoundedIcon sx={{ fontSize: 18, color: '#B38B36' }} />
+                      Client Inspiration Photos
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                      {project.customerPhoto.split(',').filter(Boolean).map((photoUrl: string, idx: number) => (
+                        <Box
+                          key={idx}
+                          onClick={() => setPreviewFileUrl(photoUrl)}
+                          sx={{
+                            position: 'relative',
+                            width: 100,
+                            height: 100,
+                            borderRadius: 2.5,
+                            overflow: 'hidden',
+                            border: '1.5px solid #E2E8F0',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              transform: 'scale(1.04)',
+                              borderColor: '#B38B36',
+                              boxShadow: '0 6px 16px rgba(0,0,0,0.1)'
+                            }
+                          }}
+                        >
+                          <img src={photoUrl} alt={`Photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              inset: 0,
+                              bgcolor: 'rgba(0,0,0,0.25)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              opacity: 0,
+                              transition: 'opacity 0.2s',
+                              '&:hover': { opacity: 1 }
+                            }}
+                          >
+                            <ZoomInRoundedIcon sx={{ color: '#FFFFFF', fontSize: 24 }} />
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Scope of Work & Requirements */}
+                <Box sx={{ mb: 4, p: 3, bgcolor: '#FFFDF5', borderRadius: 3, border: '1px solid #FFE0B2', borderLeft: '4px solid #C89F5A' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#B38B36', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.75rem' }}>
+                    Requirements / Scope of Work
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: '#334155', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+                    {project.description || 'No specific requirement description recorded during intake.'}
                   </Typography>
                 </Box>
 
-                <Divider sx={{ my: 4 }} />
+                {/* Step Progression Footer */}
                 {viewingStepOverride === null && (
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                    
-                    <Button variant="contained" size="large" onClick={() => {
-                      handleNextStage('design_sharing');
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2, borderTop: '1px solid #E2E8F0' }}>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      endIcon={<ArrowForwardRoundedIcon />}
+                      onClick={() => handleNextStage('design_sharing')}
+                      sx={{
+                        px: 4,
+                        py: 1.3,
+                        borderRadius: 2.5,
+                        bgcolor: '#1E293B',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                        '&:hover': { bgcolor: '#0F172A' }
+                      }}
+                    >
                       Proceed to Reference Image
                     </Button>
                   </Box>
@@ -1161,34 +1662,109 @@ const ProjectDetails: React.FC = () => {
 
             {/* STEP 1: REFERENCE IMAGE */}
             {stepToRender === 1 && (
-              <Paper elevation={0} sx={{ p: 5, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 3, md: 4.5 },
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: 4,
+                  boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)'
+                }}
+              >
+                {/* Header Strip */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
                   <Box>
-                    <Typography variant="h5" fontWeight="bold" color="text.primary">Reference Image</Typography>
-                    <Typography variant="body1" color="text.secondary" mt={1}>Upload the finalized reference design images, material choices, and inspiration photos.</Typography>
-                    <Typography variant="body2" color="text.secondary" mt={1}><strong>Current Date:</strong> {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
+                        Finalized Reference Designs & Material Images
+                      </Typography>
+                      <Chip
+                        label="CRM Stage 2"
+                        size="small"
+                        sx={{
+                          bgcolor: '#F0F9FF',
+                          color: '#0284C7',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          border: '1px solid #BAE6FD',
+                          borderRadius: '6px'
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+                      Upload inspiration photos, approved stone samples, and reference drawings.
+                    </Typography>
                   </Box>
-                  
-                  {/* Custom Upload & Camera Buttons Aligned Right */}
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Box 
+
+                  {/* Finalized Design Date Selector */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: '#F8FAFC', p: 1.25, borderRadius: 2.5, border: '1px solid #E2E8F0' }}>
+                    <CalendarMonthRoundedIcon sx={{ color: '#B38B36', fontSize: 20 }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', display: 'block', fontSize: '0.68rem', textTransform: 'uppercase' }}>
+                        Design Finalized Date
+                      </Typography>
+                      <input
+                        type="date"
+                        value={designFinalizedDate}
+                        onChange={(e) => setDesignFinalizedDate(e.target.value)}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                          color: '#1E293B',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Upload & Camera Action Hub */}
+                <Grid container spacing={2.5} sx={{ mb: 4 }}>
+                  {/* Action 1: Upload Files */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
                       component="label"
-                      sx={{ 
-                        width: 120, height: 120, 
-                        border: '2px dashed #B38B36', borderRadius: 3, 
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        cursor: isUploading ? 'not-allowed' : 'pointer', bgcolor: '#FFFDF5', '&:hover': { bgcolor: isUploading ? '#FFFDF5' : '#FFF4E5' }, transition: '0.2s',
-                        opacity: isUploading ? 0.6 : 1
+                      sx={{
+                        p: 3.5,
+                        border: '2px dashed #C89F5A',
+                        borderRadius: 3.5,
+                        bgcolor: isUploading ? '#F8FAFC' : '#FFFDF5',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1.5,
+                        textAlign: 'center',
+                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          bgcolor: '#FFF4E5',
+                          borderColor: '#B38B36',
+                          transform: 'translateY(-2px)'
+                        }
                       }}
                     >
-                      <Typography variant="h4" color="#B38B36" sx={{ mb: 1 }}>+</Typography>
-                      <Typography variant="body2" color="#B38B36" fontWeight="bold">{isUploading ? 'Uploading...' : 'Upload'}</Typography>
-                      <input 
-                        type="file" 
-                        hidden 
-                        multiple 
+                      <Avatar sx={{ bgcolor: '#FFF4E5', color: '#B38B36', width: 52, height: 52 }}>
+                        <CloudUploadIcon sx={{ fontSize: 28 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                          {isUploading ? 'Uploading Files...' : 'Click to Upload Images & Drawings'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block' }}>
+                          Supports JPG, PNG, WebP, PDF & DWG (Multi-select enabled)
+                        </Typography>
+                      </Box>
+                      <input
+                        type="file"
+                        hidden
+                        multiple
                         disabled={isUploading}
-                        accept="image/*,.pdf,.dwg" 
+                        accept="image/*,.pdf,.dwg"
                         onChange={async (e) => {
                           if (e.target.files && e.target.files.length > 0) {
                             setIsUploading(true);
@@ -1209,186 +1785,400 @@ const ProjectDetails: React.FC = () => {
                               e.target.value = '';
                             }
                           }
-                        }} 
+                        }}
                       />
                     </Box>
+                  </Grid>
 
-                    <Box 
+                  {/* Action 2: Camera Capture */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
                       onClick={isUploading ? undefined : startCamera}
-                      sx={{ 
-                        width: 120, height: 120, 
-                        border: '2px dashed #B38B36', borderRadius: 3, 
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        cursor: isUploading ? 'not-allowed' : 'pointer', bgcolor: '#FFFDF5', '&:hover': { bgcolor: isUploading ? '#FFFDF5' : '#FFF4E5' }, transition: '0.2s',
-                        opacity: isUploading ? 0.6 : 1
+                      sx={{
+                        p: 3.5,
+                        border: '2px dashed #0284C7',
+                        borderRadius: 3.5,
+                        bgcolor: '#F0F9FF',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1.5,
+                        textAlign: 'center',
+                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          bgcolor: '#E0F2FE',
+                          borderColor: '#0369A1',
+                          transform: 'translateY(-2px)'
+                        }
                       }}
                     >
-                      <Typography variant="h4" color="#B38B36" sx={{ mb: 1 }}>📷</Typography>
-                      <Typography variant="body2" color="#B38B36" fontWeight="bold">Camera</Typography>
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* Calendar Finalized Design Date Selector */}
-                <Box sx={{ mb: 4, display: 'flex', gap: 2, flexDirection: 'column', maxWidth: 300 }}>
-                  <Typography variant="body2" fontWeight="bold" color="text.secondary">Design Finalized Date</Typography>
-                  <TextField 
-                    type="date"
-                    value={designFinalizedDate}
-                    onChange={(e) => setDesignFinalizedDate(e.target.value)}
-                    slotProps={{ inputLabel: { shrink: true } }}
-                    fullWidth
-                  />
-                </Box>
-
-                {/* Uploaded Reference Designs list */}
-                {drawings && drawings.filter((d: any) => d.type === 'Reference Design').length > 0 && (
-                  <Box sx={{ mb: 4 }}>
-                    <Typography variant="h6" mb={2}>Finalized Reference Designs</Typography>
-                    {drawings.filter((d: any) => d.type === 'Reference Design').map((drawing: any) => (
-                      <Box key={drawing.id} sx={{ display: 'flex', alignItems: 'center', p: 2, border: '1px solid #EEE', borderRadius: 2, mb: 2 }}>
-                        <Box 
-                          onClick={() => setPreviewFileUrl(drawing.fileUrl)}
-                          sx={{ width: 80, height: 80, borderRadius: 2, overflow: 'hidden', mr: 2, cursor: 'pointer', border: '1px solid #E0E0E0', flexShrink: 0, bgcolor: '#F9F9F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          {drawing.fileUrl.toLowerCase().endsWith('.pdf') ? (
-                            <Typography variant="h6" color="text.secondary">PDF</Typography>
-                          ) : (
-                            <img src={drawing.fileUrl} alt="Drawing" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          )}
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="subtitle1" fontWeight="bold">{drawing.title} (v{drawing.version})</Typography>
-                          {drawing.comments && <Typography variant="body2" color="text.secondary">Comments: {drawing.comments}</Typography>}
-                          <Typography variant="caption" color="text.secondary">{new Date(drawing.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}</Typography>
-                          <Typography 
-                            onClick={() => setPreviewFileUrl(drawing.fileUrl)} 
-                            sx={{ color: '#1976d2', textDecoration: 'underline', fontSize: 14, cursor: 'pointer', mt: 0.5, display: 'block', width: 'fit-content' }}
-                          >
-                            View File
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button variant="outlined" color="primary" size="small" startIcon={<EditIcon />} onClick={() => handleEditDrawingClick(drawing)}>Edit</Button>
-                          <Button variant="outlined" color="error" size="small" startIcon={<DeleteIcon />} onClick={() => handleDeleteDrawingClick(drawing.id)}>Delete</Button>
-                        </Box>
+                      <Avatar sx={{ bgcolor: '#E0F2FE', color: '#0284C7', width: 52, height: 52 }}>
+                        <CameraAltIcon sx={{ fontSize: 28 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                          Take Live Photo with Camera
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block' }}>
+                          Snap physical samples, stone slabs, or site sketches directly
+                        </Typography>
                       </Box>
-                    ))}
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Finalized Reference Designs Gallery */}
+                {drawings && drawings.filter((d: any) => d.type === 'Reference Design').length > 0 ? (
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CollectionsRoundedIcon sx={{ fontSize: 20, color: '#B38B36' }} />
+                      Uploaded Reference Files ({drawings.filter((d: any) => d.type === 'Reference Design').length})
+                    </Typography>
+
+                    <Grid container spacing={2}>
+                      {drawings.filter((d: any) => d.type === 'Reference Design').map((drawing: any) => (
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={drawing.id}>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              p: 2,
+                              borderRadius: 3,
+                              bgcolor: '#F8FAFC',
+                              border: '1px solid #E2E8F0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1.5,
+                              transition: 'all 0.2s ease',
+                              '&:hover': { borderColor: '#B38B36', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' }
+                            }}
+                          >
+                            <Box
+                              onClick={() => setPreviewFileUrl(drawing.fileUrl)}
+                              sx={{
+                                width: '100%',
+                                height: 140,
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                                bgcolor: '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                position: 'relative'
+                              }}
+                            >
+                              {drawing.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                  <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: '#DC2626' }} />
+                                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>PDF Document</Typography>
+                                </Box>
+                              ) : (
+                                <img src={drawing.fileUrl} alt={drawing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              )}
+                            </Box>
+
+                            <Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                                  {drawing.title}
+                                </Typography>
+                                <Chip label={`v${drawing.version}`} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#FFF4E5', color: '#B38B36' }} />
+                              </Box>
+                              {drawing.comments && (
+                                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.5 }}>
+                                  Note: {drawing.comments}
+                                </Typography>
+                              )}
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>
+                                {new Date(drawing.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid #E2E8F0' }}>
+                              <Button
+                                size="small"
+                                onClick={() => setPreviewFileUrl(drawing.fileUrl)}
+                                sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}
+                              >
+                                View Preview
+                              </Button>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <IconButton size="small" onClick={() => handleEditDrawingClick(drawing)} sx={{ color: '#64748B' }}>
+                                  <EditIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                                <IconButton size="small" onClick={() => handleDeleteDrawingClick(drawing.id)} sx={{ color: '#DC2626' }}>
+                                  <DeleteIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Box>
+                            </Box>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                ) : (
+                  <Box sx={{ mb: 4, p: 4, textAlign: 'center', bgcolor: '#F8FAFC', borderRadius: 3, border: '1px dashed #CBD5E1' }}>
+                    <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>
+                      No reference images uploaded yet. Use the upload box or camera above to add inspiration files.
+                    </Typography>
                   </Box>
                 )}
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Button variant="outlined" size="large" onClick={() => {
-                    if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    else handleNextStage('enquiry');
-                  }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
+
+                {/* Footer Navigation */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 2, borderTop: '1px solid #E2E8F0' }}>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={() => {
+                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      else handleNextStage('enquiry');
+                    }}
+                    sx={{
+                      px: 3.5,
+                      py: 1.2,
+                      borderRadius: 2.5,
+                      borderColor: '#CBD5E1',
+                      color: '#1E293B',
+                      fontWeight: 700,
+                      textTransform: 'none'
+                    }}
+                  >
                     Back
                   </Button>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    
-                    <Button variant="contained" size="large" onClick={() => {
-                       if (viewingStepOverride !== null) setViewingStepOverride(null);
-                       else handleFreezeDesign();
-                    }} disabled={isUploading} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      {viewingStepOverride !== null ? 'Back to Active Step' : (isUploading ? 'Saving & Proceeding...' : 'Proceed to Costing')}
-                    </Button>
-                  </Box>
+
+                  <Button
+                    variant="contained"
+                    size="large"
+                    endIcon={<ArrowForwardRoundedIcon />}
+                    onClick={() => {
+                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      else handleFreezeDesign();
+                    }}
+                    disabled={isUploading}
+                    sx={{
+                      px: 4,
+                      py: 1.2,
+                      borderRadius: 2.5,
+                      bgcolor: '#1E293B',
+                      color: '#FFFFFF',
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                      '&:hover': { bgcolor: '#0F172A' }
+                    }}
+                  >
+                    {viewingStepOverride !== null ? 'Back to Active Step' : (isUploading ? 'Saving...' : 'Proceed to Costing Builder')}
+                  </Button>
                 </Box>
               </Paper>
             )}
 
-            {/* STEP 2: QUOTATION & COSTING */}
+            {/* STEP 2: QUOTATION & COSTING BUILDER */}
             {stepToRender === 2 && (
-              <Paper elevation={0} sx={{ p: 5, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
-                  <Typography variant="h5" fontWeight="bold" color="text.primary">Quotation & Costing Builder</Typography>
-                  <Button variant="contained" color="secondary" size="large" onClick={() => generateQuotationPDF(project, products, quoteDetails, { packageCostEnabled, transportCostEnabled, packageCost, transportCost }, selectedTerms, gstPercent)}>
-                    Download PDF
-                  </Button>
-                </Box>
-                
-                <Box sx={{ mb: 4, p: 3, border: '1px solid #E0E0E0', borderRadius: 3, bgcolor: '#FAFAFA' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" fontWeight="bold">Product Estimation</Typography>
-                    <Button variant="contained" onClick={handleAddProduct} sx={{ borderRadius: 2 }}>+ Add Product</Button>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 3, md: 4.5 },
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: 4,
+                  boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)'
+                }}
+              >
+                {/* Header Strip */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
+                        Quotation & Product Costing Builder
+                      </Typography>
+                      <Chip
+                        label="CRM Stage 3"
+                        size="small"
+                        sx={{
+                          bgcolor: '#FFFBEB',
+                          color: '#D97706',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          border: '1px solid #FDE68A',
+                          borderRadius: '6px'
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+                      Item-wise product sizing, factory labor costs, taxes, and customer terms.
+                    </Typography>
                   </Box>
-                  <TableContainer sx={{ border: '1px solid #E0E0E0', borderRadius: 2, mb: 2, overflowX: 'auto', '&::-webkit-scrollbar': { height: 8 }, '&::-webkit-scrollbar-thumb': { bgcolor: '#CCC', borderRadius: 4 } }}>
+
+                  <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <Button
+                      variant="contained"
+                      startIcon={<PictureAsPdfRoundedIcon />}
+                      onClick={() => generateQuotationPDF(project, products, quoteDetails, { packageCostEnabled, transportCostEnabled, packageCost, transportCost }, selectedTerms, gstPercent)}
+                      sx={{
+                        bgcolor: '#DC2626',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        borderRadius: 2.5,
+                        px: 2.5,
+                        py: 1,
+                        boxShadow: '0 4px 12px rgba(220, 38, 38, 0.25)',
+                        '&:hover': { bgcolor: '#B91C1C' }
+                      }}
+                    >
+                      Download PDF Quotation
+                    </Button>
+
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={handleAddProduct}
+                      sx={{
+                        bgcolor: '#1E293B',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        borderRadius: 2.5,
+                        px: 2.5,
+                        py: 1,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        '&:hover': { bgcolor: '#0F172A' }
+                      }}
+                    >
+                      Add Product
+                    </Button>
+                  </Box>
+                </Box>
+
+                {/* Product Estimation Table Card */}
+                <Box sx={{ mb: 4, p: 3, border: '1px solid #E2E8F0', borderRadius: 3.5, bgcolor: '#F8FAFC' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                      Product Estimation Breakdown
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                      {products.length} {products.length === 1 ? 'item' : 'items'} in quotation
+                    </Typography>
+                  </Box>
+
+                  <TableContainer
+                    sx={{
+                      bgcolor: '#FFFFFF',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 3,
+                      overflowX: 'auto',
+                      '&::-webkit-scrollbar': { height: 8 },
+                      '&::-webkit-scrollbar-thumb': { bgcolor: '#CBD5E1', borderRadius: 4 }
+                    }}
+                  >
                     <Table size="small" sx={{ minWidth: 850 }}>
-                      <TableHead sx={{ bgcolor: '#F5F5F5' }}>
+                      <TableHead sx={{ bgcolor: '#F1F5F9' }}>
                         <TableRow>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Category</TableCell>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Unit</TableCell>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Length (L)</TableCell>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Width (W)</TableCell>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>MM</TableCell>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Qty</TableCell>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Rate</TableCell>
-                          <TableCell sx={{ py: 1.5, fontWeight: 'bold', color: 'text.secondary' }}>Amount</TableCell>
-                          <TableCell sx={{ py: 1.5 }}></TableCell>
+                          <TableCell sx={{ py: 1.5, fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>PRODUCT / CATEGORY</TableCell>
+                          <TableCell sx={{ py: 1.5, fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>UNIT</TableCell>
+                          <TableCell sx={{ py: 1.5, fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>DIMENSIONS (L x W x MM)</TableCell>
+                          <TableCell sx={{ py: 1.5, fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>QTY</TableCell>
+                          <TableCell sx={{ py: 1.5, fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>RATE (₹)</TableCell>
+                          <TableCell sx={{ py: 1.5, fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>AMOUNT (₹)</TableCell>
+                          <TableCell sx={{ py: 1.5, fontWeight: 800, color: '#475569', fontSize: '0.75rem' }} align="right">ACTIONS</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {products.map(p => (
-                          <TableRow key={p.id} sx={{ '& td': { borderBottom: '1px solid #F0F0F0', py: 1.5 } }}>
+                        {products.map((p) => (
+                          <TableRow
+                            key={p.id}
+                            sx={{
+                              '& td': { borderBottom: '1px solid #F1F5F9', py: 1.75 },
+                              '&:hover': { bgcolor: '#FFFDF5' }
+                            }}
+                          >
                             <TableCell>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                 {p.photo ? (
-                                  <Avatar 
-                                    src={p.photo} 
-                                    variant="rounded" 
+                                  <Avatar
+                                    src={p.photo}
+                                    variant="rounded"
                                     onClick={() => setPreviewFileUrl(p.photo!)}
-                                    sx={{ width: 40, height: 40, border: '1px solid #E8E1D5', cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
+                                    sx={{ width: 42, height: 42, border: '1.5px solid #E2E8F0', cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
                                   />
                                 ) : (
-                                  <Box 
-                                    sx={{ 
-                                      width: 40, 
-                                      height: 40, 
-                                      border: '1px dashed #CCC', 
-                                      borderRadius: 1.5, 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
+                                  <Box
+                                    sx={{
+                                      width: 42,
+                                      height: 42,
+                                      borderRadius: 2,
+                                      border: '1.5px dashed #CBD5E1',
+                                      display: 'flex',
+                                      alignItems: 'center',
                                       justifyContent: 'center',
-                                      bgcolor: '#FAFAFA'
+                                      bgcolor: '#F8FAFC'
                                     }}
                                   >
-                                    <ImageIcon sx={{ fontSize: '1.2rem', color: '#AAA' }} />
+                                    <ImageIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
                                   </Box>
                                 )}
                                 <Box>
-                                  <Typography variant="body2">{p.category}</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E293B' }}>
+                                    {p.category}
+                                  </Typography>
                                 </Box>
                               </Box>
                             </TableCell>
-                            <TableCell><Typography variant="body2">{p.unit}</Typography></TableCell>
                             <TableCell>
-                                <Typography variant="body2">{p.length || '-'}</Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="body2">{p.width || '-'}</Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="body2">{p.breadth || '-'}</Typography>
-                              </TableCell>
-                            <TableCell><Typography variant="body2">{p.qty}</Typography></TableCell>
-                            <TableCell><Typography variant="body2">₹{p.rate.toLocaleString('en-IN')}</Typography></TableCell>
-                            <TableCell><Typography variant="body2" fontWeight="bold" color="#B38B36">₹{p.amount.toLocaleString('en-IN')}</Typography></TableCell>
+                              <Chip label={p.unit} size="small" sx={{ fontWeight: 700, fontSize: '0.72rem', bgcolor: '#F1F5F9' }} />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                                {`${p.length || 0}L × ${p.width || 0}W ${p.breadth ? `| ${p.breadth}MM` : ''}`}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                                {p.qty}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                                ₹{p.rate.toLocaleString('en-IN')}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#B38B36', fontSize: '0.92rem' }}>
+                                ₹{p.amount.toLocaleString('en-IN')}
+                              </Typography>
+                            </TableCell>
                             <TableCell align="right">
-                              <IconButton color="primary" size="small" onClick={() => handleEditProduct(p)} sx={{ mr: 1, bgcolor: '#E3F2FD', '&:hover': { bgcolor: '#BBDEFB' } }}><EditIcon fontSize="small" /></IconButton>
-                              <IconButton color="error" size="small" onClick={() => handleRemoveProduct(p.id)} sx={{ bgcolor: '#FFEBEE', '&:hover': { bgcolor: '#FFCDD2' } }}><DeleteIcon fontSize="small" /></IconButton>
+                              <IconButton size="small" onClick={() => handleEditProduct(p)} sx={{ mr: 1, color: '#0284C7', bgcolor: '#F0F9FF', '&:hover': { bgcolor: '#E0F2FE' } }}>
+                                <EditIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                              <IconButton size="small" onClick={() => handleRemoveProduct(p.id)} sx={{ color: '#DC2626', bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } }}>
+                                <DeleteIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
                             </TableCell>
                           </TableRow>
                         ))}
                         {products.length === 0 && (
-                          <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>No products added. Click "+ Add Product".</TableCell></TableRow>
+                          <TableRow>
+                            <TableCell colSpan={7} align="center" sx={{ py: 5, color: '#94A3B8' }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                No products added to quotation yet. Click "+ Add Product" to build quotation.
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
                         )}
                       </TableBody>
                     </Table>
                   </TableContainer>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', mt: 3, gap: 1, width: '100%' }}>
+
+                  {/* Two-Column Financial & Terms Summary */}
+                  <Box sx={{ mt: 3, width: '100%' }}>
                     {(() => {
                       const totalProductsAmount = products.reduce((acc, p) => acc + p.amount, 0);
-                      
+
                       let additionalTotal = 0;
                       if (Array.isArray(quoteDetails)) {
                         additionalTotal = quoteDetails.reduce((sum, item) => sum + Number(item.amount || 0), 0);
@@ -1409,119 +2199,177 @@ const ProjectDetails: React.FC = () => {
                       const finalBill = subTotal + gstAmount;
 
                       return (
-                        <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'flex-start', mt: 2, gap: 4, flexDirection: { xs: 'column', md: 'row' } }}>
-                          
-                          {/* Terms and Conditions (Left Side) */}
-                          <Box sx={{ flex: 1, minWidth: '300px' }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                              <Typography variant="subtitle2" color="text.secondary" fontWeight="bold">Terms and Conditions</Typography>
-                              <Button size="small" variant="outlined" onClick={() => setIsTermsDialogOpen(true)}>
-                                Select Terms
-                              </Button>
-                            </Box>
-                            
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: '250px', overflowY: 'auto', pr: 1 }}>
-                              {selectedTerms.length === 0 ? (
-                                <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                  No terms selected. Click 'Select Terms' to add.
-                                </Typography>
-                              ) : (
-                                selectedTerms.map((term: string, i: number) => (
-                                  <Box key={i} sx={{ display: 'flex', gap: 1, p: 1, bgcolor: '#FFF', border: '1px solid #E0E0E0', borderRadius: 1, alignItems: 'center' }}>
-                                    <Typography variant="body2" color="text.secondary" sx={{ minWidth: 20 }}>{i + 1}.</Typography>
-                                    <Typography variant="body2" sx={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'text.secondary', fontSize: '0.8rem' }} title={term}>
-                                      {term}
+                        <Grid container spacing={3} sx={{ mt: 1 }}>
+                          {/* Terms & Conditions (Left Column) */}
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <Card
+                              elevation={0}
+                              sx={{
+                                p: 3,
+                                borderRadius: 3,
+                                bgcolor: '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between'
+                              }}
+                            >
+                              <Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                                    Commercial Terms & Conditions
+                                  </Typography>
+                                  <Button size="small" variant="outlined" onClick={() => setIsTermsDialogOpen(true)} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#1E293B' }}>
+                                    Select / Add Terms
+                                  </Button>
+                                </Box>
+
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 220, overflowY: 'auto', pr: 1 }}>
+                                  {selectedTerms.length === 0 ? (
+                                    <Typography variant="body2" sx={{ color: '#94A3B8', fontStyle: 'italic', p: 2, bgcolor: '#F8FAFC', borderRadius: 2, textAlign: 'center' }}>
+                                      No specific terms attached. Standard factory delivery terms will apply.
                                     </Typography>
-                                    <IconButton size="small" onClick={() => setSelectedTerms(selectedTerms.filter(t => t !== term))} sx={{ p: 0.5, color: 'error.main' }}>
-                                      <CloseIcon fontSize="small" />
-                                    </IconButton>
+                                  ) : (
+                                    selectedTerms.map((term: string, i: number) => (
+                                      <Box key={i} sx={{ display: 'flex', gap: 1.5, p: 1.25, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, alignItems: 'center' }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#B38B36', minWidth: 20 }}>
+                                          {i + 1}.
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ flex: 1, color: '#334155', fontWeight: 600, lineHeight: 1.3 }} title={term}>
+                                          {term}
+                                        </Typography>
+                                        <IconButton size="small" onClick={() => setSelectedTerms(selectedTerms.filter((t: string) => t !== term))} sx={{ color: '#DC2626', p: 0.5 }}>
+                                          <CloseIcon sx={{ fontSize: 14 }} />
+                                        </IconButton>
+                                      </Box>
+                                    ))
+                                  )}
+                                </Box>
+                              </Box>
+                            </Card>
+                          </Grid>
+
+                          {/* Executive Quotation Financial Summary (Right Column) */}
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <Card
+                              elevation={0}
+                              sx={{
+                                p: 3,
+                                borderRadius: 3,
+                                bgcolor: '#FFFFFF',
+                                border: '1.5px solid #E2E8F0',
+                                boxShadow: '0 4px 14px rgba(0,0,0,0.02)'
+                              }}
+                            >
+                              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B', mb: 2.5, pb: 1, borderBottom: '1px solid #E2E8F0' }}>
+                                Quotation Breakdown
+                              </Typography>
+
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>Total Products Base Amount</Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#1E293B' }}>₹{totalProductsAmount.toLocaleString('en-IN')}</Typography>
+                                </Box>
+
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Checkbox size="small" checked={packageCostEnabled} onChange={(e) => setPackageCostEnabled(e.target.checked)} sx={{ p: 0, color: '#B38B36', '&.Mui-checked': { color: '#B38B36' } }} />
+                                    <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>Packaging / Crating Charges</Typography>
                                   </Box>
-                                ))
-                              )}
-                            </Box>
-                          </Box>
+                                  {packageCostEnabled ? (
+                                    <TextField
+                                      size="small"
+                                      type="number"
+                                      value={packageCost === 0 ? '' : packageCost}
+                                      onChange={(e) => setPackageCost(Number(e.target.value))}
+                                      sx={{ width: 110, '& .MuiInputBase-input': { textAlign: 'right', fontWeight: 700, py: 0.5 } }}
+                                      placeholder="₹0"
+                                      variant="outlined"
+                                    />
+                                  ) : (
+                                    <Typography variant="body2" sx={{ color: '#94A3B8', fontWeight: 600 }}>-</Typography>
+                                  )}
+                                </Box>
 
-                          {/* Totals Summary (Right Side) */}
-                          <Box sx={{ width: '400px', bgcolor: '#FAFAFA', p: 3, borderRadius: 3, border: '1px solid #E0E0E0', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                            <Typography variant="h6" fontWeight="bold" color="text.primary" mb={1} sx={{ borderBottom: '1px solid #E0E0E0', pb: 1 }}>Quotation Summary</Typography>
-                            
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <Typography variant="body2" color="text.secondary">Total Products Amount</Typography>
-                              <Typography variant="body2" fontWeight="bold">₹{totalProductsAmount.toLocaleString('en-IN')}</Typography>
-                            </Box>
-                            
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Checkbox size="small" checked={packageCostEnabled} onChange={(e) => setPackageCostEnabled(e.target.checked)} sx={{ p: 0 }} />
-                                <Typography variant="body2" color="text.secondary">Packing Charges</Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Checkbox size="small" checked={transportCostEnabled} onChange={(e) => setTransportCostEnabled(e.target.checked)} sx={{ p: 0, color: '#B38B36', '&.Mui-checked': { color: '#B38B36' } }} />
+                                    <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>Transport / Installation Cost</Typography>
+                                  </Box>
+                                  {transportCostEnabled ? (
+                                    <TextField
+                                      size="small"
+                                      type="number"
+                                      value={transportCost === 0 ? '' : transportCost}
+                                      onChange={(e) => setTransportCost(Number(e.target.value))}
+                                      sx={{ width: 110, '& .MuiInputBase-input': { textAlign: 'right', fontWeight: 700, py: 0.5 } }}
+                                      placeholder="₹0"
+                                      variant="outlined"
+                                    />
+                                  ) : (
+                                    <Typography variant="body2" sx={{ color: '#94A3B8', fontWeight: 600 }}>-</Typography>
+                                  )}
+                                </Box>
+
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>GST Applicable</Typography>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Select
+                                      size="small"
+                                      value={gstPercent}
+                                      onChange={(e) => setGstPercent(Number(e.target.value))}
+                                      sx={{ height: 32, borderRadius: 2, fontWeight: 700, fontSize: '0.82rem' }}
+                                    >
+                                      <MenuItem value={0}>0%</MenuItem>
+                                      <MenuItem value={5}>5%</MenuItem>
+                                      <MenuItem value={12}>12%</MenuItem>
+                                      <MenuItem value={18}>18%</MenuItem>
+                                      <MenuItem value={28}>28%</MenuItem>
+                                    </Select>
+                                    <Typography variant="body2" sx={{ fontWeight: 800, color: '#DC2626', minWidth: 80, textAlign: 'right' }}>
+                                      + ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+
+                                <Divider sx={{ my: 0.5 }} />
+
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#FFFDF5', p: 1.75, borderRadius: 2.5, border: '1px solid #FFE0B2' }}>
+                                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                                    Grand Total
+                                  </Typography>
+                                  <Typography variant="h5" sx={{ fontWeight: 900, color: '#B38B36' }}>
+                                    ₹{finalBill.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                  </Typography>
+                                </Box>
                               </Box>
-                              {packageCostEnabled ? (
-                                <TextField size="small" type="number" value={packageCost === 0 ? '' : packageCost} onChange={(e) => setPackageCost(Number(e.target.value))} sx={{ width: 100 }} placeholder="₹0" variant="standard" />
-                              ) : <Typography variant="body2" fontWeight="bold" color="text.secondary">-</Typography>}
-                            </Box>
-
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Checkbox size="small" checked={transportCostEnabled} onChange={(e) => setTransportCostEnabled(e.target.checked)} sx={{ p: 0 }} />
-                                <Typography variant="body2" color="text.secondary">Installation Cost</Typography>
-                              </Box>
-                              {transportCostEnabled ? (
-                                <TextField size="small" type="number" value={transportCost === 0 ? '' : transportCost} onChange={(e) => setTransportCost(Number(e.target.value))} sx={{ width: 100 }} placeholder="₹0" variant="standard" />
-                              ) : <Typography variant="body2" fontWeight="bold" color="text.secondary">-</Typography>}
-                            </Box>
-
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="body2" color="text.secondary">GST</Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Select
-                                  size="small"
-                                  variant="standard"
-                                  value={gstPercent}
-                                  onChange={(e) => setGstPercent(Number(e.target.value))}
-                                  sx={{ width: 75 }}
-                                  disableUnderline
-                                >
-                                  <MenuItem value={0}>0%</MenuItem>
-                                  <MenuItem value={5}>5%</MenuItem>
-                                  <MenuItem value={12}>12%</MenuItem>
-                                  <MenuItem value={18}>18%</MenuItem>
-                                  <MenuItem value={28}>28%</MenuItem>
-                                </Select>
-                                <Typography variant="body2" fontWeight="bold" color="error.main" sx={{ width: 80, textAlign: 'right' }}>
-                                  + ₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                                </Typography>
-                              </Box>
-                            </Box>
-
-                            <Divider sx={{ my: 1 }} />
-                            
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="h6" fontWeight="bold" color="text.primary">Grand Total</Typography>
-                              <Typography variant="h6" fontWeight="bold" color="primary.main">₹{finalBill.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</Typography>
-                            </Box>
-                            
-                          </Box>
-                        </Box>
-                      )
+                            </Card>
+                          </Grid>
+                        </Grid>
+                      );
                     })()}
                   </Box>
                 </Box>
 
-                {/* INLINE ADDITIONAL COSTS */}
+                {/* Additional Processing Costs for Selected Product */}
                 {(() => {
                   const currentCostId = activeCostProductId || (products.length > 0 ? products[0].id : null);
                   return (
-                    <Box sx={{ mb: 4, p: 3, border: '1px solid #E0E0E0', borderRadius: 3, bgcolor: '#FAFAFA' }}>
-                      <Typography variant="h6" fontWeight="bold" mb={3}>Additional Costs {currentCostId ? `for ${products.find(p => p.id === currentCostId)?.category || ''}` : ''}</Typography>
+                    <Box sx={{ mb: 4, p: 3, border: '1px solid #E2E8F0', borderRadius: 3.5, bgcolor: '#F8FAFC' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 2.5 }}>
+                        Additional Processing Costs {currentCostId ? `(${products.find(p => p.id === currentCostId)?.category || 'Selected Product'})` : ''}
+                      </Typography>
+
                       {currentCostId ? (
                         <Box>
-                          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 3, p: 3, bgcolor: '#FFF', borderRadius: 2, border: '1px solid #E8E1D5', mb: 2 }}>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2.5, p: 3, bgcolor: '#FFFFFF', borderRadius: 3, border: '1px solid #E2E8F0', mb: 2 }}>
                             {(quoteDetails[currentCostId] || getDefaultCosts()).map((item: any) => (
-                              <Box key={item.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <TextField 
-                                  fullWidth 
+                              <Box key={item.id}>
+                                <TextField
+                                  fullWidth
                                   type="number"
-                                  label={item.name} 
+                                  label={item.name}
                                   value={item.amount === 0 ? '' : item.amount}
                                   onChange={(e) => {
                                     const val = Number(e.target.value);
@@ -1530,150 +2378,430 @@ const ProjectDetails: React.FC = () => {
                                       return { ...prev, [currentCostId]: list.map(c => c.id === item.id ? { ...c, amount: val } : c) };
                                     });
                                   }}
-                                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                  slotProps={{
+                                    input: {
+                                      startAdornment: <InputAdornment position="start">₹</InputAdornment>
+                                    }
+                                  }}
+                                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}
                                 />
                               </Box>
                             ))}
                           </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Button color="primary" onClick={() => { setCustomCostName(''); setIsCostDialogOpen(true); }}>
+
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                            <Button
+                              variant="outlined"
+                              onClick={() => { setCustomCostName(''); setIsCostDialogOpen(true); }}
+                              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#1E293B' }}
+                            >
                               + Manage Cost Items
                             </Button>
-                            <Typography variant="subtitle1" fontWeight="bold" color="#B38B36">
-                              Total Additional Cost: ₹
-                              {((quoteDetails[currentCostId] || []).reduce((acc: number, item: any) => acc + Number(item.amount || 0), 0)).toLocaleString('en-IN')}
-                            </Typography>
+                            <Chip
+                              label={`Total Additional Cost: ₹${((quoteDetails[currentCostId] || []).reduce((acc: number, item: any) => acc + Number(item.amount || 0), 0)).toLocaleString('en-IN')}`}
+                              sx={{ bgcolor: '#FFF4E5', color: '#B38B36', fontWeight: 800, fontSize: '0.85rem', height: 32, border: '1px solid #FFE0B2' }}
+                            />
                           </Box>
                         </Box>
                       ) : (
-                         <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary', bgcolor: '#FFF', borderRadius: 2, border: '1px dashed #CCC' }}>
-                           Please add a product to estimation first.
-                         </Box>
+                        <Box sx={{ p: 4, textAlign: 'center', color: '#94A3B8', bgcolor: '#FFFFFF', borderRadius: 2.5, border: '1px dashed #CBD5E1' }}>
+                          Please add a product to estimation above to specify item-level additional processing costs.
+                        </Box>
                       )}
                     </Box>
                   );
                 })()}
 
-
-
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Button variant="outlined" size="large" onClick={() => {
-                    if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    else handleNextStage('design_sharing');
-                  }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
+                {/* Footer Actions */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 2, borderTop: '1px solid #E2E8F0' }}>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={() => {
+                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      else handleNextStage('design_sharing');
+                    }}
+                    sx={{
+                      px: 3.5,
+                      py: 1.2,
+                      borderRadius: 2.5,
+                      borderColor: '#CBD5E1',
+                      color: '#1E293B',
+                      fontWeight: 700,
+                      textTransform: 'none'
+                    }}
+                  >
                     Back
                   </Button>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    
-                    <Button variant="contained" size="large" onClick={async () => {
+
+                  <Button
+                    variant="contained"
+                    size="large"
+                    endIcon={<CheckCircleRoundedIcon />}
+                    onClick={async () => {
                       if (viewingStepOverride !== null) {
-                         setViewingStepOverride(null);
+                        setViewingStepOverride(null);
                       } else {
-                         await handleCreateQuotation();
+                        await handleCreateQuotation();
                       }
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
-                      {viewingStepOverride !== null ? 'Back to Active Step' : 'Save & Generate Quotation'}
-                    </Button>
-                  </Box>
+                    }}
+                    sx={{
+                      px: 4,
+                      py: 1.2,
+                      borderRadius: 2.5,
+                      bgcolor: '#1E293B',
+                      color: '#FFFFFF',
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                      '&:hover': { bgcolor: '#0F172A' }
+                    }}
+                  >
+                    {viewingStepOverride !== null ? 'Back to Active Step' : 'Save & Proceed to Advance Payment'}
+                  </Button>
                 </Box>
               </Paper>
             )}
 
             {/* STEP 3: ADVANCE PAYMENT */}
             {stepToRender === 3 && (
-              <Paper elevation={0} sx={{ p: 5, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-                <Typography variant="h5" fontWeight="bold" mb={2} color="text.primary">Advance Payment</Typography>
-                <Typography variant="body1" color="text.secondary" mb={4}>Enter the advance payment received to freeze this project and convert it into an Active Work Order.</Typography>
-                
-                <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center', mb: 4 }}>
-                  <TextField 
-                    type="number"
-                    label="Advance Payment Received (₹)" 
-                    value={advancePayment === 0 ? '' : advancePayment}
-                    onChange={(e) => setAdvancePayment(Number(e.target.value))}
-                    sx={{ width: 250, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  />
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 3, md: 4.5 },
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: 4,
+                  boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)'
+                }}
+              >
+                {/* Header Strip */}
+                <Box sx={{ mb: 3.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
+                      Advance Payment & Work Order Freeze
+                    </Typography>
+                    <Chip
+                      label="CRM Stage 4"
+                      size="small"
+                      sx={{
+                        bgcolor: '#ECFDF5',
+                        color: '#059669',
+                        fontWeight: 700,
+                        fontSize: '0.72rem',
+                        border: '1px solid #A7F3D0',
+                        borderRadius: '6px'
+                      }}
+                    />
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+                    Record client token advance to freeze commercial terms and convert enquiry into an Active Work Order.
+                  </Typography>
+                </Box>
 
-                  <FormControl sx={{ minWidth: 150 }}>
-                    <InputLabel>Payment Method</InputLabel>
-                    <Select
-                      value={paymentMethod}
-                      label="Payment Method"
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      <MenuItem value="Cash">Cash</MenuItem>
-                      <MenuItem value="Bank">Bank Transfer / Online</MenuItem>
-                      <MenuItem value="Cheque">Cheque</MenuItem>
-                    </Select>
-                  </FormControl>
+                {/* Financial Overview Banner */}
+                {(() => {
+                  const quoteTotal = project.quotations?.[0]?.finalAmount || 0;
+                  const recordedAdvance = advancePayment || 0;
+                  const balanceAmount = quoteTotal > 0 ? Math.max(0, quoteTotal - recordedAdvance) : 0;
 
-                  <TextField 
-                    type="date"
-                    label="Payment Date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    slotProps={{ inputLabel: { shrink: true } }}
-                    sx={{ width: 200, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                  />
-                  
+                  return (
+                    <Grid container spacing={2.5} sx={{ mb: 4 }}>
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <Card elevation={0} sx={{ p: 2.5, borderRadius: 3, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                            Approved Quotation Total
+                          </Typography>
+                          <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', mt: 0.5 }}>
+                            ₹{quoteTotal.toLocaleString('en-IN')}
+                          </Typography>
+                        </Card>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <Card elevation={0} sx={{ p: 2.5, borderRadius: 3, bgcolor: '#ECFDF5', border: '1px solid #A7F3D0' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>
+                            Advance To Be Recorded
+                          </Typography>
+                          <Typography variant="h5" sx={{ fontWeight: 800, color: '#059669', mt: 0.5 }}>
+                            ₹{recordedAdvance.toLocaleString('en-IN')}
+                          </Typography>
+                        </Card>
+                      </Grid>
+
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <Card elevation={0} sx={{ p: 2.5, borderRadius: 3, bgcolor: '#FFFDF5', border: '1px solid #FFE0B2' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#B38B36', textTransform: 'uppercase' }}>
+                            Balance Payable on Dispatch
+                          </Typography>
+                          <Typography variant="h5" sx={{ fontWeight: 800, color: '#B38B36', mt: 0.5 }}>
+                            ₹{balanceAmount.toLocaleString('en-IN')}
+                          </Typography>
+                        </Card>
+                      </Grid>
+                    </Grid>
+                  );
+                })()}
+
+                {/* Payment Intake Form Card */}
+                <Box sx={{ mb: 4, p: 3.5, bgcolor: '#F8FAFC', borderRadius: 3.5, border: '1px solid #E2E8F0' }}>
+                  {/* Quick Preset Buttons */}
+                  {project.quotations?.[0]?.finalAmount > 0 && (
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', display: 'block', mb: 1, textTransform: 'uppercase' }}>
+                        Quick Advance Presets
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                        {[
+                          { label: '25% Token', pct: 0.25 },
+                          { label: '50% Standard Advance', pct: 0.50 },
+                          { label: '100% Full Payment', pct: 1.0 }
+                        ].map((preset) => {
+                          const quoteTotal = project.quotations?.[0]?.finalAmount || 0;
+                          const calculatedAmount = Math.round(quoteTotal * preset.pct);
+                          const isSelected = advancePayment === calculatedAmount;
+
+                          return (
+                            <Button
+                              key={preset.label}
+                              size="small"
+                              variant={isSelected ? 'contained' : 'outlined'}
+                              onClick={() => setAdvancePayment(calculatedAmount)}
+                              sx={{
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                px: 2,
+                                py: 0.75,
+                                bgcolor: isSelected ? '#1E293B' : '#FFFFFF',
+                                color: isSelected ? '#FFFFFF' : '#1E293B',
+                                borderColor: isSelected ? '#1E293B' : '#CBD5E1',
+                                '&:hover': { bgcolor: isSelected ? '#0F172A' : '#FFFDF5', borderColor: '#B38B36' }
+                              }}
+                            >
+                              {preset.label} (₹{calculatedAmount.toLocaleString('en-IN')})
+                            </Button>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  )}
+
+                  <Grid container spacing={3} alignItems="center">
+                    <Grid size={{ xs: 12, sm: 4 }}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Advance Payment Received (₹)"
+                        value={advancePayment === 0 ? '' : advancePayment}
+                        onChange={(e) => setAdvancePayment(Number(e.target.value))}
+                        slotProps={{
+                          input: {
+                            startAdornment: <InputAdornment position="start">₹</InputAdornment>
+                          }
+                        }}
+                        sx={{ bgcolor: '#FFFFFF', '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}
+                      />
+                    </Grid>
+
+                    <Grid size={{ xs: 12, sm: 4 }}>
+                      <FormControl fullWidth sx={{ bgcolor: '#FFFFFF', '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}>
+                        <InputLabel>Payment Mode</InputLabel>
+                        <Select
+                          value={paymentMethod}
+                          label="Payment Mode"
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                        >
+                          <MenuItem value="Bank">Bank Transfer / NEFT / RTGS</MenuItem>
+                          <MenuItem value="UPI">UPI / Online Payment</MenuItem>
+                          <MenuItem value="Cheque">Cheque</MenuItem>
+                          <MenuItem value="Cash">Cash</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid size={{ xs: 12, sm: 4 }}>
+                      <TextField
+                        fullWidth
+                        type="date"
+                        label="Payment Receipt Date"
+                        value={paymentDate}
+                        onChange={(e) => setPaymentDate(e.target.value)}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                        sx={{ bgcolor: '#FFFFFF', '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}
+                      />
+                    </Grid>
+                  </Grid>
+
                   {advancePayment > 0 && (
-                    <Button variant="outlined" color="primary" onClick={handleDownloadReceipt} sx={{ height: 56, borderRadius: 2 }}>
-                      Download Receipt PDF
-                    </Button>
+                    <Box sx={{ mt: 3, pt: 2.5, borderTop: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                      <Typography variant="body2" sx={{ color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CheckCircleRoundedIcon sx={{ fontSize: 18 }} />
+                        Advance receipt ready to generate
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        startIcon={<PictureAsPdfRoundedIcon />}
+                        onClick={handleDownloadReceipt}
+                        sx={{
+                          borderRadius: 2,
+                          fontWeight: 700,
+                          textTransform: 'none',
+                          color: '#0284C7',
+                          borderColor: '#BAE6FD',
+                          bgcolor: '#F0F9FF',
+                          '&:hover': { bgcolor: '#E0F2FE' }
+                        }}
+                      >
+                        Download Payment Receipt PDF
+                      </Button>
+                    </Box>
                   )}
                 </Box>
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Button variant="outlined" size="large" onClick={() => {
-                    if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    else handleNextStage('quotation');
-                  }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
+                {/* Footer Navigation */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 2, borderTop: '1px solid #E2E8F0' }}>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={() => {
+                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      else handleNextStage('quotation');
+                    }}
+                    sx={{
+                      px: 3.5,
+                      py: 1.2,
+                      borderRadius: 2.5,
+                      borderColor: '#CBD5E1',
+                      color: '#1E293B',
+                      fontWeight: 700,
+                      textTransform: 'none'
+                    }}
+                  >
                     Back
                   </Button>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    
-                    <Button variant="contained" color="success" size="large" onClick={() => {
-                       if (viewingStepOverride !== null) setViewingStepOverride(null);
-                       else handleAdvancePayment();
-                    }} disabled={isCreatingInvoice} startIcon={viewingStepOverride !== null ? null : <CheckCircleIcon />} sx={{ px: 4, py: 1.5, borderRadius: 2, bgcolor: viewingStepOverride !== null ? 'primary.main' : '#2E7D32', '&:hover': { bgcolor: viewingStepOverride !== null ? 'primary.dark' : '#1B5E20' } }}>
-                      {viewingStepOverride !== null ? 'Back to Active Step' : (isCreatingInvoice ? 'Processing...' : 'Confirm & Proceed to Shop Drawings')}
-                    </Button>
-                  </Box>
+
+                  <Button
+                    variant="contained"
+                    size="large"
+                    endIcon={<CheckCircleRoundedIcon />}
+                    onClick={() => {
+                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      else handleAdvancePayment();
+                    }}
+                    disabled={isCreatingInvoice}
+                    sx={{
+                      px: 4,
+                      py: 1.3,
+                      borderRadius: 2.5,
+                      bgcolor: viewingStepOverride !== null ? '#1E293B' : '#059669',
+                      color: '#FFFFFF',
+                      fontWeight: 800,
+                      textTransform: 'none',
+                      boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                      '&:hover': { bgcolor: viewingStepOverride !== null ? '#0F172A' : '#047857' }
+                    }}
+                  >
+                    {viewingStepOverride !== null ? 'Back to Active Step' : (isCreatingInvoice ? 'Processing...' : 'Confirm Advance & Convert to Work Order')}
+                  </Button>
                 </Box>
               </Paper>
             )}
 
             {/* STEP 4: SHOP DRAWING & APPROVAL */}
             {stepToRender === 4 && (
-              <Paper elevation={0} sx={{ p: 5, border: '1px solid', borderColor: '#E8E1D5', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  p: { xs: 3, md: 4.5 }, 
+                  bgcolor: '#FFFFFF', 
+                  border: '1px solid #E2E8F0', 
+                  borderRadius: 4, 
+                  boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)' 
+                }}
+              >
+                {/* Header Strip */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
                   <Box>
-                    <Typography variant="h5" fontWeight="bold" color="text.primary">Shop Drawing & Design Approval</Typography>
-                    <Typography variant="body1" color="text.secondary" mt={1}>Upload final shop drawings, production layouts, and 3D renders.</Typography>
-                    <Typography variant="body2" color="text.secondary" mt={1}><strong>Date:</strong> {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
+                        Shop Drawing & Design Approval
+                      </Typography>
+                      <Chip
+                        label="Stage 5: Technical Drawings"
+                        size="small"
+                        sx={{
+                          bgcolor: '#EFF6FF',
+                          color: '#1D4ED8',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          border: '1px solid #BAE6FD',
+                          borderRadius: '6px'
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+                      Upload finalized shop drawings, production layouts, CAD blueprints, and 3D renders.
+                    </Typography>
                   </Box>
-                  
-                  {/* Custom Upload & Camera Buttons Aligned Right */}
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Box 
+
+                  {/* Date Badge */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: '#F8FAFC', p: 1.25, borderRadius: 2.5, border: '1px solid #E2E8F0' }}>
+                    <CalendarMonthRoundedIcon sx={{ color: '#B38B36', fontSize: 20 }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', display: 'block', fontSize: '0.68rem', textTransform: 'uppercase' }}>
+                        Approval Date
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '0.85rem' }}>
+                        {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Dual Action Hub */}
+                <Grid container spacing={2.5} sx={{ mb: 4 }}>
+                  {/* Action 1: Upload Blueprints & CAD */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
                       component="label"
-                      sx={{ 
-                        width: 120, height: 120, 
-                        border: '2px dashed #B38B36', borderRadius: 3, 
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        cursor: isUploading ? 'not-allowed' : 'pointer', bgcolor: '#FFFDF5', '&:hover': { bgcolor: isUploading ? '#FFFDF5' : '#FFF4E5' }, transition: '0.2s',
-                        opacity: isUploading ? 0.6 : 1
+                      sx={{
+                        p: 3.5,
+                        border: '2px dashed #C89F5A',
+                        borderRadius: 3.5,
+                        bgcolor: isUploading ? '#F8FAFC' : '#FFFDF5',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1.5,
+                        textAlign: 'center',
+                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          bgcolor: '#FFF4E5',
+                          borderColor: '#B38B36',
+                          transform: 'translateY(-2px)'
+                        }
                       }}
                     >
-                      <Typography variant="h4" color="#B38B36" sx={{ mb: 1 }}>+</Typography>
-                      <Typography variant="body2" color="#B38B36" fontWeight="bold">{isUploading ? 'Uploading...' : 'Upload'}</Typography>
-                      <input 
-                        type="file" 
-                        hidden 
-                        multiple 
+                      <Avatar sx={{ bgcolor: '#FFF4E5', color: '#B38B36', width: 52, height: 52 }}>
+                        <CloudUploadIcon sx={{ fontSize: 28 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                          {isUploading ? 'Uploading Drawings...' : 'Click to Upload Shop Drawings & CAD'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block' }}>
+                          Supports JPG, PNG, WebP, PDF & DWG (Multi-select enabled)
+                        </Typography>
+                      </Box>
+                      <input
+                        type="file"
+                        hidden
+                        multiple
                         disabled={isUploading}
-                        accept="image/*,.pdf,.dwg" 
+                        accept="image/*,.pdf,.dwg"
                         onChange={async (e) => {
                           if (e.target.files && e.target.files.length > 0) {
                             setIsUploading(true);
@@ -1682,10 +2810,10 @@ const ProjectDetails: React.FC = () => {
                             try {
                               const res = await uploadFiles(formData).unwrap();
                               for (const url of res.urls) {
-                                 await addDrawing({ projectId: id, title: 'Shop Drawing', type: 'Shop Drawing', fileUrl: url }).unwrap();
+                                await addDrawing({ projectId: id, title: 'Shop Drawing', type: 'Shop Drawing', fileUrl: url }).unwrap();
                               }
                               refetchDrawings();
-                              setSnackbarMessage('Drawings uploaded successfully!');
+                              setSnackbarMessage('Shop drawings uploaded successfully!');
                             } catch (err) {
                               console.error(err);
                               setSnackbarMessage('Upload failed');
@@ -1694,104 +2822,273 @@ const ProjectDetails: React.FC = () => {
                               e.target.value = '';
                             }
                           }
-                        }} 
+                        }}
                       />
                     </Box>
+                  </Grid>
 
-                    {/* Camera button using webcam dialog */}
-                    <Box 
+                  {/* Action 2: Camera Capture */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box
                       onClick={isUploading ? undefined : startCamera}
-                      sx={{ 
-                        width: 120, height: 120, 
-                        border: '2px dashed #B38B36', borderRadius: 3, 
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        cursor: isUploading ? 'not-allowed' : 'pointer', bgcolor: '#FFFDF5', '&:hover': { bgcolor: isUploading ? '#FFFDF5' : '#FFF4E5' }, transition: '0.2s',
-                        opacity: isUploading ? 0.6 : 1
+                      sx={{
+                        p: 3.5,
+                        border: '2px dashed #0284C7',
+                        borderRadius: 3.5,
+                        bgcolor: '#F0F9FF',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1.5,
+                        textAlign: 'center',
+                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          bgcolor: '#E0F2FE',
+                          borderColor: '#0369A1',
+                          transform: 'translateY(-2px)'
+                        }
                       }}
                     >
-                      <Typography variant="h4" color="#B38B36" sx={{ mb: 1 }}>📷</Typography>
-                      <Typography variant="body2" color="#B38B36" fontWeight="bold">Camera</Typography>
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* Uploaded Shop Drawings List with Edit/Delete Buttons */}
-                {drawings && drawings.filter((d: any) => d.type === 'Shop Drawing').length > 0 && (
-                  <Box sx={{ mb: 4 }}>
-                    <Typography variant="h6" mb={2}>Uploaded Drawings</Typography>
-                    {drawings.filter((d: any) => d.type === 'Shop Drawing').map((drawing: any) => (
-                      <Box key={drawing.id} sx={{ display: 'flex', alignItems: 'center', p: 2, border: '1px solid #EEE', borderRadius: 2, mb: 2 }}>
-                        <Box 
-                          onClick={() => setPreviewFileUrl(drawing.fileUrl)}
-                          sx={{ width: 80, height: 80, borderRadius: 2, overflow: 'hidden', mr: 2, cursor: 'pointer', border: '1px solid #E0E0E0', flexShrink: 0, bgcolor: '#F9F9F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          {drawing.fileUrl.toLowerCase().endsWith('.pdf') ? (
-                            <Typography variant="h6" color="text.secondary">PDF</Typography>
-                          ) : (
-                            <img src={drawing.fileUrl} alt="Drawing" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          )}
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="subtitle1" fontWeight="bold">{drawing.title} (v{drawing.version})</Typography>
-                          {drawing.comments && <Typography variant="body2" color="text.secondary">Comments: {drawing.comments}</Typography>}
-                          <Typography variant="caption" color="text.secondary">{new Date(drawing.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })}</Typography>
-                          <Typography 
-                            onClick={() => setPreviewFileUrl(drawing.fileUrl)} 
-                            sx={{ color: '#1976d2', textDecoration: 'underline', fontSize: 14, cursor: 'pointer', mt: 0.5, display: 'block', width: 'fit-content' }}
-                          >
-                            View File
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button variant="outlined" color="primary" size="small" startIcon={<EditIcon />} onClick={() => handleEditDrawingClick(drawing)}>Edit</Button>
-                          <Button variant="outlined" color="error" size="small" startIcon={<DeleteIcon />} onClick={() => handleDeleteDrawingClick(drawing.id)}>Delete</Button>
-                        </Box>
+                      <Avatar sx={{ bgcolor: '#E0F2FE', color: '#0284C7', width: 52, height: 52 }}>
+                        <CameraAltIcon sx={{ fontSize: 28 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                          Snap Physical Blueprint / Layout
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block' }}>
+                          Take instant photos of printed workshop drawings or site revisions
+                        </Typography>
                       </Box>
-                    ))}
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Uploaded Shop Drawings Gallery */}
+                {drawings && drawings.filter((d: any) => d.type === 'Shop Drawing').length > 0 ? (
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <DescriptionRoundedIcon sx={{ fontSize: 20, color: '#B38B36' }} />
+                      Uploaded Shop Drawings ({drawings.filter((d: any) => d.type === 'Shop Drawing').length})
+                    </Typography>
+
+                    <Grid container spacing={2}>
+                      {drawings.filter((d: any) => d.type === 'Shop Drawing').map((drawing: any) => (
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={drawing.id}>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              p: 2,
+                              borderRadius: 3,
+                              bgcolor: '#F8FAFC',
+                              border: '1px solid #E2E8F0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1.5,
+                              transition: 'all 0.2s ease',
+                              '&:hover': { borderColor: '#B38B36', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' }
+                            }}
+                          >
+                            <Box
+                              onClick={() => setPreviewFileUrl(drawing.fileUrl)}
+                              sx={{
+                                width: '100%',
+                                height: 140,
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                                bgcolor: '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                position: 'relative'
+                              }}
+                            >
+                              {drawing.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                  <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: '#DC2626' }} />
+                                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>PDF Blueprint</Typography>
+                                </Box>
+                              ) : (
+                                <img src={drawing.fileUrl} alt={drawing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              )}
+                            </Box>
+
+                            <Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                                  {drawing.title}
+                                </Typography>
+                                <Chip label={`v${drawing.version}`} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#FFF4E5', color: '#B38B36' }} />
+                              </Box>
+                              {drawing.comments && (
+                                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.5 }}>
+                                  Note: {drawing.comments}
+                                </Typography>
+                              )}
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>
+                                {new Date(drawing.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid #E2E8F0' }}>
+                              <Button
+                                size="small"
+                                onClick={() => setPreviewFileUrl(drawing.fileUrl)}
+                                sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}
+                              >
+                                View Preview
+                              </Button>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Tooltip title="Edit Details">
+                                  <IconButton size="small" onClick={() => handleEditDrawingClick(drawing)} sx={{ color: '#64748B' }}>
+                                    <EditIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete Drawing">
+                                  <IconButton size="small" onClick={() => handleDeleteDrawingClick(drawing.id)} sx={{ color: '#DC2626' }}>
+                                    <DeleteIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </Box>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                ) : (
+                  <Box sx={{ mb: 4, p: 4, textAlign: 'center', bgcolor: '#F8FAFC', borderRadius: 3, border: '1px dashed #CBD5E1' }}>
+                    <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>
+                      No shop drawings uploaded yet. Use the upload box or camera above to add technical blueprints.
+                    </Typography>
                   </Box>
                 )}
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Button variant="outlined" size="large" onClick={() => {
-                    if (viewingStepOverride !== null) setViewingStepOverride(null);
-                    else handleNextStage('advance_payment');
-                  }} sx={{ px: 4, py: 1.5, borderRadius: 2 }}>
+                {/* Footer Navigation */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 2, borderTop: '1px solid #E2E8F0' }}>
+                  <Button 
+                    variant="outlined" 
+                    size="large" 
+                    onClick={() => {
+                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      else handleNextStage('advance_payment');
+                    }} 
+                    sx={{ 
+                      px: 3.5, 
+                      py: 1.2, 
+                      borderRadius: 2.5,
+                      borderColor: '#CBD5E1',
+                      color: '#1E293B',
+                      fontWeight: 700,
+                      textTransform: 'none'
+                    }}
+                  >
                     Back
                   </Button>
                   <Box sx={{ display: 'flex', gap: 2 }}>
-                    
-                    <Button variant="contained" color="success" size="large" onClick={async () => {
-                      if (viewingStepOverride !== null) {
-                         setViewingStepOverride(null);
-                      } else {
-                         await updateProject({ id: id as string, data: { status: 'production' } }).unwrap();
-                         setActiveStep(5);
-                         setViewingStepOverride(null);
-                         refetch();
-                      }
-                    }} sx={{ px: 4, py: 1.5, borderRadius: 2, bgcolor: viewingStepOverride !== null ? 'primary.main' : '#2E7D32', '&:hover': { bgcolor: viewingStepOverride !== null ? 'primary.dark' : '#1B5E20' } }}>
-                      {viewingStepOverride !== null ? 'Back to Active Step' : 'Proceed to Production'}
+                    <Button 
+                      variant="contained" 
+                      size="large" 
+                      endIcon={<ArrowForwardRoundedIcon />}
+                      onClick={async () => {
+                        if (viewingStepOverride !== null) {
+                           setViewingStepOverride(null);
+                        } else {
+                           await updateProject({ id: id as string, data: { status: 'production' } }).unwrap();
+                           setActiveStep(5);
+                           setViewingStepOverride(null);
+                           refetch();
+                        }
+                      }} 
+                      sx={{ 
+                        px: 4, 
+                        py: 1.3, 
+                        borderRadius: 2.5, 
+                        bgcolor: viewingStepOverride !== null ? '#1E293B' : '#059669', 
+                        color: '#FFFFFF',
+                        fontWeight: 800,
+                        textTransform: 'none',
+                        boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                        '&:hover': { bgcolor: viewingStepOverride !== null ? '#0F172A' : '#047857' } 
+                      }}
+                    >
+                      {viewingStepOverride !== null ? 'Back to Active Step' : 'Proceed to Production Pipeline'}
                     </Button>
                   </Box>
                 </Box>
-                </Paper>
-              )}
+              </Paper>
+            )}
 
-            {/* STEP 5: PRODUCTION MANAGEMENT */}
+            {/* STEP 5: PRODUCTION MANAGEMENT (SLABS & PRODUCTS TRACKING) */}
             {stepToRender === 5 && (
-              <Box sx={{ width: '100%' }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 2, sm: 2.5, md: 3 },
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: 4,
+                  boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)',
+                  width: '100%'
+                }}
+              >
                 {viewingStepOverride !== null && (
-                   <Button startIcon={<ArrowBackIcon />} variant="text" size="small" onClick={() => setViewingStepOverride(null)} sx={{ mb: 3 }}>
+                   <Button startIcon={<ArrowBackIcon />} variant="text" size="small" onClick={() => setViewingStepOverride(null)} sx={{ mb: 2.5, fontWeight: 700, color: '#0284C7', textTransform: 'none' }}>
                      Back to Pipeline
                    </Button>
                 )}
 
-                {/* Machine Usage */}
-                 <Box sx={{ mb: 6 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" fontWeight="bold">Slabs & Products Tracking</Typography>
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                      <Button variant="outlined" startIcon={<SyncIcon />} onClick={async () => {
+                {/* Executive Header Bar */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
+                        Slabs & Products Production Pipeline
+                      </Typography>
+                      <Chip
+                        label={isPlanningMode ? 'Stage Configuration' : 'Live Production Tracking'}
+                        size="small"
+                        sx={{
+                          bgcolor: isPlanningMode ? '#FEF3C7' : '#ECFDF5',
+                          color: isPlanningMode ? '#B45309' : '#059669',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          border: '1px solid',
+                          borderColor: isPlanningMode ? '#FDE68A' : '#A7F3D0',
+                          borderRadius: '6px'
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+                      {isPlanningMode 
+                        ? 'Configure required manufacturing stages, piece counts, and surface finishes before starting production.' 
+                        : 'Real-time piece-level tracking across factory work stations and machine operations.'}
+                    </Typography>
+                  </Box>
+
+                  {/* Summary Metric Pills & Top Actions */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                      <LayersRoundedIcon sx={{ fontSize: 18, color: '#B38B36' }} />
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#1E293B' }}>
+                        {projectSlabs?.length || 0} Slabs
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                      <Inventory2RoundedIcon sx={{ fontSize: 18, color: '#0284C7' }} />
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#1E293B' }}>
+                        {projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} Pieces
+                      </Typography>
+                    </Box>
+
+                    <Button 
+                      variant="outlined" 
+                      startIcon={<SyncIcon />} 
+                      onClick={async () => {
                         try {
                           await syncSlabs(id as string).unwrap();
                           refetchSlabs();
@@ -1799,62 +3096,149 @@ const ProjectDetails: React.FC = () => {
                         } catch(err) {
                           setSnackbarMessage('Error syncing slabs.');
                         }
-                      }}>
-                        Sync with Quotation
-                      </Button>
-                      {isPlanningMode && (
-                        <Button variant="contained" color="success" onClick={handleStartAllWork}>
-                          Finalize & Send to Production
-                        </Button>
-                      )}
-                    </Box>
-                  </Box>
-                  <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4, overflow: 'hidden' }}>
-                    <Table>
-                      <TableHead sx={{ bgcolor: '#FDFBF7' }}>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Product Name</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Original Size</TableCell>
-                          {activeColumns.includes('Production') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Production</TableCell>}
-                          {activeColumns.includes('Polishing') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Polishing</TableCell>}
-                          {activeColumns.includes('Packing') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Packing</TableCell>}
-                          {activeColumns.includes('Dispatch') && <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }}>Dispatch</TableCell>}
-                          <TableCell sx={{ fontWeight: 'bold', color: '#4A4A4A', py: 2 }} align="center">Action</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {projectSlabs?.map((slab: any, idx: number) => (
-                          isPlanningMode 
-                            ? <SlabPlanningRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} activeColumns={activeColumns} />
-                            : <SlabTrackingRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} productionLogs={productionLogs || []} activeColumns={activeColumns} projectTotalPieces={projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} />
-                        ))}
-                        {(!projectSlabs || projectSlabs.length === 0) && (
-                           <TableRow><TableCell colSpan={9} align="center" sx={{ py: 5, color: 'text.secondary' }}>No slabs created yet.</TableCell></TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </Paper>
-                 </Box>
+                      }}
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        borderColor: '#CBD5E1',
+                        color: '#1E293B',
+                        bgcolor: '#FFFFFF',
+                        '&:hover': { borderColor: '#B38B36', bgcolor: '#FFFDF5' }
+                      }}
+                    >
+                      Sync with Quotation
+                    </Button>
 
+                    {isPlanningMode && (
+                      <Button 
+                        variant="contained" 
+                        startIcon={<PlayArrowRoundedIcon />}
+                        onClick={handleStartAllWork}
+                        sx={{
+                          borderRadius: 2.5,
+                          textTransform: 'none',
+                          fontWeight: 800,
+                          bgcolor: '#059669',
+                          color: '#FFFFFF',
+                          boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                          '&:hover': { bgcolor: '#047857' }
+                        }}
+                      >
+                        Finalize & Send to Production
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
+
+                {/* Luxury Production Table */}
+                <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', mb: 3.5 }}>
+                  <Table>
+                    <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          Product / Slab Name
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          Original Spec
+                        </TableCell>
+                        {activeColumns.includes('Production') && (
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                            Production
+                          </TableCell>
+                        )}
+                        {activeColumns.includes('Polishing') && (
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                            Polishing (Honed / Mirror)
+                          </TableCell>
+                        )}
+                        {activeColumns.includes('Packing') && (
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                            Packing
+                          </TableCell>
+                        )}
+                        {activeColumns.includes('Dispatch') && (
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                            Dispatch
+                          </TableCell>
+                        )}
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }} align="center">
+                          Action / Status
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {projectSlabs?.map((slab: any, idx: number) => (
+                        isPlanningMode 
+                          ? <SlabPlanningRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} activeColumns={activeColumns} />
+                          : <SlabTrackingRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} productionLogs={productionLogs || []} activeColumns={activeColumns} projectTotalPieces={projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} />
+                      ))}
+                      {(!projectSlabs || projectSlabs.length === 0) && (
+                         <TableRow>
+                           <TableCell colSpan={7} align="center" sx={{ py: 6, color: '#94A3B8' }}>
+                             <LayersRoundedIcon sx={{ fontSize: 40, color: '#CBD5E1', mb: 1, display: 'block', mx: 'auto' }} />
+                             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
+                               No slabs created yet
+                             </Typography>
+                             <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                               Click "Sync with Quotation" above to auto-generate slabs from your approved quotation.
+                             </Typography>
+                           </TableCell>
+                         </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </Paper>
+
+                {/* Footer Navigation */}
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
                   {viewingStepOverride !== null ? (
-                    <Button variant="contained" color="success" size="large" onClick={() => {
-                      setViewingStepOverride(null);
-                    }} sx={{ px: 5, py: 1.5, borderRadius: 2, bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' }, fontWeight: 'bold', fontSize: '1.1rem' }}>
+                    <Button 
+                      variant="contained" 
+                      size="large" 
+                      onClick={() => setViewingStepOverride(null)} 
+                      sx={{ 
+                        px: 4, 
+                        py: 1.3, 
+                        borderRadius: 2.5, 
+                        bgcolor: '#1E293B', 
+                        color: '#FFFFFF',
+                        fontWeight: 800, 
+                        textTransform: 'none',
+                        '&:hover': { bgcolor: '#0F172A' } 
+                      }}
+                    >
                       Back to Active Step
                     </Button>
                   ) : !isPlanningMode ? (
-                    <Button variant="contained" color="success" size="large" onClick={async () => {
-                       await updateProject({ id: id as string, data: { status: 'work_order' } }).unwrap();
-                       setActiveStep(7);
-                       setViewingStepOverride(null);
-                       refetch();
-                    }} sx={{ px: 5, py: 1.5, borderRadius: 2, bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' }, fontWeight: 'bold', fontSize: '1.1rem' }}>
+                    <Button 
+                      variant="contained" 
+                      size="large" 
+                      endIcon={<ArrowForwardRoundedIcon />}
+                      onClick={async () => {
+                         await updateProject({ id: id as string, data: { status: 'work_order' } }).unwrap();
+                         setActiveStep(7);
+                         setViewingStepOverride(null);
+                         refetch();
+                      }} 
+                      sx={{ 
+                        px: 5, 
+                        py: 1.3, 
+                        borderRadius: 2.5, 
+                        bgcolor: '#059669', 
+                        color: '#FFFFFF',
+                        fontWeight: 800, 
+                        fontSize: '1rem',
+                        textTransform: 'none',
+                        boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                        '&:hover': { bgcolor: '#047857' } 
+                      }}
+                    >
                       Finalize & Send to Dispatch
                     </Button>
                   ) : null}
                 </Box>
-              </Box>
+              </Paper>
             )}
 
             {/* STEP 6: WORK ORDER ACTIVE */}
@@ -2649,15 +4033,22 @@ const ProjectDetails: React.FC = () => {
       </Dialog>
 
       {/* CREATE SLAB DIALOG */}
-      <Dialog open={slabDialogOpen} onClose={() => setSlabDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Add New Slab</DialogTitle>
-        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+      <Dialog 
+        open={slabDialogOpen} 
+        onClose={() => setSlabDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.25rem' }}>Add New Slab Specification</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2.5 }}>
           <FormControl fullWidth>
             <InputLabel>Link Raw Material (Optional)</InputLabel>
             <Select
               label="Link Raw Material (Optional)"
               value={slabForm.inventoryId}
               onChange={(e) => setSlabForm({ ...slabForm, inventoryId: e.target.value })}
+              sx={{ borderRadius: 2 }}
             >
               <MenuItem value="" disabled>Select Raw Material</MenuItem>
               {inventoryItems?.filter((i: any) => i.quantity > 0).map((item: any) => (
@@ -2673,6 +4064,7 @@ const ProjectDetails: React.FC = () => {
             fullWidth 
             value={slabForm.name} 
             onChange={(e) => setSlabForm({ ...slabForm, name: e.target.value })} 
+            slotProps={{ input: { sx: { borderRadius: 2 } } }}
           >
             {products?.filter(p => !projectSlabs?.some((s: any) => s.name === p.category)).length > 0 ? (
               products.filter(p => !projectSlabs?.some((s: any) => s.name === p.category)).map((p: any) => (
@@ -2683,27 +4075,51 @@ const ProjectDetails: React.FC = () => {
             )}
           </TextField>
           <TextField 
-            label="Size (e.g., 5x2)" 
+            label="Size / Grid Spec (e.g. 5x2, 10x4)" 
             fullWidth 
             value={slabForm.size} 
             onChange={(e) => setSlabForm({ ...slabForm, size: e.target.value })} 
+            slotProps={{ input: { sx: { borderRadius: 2 } } }}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setSlabDialogOpen(false)} color="inherit">Cancel</Button>
-          <Button variant="contained" onClick={handleCreateSlab} disabled={!slabForm.name}>Add Slab</Button>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setSlabDialogOpen(false)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleCreateSlab} 
+            disabled={!slabForm.name}
+            sx={{ 
+              borderRadius: 2, 
+              bgcolor: '#1E293B', 
+              color: '#FFFFFF', 
+              fontWeight: 800, 
+              textTransform: 'none',
+              px: 3,
+              '&:hover': { bgcolor: '#0F172A' }
+            }}
+          >
+            Add Slab
+          </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={editSlabDialogOpen} onClose={() => setEditSlabDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Slab</DialogTitle>
-        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
+      {/* EDIT SLAB DIALOG */}
+      <Dialog 
+        open={editSlabDialogOpen} 
+        onClose={() => setEditSlabDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.25rem' }}>Edit Slab Specification</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2.5 }}>
           <TextField 
             select
             label="Select Slab Category (From Quotation)" 
             fullWidth 
             value={slabForm.name} 
             onChange={(e) => setSlabForm({ ...slabForm, name: e.target.value })} 
+            slotProps={{ input: { sx: { borderRadius: 2 } } }}
           >
             {products?.filter(p => p.category === slabForm.name || !projectSlabs?.some((s: any) => s.name === p.category)).length > 0 ? (
               products.filter(p => p.category === slabForm.name || !projectSlabs?.some((s: any) => s.name === p.category)).map((p: any) => (
@@ -2713,53 +4129,100 @@ const ProjectDetails: React.FC = () => {
               <MenuItem value="" disabled>All Categories Added / None Found</MenuItem>
             )}
           </TextField>
-          <TextField label="Grid Layout / Size (e.g. 5x2)" value={slabForm.size} onChange={(e) => setSlabForm({ ...slabForm, size: e.target.value })} fullWidth />
+          <TextField 
+            label="Grid Layout / Size Spec (e.g. 5x2)" 
+            value={slabForm.size} 
+            onChange={(e) => setSlabForm({ ...slabForm, size: e.target.value })} 
+            fullWidth 
+            slotProps={{ input: { sx: { borderRadius: 2 } } }}
+          />
           <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>Required Production Stages:</Typography>
-            <Grid container spacing={1}>
-              {['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(stage => (
-                <Grid xs={6} sm={4} key={stage}>
-                  <FormControlLabel
-                    control={
+            <Typography variant="subtitle2" sx={{ mb: 1.5, color: '#1E293B', fontWeight: 800 }}>Required Manufacturing Stages:</Typography>
+            <Grid container spacing={1.5}>
+              {['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(stage => {
+                const isSelected = slabForm.requiredStages?.includes(stage) || (stage === 'Polishing - Honed' && slabForm.requiredStages?.includes('Polishing')) || false;
+                return (
+                  <Grid size={{ xs: 6, sm: 4 }} key={stage}>
+                    <Box
+                      onClick={() => {
+                        let newStages;
+                        if (!isSelected) {
+                          newStages = [...(slabForm.requiredStages || []).filter(s => s !== 'Polishing'), stage];
+                        } else {
+                          newStages = (slabForm.requiredStages || []).filter(s => s !== stage && s !== 'Polishing');
+                        }
+                        setSlabForm({ ...slabForm, requiredStages: newStages });
+                      }}
+                      sx={{
+                        p: 1.25,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: isSelected ? '#86EFAC' : '#E2E8F0',
+                        bgcolor: isSelected ? '#F0FDF4' : '#F8FAFC',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        transition: 'all 0.15s ease',
+                        '&:hover': { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
+                      }}
+                    >
                       <Checkbox 
                         size="small"
-                        checked={slabForm.requiredStages?.includes(stage) || (stage === 'Polishing - Honed' && slabForm.requiredStages?.includes('Polishing')) || false} 
-                        onChange={(e) => {
-                          let newStages;
-                          if (e.target.checked) {
-                            newStages = [...(slabForm.requiredStages || []).filter(s => s !== 'Polishing'), stage];
-                          } else {
-                            newStages = (slabForm.requiredStages || []).filter(s => s !== stage && s !== 'Polishing');
-                          }
-                          setSlabForm({ ...slabForm, requiredStages: newStages });
-                        }} 
+                        checked={isSelected}
+                        sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }}
                       />
-                    }
-                    label={<Typography variant="body2">{stage}</Typography>}
-                  />
-                </Grid>
-              ))}
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: isSelected ? '#166534' : '#64748B', fontSize: '0.78rem' }}>
+                        {stage}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                );
+              })}
             </Grid>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setEditSlabDialogOpen(false)} color="inherit">Cancel</Button>
-          <Button variant="contained" onClick={handleUpdateSlab} disabled={!slabForm.name}>Update Slab</Button>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setEditSlabDialogOpen(false)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleUpdateSlab} 
+            disabled={!slabForm.name}
+            sx={{ 
+              borderRadius: 2, 
+              bgcolor: '#1E293B', 
+              color: '#FFFFFF', 
+              fontWeight: 800, 
+              textTransform: 'none',
+              px: 3,
+              '&:hover': { bgcolor: '#0F172A' }
+            }}
+          >
+            Update Slab
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* RESERVE MATERIAL DIALOG */}
-      <Dialog open={reserveDialogOpen} onClose={() => setReserveDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Reserve Material</DialogTitle>
-        <DialogContent dividers>
+      <Dialog 
+        open={reserveDialogOpen} 
+        onClose={() => setReserveDialogOpen(false)} 
+        maxWidth="xs" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B' }}>Reserve Raw Material</DialogTitle>
+        <DialogContent dividers sx={{ pt: 2.5 }}>
           {selectedInventoryItem && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                Selected: <strong>{selectedInventoryItem.itemName}</strong> (Block: {selectedInventoryItem.blockNumber || 'N/A'})
-              </Typography>
-              <Typography variant="body2" color="text.secondary" mb={1}>
-                Available Stock: <strong>{selectedInventoryItem.quantity} {selectedInventoryItem.unit}</strong>
-              </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 2.5, border: '1px solid #E2E8F0' }}>
+                <Typography variant="body2" sx={{ color: '#64748B' }}>
+                  Selected: <strong style={{ color: '#1E293B' }}>{selectedInventoryItem.itemName}</strong> (Block: {selectedInventoryItem.blockNumber || 'N/A'})
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
+                  Available Stock: <strong style={{ color: '#059669' }}>{selectedInventoryItem.quantity} {selectedInventoryItem.unit}</strong>
+                </Typography>
+              </Box>
               <TextField 
                 label={`Quantity to Reserve (${selectedInventoryItem.unit})`} 
                 type="number" 
@@ -2767,57 +4230,94 @@ const ProjectDetails: React.FC = () => {
                 value={reserveQty}
                 onChange={(e) => setReserveQty(e.target.value)}
                 autoFocus
+                slotProps={{ input: { sx: { borderRadius: 2 } } }}
               />
             </Box>
           )}
         </DialogContent>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button onClick={() => setReserveDialogOpen(false)} color="inherit">Cancel</Button>
-          <Button variant="contained" color="primary" onClick={() => {
-            if (reserveQty && !isNaN(Number(reserveQty))) {
-              reserveMaterial({ 
-                projectId: id as string, 
-                data: { 
-                  inventoryId: selectedInventoryItem.id, 
-                  quantity: Number(reserveQty), 
-                  cost: selectedInventoryItem.costPerUnit * Number(reserveQty) 
-                } 
-              }).unwrap().then(() => {
-                refetchMaterials();
-                setReserveDialogOpen(false);
-                setSnackbarMessage('Material reserved successfully!');
-              }).catch(() => {
-                setSnackbarMessage('Failed to reserve material. Not enough stock?');
-                setReserveDialogOpen(false);
-              });
-            }
-          }}>Confirm Reserve</Button>
-        </Box>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setReserveDialogOpen(false)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              if (reserveQty && !isNaN(Number(reserveQty))) {
+                reserveMaterial({ 
+                  projectId: id as string, 
+                  data: { 
+                    inventoryId: selectedInventoryItem.id, 
+                    quantity: Number(reserveQty), 
+                    cost: selectedInventoryItem.costPerUnit * Number(reserveQty) 
+                  } 
+                }).unwrap().then(() => {
+                  refetchMaterials();
+                  setReserveDialogOpen(false);
+                  setSnackbarMessage('Material reserved successfully!');
+                }).catch(() => {
+                  setSnackbarMessage('Failed to reserve material. Not enough stock?');
+                  setReserveDialogOpen(false);
+                });
+              }
+            }}
+            sx={{ 
+              borderRadius: 2, 
+              bgcolor: '#059669', 
+              color: '#FFFFFF', 
+              fontWeight: 800, 
+              textTransform: 'none',
+              px: 3,
+              '&:hover': { bgcolor: '#047857' }
+            }}
+          >
+            Confirm Reserve
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* EDIT DRAWING DIALOG */}
-      <Dialog open={isEditDrawingOpen} onClose={() => setIsEditDrawingOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Edit Drawing Info</DialogTitle>
-        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+      <Dialog 
+        open={isEditDrawingOpen} 
+        onClose={() => setIsEditDrawingOpen(false)} 
+        maxWidth="xs" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B' }}>Edit Drawing Info</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2.5 }}>
           <TextField 
             label="Drawing Title" 
             fullWidth 
             value={editDrawingTitle} 
             onChange={(e) => setEditDrawingTitle(e.target.value)} 
+            slotProps={{ input: { sx: { borderRadius: 2 } } }}
           />
           <TextField 
-            label="Comments / Notes" 
+            label="Comments / Engineering Notes" 
             fullWidth 
             multiline 
             rows={3} 
             value={editDrawingComments} 
             onChange={(e) => setEditDrawingComments(e.target.value)} 
+            slotProps={{ input: { sx: { borderRadius: 2 } } }}
           />
         </DialogContent>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button onClick={() => setIsEditDrawingOpen(false)} color="inherit">Cancel</Button>
-          <Button variant="contained" color="primary" onClick={handleSaveDrawingEdit}>Save</Button>
-        </Box>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setIsEditDrawingOpen(false)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSaveDrawingEdit}
+            sx={{ 
+              borderRadius: 2, 
+              bgcolor: '#1E293B', 
+              color: '#FFFFFF', 
+              fontWeight: 800, 
+              textTransform: 'none',
+              px: 3,
+              '&:hover': { bgcolor: '#0F172A' }
+            }}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* STANDARD TERMS DIALOG */}
