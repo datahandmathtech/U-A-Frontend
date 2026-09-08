@@ -1,43 +1,48 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
-import { Box, Typography } from '@mui/material';
-import NotFound from './pages/NotFound';
+import PageLoader from './components/PageLoader';
 
-import CRM from './pages/CRM';
-import Projects from './pages/Projects';
-import Accounts from './pages/Accounts';
-import Inventory from './pages/Inventory';
-import ItemLedger from './pages/ItemLedger';
-import InventoryLedger from './pages/InventoryLedger';
-import Production from './pages/Production';
-import Dispatch from './pages/Dispatch';
-import HR from './pages/HR';
-import Approvals from './pages/Approvals';
-import InOutLedger from './pages/InOutLedger';
-import AdminConsole from './pages/AdminConsole';
-import VendorsList from './pages/VendorsList';
-import Dashboard from './pages/Dashboard';
-import LiveFeed from './pages/LiveFeed';
-import Machines from './pages/Machines';
-import ProjectDetails from './pages/ProjectDetails';
-import LogBook from './pages/LogBook';
-import PieceTracker from './pages/PieceTracker';
-import VendorLedger from './pages/VendorLedger';
-import VendorLedgerDetails from './pages/VendorLedgerDetails';
-import SlabPieceTracker from './pages/SlabPieceTracker';
-import StageDetails from './pages/StageDetails';
-import WasteLedger from './pages/WasteLedger';
+// Lazy load all page components for instant initial app load & low bundle size
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const LiveFeed = lazy(() => import('./pages/LiveFeed'));
+const LogBook = lazy(() => import('./pages/LogBook'));
+const PieceTracker = lazy(() => import('./pages/PieceTracker'));
+const VendorLedger = lazy(() => import('./pages/VendorLedger'));
+const VendorLedgerDetails = lazy(() => import('./pages/VendorLedgerDetails'));
+const WasteLedger = lazy(() => import('./pages/WasteLedger'));
+const CRM = lazy(() => import('./pages/CRM'));
+const Projects = lazy(() => import('./pages/Projects'));
+const ProjectDetails = lazy(() => import('./pages/ProjectDetails'));
+const SlabPieceTracker = lazy(() => import('./pages/SlabPieceTracker'));
+const StageDetails = lazy(() => import('./pages/StageDetails'));
+const Approvals = lazy(() => import('./pages/Approvals'));
+const InOutLedger = lazy(() => import('./pages/InOutLedger'));
+const VendorsList = lazy(() => import('./pages/VendorsList'));
+const Accounts = lazy(() => import('./pages/Accounts'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const InventoryLedger = lazy(() => import('./pages/InventoryLedger'));
+const ItemLedger = lazy(() => import('./pages/ItemLedger'));
+const Production = lazy(() => import('./pages/Production'));
+const AdminConsole = lazy(() => import('./pages/AdminConsole'));
+const Dispatch = lazy(() => import('./pages/Dispatch'));
+const Machines = lazy(() => import('./pages/Machines'));
+const HR = lazy(() => import('./pages/HR'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
-import Login from './pages/Login';
-import WorkerDashboard from './pages/WorkerDashboard';
-import ManagerDashboard from './pages/ManagerDashboard';
+const Login = lazy(() => import('./pages/Login'));
+const WorkerDashboard = lazy(() => import('./pages/WorkerDashboard'));
+const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
-    errorElement: <NotFound />,
+    errorElement: (
+      <Suspense fallback={<PageLoader isFullPage />}>
+        <NotFound />
+      </Suspense>
+    ),
     children: [
       {
         index: true,
@@ -117,22 +122,22 @@ const router = createBrowserRouter([
       },
       {
         path: 'inventory/ledger/:supplier',
-          element: <InventoryLedger />
-        },
-        {
-          path: 'inventory/item/:itemId',
-          element: <ItemLedger />
+        element: <InventoryLedger />
+      },
+      {
+        path: 'inventory/item/:itemId',
+        element: <ItemLedger />
       },
       {
         path: 'production',
         element: <Production />
-        },
-        {
-          path: 'admin-console',
-          element: <AdminConsole />
-        },
-        {
-          path: 'dispatch',
+      },
+      {
+        path: 'admin-console',
+        element: <AdminConsole />
+      },
+      {
+        path: 'dispatch',
         element: <Dispatch />
       },
       {
@@ -151,20 +156,32 @@ const router = createBrowserRouter([
   },
   {
     path: '/login',
-    element: <Login />
+    element: (
+      <Suspense fallback={<PageLoader isFullPage message="Authenticating..." />}>
+        <Login />
+      </Suspense>
+    )
   },
   {
     path: '/worker',
-    element: <WorkerDashboard />
+    element: (
+      <Suspense fallback={<PageLoader isFullPage message="Loading Worker Portal..." />}>
+        <WorkerDashboard />
+      </Suspense>
+    )
   },
   {
     path: '/manager',
-    element: <ManagerDashboard />
+    element: (
+      <Suspense fallback={<PageLoader isFullPage message="Loading Manager Portal..." />}>
+        <ManagerDashboard />
+      </Suspense>
+    )
   }
 ]);
 
 const App: React.FC = () => {
   return <RouterProvider router={router} />;
-}
+};
 
 export default App;
