@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Box, Typography, Grid, Paper, IconButton, Chip, Dialog, DialogContent, 
-  Avatar, CircularProgress, DialogTitle, TextField, MenuItem, Button, Tooltip 
+  Avatar, CircularProgress, DialogTitle, TextField, MenuItem, Button, Tooltip, Skeleton 
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
@@ -36,7 +36,7 @@ const LiveFeed: React.FC = () => {
   const handleJumpToday = () => setSelectedDate(new Date());
 
   const { data: machines, isLoading: machinesLoading } = useGetMachinesQuery();
-  const { data: liveFeedData, isLoading: liveFeedLoading, refetch } = useGetLiveFeedQuery(formatYMD(selectedDate), {
+  const { data: liveFeedData, isLoading: liveFeedLoading, isFetching: liveFeedFetching, refetch } = useGetLiveFeedQuery(formatYMD(selectedDate), {
     pollingInterval: 20000,
     skipPollingIfUnfocused: true
   });
@@ -51,14 +51,6 @@ const LiveFeed: React.FC = () => {
   const { data: fullProject, isLoading: isProjectLoading } = useGetProjectByIdQuery(selectedProject, { skip: !selectedProject });
   const currentProject = projects?.find((p: any) => p.id === selectedProject);
   const projectProducts = fullProject?.quotations?.[0]?.products || fullProject?.products || currentProject?.products || [];
-
-  if (machinesLoading || liveFeedLoading) {
-    return (
-      <Box sx={{ display: 'flex', height: '60vh', justifyContent: 'center', alignItems: 'center' }}>
-        <CircularProgress sx={{ color: '#C89F5A' }} />
-      </Box>
-    );
-  }
 
   const activeLogs = liveFeedData?.filter((log: any) => log.status === 'active') || [];
   const pendingLogs = liveFeedData?.filter((log: any) => log.approvalStatus === 'pending') || [];
@@ -174,9 +166,13 @@ const LiveFeed: React.FC = () => {
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Active Machines
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#059669', mt: 0.2 }}>
-                {activeMachinesCount} <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>/ {machines?.length || 0}</span>
-              </Typography>
+              {liveFeedLoading || machinesLoading ? (
+                <Skeleton variant="text" width={60} height={38} />
+              ) : (
+                <Typography variant="h5" sx={{ fontWeight: 900, color: '#059669', mt: 0.2 }}>
+                  {activeMachinesCount} <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>/ {machines?.length || 0}</span>
+                </Typography>
+              )}
             </Box>
           </Paper>
         </Grid>
@@ -190,9 +186,13 @@ const LiveFeed: React.FC = () => {
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Operators On Duty
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
-                {activeStaffCount}
-              </Typography>
+              {liveFeedLoading ? (
+                <Skeleton variant="text" width={40} height={38} />
+              ) : (
+                <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
+                  {activeStaffCount}
+                </Typography>
+              )}
             </Box>
           </Paper>
         </Grid>
@@ -206,9 +206,13 @@ const LiveFeed: React.FC = () => {
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Completed Shift Logs
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
-                {completedLogs.length}
-              </Typography>
+              {liveFeedLoading ? (
+                <Skeleton variant="text" width={40} height={38} />
+              ) : (
+                <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
+                  {completedLogs.length}
+                </Typography>
+              )}
             </Box>
           </Paper>
         </Grid>
@@ -227,7 +231,22 @@ const LiveFeed: React.FC = () => {
       </Box>
 
       <Grid container spacing={2.5}>
-        {(!machines || machines.length === 0) ? (
+        {machinesLoading ? (
+          [1, 2, 3, 4, 5, 6].map((k) => (
+            <Grid size={{ xs: 12, md: 6, lg: 4 }} key={k}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3.5, border: '1px solid #E2E8F0', bgcolor: '#FAFAFA' }}>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', mb: 2 }}>
+                  <Skeleton variant="circular" width={44} height={44} />
+                  <Box sx={{ flex: 1 }}>
+                    <Skeleton variant="text" width="60%" height={24} />
+                    <Skeleton variant="text" width="40%" height={18} />
+                  </Box>
+                </Box>
+                <Skeleton variant="rectangular" height={90} sx={{ borderRadius: 2 }} />
+              </Paper>
+            </Grid>
+          ))
+        ) : (!machines || machines.length === 0) ? (
           <Grid size={{ xs: 12 }}>
             <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 3.5, bgcolor: '#FFFFFF', border: '1px dashed #CBD5E1' }}>
               <PrecisionManufacturingIcon sx={{ fontSize: 44, color: '#94A3B8', mb: 1.5 }} />
