@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel, Autocomplete } from '@mui/material';
+import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel, Autocomplete, Tooltip } from '@mui/material';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetApprovedLogsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useGetActiveOutLogsQuery } from '../store/apiSlice';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -78,12 +78,28 @@ const Approvals: React.FC = () => {
     try {
       await approveLog({ id: rejectLogId, data: { approvalStatus: 'rejected_admin', remarks: rejectReason } }).unwrap();
       setToast({ open: true, message: 'Log Rejected successfully', severity: 'success' });
-      refetch();
+      refetchPending();
     } catch (err: any) {
       setToast({ open: true, message: err?.data?.message || 'Failed to reject', severity: 'error' });
     } finally {
       setRejectDialogOpen(false);
       setRejectLogId(null);
+    }
+  };
+
+  const handleDeletePendingLog = async (id: string) => {
+    if (window.confirm("Are you sure you want to permanently delete this pending log?")) {
+      try {
+        if (id.includes('-start')) {
+          await deleteMachineLog(id.replace('-start', '')).unwrap();
+        } else {
+          await deleteProductionLog(id).unwrap();
+        }
+        setToast({ open: true, message: 'Pending log deleted permanently', severity: 'success' });
+        refetchPending();
+      } catch (err: any) {
+        setToast({ open: true, message: err?.data?.message || 'Failed to delete log', severity: 'error' });
+      }
     }
   };
 
@@ -307,13 +323,22 @@ const Approvals: React.FC = () => {
                           )}
                         </Box>
 
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                          <Button variant="contained" color="success" fullWidth onClick={() => handleApproveClick(log)} startIcon={<CheckCircleIcon />}>
+                        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                          <Button variant="contained" color="success" sx={{ flex: 1, fontWeight: 'bold' }} onClick={() => handleApproveClick(log)} startIcon={<CheckCircleIcon />}>
                             Approve
                           </Button>
-                          <Button variant="outlined" color="error" fullWidth onClick={() => handleRejectClick(log.id)} startIcon={<CancelIcon />}>
+                          <Button variant="outlined" color="error" sx={{ flex: 1, fontWeight: 'bold' }} onClick={() => handleRejectClick(log.id)} startIcon={<CancelIcon />}>
                             Reject
                           </Button>
+                          <Tooltip title="Delete Permanently">
+                            <IconButton 
+                              color="error" 
+                              sx={{ border: '1px solid #FFCDD2', bgcolor: '#FFEBEE', borderRadius: 2, '&:hover': { bgcolor: '#FFCDD2' } }} 
+                              onClick={() => handleDeletePendingLog(log.id)}
+                            >
+                              <DeleteIcon sx={{ fontSize: 20 }} />
+                            </IconButton>
+                          </Tooltip>
                         </Box>
                       </CardContent>
                     </Card>
