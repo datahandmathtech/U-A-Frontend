@@ -28,7 +28,8 @@ import {
   LinearProgress,
   Tooltip,
   InputAdornment,
-  Card
+  Card,
+  Skeleton
 } from '@mui/material';
 
 // Icons
@@ -56,7 +57,7 @@ import {
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();
-  const { data: projects, isLoading, refetch } = useGetProjectsQuery();
+  const { data: projects, isLoading, isError, refetch } = useGetProjectsQuery();
   const [createProject] = useCreateProjectMutation();
   const [updateProject] = useUpdateProjectMutation();
   const [deleteProject] = useDeleteProjectMutation();
@@ -507,9 +508,25 @@ const Projects: React.FC = () => {
           </TableHead>
           <TableBody>
             {isLoading ? (
+              [1, 2, 3, 4].map((k) => (
+                <TableRow key={k}>
+                  <TableCell><Skeleton variant="text" width="80%" height={28} /></TableCell>
+                  <TableCell><Skeleton variant="text" width="60%" height={24} /></TableCell>
+                  <TableCell><Skeleton variant="text" width="50%" height={24} /></TableCell>
+                  <TableCell><Skeleton variant="rectangular" height={16} sx={{ borderRadius: 1 }} /></TableCell>
+                  <TableCell><Skeleton variant="text" width="40%" height={24} /></TableCell>
+                  <TableCell align="right"><Skeleton variant="circular" width={28} height={28} sx={{ ml: 'auto' }} /></TableCell>
+                </TableRow>
+              ))
+            ) : isError ? (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                  Loading Work Orders...
+                  <Typography variant="body1" color="error" sx={{ fontWeight: 'bold', mb: 1.5 }}>
+                    Failed to load work orders from server.
+                  </Typography>
+                  <Button variant="outlined" color="primary" onClick={() => refetch()} sx={{ borderRadius: 2, fontWeight: 'bold', textTransform: 'none' }}>
+                    Retry Loading
+                  </Button>
                 </TableCell>
               </TableRow>
             ) : filteredWorkOrders.length === 0 ? (
