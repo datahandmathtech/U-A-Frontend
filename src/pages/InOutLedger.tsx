@@ -18,17 +18,20 @@ import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 
 const InOutLedger: React.FC = () => {
   const { data: activeOutLogsData, isLoading: outLogsLoading, refetch } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 2000,
+    pollingInterval: 10000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: pendingLogs, isLoading: pendingLoading } = useGetPendingApprovalsQuery(undefined, {
-    pollingInterval: 2000,
+    pollingInterval: 10000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: approvedLogsData, isLoading: approvedLoading } = useGetApprovedLogsQuery(undefined, {
-    pollingInterval: 2000,
+    pollingInterval: 12000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });

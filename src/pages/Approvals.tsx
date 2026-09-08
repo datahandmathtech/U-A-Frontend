@@ -15,23 +15,27 @@ import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 
 const Approvals: React.FC = () => {
   const { data: pendingLogs, isLoading, refetch: refetchPending } = useGetPendingApprovalsQuery(undefined, {
-    pollingInterval: 2000,
+    pollingInterval: 10000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: approvedLogs, refetch: refetchApproved } = useGetApprovedLogsQuery(undefined, {
-    pollingInterval: 2000,
+    pollingInterval: 12000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: projects } = useGetProjectsQuery();
   const { data: machineLogs } = useGetMachineLogsQuery(undefined, {
-    pollingInterval: 2000,
+    pollingInterval: 12000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: activeOutLogs } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 2000,
+    pollingInterval: 12000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });

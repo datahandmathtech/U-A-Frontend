@@ -67,14 +67,16 @@ const WorkerDashboard: React.FC = () => {
   const [machineClockOut, { isLoading: clockingOut }] = useMachineClockOutMutation();
   const [createMaterialLog, { isLoading: creatingMaterial }] = useCreateMaterialLogMutation();
   const { data: activeMachineLogs, refetch: refetchMachineLogs } = useGetDailyMachineLogsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 10000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
   const { data: staffList } = useGetStaffListQuery();
   const { data: vendorsList } = useGetVendorsQuery();
   const { data: activeOutLogs, refetch: refetchActiveOutLogs } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 3000,
+    pollingInterval: 10000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
@@ -153,11 +155,27 @@ const WorkerDashboard: React.FC = () => {
 
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
-      const context = canvasRef.current.getContext('2d');
-      canvasRef.current.width = videoRef.current.videoWidth;
-      canvasRef.current.height = videoRef.current.videoHeight;
-      context?.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      const maxDim = 800;
+      let width = video.videoWidth || 640;
+      let height = video.videoHeight || 480;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      context?.drawImage(video, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
       
       if (cameraTarget === 'attendance') setAttendancePhoto(dataUrl);
       else if (cameraTarget.startsWith('end_')) {

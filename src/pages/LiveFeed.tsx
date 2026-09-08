@@ -65,7 +65,8 @@ const LiveFeed: React.FC = () => {
 
   const { data: machines, isLoading: machinesLoading } = useGetMachinesQuery();
   const { data: liveFeedData, isLoading: liveFeedLoading, refetch } = useGetLiveFeedQuery(formatYMD(selectedDate), {
-    pollingInterval: 4000,
+    pollingInterval: 10000,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true
   });
