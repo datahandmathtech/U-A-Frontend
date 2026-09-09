@@ -595,6 +595,7 @@ const ProjectDetails: React.FC = () => {
           navigate(`/crm/${id}?view=${parsedView}`, { replace: true });
         } else {
           setViewingStepOverride(parsedView);
+          if (id) sessionStorage.setItem(`lastWOView_${id}`, String(parsedView));
         }
       }
     } else {
@@ -1215,7 +1216,9 @@ const ProjectDetails: React.FC = () => {
   const handleReturnToActive = () => {
     setViewingStepOverride(null);
     if (isProjectActive) {
-      navigate(`/projects/${id}`, { replace: true });
+      const savedWOView = id ? sessionStorage.getItem(`lastWOView_${id}`) : null;
+      const targetView = savedWOView !== null ? parseInt(savedWOView, 10) : (activeStep >= 4 ? activeStep : 5);
+      navigate(`/projects/${id}?view=${targetView}`, { replace: true });
     } else {
       navigate(`/crm/${id}`, { replace: true });
     }
@@ -1227,7 +1230,9 @@ const ProjectDetails: React.FC = () => {
       return;
     }
     if (isCrmView && isProjectActive) {
-      navigate(`/projects/${id}`, { replace: true });
+      const savedWOView = id ? sessionStorage.getItem(`lastWOView_${id}`) : null;
+      const targetView = savedWOView !== null ? parseInt(savedWOView, 10) : (activeStep >= 4 ? activeStep : 5);
+      navigate(`/projects/${id}?view=${targetView}`, { replace: true });
       return;
     }
     if (isCrmView) {
