@@ -1212,26 +1212,29 @@ const ProjectDetails: React.FC = () => {
     ? (viewingStepOverride !== null ? Math.min(3, viewingStepOverride) : Math.min(3, activeStep))
     : (viewingStepOverride !== null && viewingStepOverride >= 4 ? viewingStepOverride : Math.max(4, activeStep));
 
-  const handleGoBackStep = () => {
-    if (!isCrmView) {
-      if (viewingStepOverride !== null) {
-        setViewingStepOverride(null);
-        return;
-      }
-      navigate('/projects');
-      return;
+  const handleReturnToActive = () => {
+    setViewingStepOverride(null);
+    if (isProjectActive) {
+      navigate(`/projects/${id}`, { replace: true });
+    } else {
+      navigate(`/crm/${id}`, { replace: true });
     }
+  };
 
-    if (viewingStepOverride !== null) {
-      setViewingStepOverride(null);
+  const handleGoBackStep = () => {
+    if (viewingStepOverride !== null || location.search.includes('view=')) {
+      handleReturnToActive();
       return;
     }
-    const currentStepVal = Math.min(3, activeStep);
-    
-    if (currentStepVal === 0) navigate('/crm');
-    else if (currentStepVal === 1) handleNextStage('enquiry');
-    else if (currentStepVal === 2) handleNextStage('design_sharing');
-    else if (currentStepVal === 3) handleNextStage('quotation');
+    if (isCrmView && isProjectActive) {
+      navigate(`/projects/${id}`, { replace: true });
+      return;
+    }
+    if (isCrmView) {
+      navigate('/crm');
+    } else {
+      navigate('/projects');
+    }
   };
 
   return (
@@ -1240,15 +1243,21 @@ const ProjectDetails: React.FC = () => {
         <Button 
           startIcon={<ArrowBackIcon />} 
           onClick={handleGoBackStep} 
-          sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'transparent' } }}
+          sx={{ 
+            color: 'text.secondary', 
+            fontWeight: 700, 
+            '&:hover': { color: 'primary.main', bgcolor: 'transparent' } 
+          }}
           disableRipple
         >
-          {isCrmView ? 'Back' : 'Back to Work Orders'}
+          {viewingStepOverride !== null || location.search.includes('view=') || (isCrmView && isProjectActive)
+            ? (isProjectActive ? 'Back to Active Work Order' : 'Back to Current Enquiry Stage')
+            : (isCrmView ? 'Back to Enquiries Pipeline' : 'Back to Work Orders List')}
         </Button>
         {isCrmView && hasCrmAccess && (
           <IconButton 
             onClick={() => navigate('/crm')} 
-            title="Back to Pipeline"
+            title="Back to Enquiries Pipeline"
             sx={{ bgcolor: '#FFFDF5', color: '#B38B36', border: '1px solid #E8E1D5', '&:hover': { bgcolor: '#F0E6D2' } }}
           >
             <FilterListIcon />
@@ -1264,7 +1273,7 @@ const ProjectDetails: React.FC = () => {
           <Box sx={{ minHeight: 400 }}>
             
             {/* VIEWING OVERRIDE WARNING BANNER */}
-            {viewingStepOverride !== null && isProjectActive && (
+            {((viewingStepOverride !== null && isProjectActive) || (isCrmView && isProjectActive)) && (
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -1280,15 +1289,15 @@ const ProjectDetails: React.FC = () => {
                   <InfoIcon sx={{ color: '#B38B36', fontSize: '1.75rem' }} />
                   <Typography variant="body1" color="text.primary" fontWeight="600">
                     {isCrmView 
-                      ? <>You are viewing a past CRM stage: <span style={{ color: '#B38B36', fontWeight: '800' }}>{crmSteps[viewingStepOverride] || crmSteps[0]}</span></>
-                      : <>You are viewing a past stage: <span style={{ color: '#B38B36', fontWeight: '800' }}>{steps[viewingStepOverride] || steps[4]}</span></>
+                      ? <>You are viewing a past CRM stage: <span style={{ color: '#B38B36', fontWeight: '800' }}>{crmSteps[stepToRender] || crmSteps[0]}</span></>
+                      : <>You are viewing a past stage: <span style={{ color: '#B38B36', fontWeight: '800' }}>{steps[stepToRender] || steps[4]}</span></>
                     }
                   </Typography>
                 </Box>
                 <Button 
                   variant="contained" 
                   size="medium" 
-                  onClick={() => navigate(`/projects/${id}`)}
+                  onClick={handleReturnToActive}
                   sx={{ 
                     bgcolor: '#B38B36', 
                     color: '#fff', 
@@ -1300,7 +1309,7 @@ const ProjectDetails: React.FC = () => {
                     boxShadow: '0 2px 8px rgba(179, 139, 54, 0.2)'
                   }}
                 >
-                  Back to Active Step
+                  Back to Active Work Order
                 </Button>
               </Box>
             )}
@@ -1933,7 +1942,7 @@ const ProjectDetails: React.FC = () => {
                     variant="outlined"
                     size="large"
                     onClick={() => {
-                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      if (viewingStepOverride !== null || isProjectActive) handleReturnToActive();
                       else handleNextStage('enquiry');
                     }}
                     sx={{
@@ -1946,7 +1955,7 @@ const ProjectDetails: React.FC = () => {
                       textTransform: 'none'
                     }}
                   >
-                    Back
+                    {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : 'Back'}
                   </Button>
 
                   <Button
@@ -1954,7 +1963,7 @@ const ProjectDetails: React.FC = () => {
                     size="large"
                     endIcon={<ArrowForwardRoundedIcon />}
                     onClick={() => {
-                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      if (viewingStepOverride !== null || isProjectActive) handleReturnToActive();
                       else handleFreezeDesign();
                     }}
                     disabled={isUploading}
@@ -1970,7 +1979,7 @@ const ProjectDetails: React.FC = () => {
                       '&:hover': { bgcolor: '#0F172A' }
                     }}
                   >
-                    {viewingStepOverride !== null ? 'Back to Active Step' : (isUploading ? 'Saving...' : 'Proceed to Costing Builder')}
+                    {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : (isUploading ? 'Saving...' : 'Proceed to Costing Builder')}
                   </Button>
                 </Box>
               </Paper>
@@ -2418,7 +2427,7 @@ const ProjectDetails: React.FC = () => {
                     variant="outlined"
                     size="large"
                     onClick={() => {
-                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      if (viewingStepOverride !== null || isProjectActive) handleReturnToActive();
                       else handleNextStage('design_sharing');
                     }}
                     sx={{
@@ -2431,7 +2440,7 @@ const ProjectDetails: React.FC = () => {
                       textTransform: 'none'
                     }}
                   >
-                    Back
+                    {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : 'Back'}
                   </Button>
 
                   <Button
@@ -2439,8 +2448,8 @@ const ProjectDetails: React.FC = () => {
                     size="large"
                     endIcon={<CheckCircleRoundedIcon />}
                     onClick={async () => {
-                      if (viewingStepOverride !== null) {
-                        setViewingStepOverride(null);
+                      if (viewingStepOverride !== null || isProjectActive) {
+                        handleReturnToActive();
                       } else {
                         await handleCreateQuotation();
                       }
@@ -2457,7 +2466,7 @@ const ProjectDetails: React.FC = () => {
                       '&:hover': { bgcolor: '#0F172A' }
                     }}
                   >
-                    {viewingStepOverride !== null ? 'Back to Active Step' : 'Save & Proceed to Advance Payment'}
+                    {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : 'Save & Proceed to Advance Payment'}
                   </Button>
                 </Box>
               </Paper>
@@ -2665,7 +2674,7 @@ const ProjectDetails: React.FC = () => {
                     variant="outlined"
                     size="large"
                     onClick={() => {
-                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      if (viewingStepOverride !== null || isProjectActive) handleReturnToActive();
                       else handleNextStage('quotation');
                     }}
                     sx={{
@@ -2678,7 +2687,7 @@ const ProjectDetails: React.FC = () => {
                       textTransform: 'none'
                     }}
                   >
-                    Back
+                    {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : 'Back'}
                   </Button>
 
                   <Button
@@ -2686,7 +2695,7 @@ const ProjectDetails: React.FC = () => {
                     size="large"
                     endIcon={<CheckCircleRoundedIcon />}
                     onClick={() => {
-                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      if (viewingStepOverride !== null || isProjectActive) handleReturnToActive();
                       else handleAdvancePayment();
                     }}
                     disabled={isCreatingInvoice}
@@ -2694,15 +2703,15 @@ const ProjectDetails: React.FC = () => {
                       px: 4,
                       py: 1.3,
                       borderRadius: 2.5,
-                      bgcolor: viewingStepOverride !== null ? '#1E293B' : '#059669',
+                      bgcolor: (viewingStepOverride !== null || isProjectActive) ? '#1E293B' : '#059669',
                       color: '#FFFFFF',
                       fontWeight: 800,
                       textTransform: 'none',
                       boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
-                      '&:hover': { bgcolor: viewingStepOverride !== null ? '#0F172A' : '#047857' }
+                      '&:hover': { bgcolor: (viewingStepOverride !== null || isProjectActive) ? '#0F172A' : '#047857' }
                     }}
                   >
-                    {viewingStepOverride !== null ? 'Back to Active Step' : (isCreatingInvoice ? 'Processing...' : 'Confirm Advance & Convert to Work Order')}
+                    {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : (isCreatingInvoice ? 'Processing...' : 'Confirm Advance & Convert to Work Order')}
                   </Button>
                 </Box>
               </Paper>
@@ -2974,7 +2983,7 @@ const ProjectDetails: React.FC = () => {
                     variant="outlined" 
                     size="large" 
                     onClick={() => {
-                      if (viewingStepOverride !== null) setViewingStepOverride(null);
+                      if (viewingStepOverride !== null || isProjectActive) handleReturnToActive();
                       else handleNextStage('advance_payment');
                     }} 
                     sx={{ 
@@ -2987,7 +2996,7 @@ const ProjectDetails: React.FC = () => {
                       textTransform: 'none'
                     }}
                   >
-                    Back
+                    {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : 'Back'}
                   </Button>
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button 
@@ -2996,7 +3005,7 @@ const ProjectDetails: React.FC = () => {
                       endIcon={<ArrowForwardRoundedIcon />}
                       onClick={async () => {
                         if (viewingStepOverride !== null) {
-                           setViewingStepOverride(null);
+                           handleReturnToActive();
                         } else {
                            await updateProject({ id: id as string, data: { status: 'production' } }).unwrap();
                            setActiveStep(5);
@@ -3016,7 +3025,7 @@ const ProjectDetails: React.FC = () => {
                         '&:hover': { bgcolor: viewingStepOverride !== null ? '#0F172A' : '#047857' } 
                       }}
                     >
-                      {viewingStepOverride !== null ? 'Back to Active Step' : 'Proceed to Production Pipeline'}
+                      {viewingStepOverride !== null ? 'Back to Active Work Order' : 'Proceed to Production Pipeline'}
                     </Button>
                   </Box>
                 </Box>
@@ -3037,8 +3046,8 @@ const ProjectDetails: React.FC = () => {
                 }}
               >
                 {viewingStepOverride !== null && (
-                   <Button startIcon={<ArrowBackIcon />} variant="text" size="small" onClick={() => setViewingStepOverride(null)} sx={{ mb: 2.5, fontWeight: 700, color: '#0284C7', textTransform: 'none' }}>
-                     Back to Pipeline
+                   <Button startIcon={<ArrowBackIcon />} variant="text" size="small" onClick={handleReturnToActive} sx={{ mb: 2.5, fontWeight: 700, color: '#0284C7', textTransform: 'none' }}>
+                     Back to Active Work Order
                    </Button>
                 )}
 
@@ -3196,7 +3205,7 @@ const ProjectDetails: React.FC = () => {
                     <Button 
                       variant="contained" 
                       size="large" 
-                      onClick={() => setViewingStepOverride(null)} 
+                      onClick={handleReturnToActive} 
                       sx={{ 
                         px: 4, 
                         py: 1.3, 
@@ -3208,7 +3217,7 @@ const ProjectDetails: React.FC = () => {
                         '&:hover': { bgcolor: '#0F172A' } 
                       }}
                     >
-                      Back to Active Step
+                      Back to Active Work Order
                     </Button>
                   ) : !isPlanningMode ? (
                     <Button 

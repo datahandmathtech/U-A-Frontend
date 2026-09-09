@@ -34,6 +34,7 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
 import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import ExitToAppRoundedIcon from '@mui/icons-material/ExitToAppRounded';
 import { useGetProjectByIdQuery, useUpdateProjectMutation } from '../../store/apiSlice';
 
 interface TopbarProps {
@@ -358,27 +359,94 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
 
             {isProjectPage && (
               <>
-                {/* Back to pipeline link */}
-                <MenuItem
-                  onClick={() => {
-                    handleMenuClose();
-                    navigate(pageType === 'crm' ? '/crm' : '/projects');
-                  }}
-                  sx={{
-                    mx: 1,
-                    mb: 1,
-                    borderRadius: 2,
-                    bgcolor: '#FFFDF5',
-                    color: '#B38B36',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    border: '1px solid #FFE0B2',
-                    '&:hover': { bgcolor: '#FFF4E5' }
-                  }}
-                >
-                  <ArrowBackRoundedIcon sx={{ fontSize: 16, mr: 1 }} />
-                  {pageType === 'crm' ? 'Back to Enquiries Pipeline' : 'Back to Active Work Orders'}
-                </MenuItem>
+                {/* Back / Return Action Button */}
+                {isProjectActive ? (
+                  <>
+                    {(pageType === 'crm' || location.search.includes('view=')) && (
+                      <MenuItem
+                        onClick={() => {
+                          handleMenuClose();
+                          navigate(`/projects/${projectId}`);
+                        }}
+                        sx={{
+                          mx: 1,
+                          mb: 0.75,
+                          borderRadius: 2,
+                          bgcolor: '#FFFDF5',
+                          color: '#B38B36',
+                          fontWeight: 800,
+                          fontSize: '0.85rem',
+                          border: '1.5px solid #C89F5A',
+                          '&:hover': { bgcolor: '#FFF4E5' }
+                        }}
+                      >
+                        <ArrowBackRoundedIcon sx={{ fontSize: 18, mr: 1, color: '#B38B36' }} />
+                        Back to Active Work Order
+                      </MenuItem>
+                    )}
+                    <MenuItem
+                      onClick={() => {
+                        handleMenuClose();
+                        navigate('/projects');
+                      }}
+                      sx={{
+                        mx: 1,
+                        mb: 1,
+                        borderRadius: 2,
+                        color: '#64748B',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        '&:hover': { bgcolor: '#F8FAFC', color: '#1E293B' }
+                      }}
+                    >
+                      <ExitToAppRoundedIcon sx={{ fontSize: 16, mr: 1 }} />
+                      Exit to All Work Orders
+                    </MenuItem>
+                  </>
+                ) : (
+                  <>
+                    {location.search.includes('view=') && (
+                      <MenuItem
+                        onClick={() => {
+                          handleMenuClose();
+                          navigate(`/crm/${projectId}`);
+                        }}
+                        sx={{
+                          mx: 1,
+                          mb: 0.75,
+                          borderRadius: 2,
+                          bgcolor: '#FFFDF5',
+                          color: '#B38B36',
+                          fontWeight: 800,
+                          fontSize: '0.85rem',
+                          border: '1.5px solid #C89F5A',
+                          '&:hover': { bgcolor: '#FFF4E5' }
+                        }}
+                      >
+                        <ArrowBackRoundedIcon sx={{ fontSize: 18, mr: 1, color: '#B38B36' }} />
+                        Back to Current Enquiry Stage
+                      </MenuItem>
+                    )}
+                    <MenuItem
+                      onClick={() => {
+                        handleMenuClose();
+                        navigate('/crm');
+                      }}
+                      sx={{
+                        mx: 1,
+                        mb: 1,
+                        borderRadius: 2,
+                        color: '#64748B',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        '&:hover': { bgcolor: '#F8FAFC', color: '#1E293B' }
+                      }}
+                    >
+                      <ExitToAppRoundedIcon sx={{ fontSize: 16, mr: 1 }} />
+                      Exit to Enquiries Pipeline
+                    </MenuItem>
+                  </>
+                )}
 
                 {/* CRM 4-Step Stepper */}
                 {hasCrmAccess && (
@@ -464,7 +532,7 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                   </Box>
                 )}
 
-                {/* Back to Active Step */}
+                {/* Back to Active Step bottom quick link */}
                 {location.search.includes('view=') && (
                   <>
                     <Divider sx={{ my: 1 }} />
@@ -485,7 +553,7 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                       }}
                     >
                       <ArrowForwardRoundedIcon sx={{ fontSize: 16, mr: 1 }} />
-                      Back to Current Active Stage
+                      {isProjectActive ? 'Back to Active Work Order' : 'Back to Current Active Stage'}
                     </MenuItem>
                   </>
                 )}
