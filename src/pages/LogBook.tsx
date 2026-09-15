@@ -89,6 +89,8 @@ const LogBook = () => {
       filtered = filtered.filter((log: any) => 
         (log.project?.clientName || '').toLowerCase().includes(lowerQ) ||
         (log.machine?.name || '').toLowerCase().includes(lowerQ) ||
+        (log.operator?.name || '').toLowerCase().includes(lowerQ) ||
+        (log.operator?.staffId || '').toLowerCase().includes(lowerQ) ||
         (log.project?.name || '').toLowerCase().includes(lowerQ) ||
         (log.status || '').toLowerCase().includes(lowerQ)
       );
@@ -258,6 +260,7 @@ const LogBook = () => {
               <TableHead>
                 <TableRow sx={{ bgcolor: '#FAFAFA' }}>
                   <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>DATE</TableCell>
+                  <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>STAFF / OPERATOR</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>CLIENT</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>MACHINE</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: '0.75rem', color: 'text.secondary' }}>PUNCH IN</TableCell>
@@ -278,6 +281,17 @@ const LogBook = () => {
                     <TableRow key={log.id} sx={{ '&:hover': { bgcolor: 'rgba(46, 125, 50, 0.02)' } }}>
                       <TableCell sx={{ color: 'text.primary', fontWeight: 600 }}>
                         {formatDMY(new Date(log.startTime))}
+                      </TableCell>
+                      {/* STAFF / OPERATOR */}
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        <Typography sx={{ fontWeight: 800, fontSize: '0.88rem', color: '#1E293B' }}>
+                          {log.operator?.name || '—'}
+                        </Typography>
+                        {log.operator?.staffId && (
+                          <Typography sx={{ fontWeight: 700, fontSize: '0.7rem', color: '#64748B' }}>
+                            ID: {log.operator.staffId}
+                          </Typography>
+                        )}
                       </TableCell>
                       {/* CLIENT — separate bold row */}
                       <TableCell>
@@ -463,6 +477,10 @@ const LogBook = () => {
                           <Chip label={i === 0 ? 'MACHINE' : i === 1 ? 'UNIT' : 'SOFTWARE'} size="small" sx={{ position: 'absolute', top: 5, left: 5, bgcolor: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '0.6rem', height: 20 }} />
                         </Box>
                       ))}
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography sx={{ color: 'text.secondary', fontWeight: 600 }}>Staff / Operator</Typography>
+                      <Typography sx={{ fontWeight: 800, color: '#1E293B' }}>{selectedLog.operator?.name || '—'} {selectedLog.operator?.staffId ? `(${selectedLog.operator.staffId})` : ''}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography sx={{ color: 'text.secondary', fontWeight: 600 }}>Client</Typography>
