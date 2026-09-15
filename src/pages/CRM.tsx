@@ -333,16 +333,18 @@ const CRM: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.clientName.trim()) {
-      alert('Please provide at least an Enquiry/Project Title and Client Name.');
+    if (!formData.clientName.trim()) {
+      alert('Please provide at least the Client Name.');
       return;
     }
+    const finalName = formData.name.trim() || `${formData.clientName.trim()} - Enquiry`;
     try {
       if (editingId) {
         await updateProject({
           id: editingId,
           data: {
             ...formData,
+            name: finalName,
             description: formData.requirements,
             requirements: formData.requirements,
             createdAt: new Date(formData.createdAt).toISOString()
@@ -351,15 +353,17 @@ const CRM: React.FC = () => {
       } else {
         await createProject({
           ...formData,
+          name: finalName,
           description: formData.requirements,
           requirements: formData.requirements,
           createdAt: new Date(formData.createdAt).toISOString()
         }).unwrap();
       }
       handleClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save enquiry', err);
-      alert('Failed to save enquiry. Please try again.');
+      const errMsg = err?.data?.message || err?.error || err?.message || 'Failed to save enquiry. Please check connection and try again.';
+      alert(`Error: ${errMsg}`);
     }
   };
 

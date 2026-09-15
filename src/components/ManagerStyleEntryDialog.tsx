@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Box, TextField, MenuItem, Button, Typography, Switch, FormControlLabel, RadioGroup, Radio, FormControl, IconButton, Paper } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Box, TextField, MenuItem, Button, Typography, Switch, FormControlLabel, RadioGroup, Radio, FormControl, IconButton, Paper, Autocomplete } from '@mui/material';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OutputIcon from '@mui/icons-material/Output';
@@ -314,21 +314,35 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                   </TextField>
 
                   <Box sx={{ display: 'flex', gap: 1.5 }}>
-                    <TextField 
-                      select
-                      label="Work Stage" 
-                      fullWidth 
-                      size="small"
+                    <Autocomplete
+                      freeSolo
+                      options={['Production', 'Polishing', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch', 'Spare Parts', 'Fabrication', 'Grooving', 'CNC Cutting', 'Inlay Work', 'Carving']}
                       value={row.stage}
-                      onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], stage: e.target.value }; return arr; })}
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' } }}
-                    >
-                      <MenuItem value="Production">Production</MenuItem>
-                      <MenuItem value="Polishing">Polishing</MenuItem>
-                      <MenuItem value="Packing">Packing</MenuItem>
-                      <MenuItem value="Dispatch">Dispatch</MenuItem>
-                      <MenuItem value="Spare Parts">Spare Parts</MenuItem>
-                    </TextField>
+                      onChange={(_, newValue) => {
+                        setVendorRows(prev => {
+                          const arr = [...prev];
+                          arr[index] = { ...arr[index], stage: newValue || 'Production' };
+                          return arr;
+                        });
+                      }}
+                      onInputChange={(_, newInputValue) => {
+                        setVendorRows(prev => {
+                          const arr = [...prev];
+                          arr[index] = { ...arr[index], stage: newInputValue };
+                          return arr;
+                        });
+                      }}
+                      renderInput={(params) => (
+                        <TextField 
+                          {...params} 
+                          label="Work Stage" 
+                          size="small" 
+                          fullWidth 
+                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#FFFFFF' } }} 
+                        />
+                      )}
+                      sx={{ flex: 1 }}
+                    />
                     <TextField 
                       fullWidth 
                       size="small"

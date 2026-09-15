@@ -1764,20 +1764,35 @@ const ManagerDashboard: React.FC = () => {
                           </TextField>
 
                           <Box sx={{ display: 'flex', gap: 1.5 }}>
-                            <TextField 
-                              select
-                              label="Work Stage" 
-                              fullWidth 
-                              size="small"
-                              value={row.stage} 
-                              onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], stage: e.target.value }; return arr; })} 
-                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                            >
-                              <MenuItem value="Production">Production</MenuItem>
-                              <MenuItem value="Polishing">Polishing</MenuItem>
-                              <MenuItem value="Packing">Packing</MenuItem>
-                              <MenuItem value="Spare Parts">Spare Parts</MenuItem>
-                            </TextField>
+                            <Autocomplete
+                              freeSolo
+                              options={['Production', 'Polishing', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch', 'Spare Parts', 'Fabrication', 'Grooving', 'CNC Cutting', 'Inlay Work', 'Carving']}
+                              value={row.stage}
+                              onChange={(_, newValue) => {
+                                setVendorRows(prev => { 
+                                  const arr = [...prev]; 
+                                  arr[index] = { ...arr[index], stage: newValue || 'Production' }; 
+                                  return arr; 
+                                });
+                              }}
+                              onInputChange={(_, newInputValue) => {
+                                setVendorRows(prev => { 
+                                  const arr = [...prev]; 
+                                  arr[index] = { ...arr[index], stage: newInputValue }; 
+                                  return arr; 
+                                });
+                              }}
+                              renderInput={(params) => (
+                                <TextField 
+                                  {...params} 
+                                  label="Work Stage" 
+                                  size="small" 
+                                  fullWidth 
+                                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} 
+                                />
+                              )}
+                              sx={{ flex: 1 }}
+                            />
                             <TextField 
                               fullWidth 
                               size="small"

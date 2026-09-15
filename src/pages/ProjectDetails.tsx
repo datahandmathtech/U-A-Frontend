@@ -620,14 +620,8 @@ const ProjectDetails: React.FC = () => {
 
   const isPlanningMode = projectSlabs?.some((s: any) => s.status === 'pending') || !projectSlabs || projectSlabs.length === 0;
 
-  const globalRequiredStages = new Set<string>();
-  if (!isPlanningMode && projectSlabs) {
-    projectSlabs.forEach((s: any) => {
-      (s.requiredStages || []).forEach((stage: string) => globalRequiredStages.add(stage.split(' ')[0]));
-    });
-  }
   const ALL_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-  const activeColumns = isPlanningMode ? ALL_STAGES : ALL_STAGES.filter(s => globalRequiredStages.has(s));
+  const activeColumns = ALL_STAGES;
 
   const handleStartAllWork = async () => {
     try {
@@ -667,22 +661,34 @@ const ProjectDetails: React.FC = () => {
       size: slab.size || '', 
       cost: slab.cost || 0, 
       inventoryId: slab.inventoryId || '',
-      requiredStages: slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch']
+      requiredStages: slab.requiredStages && slab.requiredStages.length > 0
+        ? slab.requiredStages
+        : ['Production', 'Polishing - Honed', 'Packing', 'Dispatch']
     });
     setEditSlabDialogOpen(true);
   };
 
   const handleUpdateSlab = async () => {
     try {
-      await updateSlab({ id: editingSlabId as string, data: slabForm }).unwrap();
+      const payload: any = {
+        name: slabForm.name,
+        size: slabForm.size || '',
+        cost: Number(slabForm.cost) || 0,
+        requiredStages: slabForm.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch']
+      };
+      if (slabForm.inventoryId && slabForm.inventoryId.length === 24) {
+        payload.inventoryId = slabForm.inventoryId;
+      }
+      await updateSlab({ id: editingSlabId as string, data: payload }).unwrap();
       setEditSlabDialogOpen(false);
       setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
       setEditingSlabId(null);
       refetchSlabs();
       setSnackbarMessage('Slab updated successfully!');
-    } catch (error) {
-      console.error(error);
-      setSnackbarMessage('Failed to update slab.');
+    } catch (error: any) {
+      console.error('Failed to update slab:', error);
+      const msg = error?.data?.message || error?.error || 'Failed to update slab.';
+      setSnackbarMessage(`Failed to update slab: ${msg}`);
     }
   };
 
