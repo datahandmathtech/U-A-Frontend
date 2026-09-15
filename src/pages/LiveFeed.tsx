@@ -915,7 +915,7 @@ const LiveFeed: React.FC = () => {
                                 MACHINE CURRENTLY IN OPERATION
                               </Typography>
                               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mt: 0.5 }}>
-                                Running duration today: {getRunDurationStr(selectedLog.startTime, selectedLog.endTime)}
+                                Running duration today: {getDayRunDurationStr(selectedLog.startTime, selectedLog.endTime, selectedDate)}
                               </Typography>
                             </Box>
                           )}
