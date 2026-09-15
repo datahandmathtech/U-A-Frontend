@@ -429,7 +429,7 @@ const LiveFeed: React.FC = () => {
               const isPending = log.approvalStatus === 'pending';
               const isActive = log.status === 'active';
               const logStartMs = new Date(log.startTime).getTime();
-              const isCarryForward = Boolean(log.isCarryForward) || Boolean(log.parentLogId) || logStartMs < dayStart.getTime();
+              const isCarryForward = isActive && (Boolean(log.isCarryForward) || Boolean(log.parentLogId) || logStartMs < dayStart.getTime());
 
               const durationLabel = isCarryForward ? 'TOTAL RUN' : (isCompleted ? 'TOTAL RUN' : 'TODAY RUN');
               const durationText = isCarryForward
@@ -767,8 +767,11 @@ const LiveFeed: React.FC = () => {
                       <Typography variant="caption" sx={{ color: '#059669', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.75, letterSpacing: 0.5, mb: 1.5 }}>
                         🟢 SHIFT START (PUNCH IN)
                       </Typography>
-                      <Typography variant="h4" sx={{ fontWeight: 900, mb: 1, color: '#0F172A' }}>
-                        {selectedLog.isCarryForward || new Date(selectedLog.startTime).getTime() < dayStart.getTime() ? '12:00 AM (CF)' : formatTime(selectedLog.startTime)}
+                      <Typography variant="h4" sx={{ fontWeight: 900, mb: 0.5, color: '#0F172A' }}>
+                        {formatTime(selectedLog.initialStartTime || selectedLog.startTime)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 1.5 }}>
+                        First Started: {formatDMY(selectedLog.initialStartTime || selectedLog.startTime)}
                       </Typography>
                       
                       {selectedLog.approvalStatus === 'pending' ? (
@@ -870,9 +873,14 @@ const LiveFeed: React.FC = () => {
                       
                       {selectedLog.status === 'completed' ? (
                         <>
-                          <Typography variant="h4" sx={{ fontWeight: 900, mb: 1, color: '#0F172A' }}>
-                            {selectedLog.endTime ? (new Date(selectedLog.endTime).getTime() > dayEnd.getTime() || selectedLog.remarks?.includes('Auto-closed') ? '12:00 AM (Split)' : formatTime(selectedLog.endTime)) : '-'}
+                          <Typography variant="h4" sx={{ fontWeight: 900, mb: 0.5, color: '#0F172A' }}>
+                            {selectedLog.endTime ? formatTime(selectedLog.endTime) : '-'}
                           </Typography>
+                          {selectedLog.endTime && (
+                            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 1.5 }}>
+                              Turned Off: {formatDMY(selectedLog.endTime)}
+                            </Typography>
+                          )}
                           <Typography variant="body2" sx={{ mb: 2, p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, fontStyle: 'italic', color: '#475569', border: '1px solid #E2E8F0' }}>
                             "{selectedLog.remarks || 'No remarks provided'}"
                           </Typography>
