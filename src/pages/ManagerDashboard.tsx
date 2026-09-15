@@ -1729,26 +1729,49 @@ const ManagerDashboard: React.FC = () => {
                 ) : (
                   <>
                     {/* Material Tracking Assignment flow - Strictly External Vendor */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem' }}>
-                        Assign Stone to Vendor:
-                      </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography sx={{ color: '#0F172A', fontWeight: 800, fontSize: '0.88rem', letterSpacing: '-0.2px' }}>
+                          Assign Stone to Vendor(s):
+                        </Typography>
+                        <Chip label={`${vendorRows.length} Vendor${vendorRows.length > 1 ? 's' : ''}`} size="small" sx={{ fontWeight: 700, fontSize: '0.72rem', bgcolor: '#FFF7ED', color: '#EA580C', border: '1px solid #FFEDD5' }} />
+                      </Box>
+
                       {vendorRows.map((row, index) => (
-                        <Paper key={index} elevation={0} sx={{ p: 2, border: '1px solid #E2E8F0', borderRadius: 2.5, bgcolor: '#F8FAFC', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Paper 
+                          key={index} 
+                          elevation={0} 
+                          sx={{ 
+                            p: 2.5, 
+                            border: '1.5px solid #E2E8F0', 
+                            borderRadius: 3.5, 
+                            bgcolor: '#FFFFFF', 
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: 2 
+                          }}
+                        >
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.82rem' }}>
-                              Assignment {index + 1}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#EA580C', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>
+                                {index + 1}
+                              </Box>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.86rem' }}>
+                                Assignment {index + 1}
+                              </Typography>
+                            </Box>
                             {vendorRows.length > 1 && (
-                              <IconButton size="small" color="error" onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))}>
+                              <IconButton size="small" color="error" onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))} sx={{ bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } }}>
                                 <DeleteIcon sx={{ fontSize: 16 }} />
                               </IconButton>
                             )}
                           </Box>
                           
+                          {/* 1. Vendor Selection */}
                           <TextField 
                             select
-                            label="Select Vendor" 
+                            label="Select Vendor *" 
                             fullWidth 
                             size="small"
                             value={row.vendorId} 
@@ -1756,14 +1779,15 @@ const ManagerDashboard: React.FC = () => {
                               const vName = vendorsList?.find((v:any) => v.id === e.target.value)?.name || '';
                               setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], vendorId: e.target.value, vendorName: vName }; return arr; });
                             }}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                            slotProps={{ input: { sx: { borderRadius: 2.5, bgcolor: '#F8FAFC' } } }}
                           >
                             {vendorsList?.map((v: any) => (
-                              <MenuItem key={v.id} value={v.id} sx={{ fontSize: '0.85rem' }}>{v.name}</MenuItem>
+                              <MenuItem key={v.id} value={v.id} sx={{ fontSize: '0.88rem' }}>{v.name}</MenuItem>
                             ))}
                           </TextField>
 
-                          <Box sx={{ display: 'flex', gap: 1.5 }}>
+                          {/* 2. Work Stage Selection with Quick Chips */}
+                          <Box>
                             <Autocomplete
                               freeSolo
                               options={['Production', 'Polishing', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch', 'Spare Parts', 'Fabrication', 'Grooving', 'CNC Cutting', 'Inlay Work', 'Carving']}
@@ -1785,33 +1809,85 @@ const ManagerDashboard: React.FC = () => {
                               renderInput={(params) => (
                                 <TextField 
                                   {...params} 
-                                  label="Work Stage" 
+                                  label="Work Stage *" 
                                   size="small" 
                                   fullWidth 
-                                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} 
+                                  slotProps={{ input: { ...params.InputProps, sx: { borderRadius: 2.5, bgcolor: '#F8FAFC' } } }} 
                                 />
                               )}
-                              sx={{ flex: 1 }}
                             />
-                            <TextField 
-                              fullWidth 
-                              size="small"
-                              label="Quantity" 
-                              type="number"
-                              value={row.qty}
-                              onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
-                              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                            />
+
+                            {/* Quick Select Stage Chips */}
+                            <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', mt: 1 }}>
+                              {['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(st => {
+                                const isSelected = row.stage === st;
+                                return (
+                                  <Chip
+                                    key={st}
+                                    label={st}
+                                    size="small"
+                                    onClick={() => {
+                                      setVendorRows(prev => {
+                                        const arr = [...prev];
+                                        arr[index] = { ...arr[index], stage: st };
+                                        return arr;
+                                      });
+                                    }}
+                                    sx={{
+                                      cursor: 'pointer',
+                                      fontWeight: isSelected ? 800 : 600,
+                                      fontSize: '0.72rem',
+                                      height: 24,
+                                      bgcolor: isSelected ? '#EA580C' : '#F1F5F9',
+                                      color: isSelected ? '#FFFFFF' : '#475569',
+                                      border: '1px solid',
+                                      borderColor: isSelected ? '#EA580C' : '#E2E8F0',
+                                      transition: 'all 0.15s ease',
+                                      '&:hover': { bgcolor: isSelected ? '#C2410C' : '#E2E8F0' }
+                                    }}
+                                  />
+                                );
+                              })}
+                            </Box>
                           </Box>
+
+                          {/* 3. Quantity */}
+                          <TextField 
+                            fullWidth 
+                            size="small"
+                            label="Quantity (Pieces) *" 
+                            type="number"
+                            placeholder="Enter number of pieces"
+                            value={row.qty}
+                            onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
+                            slotProps={{ 
+                              input: { 
+                                endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B' }}>Pcs</Typography></InputAdornment>,
+                                sx: { borderRadius: 2.5, bgcolor: '#F8FAFC' } 
+                              } 
+                            }}
+                          />
                         </Paper>
                       ))}
 
                       <Button 
-                        startIcon={<AddIcon sx={{ fontSize: 16 }} />} 
+                        startIcon={<AddIcon sx={{ fontSize: 18 }} />} 
                         onClick={() => setVendorRows(prev => [...prev, { vendorId: '', vendorName: '', stage: 'Production', qty: '' }])} 
-                        sx={{ alignSelf: 'flex-start', textTransform: 'none', fontWeight: 700, fontSize: '0.8rem' }}
+                        sx={{ 
+                          alignSelf: 'flex-start', 
+                          textTransform: 'none', 
+                          fontWeight: 800, 
+                          fontSize: '0.82rem',
+                          color: '#EA580C',
+                          bgcolor: '#FFF7ED',
+                          border: '1px solid #FFEDD5',
+                          borderRadius: 2.5,
+                          px: 2,
+                          py: 0.8,
+                          '&:hover': { bgcolor: '#FFEDD5' }
+                        }}
                       >
-                        + Add Another Vendor
+                        + Add Another Vendor Assignment
                       </Button>
                     </Box>
                   </>
