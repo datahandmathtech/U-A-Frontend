@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, Paper, TextField, MenuItem, CircularProgress, 
   Alert, Snackbar, Divider, Avatar, Dialog, DialogTitle, DialogContent, 
   DialogActions, IconButton, Chip, Autocomplete, RadioGroup, FormControlLabel, 
-  Radio, FormControl, Grid, Switch, Tooltip, Checkbox 
+  Radio, FormControl, Grid, Switch, Tooltip, Checkbox, InputAdornment 
 } from '@mui/material';
 import { 
   useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, 
