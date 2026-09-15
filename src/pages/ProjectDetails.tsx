@@ -2526,7 +2526,7 @@ const ProjectDetails: React.FC = () => {
                     </Box>
                   )}
 
-                  <Grid container spacing={3} alignItems="center">
+                  <Grid container spacing={3} sx={{ alignItems: 'center' }}>
                     <Grid size={{ xs: 12, sm: 4 }}>
                       <TextField
                         fullWidth
