@@ -328,7 +328,7 @@ const LogBook = () => {
                         </Box>
                       </TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap', minWidth: 130 }}>
-                        <Typography sx={{ color: log.isCarryForward ? '#D97706' : '#2E7D32', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 0.75, whiteSpace: 'nowrap' }}>
+                        <Box sx={{ color: log.isCarryForward ? '#D97706' : '#2E7D32', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 0.75, whiteSpace: 'nowrap', fontSize: '0.875rem' }}>
                           <ArrowOutwardIcon fontSize="small" /> {log.isCarryForward ? '12:00 AM' : formatTime(log.startTime)}
                           {log.isCarryForward && (
                             <Chip 
@@ -337,7 +337,7 @@ const LogBook = () => {
                               sx={{ 
                                 bgcolor: '#FEF3C7', 
                                 color: '#B45309', 
-                                border: '1px solid #FCD34D',
+                                border: '1px solid #FCD34D', 
                                 fontWeight: 800, 
                                 fontSize: '0.62rem', 
                                 height: 18, 
@@ -345,11 +345,11 @@ const LogBook = () => {
                               }} 
                             />
                           )}
-                        </Typography>
+                        </Box>
                       </TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap', minWidth: 140 }}>
                         {log.endTime ? (
-                          <Typography sx={{ color: '#1976D2', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 0.75, whiteSpace: 'nowrap' }}>
+                          <Box sx={{ color: '#1976D2', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 0.75, whiteSpace: 'nowrap', fontSize: '0.875rem' }}>
                             <CallReceivedIcon fontSize="small" /> {formatTime(log.endTime)}
                             {log.remarks?.includes('Auto-closed') && (
                               <Chip 
@@ -358,7 +358,7 @@ const LogBook = () => {
                                 sx={{ 
                                   bgcolor: '#EDE9FE', 
                                   color: '#6D28D9', 
-                                  border: '1px solid #DDD6FE',
+                                  border: '1px solid #DDD6FE', 
                                   fontWeight: 800, 
                                   fontSize: '0.62rem', 
                                   height: 18, 
@@ -366,7 +366,7 @@ const LogBook = () => {
                                 }} 
                               />
                             )}
-                          </Typography>
+                          </Box>
                         ) : (
                           <Chip label="RUNNING NOW" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0', fontWeight: 'bold', fontSize: '0.7rem' }} />
                         )}
