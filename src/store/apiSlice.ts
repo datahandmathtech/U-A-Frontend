@@ -164,10 +164,10 @@ export const apiSlice = createApi({
       providesTags: ['Production']
     }),
     login: builder.mutation<any, any>({
-      query: (body) => ({ url: '/auth/login', method: 'POST', body })
+      query: (body) => ({ url: '/user-auth/login', method: 'POST', body })
     }),
     registerUser: builder.mutation<any, any>({
-      query: (body) => ({ url: '/auth/register', method: 'POST', body })
+      query: (body) => ({ url: '/user-auth/register', method: 'POST', body })
     }),
     getMachines: builder.query<any[], void>({
       query: () => '/machines',
