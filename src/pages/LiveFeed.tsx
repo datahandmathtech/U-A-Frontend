@@ -150,7 +150,7 @@ const LiveFeed: React.FC = () => {
   // Machines registered in system that did NOT run at all on this selected date
   const idleMachines = useMemo(() => {
     if (!allMachinesList) return [];
-    return allMachinesList.filter((m: any) => !operatedMachineIds.has(m.id));
+    return allMachinesList.filter((m: any) => !operatedMachineIds.has(m.id) && !operatedMachineIds.has(m._id));
   }, [allMachinesList, operatedMachineIds]);
 
   const displayedLogs = useMemo(() => {
@@ -161,8 +161,8 @@ const LiveFeed: React.FC = () => {
     return rawLogs;
   }, [filterType, rawLogs, activeLogs, carryForwardLogs, completedLogs]);
 
-  // ONLY show Idle machines when the "Idle Machines" filter is selected!
-  const showIdleCards = filterType === 'idle';
+  // Show Idle machines when viewing "All Machines" or "Idle Machines"
+  const showIdleCards = filterType === 'idle' || filterType === 'all';
 
   return (
     <Box sx={{ width: '100%', px: { xs: 0, sm: 0.5, md: 1 } }}>
@@ -269,7 +269,7 @@ const LiveFeed: React.FC = () => {
           { 
             key: 'all', 
             label: 'All Machines', 
-            count: rawLogs.length,
+            count: (allMachinesList && allMachinesList.length > 0 ? allMachinesList.length : rawLogs.length),
             icon: <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />,
             activeBg: '#0F172A',
             activeColor: '#FFFFFF',
