@@ -1729,146 +1729,134 @@ const ManagerDashboard: React.FC = () => {
                 ) : (
                   <>
                     {/* Material Tracking Assignment flow - Strictly External Vendor */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography sx={{ color: '#0F172A', fontWeight: 800, fontSize: '0.88rem', letterSpacing: '-0.2px' }}>
+                        <Typography sx={{ color: '#0F172A', fontWeight: 800, fontSize: '0.88rem' }}>
                           Assign Stone to Vendor(s):
                         </Typography>
                         <Chip label={`${vendorRows.length} Vendor${vendorRows.length > 1 ? 's' : ''}`} size="small" sx={{ fontWeight: 700, fontSize: '0.72rem', bgcolor: '#FFF7ED', color: '#EA580C', border: '1px solid #FFEDD5' }} />
                       </Box>
 
-                      {vendorRows.map((row, index) => (
-                        <Paper 
-                          key={index} 
-                          elevation={0} 
-                          sx={{ 
-                            p: 2.5, 
-                            border: '1.5px solid #E2E8F0', 
-                            borderRadius: 3.5, 
-                            bgcolor: '#FFFFFF', 
-                            boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            gap: 2 
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#EA580C', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>
-                                {index + 1}
-                              </Box>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.86rem' }}>
-                                Assignment {index + 1}
-                              </Typography>
-                            </Box>
-                            {vendorRows.length > 1 && (
-                              <IconButton size="small" color="error" onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))} sx={{ bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } }}>
-                                <DeleteIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            )}
-                          </Box>
-                          
-                          {/* 1. Vendor Selection */}
-                          <TextField 
-                            select
-                            label="Select Vendor *" 
-                            fullWidth 
-                            size="small"
-                            value={row.vendorId} 
-                            onChange={(e) => {
-                              const vName = vendorsList?.find((v:any) => v.id === e.target.value)?.name || '';
-                              setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], vendorId: e.target.value, vendorName: vName }; return arr; });
+                      {vendorRows.map((row, index) => {
+                        const DEFAULT_STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Polishing', 'Packing', 'Dispatch', 'Spare Parts', 'Fabrication', 'Grooving', 'CNC Cutting', 'Inlay Work', 'Carving'];
+                        const isCustomStage = !DEFAULT_STAGES.includes(row.stage);
+
+                        return (
+                          <Paper 
+                            key={index} 
+                            elevation={0} 
+                            sx={{ 
+                              p: 2, 
+                              border: '1px solid #E2E8F0', 
+                              borderRadius: 3, 
+                              bgcolor: '#FFFFFF', 
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: 1.5 
                             }}
-                            slotProps={{ input: { sx: { borderRadius: 2.5, bgcolor: '#F8FAFC' } } }}
                           >
-                            {vendorsList?.map((v: any) => (
-                              <MenuItem key={v.id} value={v.id} sx={{ fontSize: '0.88rem' }}>{v.name}</MenuItem>
-                            ))}
-                          </TextField>
-
-                          {/* 2. Work Stage Selection with Quick Chips */}
-                          <Box>
-                            <Autocomplete
-                              freeSolo
-                              options={['Production', 'Polishing', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch', 'Spare Parts', 'Fabrication', 'Grooving', 'CNC Cutting', 'Inlay Work', 'Carving']}
-                              value={row.stage}
-                              onChange={(_, newValue) => {
-                                setVendorRows(prev => { 
-                                  const arr = [...prev]; 
-                                  arr[index] = { ...arr[index], stage: newValue || 'Production' }; 
-                                  return arr; 
-                                });
-                              }}
-                              onInputChange={(_, newInputValue) => {
-                                setVendorRows(prev => { 
-                                  const arr = [...prev]; 
-                                  arr[index] = { ...arr[index], stage: newInputValue }; 
-                                  return arr; 
-                                });
-                              }}
-                              renderInput={(params) => (
-                                <TextField 
-                                  {...params} 
-                                  label="Work Stage *" 
-                                  size="small" 
-                                  fullWidth 
-                                  slotProps={{ input: { ...params.InputProps, sx: { borderRadius: 2.5, bgcolor: '#F8FAFC' } } }} 
-                                />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#EA580C', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>
+                                  {index + 1}
+                                </Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.84rem' }}>
+                                  Assignment {index + 1}
+                                </Typography>
+                              </Box>
+                              {vendorRows.length > 1 && (
+                                <IconButton size="small" color="error" onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))} sx={{ bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } }}>
+                                  <DeleteIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
                               )}
-                            />
-
-                            {/* Quick Select Stage Chips */}
-                            <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', mt: 1 }}>
-                              {['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(st => {
-                                const isSelected = row.stage === st;
-                                return (
-                                  <Chip
-                                    key={st}
-                                    label={st}
-                                    size="small"
-                                    onClick={() => {
-                                      setVendorRows(prev => {
-                                        const arr = [...prev];
-                                        arr[index] = { ...arr[index], stage: st };
-                                        return arr;
-                                      });
-                                    }}
-                                    sx={{
-                                      cursor: 'pointer',
-                                      fontWeight: isSelected ? 800 : 600,
-                                      fontSize: '0.72rem',
-                                      height: 24,
-                                      bgcolor: isSelected ? '#EA580C' : '#F1F5F9',
-                                      color: isSelected ? '#FFFFFF' : '#475569',
-                                      border: '1px solid',
-                                      borderColor: isSelected ? '#EA580C' : '#E2E8F0',
-                                      transition: 'all 0.15s ease',
-                                      '&:hover': { bgcolor: isSelected ? '#C2410C' : '#E2E8F0' }
-                                    }}
-                                  />
-                                );
-                              })}
                             </Box>
-                          </Box>
+                            
+                            {/* 1. Vendor Selection */}
+                            <TextField 
+                              select
+                              label="Select Vendor *" 
+                              fullWidth 
+                              size="small"
+                              value={row.vendorId} 
+                              onChange={(e) => {
+                                const vName = vendorsList?.find((v:any) => v.id === e.target.value)?.name || '';
+                                setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], vendorId: e.target.value, vendorName: vName }; return arr; });
+                              }}
+                              slotProps={{ input: { sx: { borderRadius: 2, bgcolor: '#F8FAFC' } } }}
+                            >
+                              {vendorsList?.map((v: any) => (
+                                <MenuItem key={v.id} value={v.id} sx={{ fontSize: '0.88rem' }}>{v.name}</MenuItem>
+                              ))}
+                            </TextField>
 
-                          {/* 3. Quantity */}
-                          <TextField 
-                            fullWidth 
-                            size="small"
-                            label="Quantity (Pieces) *" 
-                            type="number"
-                            placeholder="Enter number of pieces"
-                            value={row.qty}
-                            onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
-                            slotProps={{ 
-                              input: { 
-                                endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B' }}>Pcs</Typography></InputAdornment>,
-                                sx: { borderRadius: 2.5, bgcolor: '#F8FAFC' } 
-                              } 
-                            }}
-                          />
-                        </Paper>
-                      ))}
+                            {/* 2. Work Stage & Quantity in clean 2-column grid */}
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 1.5 }}>
+                              <TextField 
+                                select
+                                label="Work Stage *" 
+                                fullWidth 
+                                size="small"
+                                value={isCustomStage ? 'OTHER' : (row.stage || 'Production')} 
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setVendorRows(prev => { 
+                                    const arr = [...prev]; 
+                                    arr[index] = { ...arr[index], stage: val === 'OTHER' ? '' : val }; 
+                                    return arr; 
+                                  });
+                                }} 
+                                slotProps={{ input: { sx: { borderRadius: 2, bgcolor: '#F8FAFC' } } }}
+                              >
+                                <MenuItem value="Production">Production</MenuItem>
+                                <MenuItem value="Polishing - Honed">Polishing - Honed</MenuItem>
+                                <MenuItem value="Polishing - Mirror">Polishing - Mirror</MenuItem>
+                                <MenuItem value="Polishing">Polishing</MenuItem>
+                                <MenuItem value="Packing">Packing</MenuItem>
+                                <MenuItem value="Dispatch">Dispatch</MenuItem>
+                                <MenuItem value="Spare Parts">Spare Parts</MenuItem>
+                                <MenuItem value="Fabrication">Fabrication</MenuItem>
+                                <MenuItem value="Grooving">Grooving</MenuItem>
+                                <MenuItem value="CNC Cutting">CNC Cutting</MenuItem>
+                                <MenuItem value="Inlay Work">Inlay Work</MenuItem>
+                                <MenuItem value="Carving">Carving</MenuItem>
+                                <Divider sx={{ my: 0.5 }} />
+                                <MenuItem value="OTHER" sx={{ color: '#EA580C', fontWeight: 800 }}>+ Custom Work Stage...</MenuItem>
+                              </TextField>
+
+                              <TextField 
+                                fullWidth 
+                                size="small"
+                                label="Quantity *" 
+                                type="number"
+                                placeholder="e.g. 5"
+                                value={row.qty}
+                                onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
+                                slotProps={{ 
+                                  input: { 
+                                    endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B' }}>Pcs</Typography></InputAdornment>,
+                                    sx: { borderRadius: 2, bgcolor: '#F8FAFC' } 
+                                  } 
+                                }}
+                              />
+                            </Box>
+
+                            {/* Custom stage input if 'OTHER' is selected */}
+                            {isCustomStage && (
+                              <TextField
+                                fullWidth
+                                size="small"
+                                label="Enter Custom Work Stage *"
+                                placeholder="e.g. Chamfering / Sandblast / Custom Work"
+                                value={row.stage}
+                                onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], stage: e.target.value }; return arr; })}
+                                slotProps={{ input: { sx: { borderRadius: 2, bgcolor: '#FFF7ED' } } }}
+                                autoFocus
+                              />
+                            )}
+                          </Paper>
+                        );
+                      })}
 
                       <Button 
                         startIcon={<AddIcon sx={{ fontSize: 18 }} />} 
@@ -1881,9 +1869,9 @@ const ManagerDashboard: React.FC = () => {
                           color: '#EA580C',
                           bgcolor: '#FFF7ED',
                           border: '1px solid #FFEDD5',
-                          borderRadius: 2.5,
+                          borderRadius: 2,
                           px: 2,
-                          py: 0.8,
+                          py: 0.7,
                           '&:hover': { bgcolor: '#FFEDD5' }
                         }}
                       >
