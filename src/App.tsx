@@ -3,36 +3,35 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import PageLoader from './components/PageLoader';
 
-// Lazy load all page components for instant initial app load & low bundle size
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const LiveFeed = lazy(() => import('./pages/LiveFeed'));
-const LogBook = lazy(() => import('./pages/LogBook'));
-const PieceTracker = lazy(() => import('./pages/PieceTracker'));
-const VendorLedger = lazy(() => import('./pages/VendorLedger'));
-const VendorLedgerDetails = lazy(() => import('./pages/VendorLedgerDetails'));
-const WasteLedger = lazy(() => import('./pages/WasteLedger'));
-const CRM = lazy(() => import('./pages/CRM'));
-const Projects = lazy(() => import('./pages/Projects'));
-const ProjectDetails = lazy(() => import('./pages/ProjectDetails'));
-const SlabPieceTracker = lazy(() => import('./pages/SlabPieceTracker'));
-const StageDetails = lazy(() => import('./pages/StageDetails'));
-const Approvals = lazy(() => import('./pages/Approvals'));
-const InOutLedger = lazy(() => import('./pages/InOutLedger'));
-const VendorsList = lazy(() => import('./pages/VendorsList'));
-const Accounts = lazy(() => import('./pages/Accounts'));
-const Inventory = lazy(() => import('./pages/Inventory'));
-const InventoryLedger = lazy(() => import('./pages/InventoryLedger'));
-const ItemLedger = lazy(() => import('./pages/ItemLedger'));
-const Production = lazy(() => import('./pages/Production'));
-const AdminConsole = lazy(() => import('./pages/AdminConsole'));
-const Dispatch = lazy(() => import('./pages/Dispatch'));
-const Machines = lazy(() => import('./pages/Machines'));
-const HR = lazy(() => import('./pages/HR'));
-const NotFound = lazy(() => import('./pages/NotFound'));
-
-const Login = lazy(() => import('./pages/Login'));
-const WorkerDashboard = lazy(() => import('./pages/WorkerDashboard'));
-const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
+// Directly import all page components for instant 0ms tab switching & zero layout flash
+import Dashboard from './pages/Dashboard';
+import LiveFeed from './pages/LiveFeed';
+import LogBook from './pages/LogBook';
+import PieceTracker from './pages/PieceTracker';
+import VendorLedger from './pages/VendorLedger';
+import VendorLedgerDetails from './pages/VendorLedgerDetails';
+import WasteLedger from './pages/WasteLedger';
+import CRM from './pages/CRM';
+import Projects from './pages/Projects';
+import ProjectDetails from './pages/ProjectDetails';
+import SlabPieceTracker from './pages/SlabPieceTracker';
+import StageDetails from './pages/StageDetails';
+import Approvals from './pages/Approvals';
+import InOutLedger from './pages/InOutLedger';
+import VendorsList from './pages/VendorsList';
+import Accounts from './pages/Accounts';
+import Inventory from './pages/Inventory';
+import InventoryLedger from './pages/InventoryLedger';
+import ItemLedger from './pages/ItemLedger';
+import Production from './pages/Production';
+import AdminConsole from './pages/AdminConsole';
+import Dispatch from './pages/Dispatch';
+import Machines from './pages/Machines';
+import HR from './pages/HR';
+import NotFound from './pages/NotFound';
+import Login from './pages/Login';
+import WorkerDashboard from './pages/WorkerDashboard';
+import ManagerDashboard from './pages/ManagerDashboard';
 
 const router = createBrowserRouter([
   {
