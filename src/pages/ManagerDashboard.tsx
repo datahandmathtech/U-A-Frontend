@@ -1738,7 +1738,7 @@ const ManagerDashboard: React.FC = () => {
                       </Box>
 
                       {vendorRows.map((row, index) => {
-                        const DEFAULT_STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Polishing', 'Packing', 'Dispatch', 'Spare Parts', 'Fabrication', 'Grooving', 'CNC Cutting', 'Inlay Work', 'Carving'];
+                        const DEFAULT_STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Polishing', 'Packing', 'Dispatch'];
                         const isCustomStage = !DEFAULT_STAGES.includes(row.stage);
 
                         return (
@@ -1814,12 +1814,6 @@ const ManagerDashboard: React.FC = () => {
                                 <MenuItem value="Polishing">Polishing</MenuItem>
                                 <MenuItem value="Packing">Packing</MenuItem>
                                 <MenuItem value="Dispatch">Dispatch</MenuItem>
-                                <MenuItem value="Spare Parts">Spare Parts</MenuItem>
-                                <MenuItem value="Fabrication">Fabrication</MenuItem>
-                                <MenuItem value="Grooving">Grooving</MenuItem>
-                                <MenuItem value="CNC Cutting">CNC Cutting</MenuItem>
-                                <MenuItem value="Inlay Work">Inlay Work</MenuItem>
-                                <MenuItem value="Carving">Carving</MenuItem>
                                 <Divider sx={{ my: 0.5 }} />
                                 <MenuItem value="OTHER" sx={{ color: '#EA580C', fontWeight: 800 }}>+ Custom Work Stage...</MenuItem>
                               </TextField>

@@ -364,12 +364,6 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                         <MenuItem value="Polishing">Polishing</MenuItem>
                         <MenuItem value="Packing">Packing</MenuItem>
                         <MenuItem value="Dispatch">Dispatch</MenuItem>
-                        <MenuItem value="Spare Parts">Spare Parts</MenuItem>
-                        <MenuItem value="Fabrication">Fabrication</MenuItem>
-                        <MenuItem value="Grooving">Grooving</MenuItem>
-                        <MenuItem value="CNC Cutting">CNC Cutting</MenuItem>
-                        <MenuItem value="Inlay Work">Inlay Work</MenuItem>
-                        <MenuItem value="Carving">Carving</MenuItem>
                         <Divider sx={{ my: 0.5 }} />
                         <MenuItem value="OTHER" sx={{ color: '#EA580C', fontWeight: 800 }}>+ Custom Work Stage...</MenuItem>
                       </TextField>
