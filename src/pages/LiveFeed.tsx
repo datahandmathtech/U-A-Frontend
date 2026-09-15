@@ -563,7 +563,7 @@ const LiveFeed: React.FC = () => {
                         {isCarryForward ? (
                           <>
                             <Typography variant="caption" sx={{ fontWeight: 800, color: '#B45309', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.74rem' }}>
-                              🟡 FIRST ON: {firstOnDateStr} ({firstOnTimeStr})
+                              🟡 ON: {firstOnDateStr} ({firstOnTimeStr})
                             </Typography>
                             <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, display: 'block', mt: 0.3, fontSize: '0.73rem' }}>
                               👤 OPERATOR: {operatorName}
