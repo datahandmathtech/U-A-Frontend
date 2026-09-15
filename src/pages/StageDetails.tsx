@@ -113,30 +113,32 @@ const StageDetails = () => {
       const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/i);
       const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/i);
       if (lMatch && wMatch) {
-        slabArea = parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
+        slabArea = (parseFloat(lMatch[1]) * parseFloat(wMatch[1])) / 144;
       }
     }
 
     if (slabArea > 0) {
       let existingArea = 0;
       (slab.pieces || []).forEach((p: any) => {
-        if (p.size) {
+        if (p.length && p.width) {
+          existingArea += (p.length * p.width) / 144;
+        } else if (p.size) {
            const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
            const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
            if (lMatch && wMatch) {
-             existingArea += parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
+             existingArea += (parseFloat(lMatch[1]) * parseFloat(wMatch[1])) / 144;
            }
         }
       });
 
-      const newArea = piecesData.reduce((sum, p) => sum + ((p.l || 0) * (p.w || 0)), 0);
+      const newArea = piecesData.reduce((sum, p) => sum + (((p.l || 0) * (p.w || 0)) / 144), 0);
       
       // Round to 2 decimal places to avoid floating point precision issues
       const totalArea = Math.round((existingArea + newArea) * 100) / 100;
       const roundedSlabArea = Math.round(slabArea * 100) / 100;
 
       if (totalArea > roundedSlabArea) {
-        alert(`Cannot add pieces. Total size exceeds original slab size.\nSlab Size: ${roundedSlabArea.toFixed(2)}\nUsed Size: ${existingArea.toFixed(2)}\nNew Pieces Size: ${newArea.toFixed(2)}\nRemaining: ${(roundedSlabArea - existingArea).toFixed(2)}`);
+        alert(`Cannot add pieces. Total size exceeds original slab size.\nSlab Size: ${roundedSlabArea.toFixed(2)} Sq.Ft\nUsed Size: ${existingArea.toFixed(2)} Sq.Ft\nNew Pieces Size: ${newArea.toFixed(2)} Sq.Ft\nRemaining: ${(roundedSlabArea - existingArea).toFixed(2)} Sq.Ft`);
         setIsSaving(false);
         return;
       }
@@ -899,7 +901,7 @@ const StageDetails = () => {
                     </TableCell>
                     <TableCell sx={{ py: 1.25 }}>
                       <Chip 
-                        label={`${(p.l * p.w).toFixed(2)} Sq.Ft`} 
+                        label={`${((p.l * p.w) / 144).toFixed(2)} Sq.Ft`} 
                         size="small" 
                         sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 800, fontSize: '0.72rem' }} 
                       />
@@ -1106,18 +1108,21 @@ const StageDetails = () => {
                   
                   if (stageFormatted === 'Dispatch') {
                     const packedLogs = productionLogs?.filter((l: any) =>
-                      l.stage === 'Packing' &&
-                      l.approvalStatus === 'approved' &&
+                      (l.stage === 'Packing' || l.stage === 'Packing Work') &&
+                      (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
                       (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
                     ) || [];
                     
                     const dispatchLogs = productionLogs?.filter((l: any) =>
-                      l.stage === 'Dispatch' &&
-                      l.approvalStatus === 'approved'
+                      (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
+                      (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
                     ) || [];
 
-                    displayLogs = packedLogs.map((pLog: any) => {
+                    const matchedDispatchIds = new Set<string>();
+
+                    const packedDisplay = packedLogs.map((pLog: any) => {
                       const dLog = dispatchLogs.find((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode));
+                      if (dLog) matchedDispatchIds.add(dLog.id);
                       return {
                         id: pLog.id,
                         isDispatched: !!dLog,
@@ -1130,10 +1135,29 @@ const StageDetails = () => {
                         logToDelete: dLog?.id || pLog.id
                       };
                     });
+
+                    // Direct dispatch logs (logged directly at Dispatch stage without prior Packing log, or when Packing was skipped)
+                    const directLogs = dispatchLogs.filter((dLog: any) => {
+                      if (matchedDispatchIds.has(dLog.id)) return false;
+                      const matchesSlab = dLog.slabId === slab?.id || dLog.productName === slab?.name || dLog.productId === slab?.id || (dLog.pieceIds && dLog.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid)));
+                      return matchesSlab;
+                    }).map((dLog: any) => ({
+                      id: dLog.id,
+                      isDispatched: true,
+                      dispatchLogId: dLog.id,
+                      createdAt: dLog.createdAt,
+                      boxCode: dLog.boxCode,
+                      vehicleNumber: dLog.vehicleNumber || '-',
+                      quantityProduced: dLog.quantityProduced,
+                      photo: dLog.startPhotos?.machine || dLog.startPhotos?.unit || dLog.startPhotos?.software || dLog.startPhotos?.endPhoto,
+                      logToDelete: dLog.id
+                    }));
+
+                    displayLogs = [...packedDisplay, ...directLogs];
                   } else {
                     displayLogs = productionLogs?.filter((l: any) =>
                       l.stage === stageFormatted &&
-                      l.approvalStatus === 'approved' &&
+                      (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
                       (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
                     ) || [];
                   }

@@ -487,7 +487,7 @@ const InOutLedger: React.FC = () => {
           value={currentTab} 
           onChange={(e, val) => setCurrentTab(val)} 
           textColor="inherit"
-          TabIndicatorProps={{ style: { display: 'none' } }}
+          slotProps={{ indicator: { style: { display: 'none' } } }}
           sx={{ minHeight: 'unset' }}
         >
           <Tab 

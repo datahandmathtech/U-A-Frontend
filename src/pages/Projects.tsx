@@ -210,26 +210,110 @@ const Projects: React.FC = () => {
     );
   }, [projects]);
 
+  // Reusable Production Progress Calculation Helper
+  const getProjectStoneProgress = (project: any) => {
+    const slabs = project.slabs && project.slabs.length > 0 ? project.slabs : [];
+    if (slabs.length === 0) {
+      const totalPieces = project.totalPieces || 1;
+      const completedPieces = project.completedPieces || 0;
+      const pct = totalPieces > 0 ? Math.min(100, Math.round((completedPieces / totalPieces) * 100)) : 0;
+      return {
+        totalStones: 1,
+        completedStones: (completedPieces / totalPieces) || 0,
+        percent: pct
+      };
+    }
+
+    let totalProjectCompletedStones = 0;
+
+    slabs.forEach((slab: any) => {
+      const requiredStages = slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      
+      const hasProduction = requiredStages.includes('Production');
+      const hasPolishing = requiredStages.some((s: string) => s.startsWith('Polishing'));
+      const hasPacking = requiredStages.includes('Packing');
+      const hasDispatch = requiredStages.includes('Dispatch');
+
+      let wProd = hasProduction ? (hasPolishing ? 60 : 80) : 0;
+      let wPoli = hasPolishing ? 20 : 0;
+      let wPack = hasPacking ? 10 : 0;
+      let wDisp = hasDispatch ? 10 : 0;
+
+      const totalWeight = wProd + wPoli + wPack + wDisp;
+      if (totalWeight > 0) {
+        wProd = (wProd / totalWeight);
+        wPoli = (wPoli / totalWeight);
+        wPack = (wPack / totalWeight);
+        wDisp = (wDisp / totalWeight);
+      }
+
+      const totalSubPieces = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
+
+      const getStageCompletionRatio = (stageName: string) => {
+        if (slab.pieces && slab.pieces.length > 0) {
+          let completedCount = 0;
+          slab.pieces.forEach((p: any) => {
+            const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+            const hasLog = p.logs && p.logs.some((l: any) => {
+              const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+              return (lStage === stageName || lStage.startsWith(stageName)) && (l.status === 'completed' || l.status === 'approved');
+            });
+            if (hasLog || (pStage === stageName && p.status === 'completed')) {
+              completedCount++;
+            }
+          });
+          return Math.min(1.0, completedCount / totalSubPieces);
+        }
+        return 0;
+      };
+
+      const cProd = hasProduction ? (slab.status === 'completed' ? 1.0 : getStageCompletionRatio('Production')) : 0;
+      const cPoli = hasPolishing ? getStageCompletionRatio('Polishing') : 0;
+      const cPack = hasPacking ? getStageCompletionRatio('Packing') : 0;
+      const cDisp = hasDispatch ? getStageCompletionRatio('Dispatch') : 0;
+
+      const slabProgressFraction = (wProd * cProd) + (wPoli * cPoli) + (wPack * cPack) + (wDisp * cDisp);
+      totalProjectCompletedStones += slabProgressFraction;
+    });
+
+    const totalStones = slabs.length;
+    const overallPercent = Math.min(100, Math.round((totalProjectCompletedStones / totalStones) * 100));
+
+    return {
+      totalStones,
+      completedStones: totalProjectCompletedStones,
+      percent: overallPercent
+    };
+  };
+
   // Metric Computations
   const stats = useMemo(() => {
     const totalOrders = workOrders.length;
-    let totalPieces = 0;
-    let completedPieces = 0;
+    let totalMainStones = 0;
+    let completedMainStones = 0;
     let overdueCount = 0;
     const today = new Date();
 
     workOrders.forEach((wo: any) => {
-      totalPieces += wo.totalPieces || 0;
-      completedPieces += wo.completedPieces || 0;
+      const prog = getProjectStoneProgress(wo);
+      totalMainStones += prog.totalStones;
+      completedMainStones += prog.completedStones;
+
       const targetDate = wo.deadline || wo.deliveryDate;
       if (targetDate && new Date(targetDate) < today && wo.status !== 'completed') {
         overdueCount++;
       }
     });
 
-    const completionRate = totalPieces > 0 ? Math.round((completedPieces / totalPieces) * 100) : 0;
+    const completionRate = totalMainStones > 0 ? Math.round((completedMainStones / totalMainStones) * 100) : 0;
 
-    return { totalOrders, totalPieces, completedPieces, overdueCount, completionRate };
+    return { 
+      totalOrders, 
+      totalMainStones, 
+      completedMainStones: Number(completedMainStones.toFixed(2)), 
+      overdueCount, 
+      completionRate 
+    };
   }, [workOrders]);
 
   // Filter by Search Query
@@ -347,7 +431,7 @@ const Projects: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* Pieces In Production */}
+        {/* Box 1: Total Main Stones */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
             sx={{
@@ -360,22 +444,22 @@ const Projects: React.FC = () => {
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: '#0284C7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Pieces In Production
+                Total Main Stones
               </Typography>
               <Avatar sx={{ bgcolor: '#F0F9FF', color: '#0284C7', width: 34, height: 34 }}>
                 <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />
               </Avatar>
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
-              {stats.totalPieces}
+              {stats.totalMainStones}
             </Typography>
             <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
-              Total stone pieces scheduled
+              Main stone items scheduled
             </Typography>
           </Card>
         </Grid>
 
-        {/* Completed Pieces */}
+        {/* Box 2: Completed Main Stones */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
             sx={{
@@ -388,14 +472,14 @@ const Projects: React.FC = () => {
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Completed Pieces
+                Completed Main Stones
               </Typography>
               <Avatar sx={{ bgcolor: '#ECFDF5', color: '#059669', width: 34, height: 34 }}>
                 <CheckCircleIcon sx={{ fontSize: 18 }} />
               </Avatar>
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
-              {stats.completedPieces}
+              {stats.completedMainStones}
             </Typography>
             <Typography variant="caption" sx={{ color: '#059669', mt: 0.5, display: 'block', fontWeight: 600 }}>
               {stats.completionRate}% Overall Completion Rate
@@ -403,7 +487,7 @@ const Projects: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* Overdue / Due Deadlines */}
+        {/* Box 3: Attention / Overdue */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
             sx={{
@@ -427,7 +511,7 @@ const Projects: React.FC = () => {
               {stats.overdueCount}
             </Typography>
             <Typography variant="caption" sx={{ color: stats.overdueCount > 0 ? '#DC2626' : '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
-              {stats.overdueCount > 0 ? 'Orders past delivery deadline' : 'All orders on schedule'}
+              {stats.overdueCount > 0 ? `${stats.overdueCount} orders past deadline` : 'All orders on schedule'}
             </Typography>
           </Card>
         </Grid>
@@ -450,7 +534,7 @@ const Projects: React.FC = () => {
       >
         <TextField
           size="small"
-          placeholder="Search by Work Order ID, client name, title, manager..."
+          placeholder="Search by Work Order ID, project name, manager..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           sx={{
@@ -499,7 +583,7 @@ const Projects: React.FC = () => {
           <TableHead sx={{ bgcolor: '#F8FAFC' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>WORK ORDER ID / TITLE</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>CLIENT & MANAGER</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>WORK ORDER CODE & MANAGER</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>START DATE</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8, minWidth: 160 }}>PRODUCTION PROGRESS</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>DEADLINE</TableCell>
@@ -545,10 +629,8 @@ const Projects: React.FC = () => {
               </TableRow>
             ) : (
               filteredWorkOrders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((project: any) => {
-                const totalPieces = project.totalPieces || 0;
-                const completedPieces = project.completedPieces || 0;
-                const remainingPieces = Math.max(0, totalPieces - completedPieces);
-                const percent = totalPieces > 0 ? Math.round((completedPieces / totalPieces) * 100) : 0;
+                const stoneProg = getProjectStoneProgress(project);
+                const percent = stoneProg.percent;
 
                 const finalEndDate = project.deadline || project.deliveryDate;
                 let statusChip = { label: 'On Schedule', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
@@ -590,7 +672,7 @@ const Projects: React.FC = () => {
                             border: '1.5px solid #FFE0B2'
                           }}
                         >
-                          {project.clientName ? project.clientName.charAt(0).toUpperCase() : 'W'}
+                          {project.name ? project.name.charAt(0).toUpperCase() : 'W'}
                         </Avatar>
                         <Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
@@ -630,10 +712,10 @@ const Projects: React.FC = () => {
                       </Box>
                     </TableCell>
 
-                    {/* Client & Handle */}
+                    {/* Work Order Code & Manager */}
                     <TableCell sx={{ py: 2 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1E293B' }}>
-                        {project.clientName || '—'}
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#B38B36' }}>
+                        {project.projectId || 'WO'}
                       </Typography>
                       {project.clientHandle && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
@@ -666,7 +748,7 @@ const Projects: React.FC = () => {
                       <Box sx={{ width: '100%', maxWidth: 180 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                           <Typography variant="caption" sx={{ fontWeight: 700, color: '#1E293B' }}>
-                            {completedPieces} / {totalPieces} Pcs
+                            {stoneProg.completedStones.toFixed(2)} / {stoneProg.totalStones} Pcs
                           </Typography>
                           <Typography variant="caption" sx={{ fontWeight: 700, color: '#B38B36' }}>
                             {percent}%

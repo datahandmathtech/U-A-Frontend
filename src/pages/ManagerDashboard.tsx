@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, Paper, TextField, MenuItem, CircularProgress, 
   Alert, Snackbar, Divider, Avatar, Dialog, DialogTitle, DialogContent, 
   DialogActions, IconButton, Chip, Autocomplete, RadioGroup, FormControlLabel, 
-  Radio, FormControl, Grid, Switch, Tooltip 
+  Radio, FormControl, Grid, Switch, Tooltip, Checkbox 
 } from '@mui/material';
 import { 
   useGetMachinesQuery, usePunchInMutation, usePunchOutMutation, 
@@ -313,6 +313,90 @@ const ManagerDashboard: React.FC = () => {
   const [packingSize, setPackingSize] = useState('');
 
   const [selectedOutLogId, setSelectedOutLogId] = useState('');
+
+  // Helper to check if a slab has completed a stage
+  const isSlabStageCompleted = (slab: any, stageName: string) => {
+    if (!slab) return false;
+    const normalizedStage = stageName.split(' - ')[0].replace(' Work', '').trim();
+    const targetQty = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
+
+    // 1. Piece-level tracking
+    if (slab.pieces && slab.pieces.length > 0) {
+      const completedPiecesCount = slab.pieces.filter((p: any) => {
+        const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+        const hasLog = p.logs && p.logs.some((l: any) => {
+          const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+          return (lStage === normalizedStage || lStage.startsWith(normalizedStage)) && (l.status === 'completed' || l.status === 'approved');
+        });
+        const hasProdLog = approvedLogs && approvedLogs.some((l: any) => {
+          const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+          if (lStage !== normalizedStage && !lStage.startsWith(normalizedStage)) return false;
+          return (l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
+        });
+        return hasLog || hasProdLog || (pStage === normalizedStage && p.status === 'completed');
+      }).length;
+
+      if (completedPiecesCount >= targetQty) return true;
+    }
+
+    // 2. Production logs check
+    if (approvedLogs) {
+      let sumQty = 0;
+      if (normalizedStage === 'Dispatch') {
+        const directDispatchLogs = approvedLogs.filter((l: any) => 
+          (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
+          (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
+        );
+        const packedLogs = approvedLogs.filter((l: any) => 
+          (l.stage === 'Packing' || l.stage === 'Packing Work') &&
+          (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id)
+        );
+        const allDispatchLogs = approvedLogs.filter((l: any) => (l.stage === 'Dispatch' || l.stage === 'Dispatch Work'));
+        const dispatchedPackedLogs = packedLogs.filter((pLog: any) => 
+           allDispatchLogs.some((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode))
+        );
+        const directQty = directDispatchLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
+        const packedDispatchedQty = dispatchedPackedLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
+        sumQty = Math.max(directQty, packedDispatchedQty);
+      } else {
+        const stageLogs = approvedLogs.filter((l: any) => 
+          (l.stage === normalizedStage || l.stage === `${normalizedStage} Work` || l.stage.startsWith(normalizedStage)) &&
+          (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
+        );
+        sumQty = stageLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
+      }
+
+      if (sumQty >= targetQty) return true;
+    }
+
+    return false;
+  };
+
+  // Auto-select single pending stone when project is selected
+  React.useEffect(() => {
+    if (selectedProjectId && projectSlabs && materialDialogOpen) {
+      const pendingSlabs = projectSlabs.filter((s: any) => {
+        if (s.requiredStages && s.requiredStages.length > 0) {
+          if (materialStage === 'Polishing' || materialStage.startsWith('Polishing')) {
+            if (!s.requiredStages.some((rs: string) => rs.startsWith('Polishing'))) return false;
+          } else if (materialStage === 'Packing') {
+            if (!s.requiredStages.includes('Packing')) return false;
+          } else if (materialStage === 'Production') {
+            if (!s.requiredStages.includes('Production')) return false;
+          }
+        }
+        return !isSlabStageCompleted(s, materialStage);
+      });
+
+      if (pendingSlabs.length === 1) {
+        const singleSlab = pendingSlabs[0];
+        setSelectedSlabId(singleSlab.id);
+        setSelectedProductName(singleSlab.name);
+        const totalPieces = singleSlab.pieces && singleSlab.pieces.length > 0 ? singleSlab.pieces.length : 1;
+        setMaterialQuantity(String(totalPieces));
+      }
+    }
+  }, [selectedProjectId, projectSlabs, materialStage, materialDialogOpen]);
 
   // Re-do Rejected Item State
   const [redoDialogOpen, setRedoDialogOpen] = useState(false);
@@ -1239,17 +1323,17 @@ const ManagerDashboard: React.FC = () => {
                       }}
                     >
                       <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
-                        {(log.startPhotos?.machine || log.startPhotos?.unit) && (
+                        {(log.startPhotos?.rejectionPhoto || log.rejectionPhoto || log.startPhotos?.machine || log.startPhotos?.unit) && (
                           <Box 
                             component="img" 
-                            src={log.startPhotos?.machine || log.startPhotos?.unit} 
-                            onClick={() => setPreviewPhoto(log.startPhotos?.machine || log.startPhotos?.unit)}
+                            src={log.startPhotos?.rejectionPhoto || log.rejectionPhoto || log.startPhotos?.machine || log.startPhotos?.unit} 
+                            onClick={() => setPreviewPhoto(log.startPhotos?.rejectionPhoto || log.rejectionPhoto || log.startPhotos?.machine || log.startPhotos?.unit)}
                             sx={{ 
-                              width: 50, 
-                              height: 50, 
+                              width: 55, 
+                              height: 55, 
                               borderRadius: 2, 
                               objectFit: 'cover', 
-                              border: '1px solid #FDA4AF', 
+                              border: (log.startPhotos?.rejectionPhoto || log.rejectionPhoto) ? '2px solid #DC2626' : '1px solid #FDA4AF', 
                               cursor: 'pointer',
                               flexShrink: 0 
                             }} 
@@ -1272,12 +1356,12 @@ const ManagerDashboard: React.FC = () => {
                             <Box sx={{ 
                               mt: 1, 
                               p: 1, 
-                              bgcolor: 'rgba(255,255,255,0.85)', 
+                              bgcolor: '#FEE2E2', 
                               borderRadius: 1.5, 
-                              border: '1px solid #FECDD3' 
+                              border: '1px solid #FCA5A5' 
                             }}>
-                              <Typography variant="caption" sx={{ color: '#BE123C', fontWeight: 700, display: 'block', fontSize: '0.72rem' }}>
-                                Admin Note: <span style={{ fontWeight: 500, color: '#881337' }}>{log.remarks}</span>
+                              <Typography variant="caption" sx={{ color: '#DC2626', fontWeight: 800, display: 'block', fontSize: '0.75rem' }}>
+                                Admin Note: <span style={{ fontWeight: 800, color: '#DC2626' }}>{log.remarks}</span>
                               </Typography>
                             </Box>
                           )}
@@ -1420,62 +1504,96 @@ const ManagerDashboard: React.FC = () => {
         <DialogContent sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#FFFFFF' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
-            {/* Inward Section: Select active out log to return */}
+            {/* Inward Section: Select active out log to return using Checkboxes */}
             {materialType === 'IN' && (
               <Box>
-                <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 0.6 }}>
+                <Typography sx={{ color: '#1E293B', fontWeight: 800, fontSize: '0.88rem', mb: 1.2 }}>
                   1. Select Active Assignment to Return
                 </Typography>
-                <TextField 
-                  select
-                  fullWidth 
-                  size="small"
-                  value={selectedOutLogId}
-                  onChange={(e) => setSelectedOutLogId(e.target.value)}
-                  sx={{ 
-                    '& .MuiOutlinedInput-root': { 
-                      borderRadius: 2.5, 
-                      bgcolor: '#F8FAFC',
-                      '& fieldset': { borderColor: '#E2E8F0' },
-                      '&:hover fieldset': { borderColor: '#CBD5E1' },
-                      '&.Mui-focused fieldset': { borderColor: '#0284C7', borderWidth: 2 }
-                    } 
-                  }}
-                >
-                  <MenuItem value="" disabled>-- Select Pending Assignment --</MenuItem>
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
                   {activeOutLogs?.filter((log: any) => dialogOrigin === 'Material Tracking' || log.stage === materialStage).map((log: any) => {
-                    const prefix = [log.project?.name, log.productName].filter(Boolean).join(' | ');
+                    const clientName = log.project?.clientName || log.project?.name || log.vendorName || 'Client';
+                    const projName = log.project?.name && log.project?.clientName ? log.project.name : (log.project?.projectId || '');
+                    const pendingQty = (log.quantityProduced || 0) - (log.returnedQty || 0);
+                    const isChecked = selectedOutLogId === log.id;
+
                     return (
-                      <MenuItem key={log.id} value={log.id} sx={{ fontSize: '0.88rem' }}>
-                        {prefix ? `${prefix} | ` : ''}{log.stage} - {log.quantityProduced - (log.returnedQty || 0)} qty pending ({log.worker?.name || log.vendorName})
-                      </MenuItem>
+                      <Paper
+                        key={log.id}
+                        onClick={() => {
+                          if (isChecked) {
+                            setSelectedOutLogId('');
+                            setMaterialQuantity('');
+                          } else {
+                            setSelectedOutLogId(log.id);
+                            setMaterialQuantity(String(pendingQty));
+                          }
+                        }}
+                        elevation={0}
+                        sx={{
+                          p: 1.75,
+                          borderRadius: 3,
+                          border: '1.5px solid',
+                          borderColor: isChecked ? '#0284C7' : '#E2E8F0',
+                          bgcolor: isChecked ? '#F0F9FF' : '#F8FAFC',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.2s ease',
+                          boxShadow: isChecked ? '0 4px 12px rgba(2, 132, 199, 0.15)' : 'none',
+                          '&:hover': { borderColor: '#0284C7', bgcolor: '#F0F9FF' }
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Checkbox 
+                            checked={isChecked} 
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              if (isChecked) {
+                                setSelectedOutLogId('');
+                                setMaterialQuantity('');
+                              } else {
+                                setSelectedOutLogId(log.id);
+                                setMaterialQuantity(String(pendingQty));
+                              }
+                            }} 
+                            color="primary"
+                            sx={{ p: 0.5 }}
+                          />
+                          <Box>
+                            <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>
+                              Client: <span style={{ color: '#0284C7', fontWeight: 900 }}>{clientName}</span>{projName ? ` (${projName})` : ''}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, display: 'block', mt: 0.3 }}>
+                              {log.productName ? `${log.productName} • ` : ''}{log.stage} ({log.worker?.name || log.vendorName || 'External Vendor'})
+                            </Typography>
+                          </Box>
+                        </Box>
+                        
+                        <Chip 
+                          label={`${pendingQty} pcs pending`} 
+                          size="small" 
+                          sx={{ 
+                            bgcolor: isChecked ? '#0284C7' : '#E2E8F0', 
+                            color: isChecked ? '#FFFFFF' : '#334155', 
+                            fontWeight: 800, 
+                            fontSize: '0.74rem' 
+                          }} 
+                        />
+                      </Paper>
                     );
                   })}
-                </TextField>
-              </Box>
-            )}
 
-            {materialType === 'IN' && selectedOutLogId && (
-              <Box>
-                <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 0.6 }}>
-                  2. Quantity Returning
-                </Typography>
-                <TextField 
-                  fullWidth 
-                  size="small"
-                  type="number"
-                  placeholder="e.g. 4 pieces"
-                  value={materialQuantity}
-                  onChange={(e) => setMaterialQuantity(e.target.value)}
-                  sx={{ 
-                    '& .MuiOutlinedInput-root': { 
-                      borderRadius: 2.5, 
-                      bgcolor: '#F8FAFC',
-                      '& fieldset': { borderColor: '#E2E8F0' },
-                      '&:hover fieldset': { borderColor: '#CBD5E1' }
-                    } 
-                  }}
-                />
+                  {(!activeOutLogs || activeOutLogs.filter((log: any) => dialogOrigin === 'Material Tracking' || log.stage === materialStage).length === 0) && (
+                    <Box sx={{ textAlign: 'center', py: 3, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px dashed #CBD5E1' }}>
+                      <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>
+                        No pending assignments available to return.
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
               </Box>
             )}
 
@@ -1508,10 +1626,10 @@ const ManagerDashboard: React.FC = () => {
                           } 
                         }}
                       >
-                        <MenuItem value="" disabled>-- Select Client / Project --</MenuItem>
+                        <MenuItem value="" disabled>-- Select Work Order --</MenuItem>
                         {projectsData?.map((p: any) => (
                           <MenuItem key={p.id} value={p.id} sx={{ fontSize: '0.88rem' }}>
-                            {p.clientName} ({p.name})
+                            {p.projectId ? `[${p.projectId}] ` : ''}{p.name}
                           </MenuItem>
                         ))}
                       </TextField>
@@ -1549,12 +1667,37 @@ const ManagerDashboard: React.FC = () => {
                             } 
                           }}
                         >
-                          <MenuItem value="" disabled>-- Select Main Stone / Product --</MenuItem>
-                          {projectSlabs?.map((s: any) => (
-                            <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.88rem' }}>
-                              {s.name} ({s.pieces?.length || 1} Pcs)
-                            </MenuItem>
-                          ))}
+                          {(() => {
+                            const filteredSlabs = projectSlabs?.filter((s: any) => {
+                              if (s.requiredStages && s.requiredStages.length > 0) {
+                                if (materialStage === 'Polishing' || materialStage.startsWith('Polishing')) {
+                                  if (!s.requiredStages.some((rs: string) => rs.startsWith('Polishing'))) return false;
+                                } else if (materialStage === 'Packing') {
+                                  if (!s.requiredStages.includes('Packing')) return false;
+                                } else if (materialStage === 'Production') {
+                                  if (!s.requiredStages.includes('Production')) return false;
+                                }
+                              }
+                              return !isSlabStageCompleted(s, materialStage);
+                            }) || [];
+
+                            if (filteredSlabs.length === 0) {
+                              return (
+                                <MenuItem value="" disabled sx={{ fontSize: '0.88rem', color: '#EF4444', fontWeight: 700 }}>
+                                  -- All stones in this project have completed {materialStage} --
+                                </MenuItem>
+                              );
+                            }
+
+                            return [
+                              <MenuItem key="default" value="" disabled sx={{ fontSize: '0.88rem' }}>-- Select Main Stone / Product --</MenuItem>,
+                              ...filteredSlabs.map((s: any) => (
+                                <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.88rem' }}>
+                                  {s.name} ({s.pieces?.length || 1} Pcs)
+                                </MenuItem>
+                              ))
+                            ];
+                          })()}
                         </TextField>
                       </Box>
                     )}
@@ -1707,6 +1850,13 @@ const ManagerDashboard: React.FC = () => {
                       setDispatchBoxCodes(newValue.map((v: any) => v.boxCode || v.id));
                       const totalQty = newValue.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
                       if (totalQty > 0) setMaterialQuantity(String(totalQty));
+                      const firstBox = newValue[0];
+                      if (firstBox && firstBox.boxCode) {
+                        const parts = firstBox.boxCode.split('|');
+                        if (parts[0]) setPackingBox(parts[0]);
+                        if (parts[1]) setPackingCode(parts[1]);
+                        if (parts[2]) setPackingSize(parts[2]);
+                      }
                     }}
                     renderInput={(params) => (
                       <TextField 
@@ -1730,12 +1880,42 @@ const ManagerDashboard: React.FC = () => {
                 <TextField 
                   fullWidth 
                   size="small"
-                  label="Quantity Dispatched" 
+                  label="Quantity Dispatched *" 
                   type="number"
                   value={materialQuantity}
                   onChange={(e) => setMaterialQuantity(e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 />
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5 }}>
+                  <TextField 
+                    fullWidth 
+                    size="small"
+                    label="Box *"
+                    placeholder="e.g. Ram"
+                    value={packingBox}
+                    onChange={(e) => setPackingBox(e.target.value)}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  />
+                  <TextField 
+                    fullWidth 
+                    size="small"
+                    label="Code *"
+                    placeholder="e.g. 101"
+                    value={packingCode}
+                    onChange={(e) => setPackingCode(e.target.value)}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  />
+                  <TextField 
+                    fullWidth 
+                    size="small"
+                    label="Size (Opt)"
+                    placeholder="e.g. 10x25x52"
+                    value={packingSize}
+                    onChange={(e) => setPackingSize(e.target.value)}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  />
+                </Box>
               </>
             )}
 

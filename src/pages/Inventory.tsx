@@ -268,7 +268,7 @@ const Inventory: React.FC = () => {
           value={activeTab} 
           onChange={handleTabChange} 
           textColor="inherit"
-          TabIndicatorProps={{ style: { display: 'none' } }}
+          slotProps={{ indicator: { style: { display: 'none' } } }}
           sx={{ minHeight: 'unset' }}
         >
           <Tab 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Box, Typography, Grid, Paper, IconButton, Chip, Dialog, DialogContent, 
   Avatar, CircularProgress, DialogTitle, TextField, MenuItem, Button, Tooltip, Skeleton 
@@ -15,6 +15,8 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
 import RadioButtonCheckedRoundedIcon from '@mui/icons-material/RadioButtonCheckedRounded';
 import TodayRoundedIcon from '@mui/icons-material/TodayRounded';
+import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import { useGetLiveFeedQuery, useGetProjectsQuery, useApproveMachineLogMutation, useRejectMachineLogMutation, useGetMachinesQuery, useGetProjectByIdQuery } from '../store/apiSlice';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 
@@ -28,21 +30,76 @@ const formatDMY = (date: Date) => {
   return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 };
 
+const formatTime = (dateStr: string | Date | null) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+};
+
+const getDayRunDurationStr = (startTime: string | Date, endTime: string | Date | null, targetDate: Date) => {
+  const dayStart = new Date(targetDate);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(targetDate);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const logStart = new Date(startTime).getTime();
+  const isTargetToday = formatDMY(targetDate) === formatDMY(new Date());
+  const logEnd = endTime ? new Date(endTime).getTime() : (isTargetToday ? new Date().getTime() : dayEnd.getTime());
+
+  // Clamp to the target day window
+  const effectiveStart = Math.max(logStart, dayStart.getTime());
+  const effectiveEnd = Math.min(logEnd, dayEnd.getTime());
+
+  if (effectiveEnd <= effectiveStart) return '0h 00m';
+
+  const diffMs = effectiveEnd - effectiveStart;
+  if (diffMs >= 23 * 3600000 + 59 * 60000) return '24h 00m';
+
+  const hrs = Math.floor(diffMs / (1000 * 60 * 60));
+  const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  return `${hrs}h ${mins}m`;
+};
+
 const LiveFeed: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [filterType, setFilterType] = useState<'all' | 'running' | 'idle' | 'carry_forward' | 'completed'>('all');
   
-  const handlePrevDay = () => setSelectedDate(prev => new Date(prev.getTime() - 24*60*60*1000));
-  const handleNextDay = () => setSelectedDate(prev => new Date(prev.getTime() + 24*60*60*1000));
-  const handleJumpToday = () => setSelectedDate(new Date());
+  const handlePrevDay = () => {
+    setSelectedDate(prev => new Date(prev.getTime() - 24*60*60*1000));
+    setFilterType('all');
+  };
+  const handleNextDay = () => {
+    setSelectedDate(prev => new Date(prev.getTime() + 24*60*60*1000));
+    setFilterType('all');
+  };
+  const handleJumpToday = () => {
+    setSelectedDate(new Date());
+    setFilterType('all');
+  };
 
-  const { data: machines, isLoading: machinesLoading } = useGetMachinesQuery();
+  const dayStart = useMemo(() => {
+    const d = new Date(selectedDate);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [selectedDate]);
+
+  const dayEnd = useMemo(() => {
+    const d = new Date(selectedDate);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, [selectedDate]);
+
+  const isToday = useMemo(() => formatDMY(selectedDate) === formatDMY(new Date()), [selectedDate]);
+
   const { data: liveFeedData, isLoading: liveFeedLoading, isFetching: liveFeedFetching, refetch } = useGetLiveFeedQuery(formatYMD(selectedDate), {
-    pollingInterval: 20000,
+    pollingInterval: 15000,
     skipPollingIfUnfocused: true
   });
+  const { data: allMachinesList } = useGetMachinesQuery();
   const { data: projects } = useGetProjectsQuery();
   const [approveLog, { isLoading: isApproving }] = useApproveMachineLogMutation();
   const [rejectLog, { isLoading: isRejecting }] = useRejectMachineLogMutation();
+  
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -52,18 +109,66 @@ const LiveFeed: React.FC = () => {
   const currentProject = projects?.find((p: any) => p.id === selectedProject);
   const projectProducts = fullProject?.quotations?.[0]?.products || fullProject?.products || currentProject?.products || [];
 
-  const activeLogs = liveFeedData?.filter((log: any) => log.status === 'active') || [];
-  const pendingLogs = liveFeedData?.filter((log: any) => log.approvalStatus === 'pending') || [];
-  const completedLogs = liveFeedData?.filter((log: any) => log.status === 'completed') || [];
-  const activeStaffCount = new Set(activeLogs.filter((l:any) => l.operatorId).map((log: any) => log.operatorId)).size;
-  const activeMachinesCount = new Set(activeLogs.filter((l:any) => l.machineId).map((log: any) => log.machineId)).size;
-  const isToday = formatDMY(selectedDate) === formatDMY(new Date());
+  const rawLogs = useMemo(() => liveFeedData || [], [liveFeedData]);
+
+  // 1. RUNNING NOW (Day-wise):
+  // - On Today: machines currently active right now (status: active)
+  // - On Past Dates: 0 (since past dates have concluded)
+  const activeLogs = useMemo(() => {
+    if (!isToday) return [];
+    return rawLogs.filter((log: any) => log.status === 'active');
+  }, [rawLogs, isToday]);
+
+  // 2. CARRY FORWARD (Day-wise):
+  // Started before 00:00:00 of this selected date OR marked as carry forward
+  const carryForwardLogs = useMemo(() => {
+    return rawLogs.filter((log: any) => {
+      const startMs = new Date(log.startTime).getTime();
+      return Boolean(log.isCarryForward) || startMs < dayStart.getTime();
+    });
+  }, [rawLogs, dayStart]);
+
+  // 3. COMPLETED SHIFTS (Day-wise):
+  // - On Today: shifts that were closed/clocked-out today
+  // - On Past Dates: all shifts that operated on that date
+  const completedLogs = useMemo(() => {
+    if (!isToday) {
+      return rawLogs;
+    }
+    return rawLogs.filter((log: any) => {
+      if (log.status !== 'completed') return false;
+      if (!log.endTime) return false;
+      const endMs = new Date(log.endTime).getTime();
+      return endMs >= dayStart.getTime() && endMs <= dayEnd.getTime() && !log.remarks?.includes('Auto-closed');
+    });
+  }, [rawLogs, isToday, dayStart, dayEnd]);
+
+  // Operated machine IDs on this selected date
+  const operatedMachineIds = useMemo(() => new Set(rawLogs.map((l: any) => l.machineId).filter(Boolean)), [rawLogs]);
+
+  // 4. IDLE MACHINES (Day-wise):
+  // Machines registered in system that did NOT run at all on this selected date
+  const idleMachines = useMemo(() => {
+    if (!allMachinesList) return [];
+    return allMachinesList.filter((m: any) => !operatedMachineIds.has(m.id));
+  }, [allMachinesList, operatedMachineIds]);
+
+  const displayedLogs = useMemo(() => {
+    if (filterType === 'running') return activeLogs;
+    if (filterType === 'carry_forward') return carryForwardLogs;
+    if (filterType === 'completed') return completedLogs;
+    if (filterType === 'idle') return [];
+    return rawLogs;
+  }, [filterType, rawLogs, activeLogs, carryForwardLogs, completedLogs]);
+
+  // ONLY show Idle machines when the "Idle Machines" filter is selected!
+  const showIdleCards = filterType === 'idle';
 
   return (
     <Box sx={{ width: '100%', px: { xs: 0, sm: 0.5, md: 1 } }}>
       
       {/* 1. EXECUTIVE HEADER & CONTROLS */}
-      <Box sx={{ mb: 3.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.5px' }}>
@@ -71,12 +176,13 @@ const LiveFeed: React.FC = () => {
             </Typography>
             <Chip 
               icon={<RadioButtonCheckedRoundedIcon sx={{ fontSize: '13px !important', color: '#10B981 !important' }} />}
-              label="Live Monitoring" 
+              label={liveFeedFetching ? "Refreshing..." : (isToday ? "Active Monitoring" : "Archive View")} 
               size="small" 
               sx={{ 
-                bgcolor: '#ECFDF5', 
-                color: '#059669', 
-                border: '1px solid #A7F3D0', 
+                bgcolor: isToday ? '#ECFDF5' : '#F1F5F9', 
+                color: isToday ? '#059669' : '#475569', 
+                border: '1px solid',
+                borderColor: isToday ? '#A7F3D0' : '#CBD5E1', 
                 fontWeight: 800, 
                 fontSize: '0.72rem',
                 borderRadius: 1.5 
@@ -84,7 +190,7 @@ const LiveFeed: React.FC = () => {
             />
           </Box>
           <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
-            Real-time machine telemetry, active operator duty shifts, and camera verification feeds.
+            Live running machines, multi-day carry-forward jobs, idle machines, and operator shift proofs.
           </Typography>
         </Box>
         
@@ -136,7 +242,9 @@ const LiveFeed: React.FC = () => {
                 value={formatYMD(selectedDate)}
                 onChange={(e) => {
                   if (e.target.value) {
-                    setSelectedDate(new Date(e.target.value));
+                    const [y, m, d] = e.target.value.split('-').map(Number);
+                    setSelectedDate(new Date(y, m - 1, d));
+                    setFilterType('all');
                   }
                 }}
                 style={{
@@ -155,83 +263,126 @@ const LiveFeed: React.FC = () => {
         </Box>
       </Box>
 
-      {/* 2. KPI SUMMARY METRIC CARDS */}
-      <Grid container spacing={2} sx={{ mb: 3.5 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-            <Avatar sx={{ bgcolor: '#ECFDF5', color: '#059669', width: 44, height: 44 }}>
-              <PrecisionManufacturingIcon sx={{ fontSize: 22 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Active Machines
+      {/* 2. REFINED FILTER & STATUS TABS BAR */}
+      <Box sx={{ mb: 3, display: 'flex', gap: 1.25, flexWrap: 'wrap', alignItems: 'center' }}>
+        {[
+          { 
+            key: 'all', 
+            label: 'All Machines', 
+            count: rawLogs.length,
+            icon: <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />,
+            activeBg: '#0F172A',
+            activeColor: '#FFFFFF',
+            activeBorder: '#0F172A',
+            badgeBg: '#334155',
+            badgeColor: '#F8FAFC',
+            iconColor: '#C89F5A'
+          },
+          { 
+            key: 'running', 
+            label: 'Running Now', 
+            count: activeLogs.length,
+            icon: <RadioButtonCheckedRoundedIcon sx={{ fontSize: 15 }} />,
+            activeBg: '#ECFDF5',
+            activeColor: '#065F46',
+            activeBorder: '#10B981',
+            badgeBg: '#10B981',
+            badgeColor: '#FFFFFF',
+            iconColor: '#059669'
+          },
+          { 
+            key: 'idle', 
+            label: 'Idle Machines', 
+            count: idleMachines.length,
+            icon: <PowerSettingsNewIcon sx={{ fontSize: 16 }} />,
+            activeBg: '#F1F5F9',
+            activeColor: '#334155',
+            activeBorder: '#64748B',
+            badgeBg: '#64748B',
+            badgeColor: '#FFFFFF',
+            iconColor: '#64748B'
+          },
+          { 
+            key: 'carry_forward', 
+            label: 'Carry Forward', 
+            count: carryForwardLogs.length,
+            icon: <AutorenewRoundedIcon sx={{ fontSize: 16 }} />,
+            activeBg: '#FFFBEB',
+            activeColor: '#92400E',
+            activeBorder: '#F59E0B',
+            badgeBg: '#F59E0B',
+            badgeColor: '#FFFFFF',
+            iconColor: '#D97706'
+          },
+          { 
+            key: 'completed', 
+            label: 'Completed Shifts', 
+            count: completedLogs.length,
+            icon: <CheckCircleIcon sx={{ fontSize: 16 }} />,
+            activeBg: '#EFF6FF',
+            activeColor: '#075985',
+            activeBorder: '#0284C7',
+            badgeBg: '#0284C7',
+            badgeColor: '#FFFFFF',
+            iconColor: '#0284C7'
+          },
+        ].map((tab) => {
+          const isSelected = filterType === tab.key;
+          return (
+            <Paper
+              key={tab.key}
+              elevation={0}
+              onClick={() => setFilterType(tab.key as any)}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 1.25,
+                px: { xs: 1.5, sm: 2 },
+                py: 1.2,
+                borderRadius: 3,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                bgcolor: isSelected ? tab.activeBg : '#FFFFFF',
+                color: isSelected ? tab.activeColor : '#475569',
+                border: '1.5px solid',
+                borderColor: isSelected ? tab.activeBorder : '#E2E8F0',
+                boxShadow: isSelected ? '0 4px 14px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.02)',
+                '&:hover': {
+                  borderColor: isSelected ? tab.activeBorder : '#CBD5E1',
+                  bgcolor: isSelected ? tab.activeBg : '#F8FAFC',
+                  transform: 'translateY(-1px)'
+                }
+              }}
+            >
+              <Box sx={{ color: isSelected ? (tab.key === 'all' ? '#C89F5A' : tab.iconColor) : tab.iconColor, display: 'flex', alignItems: 'center' }}>
+                {tab.icon}
+              </Box>
+              <Typography sx={{ fontWeight: 800, fontSize: { xs: '0.8rem', sm: '0.88rem' }, letterSpacing: '-0.2px' }}>
+                {tab.label}
               </Typography>
-              {liveFeedLoading || machinesLoading ? (
-                <Skeleton variant="text" width={60} height={38} />
-              ) : (
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#059669', mt: 0.2 }}>
-                  {activeMachinesCount} <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>/ {machines?.length || 0}</span>
-                </Typography>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-            <Avatar sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', width: 44, height: 44 }}>
-              <GroupsIcon sx={{ fontSize: 22 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Operators On Duty
-              </Typography>
-              {liveFeedLoading ? (
-                <Skeleton variant="text" width={40} height={38} />
-              ) : (
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
-                  {activeStaffCount}
-                </Typography>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper elevation={0} sx={{ p: 2.25, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-            <Avatar sx={{ bgcolor: '#FFFDF5', color: '#B38B36', width: 44, height: 44 }}>
-              <AccessTimeIcon sx={{ fontSize: 22 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Completed Shift Logs
-              </Typography>
-              {liveFeedLoading ? (
-                <Skeleton variant="text" width={40} height={38} />
-              ) : (
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
-                  {completedLogs.length}
-                </Typography>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* 3. MACHINE TELEMETRY GRID */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '1rem' }}>
-          Machine Status Overview ({formatDMY(selectedDate)})
-        </Typography>
-        <Chip 
-          label={`${machines?.length || 0} Total Units`} 
-          size="small" 
-          sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem' }} 
-        />
+              <Box
+                sx={{
+                  bgcolor: isSelected ? tab.badgeBg : '#F1F5F9',
+                  color: isSelected ? tab.badgeColor : '#64748B',
+                  fontWeight: 900,
+                  fontSize: '0.75rem',
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 2,
+                  minWidth: 20,
+                  textAlign: 'center'
+                }}
+              >
+                {liveFeedLoading ? '...' : tab.count}
+              </Box>
+            </Paper>
+          );
+        })}
       </Box>
 
+      {/* 3. MACHINE TELEMETRY GRID */}
       <Grid container spacing={2.5}>
-        {machinesLoading ? (
+        {liveFeedLoading ? (
           [1, 2, 3, 4, 5, 6].map((k) => (
             <Grid size={{ xs: 12, md: 6, lg: 4 }} key={k}>
               <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3.5, border: '1px solid #E2E8F0', bgcolor: '#FAFAFA' }}>
@@ -242,147 +393,271 @@ const LiveFeed: React.FC = () => {
                     <Skeleton variant="text" width="40%" height={18} />
                   </Box>
                 </Box>
-                <Skeleton variant="rectangular" height={90} sx={{ borderRadius: 2 }} />
+                <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 2 }} />
               </Paper>
             </Grid>
           ))
-        ) : (!machines || machines.length === 0) ? (
+        ) : (displayedLogs.length === 0 && (!showIdleCards || idleMachines.length === 0)) ? (
           <Grid size={{ xs: 12 }}>
             <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 3.5, bgcolor: '#FFFFFF', border: '1px dashed #CBD5E1' }}>
-              <PrecisionManufacturingIcon sx={{ fontSize: 44, color: '#94A3B8', mb: 1.5 }} />
+              <PrecisionManufacturingIcon sx={{ fontSize: 48, color: '#94A3B8', mb: 1.5 }} />
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B' }}>
-                No machines found in factory
+                No machines found for this filter on {formatDMY(selectedDate)}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
-                Add machines under Machine Master to start tracking live operations.
+              <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, maxWidth: 500, mx: 'auto' }}>
+                Try selecting "All Machines" or another date to view machine status.
               </Typography>
             </Paper>
           </Grid>
         ) : (
-          [...machines].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map((machine: any) => {
-            const log = liveFeedData?.find((l: any) => l.machineId === machine.id);
-            const isCompleted = log?.status === 'completed';
-            const isPending = log?.approvalStatus === 'pending';
-            const isActive = log?.status === 'active';
-            
-            return (
-              <Grid size={{ xs: 12, md: 6, lg: 4 }} key={machine.id}>
-                <Paper 
-                  onClick={() => {
-                    if (log) {
+          <>
+            {/* 3A. OPERATED / RUNNING MACHINE LOGS */}
+            {displayedLogs.map((log: any) => {
+              const isCompleted = log.status === 'completed';
+              const isPending = log.approvalStatus === 'pending';
+              const isActive = log.status === 'active';
+              const logStartMs = new Date(log.startTime).getTime();
+              const isCarryForward = Boolean(log.isCarryForward) || logStartMs < dayStart.getTime();
+              const durationText = getDayRunDurationStr(log.startTime, log.endTime, selectedDate);
+              const machineName = log.machine?.name || 'Factory Machine';
+              
+              return (
+                <Grid size={{ xs: 12, md: 6, lg: 4 }} key={log.id}>
+                  <Paper 
+                    onClick={() => {
                       setSelectedLog(log);
                       if (log.projectId) setSelectedProject(log.projectId);
                       else setSelectedProject('');
                       setSelectedProduct(null);
-                    }
-                  }}
+                    }}
+                    elevation={0}
+                    sx={{ 
+                      p: 2.5, 
+                      borderRadius: 3.5, 
+                      border: '1px solid',
+                      borderColor: isCompleted ? '#CBD5E1' : (isPending ? '#FDE68A' : '#86EFAC'),
+                      bgcolor: '#FFFFFF',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      boxShadow: isActive ? '0 4px 16px rgba(16, 185, 129, 0.08)' : '0 2px 10px rgba(0,0,0,0.03)',
+                      '&:hover': { 
+                        transform: 'translateY(-3px)', 
+                        boxShadow: '0 10px 28px rgba(0,0,0,0.08)',
+                        borderColor: '#C89F5A'
+                      }
+                    }}
+                  >
+                    {/* Left Edge Accent */}
+                    <Box sx={{ 
+                      position: 'absolute', left: 0, top: 0, bottom: 0, width: 5, 
+                      bgcolor: isCarryForward ? '#D97706' : (isCompleted ? '#0284C7' : (isPending ? '#EA580C' : '#10B981'))
+                    }} />
+
+                    {/* Header Row */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, pl: 1 }}>
+                      <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                        <Avatar sx={{ 
+                          bgcolor: isCarryForward ? '#FEF3C7' : (isCompleted ? '#EFF6FF' : (isPending ? '#FFFBEB' : '#ECFDF5')), 
+                          color: isCarryForward ? '#B45309' : (isCompleted ? '#0284C7' : (isPending ? '#D97706' : '#059669')), 
+                          width: 44, height: 44 
+                        }}>
+                          <PrecisionManufacturingIcon sx={{ fontSize: 22 }} />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.95rem' }}>
+                            {machineName}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+                            {log.operator?.name ? `Operator: ${log.operator.name}` : (log.machine?.type || 'Factory Unit')}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                        {isCarryForward && (
+                          <Chip 
+                            icon={<AutorenewRoundedIcon sx={{ fontSize: '13px !important', color: '#B45309 !important' }} />}
+                            label="CARRY FORWARD" 
+                            size="small" 
+                            sx={{ 
+                              fontWeight: 800, 
+                              fontSize: '0.66rem',
+                              borderRadius: 1.5,
+                              bgcolor: '#FEF3C7',
+                              color: '#B45309',
+                              border: '1px solid #FCD34D',
+                              height: 20
+                            }} 
+                          />
+                        )}
+                        <Chip 
+                          label={isCompleted ? 'COMPLETED' : (isPending ? 'PENDING APPROVAL' : 'RUNNING NOW')} 
+                          size="small" 
+                          sx={{ 
+                            fontWeight: 800, 
+                            fontSize: '0.68rem',
+                            borderRadius: 1.5,
+                            bgcolor: isCompleted ? '#EFF6FF' : (isPending ? '#FFFBEB' : '#ECFDF5'),
+                            color: isCompleted ? '#0284C7' : (isPending ? '#B45309' : '#059669'),
+                            border: '1px solid',
+                            borderColor: isCompleted ? '#BAE6FD' : (isPending ? '#FDE68A' : '#A7F3D0'),
+                            height: 22
+                          }} 
+                        />
+                      </Box>
+                    </Box>
+
+                    {/* Project & Product Row */}
+                    <Box sx={{ pl: 1, py: 1.25, my: 1, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ overflow: 'hidden' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <LayersRoundedIcon sx={{ fontSize: 15, color: '#B38B36' }} />
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.82rem' }}>
+                            {log.project?.projectId || log.project?.name || 'General Production'}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          {log.productName || log.project?.clientName || 'Standard Job Work'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'right', pr: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '0.68rem', display: 'block', textTransform: 'uppercase' }}>
+                          TODAY RUN
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.85rem' }}>
+                          {durationText}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* Shift Times & Proof Photos Row */}
+                    <Box sx={{ pl: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5 }}>
+                      <Box>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          🟢 IN: {isCarryForward ? '12:00 AM (CF)' : formatTime(log.startTime)}
+                        </Typography>
+                        {isCompleted && log.endTime && (
+                          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mt: 0.2 }}>
+                            🔴 OUT: {new Date(log.endTime).getTime() > dayEnd.getTime() || log.remarks?.includes('Auto-closed') ? '12:00 AM (Split)' : formatTime(log.endTime)}
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Mini Photo Proof Thumbnails */}
+                      <Box sx={{ display: 'flex', gap: 0.75 }}>
+                        {[log.machinePhotoUrl, log.unitPhotoUrl, log.softwarePhotoUrl].filter(Boolean).slice(0, 3).map((url, idx) => (
+                          <Box 
+                            key={idx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewPhoto(url);
+                            }}
+                            sx={{ 
+                              width: 32, height: 32, borderRadius: 1.5, overflow: 'hidden', 
+                              bgcolor: '#F1F5F9', border: '1px solid #E2E8F0',
+                              cursor: 'pointer',
+                              '&:hover': { transform: 'scale(1.1)', borderColor: '#C89F5A' }
+                            }}
+                          >
+                            <img src={getOptimizedUrl(url)} alt="proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+              );
+            })}
+
+            {/* 3B. IDLE / OFF MACHINES */}
+            {showIdleCards && idleMachines.map((machine: any) => (
+              <Grid size={{ xs: 12, md: 6, lg: 4 }} key={`idle-${machine.id}`}>
+                <Paper 
                   elevation={0}
                   sx={{ 
                     p: 2.5, 
                     borderRadius: 3.5, 
-                    border: '1px solid',
-                    borderColor: !log ? '#E2E8F0' : (isCompleted ? '#CBD5E1' : (isPending ? '#FDE68A' : '#86EFAC')),
-                    bgcolor: !log ? '#FAFAFA' : '#FFFFFF',
-                    cursor: log ? 'pointer' : 'default',
-                    transition: 'all 0.2s ease',
+                    border: '1px solid #E2E8F0',
+                    bgcolor: '#FFFFFF',
                     position: 'relative',
                     overflow: 'hidden',
-                    boxShadow: log ? '0 2px 10px rgba(0,0,0,0.03)' : 'none',
-                    '&:hover': log ? { 
-                      transform: 'translateY(-2px)', 
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-                      borderColor: '#C89F5A'
-                    } : {}
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+                    transition: 'all 0.2s ease',
+                    '&:hover': { 
+                      borderColor: '#94A3B8',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+                      transform: 'translateY(-2px)'
+                    }
                   }}
                 >
                   {/* Left Edge Accent */}
                   <Box sx={{ 
-                    position: 'absolute', left: 0, top: 0, bottom: 0, width: 4.5, 
-                    bgcolor: !log ? '#CBD5E1' : (isCompleted ? '#0284C7' : (isPending ? '#D97706' : '#10B981'))
+                    position: 'absolute', left: 0, top: 0, bottom: 0, width: 5, 
+                    bgcolor: '#94A3B8'
                   }} />
 
                   {/* Header Row */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2, pl: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, pl: 1 }}>
                     <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                      <Avatar sx={{ 
-                        bgcolor: !log ? '#F1F5F9' : (isCompleted ? '#EFF6FF' : (isPending ? '#FFFBEB' : '#ECFDF5')), 
-                        color: !log ? '#94A3B8' : (isCompleted ? '#0284C7' : (isPending ? '#D97706' : '#059669')), 
-                        width: 44, height: 44 
-                      }}>
+                      <Avatar sx={{ bgcolor: '#F1F5F9', color: '#64748B', width: 44, height: 44 }}>
                         <PrecisionManufacturingIcon sx={{ fontSize: 22 }} />
                       </Avatar>
                       <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: !log ? '#64748B' : '#0F172A', fontSize: '0.95rem' }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '0.95rem' }}>
                           {machine.name}
                         </Typography>
                         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
-                          {log?.operator?.name ? `Operator: ${log.operator.name}` : (machine.modelNumber || 'Factory Unit')}
+                          {machine.type || 'Factory Unit'}
                         </Typography>
                       </Box>
                     </Box>
 
                     <Chip 
-                      label={!log ? 'IDLE' : (isCompleted ? 'COMPLETED' : (isPending ? 'PENDING APPROVAL' : 'ACTIVE / RUNNING'))} 
+                      label="IDLE / OFF" 
                       size="small" 
                       sx={{ 
                         fontWeight: 800, 
-                        fontSize: '0.7rem',
+                        fontSize: '0.68rem',
                         borderRadius: 1.5,
-                        bgcolor: !log ? '#F1F5F9' : (isCompleted ? '#EFF6FF' : (isPending ? '#FFFBEB' : '#ECFDF5')),
-                        color: !log ? '#64748B' : (isCompleted ? '#0284C7' : (isPending ? '#B45309' : '#059669')),
-                        border: '1px solid',
-                        borderColor: !log ? '#E2E8F0' : (isCompleted ? '#BAE6FD' : (isPending ? '#FDE68A' : '#A7F3D0'))
+                        bgcolor: '#F1F5F9',
+                        color: '#64748B',
+                        border: '1px solid #CBD5E1',
+                        height: 22
                       }} 
                     />
                   </Box>
 
-                  {/* Body Details */}
-                  <Box sx={{ pl: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 2.5, pt: 1.5, borderTop: '1px solid #F1F5F9' }}>
+                  {/* Status Row */}
+                  <Box sx={{ pl: 1, py: 1.5, my: 1, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
-                      {log?.project ? (
-                        <>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                            <LayersRoundedIcon sx={{ fontSize: 14, color: '#B38B36' }} />
-                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.85rem' }}>
-                              {log.project.projectId}
-                            </Typography>
-                          </Box>
-                          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500, display: 'block', mt: 0.2 }}>
-                            {log.productName || log.project.name}
-                          </Typography>
-                        </>
-                      ) : (
-                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 500 }}>
-                          No active assignment
-                        </Typography>
-                      )}
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#64748B', fontSize: '0.82rem' }}>
+                        ⚪ Standby / Offline
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                        No active shift on {formatDMY(selectedDate)}
+                      </Typography>
                     </Box>
+                    <Chip label="STANDBY" size="small" sx={{ bgcolor: '#E2E8F0', color: '#475569', fontWeight: 800, fontSize: '0.65rem' }} />
+                  </Box>
 
-                    <Box sx={{ textAlign: 'right' }}>
-                      {log ? (
-                        <>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', display: 'block' }}>
-                            Start: {new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Typography>
-                          {isCompleted && log.endTime && (
-                            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
-                              End: {new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </Typography>
-                          )}
-                        </>
-                      ) : (
-                        <Typography variant="caption" sx={{ color: '#CBD5E1', fontWeight: 600 }}>Standby</Typography>
-                      )}
-                    </Box>
+                  {/* Footer Row */}
+                  <Box sx={{ pl: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5 }}>
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                      Ready for operator assignment
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>
+                      0h 00m run
+                    </Typography>
                   </Box>
                 </Paper>
               </Grid>
-            );
-          })
+            ))}
+          </>
         )}
       </Grid>
-
-      {/* 4. DETAILED MODAL */}
+      {/* 4. DETAILED INSPECTION & APPROVAL MODAL */}
       <Dialog 
         open={Boolean(selectedLog)} 
         onClose={() => setSelectedLog(null)} 
@@ -398,9 +673,19 @@ const LiveFeed: React.FC = () => {
                   {selectedLog.operator?.name?.charAt(0) || 'U'}
                 </Avatar>
                 <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A' }}>
-                    {selectedLog.operator?.name || 'Operator Shift Details'}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A' }}>
+                      {selectedLog.operator?.name || 'Operator Shift Details'}
+                    </Typography>
+                    {selectedLog.isCarryForward && (
+                      <Chip 
+                        icon={<AutorenewRoundedIcon sx={{ fontSize: '13px !important', color: '#B45309 !important' }} />}
+                        label="CARRY FORWARD" 
+                        size="small" 
+                        sx={{ bgcolor: '#FEF3C7', color: '#B45309', fontWeight: 800, fontSize: '0.65rem', height: 20 }} 
+                      />
+                    )}
+                  </Box>
                   <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
                     Machine: {selectedLog.machine?.name} • Staff ID: {selectedLog.operator?.staffId || '-'}
                   </Typography>
@@ -412,8 +697,21 @@ const LiveFeed: React.FC = () => {
             </DialogTitle>
 
             <DialogContent sx={{ p: 3, mt: 1 }}>
+              {selectedLog.isCarryForward && (
+                <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#FFFDF5', borderRadius: 2.5, border: '1px solid #FCD34D', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <AutorenewRoundedIcon sx={{ color: '#B45309', fontSize: 24 }} />
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: '#92400E' }}>
+                      Multi-Day Continuous Run (Carry Forward)
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 500 }}>
+                      This machine was left running across midnight (12:00 AM) and is automatically split into this day's log starting at 00:00:00 to keep daily running hours accurate.
+                    </Typography>
+                  </Box>
+                </Paper>
+              )}
+
               <Paper elevation={0} sx={{ p: 2.5, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px solid #E2E8F0' }}>
-                
                 <Grid container spacing={2.5}>
                   {/* PUNCH IN PANEL */}
                   <Grid size={{ xs: 12, md: 6 }}>
@@ -422,7 +720,7 @@ const LiveFeed: React.FC = () => {
                         🟢 SHIFT START (PUNCH IN)
                       </Typography>
                       <Typography variant="h4" sx={{ fontWeight: 900, mb: 1, color: '#0F172A' }}>
-                        {new Date(selectedLog.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {selectedLog.isCarryForward || new Date(selectedLog.startTime).getTime() < dayStart.getTime() ? '12:00 AM (CF)' : formatTime(selectedLog.startTime)}
                       </Typography>
                       
                       {selectedLog.approvalStatus === 'pending' ? (
@@ -440,7 +738,7 @@ const LiveFeed: React.FC = () => {
                             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, mb: selectedProject ? 1.5 : 0 }}
                           >
                             {projects?.filter((p: any) => ['shop_drawing', 'work_order', 'material_planning', 'production'].includes(p.status)).map((p: any) => (
-                              <MenuItem key={p.id} value={p.id}>{p.projectId} - {p.name}</MenuItem>
+                              <MenuItem key={p.id} value={p.id}>[{p.projectId || 'WO'}] {p.name}</MenuItem>
                             ))}
                           </TextField>
                           
@@ -525,7 +823,7 @@ const LiveFeed: React.FC = () => {
                       {selectedLog.status === 'completed' ? (
                         <>
                           <Typography variant="h4" sx={{ fontWeight: 900, mb: 1, color: '#0F172A' }}>
-                            {new Date(selectedLog.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {selectedLog.endTime ? (new Date(selectedLog.endTime).getTime() > dayEnd.getTime() || selectedLog.remarks?.includes('Auto-closed') ? '12:00 AM (Split)' : formatTime(selectedLog.endTime)) : '-'}
                           </Typography>
                           <Typography variant="body2" sx={{ mb: 2, p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, fontStyle: 'italic', color: '#475569', border: '1px solid #E2E8F0' }}>
                             "{selectedLog.remarks || 'No remarks provided'}"
@@ -616,6 +914,9 @@ const LiveFeed: React.FC = () => {
                               <Typography variant="body2" sx={{ color: '#059669', fontWeight: 800, letterSpacing: 0.5 }}>
                                 MACHINE CURRENTLY IN OPERATION
                               </Typography>
+                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mt: 0.5 }}>
+                                Running duration today: {getRunDurationStr(selectedLog.startTime, selectedLog.endTime)}
+                              </Typography>
                             </Box>
                           )}
                         </Box>
@@ -630,26 +931,64 @@ const LiveFeed: React.FC = () => {
         )}
       </Dialog>
 
-      {/* 5. PHOTO PREVIEW FULLSCREEN DIALOG */}
+      {/* 5. PHOTO PREVIEW FULLSCREEN DIALOG WITH PROMINENT BACK BUTTON */}
       <Dialog 
         open={Boolean(previewPhoto)} 
         onClose={() => setPreviewPhoto(null)} 
-        maxWidth="lg" 
+        maxWidth="md" 
         fullWidth 
-        slotProps={{ paper: { sx: { bgcolor: 'transparent', boxShadow: 'none' } } }}
+        slotProps={{ 
+          backdrop: { sx: { bgcolor: 'rgba(0, 0, 0, 0.85)' } },
+          paper: { sx: { bgcolor: '#0F172A', borderRadius: 3, overflow: 'hidden', p: 0, boxShadow: '0 24px 60px rgba(0,0,0,0.6)' } } 
+        }}
       >
-        <Box sx={{ position: 'relative', textAlign: 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2.5, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <Button
+            startIcon={<ArrowBackIosNewIcon sx={{ fontSize: '13px !important' }} />}
+            onClick={() => setPreviewPhoto(null)}
+            variant="contained"
+            size="small"
+            sx={{
+              bgcolor: 'rgba(255,255,255,0.15)',
+              color: '#FFF',
+              fontWeight: 800,
+              textTransform: 'none',
+              fontSize: '0.82rem',
+              borderRadius: 2,
+              px: 2,
+              py: 0.7,
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.28)' }
+            }}
+          >
+            Back to Shift Details
+          </Button>
+
           <IconButton 
             onClick={() => setPreviewPhoto(null)} 
-            sx={{ position: 'absolute', top: -40, right: -40, color: '#fff', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
+            sx={{ color: '#FFF', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } }}
           >
-            <CloseIcon fontSize="large" />
+            <CloseIcon fontSize="small" />
           </IconButton>
+        </Box>
+
+        <Box 
+          onClick={() => setPreviewPhoto(null)}
+          sx={{ 
+            p: 2, 
+            textAlign: 'center', 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            bgcolor: '#020617', 
+            minHeight: 350,
+            cursor: 'pointer' 
+          }}
+        >
           {previewPhoto && (
             <img 
               src={getFullQualityUrl(previewPhoto)} 
-              alt="Preview" 
-              style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }} 
+              alt="Photo Evidence Preview" 
+              style={{ maxWidth: '100%', maxHeight: '72vh', borderRadius: 8, objectFit: 'contain' }} 
             />
           )}
         </Box>

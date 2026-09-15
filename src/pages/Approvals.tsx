@@ -12,6 +12,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import CloseIcon from '@mui/icons-material/Close';
 
 const Approvals: React.FC = () => {
   const { data: pendingLogs, isLoading, refetch: refetchPending } = useGetPendingApprovalsQuery(undefined, {
@@ -55,6 +57,7 @@ const Approvals: React.FC = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectLogId, setRejectLogId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectPhoto, setRejectPhoto] = useState<string | null>(null);
 
   const activeProjectId = editHistoryDialogOpen ? editingHistoryLog?.projectId : detailsDialogOpen ? detailsLog?.projectId : projectSplits[0]?.projectId;
   const { data: slabs } = useGetSlabsQuery(activeProjectId, { skip: !activeProjectId });
@@ -70,13 +73,44 @@ const Approvals: React.FC = () => {
   const handleRejectClick = (logId: string) => {
     setRejectLogId(logId);
     setRejectReason('');
+    setRejectPhoto(null);
     setRejectDialogOpen(true);
+  };
+
+  const handleRejectPhotoUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = (e: any) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setRejectPhoto(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
   };
 
   const submitReject = async () => {
     if (!rejectLogId) return;
     try {
-      await approveLog({ id: rejectLogId, data: { approvalStatus: 'rejected_admin', remarks: rejectReason } }).unwrap();
+      const targetLog = (pendingLogs || []).find((l: any) => l.id === rejectLogId);
+      await approveLog({ 
+        id: rejectLogId, 
+        data: { 
+          approvalStatus: 'rejected_admin', 
+          remarks: rejectReason,
+          rejectionPhoto: rejectPhoto,
+          startPhotos: {
+            ...(targetLog?.startPhotos || {}),
+            rejectionPhoto: rejectPhoto
+          }
+        } 
+      }).unwrap();
       setToast({ open: true, message: 'Log Rejected successfully', severity: 'success' });
       refetchPending();
     } catch (err: any) {
@@ -84,6 +118,8 @@ const Approvals: React.FC = () => {
     } finally {
       setRejectDialogOpen(false);
       setRejectLogId(null);
+      setRejectReason('');
+      setRejectPhoto(null);
     }
   };
 
@@ -1144,11 +1180,11 @@ const Approvals: React.FC = () => {
       </Dialog>
 
       {/* Reject Dialog */}
-      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Reject Log</DialogTitle>
+      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 4 } } }}>
+        <DialogTitle sx={{ fontWeight: 'bold', color: '#DC2626' }}>Reject Log</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            Please enter the reason for rejecting this log. This will be visible to the worker/manager.
+          <Typography variant="body2" color="text.secondary" mb= {2}>
+            Please enter the reason for rejecting this log and optionally upload a photo. This will be visible to the worker/manager.
           </Typography>
           <TextField
             autoFocus
@@ -1159,11 +1195,36 @@ const Approvals: React.FC = () => {
             label="Rejection Remarks"
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
+            sx={{ mb: 2 }}
           />
+
+          <Box sx={{ p: 2, border: '2px dashed #FCA5A5', borderRadius: 3, bgcolor: '#FEF2F2', textAlign: 'center' }}>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<PhotoCameraIcon />}
+              onClick={handleRejectPhotoUpload}
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 800 }}
+            >
+              {rejectPhoto ? 'Change Rejection Photo' : 'Upload / Capture Rejection Photo'}
+            </Button>
+            {rejectPhoto && (
+              <Box sx={{ mt: 2, position: 'relative', display: 'inline-block' }}>
+                <img src={rejectPhoto} alt="Rejection Photo" style={{ width: 140, height: 140, objectFit: 'cover', borderRadius: 8, border: '2px solid #DC2626' }} />
+                <IconButton
+                  size="small"
+                  onClick={() => setRejectPhoto(null)}
+                  sx={{ position: 'absolute', top: -8, right: -8, bgcolor: '#DC2626', color: '#FFF', '&:hover': { bgcolor: '#991B1B' } }}
+                >
+                  <CloseIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Box>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>
           <Button onClick={() => setRejectDialogOpen(false)} color="inherit">Cancel</Button>
-          <Button onClick={submitReject} variant="contained" color="error" disabled={!rejectReason.trim()}>
+          <Button onClick={submitReject} variant="contained" color="error" disabled={!rejectReason.trim()} sx={{ fontWeight: 'bold' }}>
             Reject Log
           </Button>
         </DialogActions>

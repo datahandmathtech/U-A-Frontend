@@ -165,7 +165,7 @@ const Dispatch: React.FC = () => {
         >
           {projects && projects.length > 0 ? (
             projects.map((p: any) => (
-              <MenuItem key={p.id} value={p.id}>{p.clientName ? p.clientName + ' (' + p.name + ')' : p.name}</MenuItem>
+              <MenuItem key={p.id} value={p.id}>{p.projectId ? `[${p.projectId}] ` : ''}{p.name}</MenuItem>
             ))
           ) : (
             <MenuItem value="" disabled>No projects available.</MenuItem>

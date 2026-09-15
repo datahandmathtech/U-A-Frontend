@@ -333,7 +333,7 @@ const Production: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
             >
               {activeWorkOrders.map((p: any) => (
-                <MenuItem key={p.id} value={p.id}>{p.projectId} - {p.name}</MenuItem>
+                <MenuItem key={p.id} value={p.id}>[{p.projectId || 'WO'}] {p.name}</MenuItem>
               ))}
               {activeWorkOrders.length === 0 && <MenuItem disabled>No Active Work Orders</MenuItem>}
             </TextField>
