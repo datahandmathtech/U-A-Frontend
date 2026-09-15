@@ -45,6 +45,10 @@ import StraightenRoundedIcon from '@mui/icons-material/StraightenRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import BrushRoundedIcon from '@mui/icons-material/BrushRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
+import SearchIcon from '@mui/icons-material/Search';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { 
   useGetProjectByIdQuery, useUpdateProjectMutation, useCreateQuotationMutation, 
   useCreateInvoiceMutation, useUploadFilesMutation, useGetDrawingsQuery, 
@@ -54,7 +58,7 @@ import {
   useGetInventoryQuery, useCreateInventoryMutation, useGetCategoriesQuery, useCreateCategoryMutation, useDeleteCategoryMutation,
   useGetUnitsQuery, useCreateUnitMutation, useDeleteUnitMutation,
   useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation,
-  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useAddPiecesMutation, useSyncSlabsMutation,
+  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useAddPiecesMutation, useSyncSlabsMutation,
   useGetQuotationTermsQuery, useAddQuotationTermMutation
 } from '../store/apiSlice';
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
@@ -81,8 +85,30 @@ const STANDARD_TERMS = [
   "E. & O.E. — Errors and Omissions Excepted."
 ];
 
-const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumns }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[], activeColumns: string[] }) => {
+const SlabRow = ({
+  slab,
+  index,
+  isSelected,
+  onToggleSelect,
+  onEdit,
+  onDelete,
+  products,
+  productionLogs,
+  isPlanningMode
+}: {
+  slab: any;
+  index: number;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  onEdit: (slab: any) => void;
+  onDelete: (id: string) => void;
+  products: any[];
+  productionLogs: any[];
+  isPlanningMode: boolean;
+}) => {
+  const navigate = useNavigate();
   const { id: projectId } = useParams();
+  const [updateSlab] = useUpdateSlabMutation();
 
   const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
   const dimensionStr = slab.size
@@ -91,7 +117,13 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumn
       ? `${matchedProduct.length || 0}L A- ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
       : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1') : ''));
 
-  const [updateSlab] = useUpdateSlabMutation();
+  const rawUnit = matchedProduct?.unit || (slab.size?.toLowerCase().includes('mm') ? 'mm' : 'inch');
+  const unitLabel = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches'
+    : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet'
+    : rawUnit.toLowerCase() === 'sq_ft' || rawUnit.toLowerCase() === 'sqft' ? 'Sq.Ft'
+    : rawUnit.toLowerCase() === 'mm' ? 'MM'
+    : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
+
   const requiredStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
 
   const handleToggleStage = async (stageKey: string, e: React.MouseEvent | React.ChangeEvent) => {
@@ -102,7 +134,6 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumn
     if (isCurrentlyChecked) {
       newRequired = requiredStages.filter((s: string) => s !== stageKey && s !== 'Polishing');
     } else {
-      // If we are adding a stage, make sure we remove the legacy 'Polishing' string to keep it clean
       newRequired = [...requiredStages.filter((s: string) => s !== 'Polishing'), stageKey];
     }
     try {
@@ -112,326 +143,90 @@ const SlabPlanningRow = ({ slab, index, onEdit, onDelete, products, activeColumn
     }
   };
 
-  const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-  const isLocked = slab.status !== 'pending';
-
-  return (
-    <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
-      <TableCell sx={{ py: 2 }}>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{slab.name}</Typography>
-          <Chip 
-            label={`${slab.pieces?.length || 0} Pieces`} 
-            size="small" 
-            sx={{ 
-              mt: 0.5, 
-              bgcolor: '#EFF6FF', 
-              color: '#1D4ED8', 
-              fontWeight: 700, 
-              fontSize: '0.72rem', 
-              height: 22, 
-              borderRadius: 1.5, 
-              border: '1px solid #DBEAFE' 
-            }} 
-          />
-        </Box>
-      </TableCell>
-      <TableCell sx={{ py: 2 }}>
-        {dimensionStr ? (
-          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
-            <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
-            <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>{dimensionStr}</Typography>
-          </Box>
-        ) : (
-          <Typography variant="caption" sx={{ color: '#94A3B8' }}>Standard Spec</Typography>
-        )}
-      </TableCell>
-      {STAGES.filter(stage => activeColumns.includes(stage)).map(stage => (
-        <TableCell key={stage} sx={{ verticalAlign: 'middle', py: 2 }}>
-          {stage === 'Polishing' ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-              {(() => {
-                const isHoned = requiredStages.includes('Polishing - Honed') || requiredStages.includes('Polishing');
-                return (
-                  <Box 
-                    onClick={isLocked ? undefined : (e) => handleToggleStage('Polishing - Honed', e)}
-                    sx={{ 
-                      display: 'inline-flex', alignItems: 'center', gap: 0.75, 
-                      px: 1.25, py: 0.4, borderRadius: 1.5, 
-                      bgcolor: isHoned ? '#F0FDF4' : '#F8FAFC', 
-                      border: '1px solid', borderColor: isHoned ? '#86EFAC' : '#E2E8F0', 
-                      cursor: isLocked ? 'default' : 'pointer',
-                      transition: 'all 0.15s ease',
-                      '&:hover': isLocked ? {} : { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
-                    }}
-                  >
-                    <Checkbox size="small" disabled={isLocked} checked={isHoned} sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} />
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: isHoned ? '#166534' : '#64748B', fontSize: '0.75rem' }}>Honed</Typography>
-                  </Box>
-                );
-              })()}
-              {(() => {
-                const isMirror = requiredStages.includes('Polishing - Mirror');
-                return (
-                  <Box 
-                    onClick={isLocked ? undefined : (e) => handleToggleStage('Polishing - Mirror', e)}
-                    sx={{ 
-                      display: 'inline-flex', alignItems: 'center', gap: 0.75, 
-                      px: 1.25, py: 0.4, borderRadius: 1.5, 
-                      bgcolor: isMirror ? '#F0FDF4' : '#F8FAFC', 
-                      border: '1px solid', borderColor: isMirror ? '#86EFAC' : '#E2E8F0', 
-                      cursor: isLocked ? 'default' : 'pointer',
-                      transition: 'all 0.15s ease',
-                      '&:hover': isLocked ? {} : { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
-                    }}
-                  >
-                    <Checkbox size="small" disabled={isLocked} checked={isMirror} sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} />
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: isMirror ? '#166534' : '#64748B', fontSize: '0.75rem' }}>Mirror</Typography>
-                  </Box>
-                );
-              })()}
-            </Box>
-          ) : (
-            (() => {
-              const isChecked = requiredStages.includes(stage);
-              return (
-                <Box 
-                  onClick={isLocked ? undefined : (e) => handleToggleStage(stage, e)}
-                  sx={{ 
-                    display: 'inline-flex', alignItems: 'center', gap: 0.75, 
-                    px: 1.5, py: 0.6, borderRadius: 1.75, 
-                    bgcolor: isChecked ? '#F0FDF4' : '#F8FAFC', 
-                    border: '1px solid', borderColor: isChecked ? '#86EFAC' : '#E2E8F0', 
-                    cursor: isLocked ? 'default' : 'pointer',
-                    transition: 'all 0.15s ease',
-                    '&:hover': isLocked ? {} : { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
-                  }}
-                >
-                  <Checkbox size="small" disabled={isLocked} checked={isChecked} sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} />
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: isChecked ? '#166534' : '#64748B', fontSize: '0.78rem' }}>{stage}</Typography>
-                </Box>
-              );
-            })()
-          )}
-        </TableCell>
-      ))}
-      <TableCell align="center" sx={{ py: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <Chip 
-            label={isLocked ? 'Active' : 'Planning'} 
-            size="small" 
-            sx={{ 
-              fontWeight: 800, 
-              fontSize: '0.7rem', 
-              height: 22, 
-              bgcolor: isLocked ? '#DCFCE7' : '#FEF3C7', 
-              color: isLocked ? '#15803D' : '#B45309', 
-              border: '1px solid',
-              borderColor: isLocked ? '#86EFAC' : '#FDE68A'
-            }} 
-          />
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <Tooltip title={isLocked ? "Slab is in active production" : "Edit Slab Details"}>
-              <span>
-                <IconButton 
-                  size="small" 
-                  disabled={isLocked} 
-                  onClick={(e) => { e.stopPropagation(); onEdit(slab); }}
-                  sx={{ 
-                    color: '#0284C7', 
-                    bgcolor: '#F0F9FF', 
-                    border: '1px solid #BAE6FD', 
-                    '&:hover': { bgcolor: '#E0F2FE' },
-                    '&.Mui-disabled': { bgcolor: '#F8FAFC', borderColor: '#E2E8F0', color: '#CBD5E1' }
-                  }}
-                >
-                  <EditIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="Delete Slab">
-              <IconButton 
-                size="small" 
-                onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}
-                sx={{ 
-                  color: '#DC2626', 
-                  bgcolor: '#FEF2F2', 
-                  border: '1px solid #FECACA', 
-                  '&:hover': { bgcolor: '#FEE2E2' } 
-                }}
-              >
-                <DeleteIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
-      </TableCell>
-    </TableRow>
-  );
-};
-
-const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLogs, activeColumns, projectTotalPieces }: { slab: any, index: number, onEdit: (slab: any) => void, onDelete: (id: string) => void, products: any[], productionLogs: any[], activeColumns: string[], projectTotalPieces: number }) => {
-  const navigate = useNavigate();
-  const { id: projectId } = useParams();
-
-  const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
-  const dimensionStr = slab.size
-    ? slab.size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1')
-    : (matchedProduct 
-      ? `${matchedProduct.length || 0}L A- ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
-      : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1') : ''));
-
-  const requiredStages = slab.requiredStages || [];
-
-  const getStageStatus = (stageName: string) => {
-    const normalizedStageName = stageName.split(' - ')[0];
-
-    // If stage is omitted from required stages, return N/A
-    if (requiredStages && requiredStages.length > 0) {
-      const isRequired = requiredStages.some((rs: string) => rs.split(' - ')[0] === normalizedStageName);
-      if (!isRequired) return 'N/A';
-    }
+  const getStageStatus = (stageKey: string) => {
+    const normalizedStageName = stageKey.split(' - ')[0];
+    const isRequired = requiredStages.includes(stageKey) || (stageKey === 'Polishing - Honed' && requiredStages.includes('Polishing'));
+    if (!isRequired) return 'N/A';
 
     const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
     const stageIdx = BASE_STAGES.indexOf(normalizedStageName);
     const targetQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : (matchedProduct?.qty || 0);
 
-    // 1. Piece-level tracking if pieces exist
-    let piecesCompletedInThisStage = 0;
-    let piecesActiveInThisStage = 0;
+    let piecesCompleted = 0;
+    let piecesActive = 0;
     if (slab.pieces && slab.pieces.length > 0) {
       for (const p of slab.pieces) {
-        const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
-        const pStageIdx = BASE_STAGES.indexOf(normalizedPieceStage);
-
-        // Check if piece has an approved/completed log specifically for this stage
-        const hasCompletedStageLog = p.logs && p.logs.some((l: any) => {
+        const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+        const pIdx = BASE_STAGES.indexOf(pStage);
+        const hasCompletedLog = p.logs && p.logs.some((l: any) => {
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
           return (lStage === normalizedStageName || lStage.startsWith(normalizedStageName)) && (l.status === 'completed' || l.status === 'approved');
         });
-
-        // Check if there is an approved productionLog matching this piece for this stage
-        const hasApprovedProductionLog = productionLogs && productionLogs.some((l: any) => {
+        const hasApprovedProdLog = productionLogs && productionLogs.some((l: any) => {
           if (l.approvalStatus !== 'approved') return false;
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
           if (lStage !== normalizedStageName && !lStage.startsWith(normalizedStageName)) return false;
           return (l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
         });
+        const isCurrentStageCompleted = pStage === normalizedStageName && p.status === 'completed';
 
-        // Or if the piece's current stage is this stage and it is completed
-        const isCurrentStageCompleted = normalizedPieceStage === normalizedStageName && p.status === 'completed';
-
-        if (hasCompletedStageLog || hasApprovedProductionLog || isCurrentStageCompleted) {
-          piecesCompletedInThisStage++;
-        } else if (pStageIdx === stageIdx && (p.status === 'active' || p.status === 'in_progress')) {
-          piecesActiveInThisStage++;
+        if (hasCompletedLog || hasApprovedProdLog || isCurrentStageCompleted) {
+          piecesCompleted++;
+        } else if (pIdx === stageIdx && (p.status === 'active' || p.status === 'in_progress')) {
+          piecesActive++;
         }
       }
-
-      if (piecesCompletedInThisStage >= slab.pieces.length) return 'Completed';
+      if (piecesCompleted >= slab.pieces.length) return 'Completed';
+      if (piecesCompleted > 0 || piecesActive > 0) return 'In Progress';
     }
 
-    // 2. Production logs check (for direct slab logs or packed logs)
     if (targetQty > 0 && productionLogs) {
-      let sumQty = 0;
-
-      if (normalizedStageName === 'Dispatch') {
-        const directDispatchLogs = productionLogs.filter((log: any) => 
-          log.approvalStatus === 'approved' &&
-          (log.stage === 'Dispatch' || log.stage === 'Dispatch Work') &&
-          (log.slabId === slab.id || log.productId === slab.id || log.productName === slab.name || (log.pieceIds && log.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
-        );
-
-        const packedLogs = productionLogs.filter((log: any) => 
-          log.approvalStatus === 'approved' &&
-          (log.stage === 'Packing' || log.stage === 'Packing Work') &&
-          (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id)
-        );
-        const allDispatchLogs = productionLogs.filter((l: any) => (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') && l.approvalStatus === 'approved');
-        const dispatchedPackedLogs = packedLogs.filter((pLog: any) => 
-           allDispatchLogs.some((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode))
-        );
-
-        const directQty = directDispatchLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
-        const packedDispatchedQty = dispatchedPackedLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
-        sumQty = Math.max(directQty, packedDispatchedQty);
-      } else {
-        const stageLogs = productionLogs.filter((log: any) => 
-          log.approvalStatus === 'approved' &&
-          (log.stage === normalizedStageName || log.stage === `${normalizedStageName} Work` || log.stage.startsWith(normalizedStageName)) &&
-          (log.productName === slab.name || log.productId === slab.id || log.slabId === slab.id || (log.pieceIds && log.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
-        );
-        sumQty = stageLogs.reduce((acc: number, log: any) => acc + (log.quantityProduced || 0), 0);
-      }
-
+      const stageLogs = productionLogs.filter((l: any) => 
+        l.approvalStatus === 'approved' &&
+        (l.stage === normalizedStageName || l.stage === `${normalizedStageName} Work` || l.stage.startsWith(normalizedStageName)) &&
+        (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
+      );
+      const sumQty = stageLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
       if (sumQty >= targetQty) return 'Completed';
-      if (sumQty > 0 || piecesCompletedInThisStage > 0 || piecesActiveInThisStage > 0) return 'In Progress';
-    } else if (piecesCompletedInThisStage > 0 || piecesActiveInThisStage > 0) {
-      return 'In Progress';
+      if (sumQty > 0) return 'In Progress';
     }
 
     return 'Pending';
   };
 
-  const renderStatusBadge = (status: string, label: string, onClickRoute: () => void) => {
-    let bgcolor = '#F8FAFC';
-    let borderColor = '#E2E8F0';
-    let color = '#64748B';
-    let icon = <CircleIcon sx={{ fontSize: 8, color: '#94A3B8' }} />;
+  const STAGE_COLUMNS = [
+    { key: 'Production', label: 'Production', route: 'production' },
+    { key: 'Polishing - Honed', label: 'Polishing - Honed', route: 'polishing' },
+    { key: 'Polishing - Mirror', label: 'Polishing - Mirror', route: 'polishing' },
+    { key: 'Packing', label: 'Packing', route: 'packing' },
+    { key: 'Dispatch', label: 'Dispatch', route: 'dispatch' }
+  ];
 
-    if (status === 'Completed') {
-      bgcolor = '#ECFDF5';
-      borderColor = '#A7F3D0';
-      color = '#065F46';
-      icon = <CheckCircleRoundedIcon sx={{ fontSize: 16, color: '#059669' }} />;
-    } else if (status === 'In Progress') {
-      bgcolor = '#FFFBEB';
-      borderColor = '#FDE68A';
-      color = '#92400E';
-      icon = <CircleIcon sx={{ fontSize: 10, color: '#D97706' }} />;
-    }
-
-    return (
-      <Tooltip title={`Click to open live ${label} tracking`}>
-        <Box 
-          onClick={onClickRoute}
-          sx={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: 0.9, 
-            px: 1.5, 
-            py: 0.7, 
-            borderRadius: 2, 
-            bgcolor, 
-            border: '1px solid', 
-            borderColor, 
-            cursor: 'pointer', 
-            transition: 'all 0.15s ease',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-            '&:hover': { 
-              borderColor: '#3B82F6', 
-              boxShadow: '0 3px 10px rgba(59, 130, 246, 0.15)',
-              transform: 'translateY(-1px)'
-            } 
-          }}
-        >
-          {icon}
-          <Typography variant="caption" sx={{ fontWeight: 700, color, fontSize: '0.78rem' }}>
-            {label}
-          </Typography>
-          <OpenInNewRoundedIcon sx={{ fontSize: 12, color: '#94A3B8', opacity: 0.6 }} />
-        </Box>
-      </Tooltip>
-    );
-  };
-
-  const STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+  const overallStatus = slab.status === 'completed' ? 'Completed' : (slab.status === 'active' ? 'In Production' : 'Not Started');
 
   return (
-    <TableRow sx={{ bgcolor: index % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
-      <TableCell sx={{ py: 2 }}>
+    <TableRow 
+      sx={{ 
+        bgcolor: isSelected ? '#F0F9FF' : (index % 2 === 0 ? '#FFFFFF' : '#FBFBFB'), 
+        '&:hover': { bgcolor: isSelected ? '#E0F2FE' : '#F8FAFC' }, 
+        transition: 'background-color 0.15s ease' 
+      }}
+    >
+      {/* Checkbox */}
+      <TableCell padding="checkbox" sx={{ pl: 2, py: 1.75 }}>
+        <Checkbox 
+          checked={isSelected} 
+          onChange={onToggleSelect} 
+          sx={{ '&.Mui-checked': { color: '#1D4ED8' } }} 
+        />
+      </TableCell>
+
+      {/* Product / Slab Name */}
+      <TableCell sx={{ py: 1.75 }}>
         <Box>
-          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{slab.name}</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem', textTransform: 'uppercase' }}>
+            {slab.name}
+          </Typography>
           <Chip 
             label={`${slab.pieces?.length || 0} Pieces`} 
             size="small" 
@@ -448,85 +243,184 @@ const SlabTrackingRow = ({ slab, index, onEdit, onDelete, products, productionLo
           />
         </Box>
       </TableCell>
-      <TableCell sx={{ py: 2 }}>
+
+      {/* Original Spec + Unit Badge */}
+      <TableCell sx={{ py: 1.75 }}>
         {dimensionStr ? (
-          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
-            <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
-            <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>{dimensionStr}</Typography>
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
+              <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
+              <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>
+                {dimensionStr}
+              </Typography>
+            </Box>
+            <Chip 
+              label={unitLabel} 
+              size="small" 
+              sx={{ 
+                bgcolor: '#FFFFFF', 
+                color: '#475569', 
+                fontWeight: 800, 
+                fontSize: '0.72rem', 
+                height: 22, 
+                borderRadius: 1.5, 
+                border: '1px solid #CBD5E1',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+              }} 
+            />
           </Box>
         ) : (
           <Typography variant="caption" sx={{ color: '#94A3B8' }}>Standard Spec</Typography>
         )}
       </TableCell>
-      {STAGES.filter(stage => activeColumns.includes(stage)).map(stage => {
-        if (stage === 'Polishing') {
-          const hasHoned = requiredStages.includes('Polishing - Honed') || requiredStages.includes('Polishing');
-          const hasMirror = requiredStages.includes('Polishing - Mirror');
-          if (!hasHoned && !hasMirror) return <TableCell key={stage} sx={{ py: 2 }}><Typography variant="caption" sx={{ color: '#CBD5E1' }}>—</Typography></TableCell>;
+
+      {/* Stage Columns: Production, Polishing (Honed), Polishing (Mirror), Packing, Dispatch */}
+      {STAGE_COLUMNS.map(col => {
+        const isChecked = requiredStages.includes(col.key) || (col.key === 'Polishing - Honed' && requiredStages.includes('Polishing'));
+        
+        if (isPlanningMode) {
           return (
-            <TableCell key={stage} sx={{ verticalAlign: 'middle', py: 2 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                {hasHoned && renderStatusBadge(
-                  getStageStatus('Polishing - Honed'), 
-                  `Honed: ${getStageStatus('Polishing - Honed')}`, 
-                  () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/polishing`)
-                )}
-                {hasMirror && renderStatusBadge(
-                  getStageStatus('Polishing - Mirror'), 
-                  `Mirror: ${getStageStatus('Polishing - Mirror')}`, 
-                  () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/polishing`)
-                )}
+            <TableCell key={col.key} sx={{ verticalAlign: 'middle', py: 1.75 }}>
+              <Box
+                onClick={(e) => handleToggleStage(col.key, e)}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: 1.75,
+                  bgcolor: isChecked ? '#F0FDF4' : '#F8FAFC',
+                  border: '1px solid',
+                  borderColor: isChecked ? '#86EFAC' : '#E2E8F0',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  '&:hover': { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
+                }}
+              >
+                <Checkbox 
+                  size="small" 
+                  checked={isChecked} 
+                  sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} 
+                />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: isChecked ? '#166534' : '#64748B', fontSize: '0.76rem' }}>
+                  {col.label}
+                </Typography>
               </Box>
             </TableCell>
           );
         }
 
-        const isRequired = requiredStages.includes(stage);
-        if (!isRequired) {
+        // Active production tracking mode
+        if (!isChecked) {
           return (
-            <TableCell key={stage} sx={{ py: 2 }}>
-              <Chip label="Skipped" size="small" sx={{ bgcolor: '#F1F5F9', color: '#94A3B8', fontSize: '0.7rem', height: 20 }} />
+            <TableCell key={col.key} sx={{ py: 1.75 }}>
+              <Chip label="N/A" size="small" sx={{ bgcolor: '#F1F5F9', color: '#94A3B8', fontSize: '0.7rem', height: 20 }} />
             </TableCell>
           );
         }
 
-        const status = getStageStatus(stage);
+        const status = getStageStatus(col.key);
+        let bgcolor = '#F8FAFC';
+        let borderColor = '#E2E8F0';
+        let color = '#64748B';
+        let icon = <CircleIcon sx={{ fontSize: 7, color: '#94A3B8' }} />;
+
+        if (status === 'Completed') {
+          bgcolor = '#ECFDF5';
+          borderColor = '#A7F3D0';
+          color = '#065F46';
+          icon = <CheckCircleRoundedIcon sx={{ fontSize: 14, color: '#059669' }} />;
+        } else if (status === 'In Progress') {
+          bgcolor = '#FFFBEB';
+          borderColor = '#FDE68A';
+          color = '#92400E';
+          icon = <CircleIcon sx={{ fontSize: 8, color: '#D97706' }} />;
+        }
+
         return (
-          <TableCell key={stage} sx={{ verticalAlign: 'middle', py: 2 }}>
-            {renderStatusBadge(
-              status, 
-              status, 
-              () => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${stage.toLowerCase()}`)
-            )}
+          <TableCell key={col.key} sx={{ verticalAlign: 'middle', py: 1.75 }}>
+            <Tooltip title={`Open ${col.label} Workspace`}>
+              <Box
+                onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${col.route}`)}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: 1.75,
+                  bgcolor,
+                  border: '1px solid',
+                  borderColor,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  '&:hover': { borderColor: '#3B82F6', boxShadow: '0 2px 8px rgba(59, 130, 246, 0.15)', transform: 'translateY(-1px)' }
+                }}
+              >
+                {icon}
+                <Typography variant="caption" sx={{ fontWeight: 700, color, fontSize: '0.76rem' }}>
+                  {col.label}
+                </Typography>
+                <OpenInNewRoundedIcon sx={{ fontSize: 11, color: '#94A3B8', opacity: 0.7 }} />
+              </Box>
+            </Tooltip>
           </TableCell>
         );
       })}
-      <TableCell align="center" sx={{ py: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
-          <Chip 
-            label="In Production" 
-            size="small" 
-            sx={{ 
-              fontWeight: 800, 
-              fontSize: '0.7rem', 
-              height: 22, 
-              bgcolor: '#ECFDF5', 
-              color: '#059669', 
-              border: '1px solid #A7F3D0' 
-            }} 
-          />
-          <Tooltip title="Edit Slab Specification">
+
+      {/* Overall Status */}
+      <TableCell sx={{ py: 1.75 }}>
+        <Chip 
+          label={overallStatus} 
+          size="small" 
+          sx={{ 
+            fontWeight: 800, 
+            fontSize: '0.72rem', 
+            height: 24, 
+            bgcolor: overallStatus === 'In Production' ? '#ECFDF5' : (overallStatus === 'Completed' ? '#EFF6FF' : '#F1F5F9'), 
+            color: overallStatus === 'In Production' ? '#059669' : (overallStatus === 'Completed' ? '#1D4ED8' : '#64748B'), 
+            border: '1px solid',
+            borderColor: overallStatus === 'In Production' ? '#A7F3D0' : (overallStatus === 'Completed' ? '#DBEAFE' : '#E2E8F0')
+          }} 
+        />
+      </TableCell>
+
+      {/* Actions */}
+      <TableCell align="center" sx={{ py: 1.75 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/production`)}
+            sx={{
+              fontWeight: 700,
+              fontSize: '0.78rem',
+              textTransform: 'none',
+              color: '#0284C7',
+              p: 0.5,
+              minWidth: 'auto',
+              '&:hover': { bgcolor: '#F0F9FF' }
+            }}
+          >
+            Details
+          </Button>
+          <Tooltip title="Edit Slab">
             <IconButton 
               size="small" 
               onClick={(e) => { e.stopPropagation(); onEdit(slab); }}
-              sx={{ 
-                color: '#0284C7', 
-                bgcolor: '#F0F9FF', 
-                border: '1px solid #BAE6FD', 
-                '&:hover': { bgcolor: '#E0F2FE' } 
-              }}
+              sx={{ color: '#64748B', p: 0.5, '&:hover': { color: '#0284C7', bgcolor: '#F0F9FF' } }}
             >
               <EditIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Slab">
+            <IconButton 
+              size="small" 
+              onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}
+              sx={{ color: '#64748B', p: 0.5, '&:hover': { color: '#DC2626', bgcolor: '#FEF2F2' } }}
+            >
+              <DeleteIcon sx={{ fontSize: 16 }} />
             </IconButton>
           </Tooltip>
         </Box>
@@ -620,8 +514,33 @@ const ProjectDetails: React.FC = () => {
 
   const isPlanningMode = projectSlabs?.some((s: any) => s.status === 'pending') || !projectSlabs || projectSlabs.length === 0;
 
+  const [selectedSlabIds, setSelectedSlabIds] = useState<string[]>([]);
+  const [bulkStages, setBulkStages] = useState<string[]>(['Production', 'Polishing - Honed']);
+  const [slabSearchQuery, setSlabSearchQuery] = useState<string>('');
+  const [slabCategoryFilter, setSlabCategoryFilter] = useState<string>('All');
+  const [bulkUpdateSlabStages, { isLoading: isBulkUpdating }] = useBulkUpdateSlabStagesMutation();
+
   const ALL_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
   const activeColumns = ALL_STAGES;
+
+  const handleApplyBulkStages = async () => {
+    if (selectedSlabIds.length === 0) {
+      setSnackbarMessage('Please select at least one slab.');
+      return;
+    }
+    try {
+      await bulkUpdateSlabStages({ 
+        slabIds: selectedSlabIds, 
+        requiredStages: bulkStages 
+      }).unwrap();
+      refetchSlabs();
+      setSelectedSlabIds([]);
+      setSnackbarMessage('Stages updated successfully in bulk!');
+    } catch (err: any) {
+      console.error(err);
+      setSnackbarMessage('Error updating stages in bulk.');
+    }
+  };
 
   const handleStartAllWork = async () => {
     try {
@@ -3044,222 +2963,475 @@ const ProjectDetails: React.FC = () => {
             )}
 
             {/* STEP 5: PRODUCTION MANAGEMENT (SLABS & PRODUCTS TRACKING) */}
-            {stepToRender === 5 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  p: { xs: 2, sm: 2.5, md: 3 },
-                  bgcolor: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: 4,
-                  boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)',
-                  width: '100%'
-                }}
-              >
-                {viewingStepOverride !== null && (
-                   <Button startIcon={<ArrowBackIcon />} variant="text" size="small" onClick={handleReturnToActive} sx={{ mb: 2.5, fontWeight: 700, color: '#0284C7', textTransform: 'none' }}>
-                     Back to Active Work Order
-                   </Button>
-                )}
+            {stepToRender === 5 && (() => {
+              const categories = Array.from(new Set(projectSlabs?.map((s: any) => {
+                const prod = products?.find(p => s.name.startsWith(p.category));
+                return prod?.category || s.name.split(' ')[0];
+              }).filter(Boolean))) as string[];
 
-                {/* Executive Header Bar */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
-                        Slabs & Products Production Pipeline
-                      </Typography>
-                      <Chip
-                        label={isPlanningMode ? 'Stage Configuration' : 'Live Production Tracking'}
-                        size="small"
-                        sx={{
-                          bgcolor: isPlanningMode ? '#FEF3C7' : '#ECFDF5',
-                          color: isPlanningMode ? '#B45309' : '#059669',
-                          fontWeight: 700,
-                          fontSize: '0.72rem',
-                          border: '1px solid',
-                          borderColor: isPlanningMode ? '#FDE68A' : '#A7F3D0',
-                          borderRadius: '6px'
-                        }}
-                      />
-                    </Box>
-                    <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
-                      {isPlanningMode 
-                        ? 'Configure required manufacturing stages, piece counts, and surface finishes before starting production.' 
-                        : 'Real-time piece-level tracking across factory work stations and machine operations.'}
-                    </Typography>
-                  </Box>
+              const filteredSlabs = projectSlabs?.filter((s: any) => {
+                const matchesSearch = !slabSearchQuery || 
+                  s.name.toLowerCase().includes(slabSearchQuery.toLowerCase()) || 
+                  (s.size && s.size.toLowerCase().includes(slabSearchQuery.toLowerCase()));
+                const slabCategory = products?.find(p => s.name.startsWith(p.category))?.category || s.name.split(' ')[0];
+                const matchesCategory = slabCategoryFilter === 'All' || slabCategory === slabCategoryFilter;
+                return matchesSearch && matchesCategory;
+              }) || [];
 
-                  {/* Summary Metric Pills & Top Actions */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
-                      <LayersRoundedIcon sx={{ fontSize: 18, color: '#B38B36' }} />
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#1E293B' }}>
-                        {projectSlabs?.length || 0} Slabs
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
-                      <Inventory2RoundedIcon sx={{ fontSize: 18, color: '#0284C7' }} />
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#1E293B' }}>
-                        {projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} Pieces
-                      </Typography>
-                    </Box>
+              const selectedInFilterCount = selectedSlabIds.filter(id => filteredSlabs.some(s => s.id === id)).length;
+              const isAllFilteredSelected = filteredSlabs.length > 0 && selectedInFilterCount === filteredSlabs.length;
+              const isSomeFilteredSelected = selectedInFilterCount > 0 && !isAllFilteredSelected;
 
-                    <Button 
-                      variant="outlined" 
-                      startIcon={<SyncIcon />} 
-                      onClick={async () => {
-                        try {
-                          await syncSlabs(id as string).unwrap();
-                          refetchSlabs();
-                          setSnackbarMessage('Synced successfully with Quotation!');
-                        } catch(err) {
-                          setSnackbarMessage('Error syncing slabs.');
-                        }
-                      }}
-                      sx={{
-                        borderRadius: 2,
-                        textTransform: 'none',
-                        fontWeight: 700,
-                        borderColor: '#CBD5E1',
-                        color: '#1E293B',
-                        bgcolor: '#FFFFFF',
-                        '&:hover': { borderColor: '#B38B36', bgcolor: '#FFFDF5' }
-                      }}
-                    >
-                      Sync with Quotation
+              return (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: { xs: 2, sm: 2.5, md: 3 },
+                    bgcolor: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: 4,
+                    boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)',
+                    width: '100%'
+                  }}
+                >
+                  {viewingStepOverride !== null && (
+                    <Button startIcon={<ArrowBackIcon />} variant="text" size="small" onClick={handleReturnToActive} sx={{ mb: 2.5, fontWeight: 700, color: '#0284C7', textTransform: 'none' }}>
+                      Back to Active Work Order
                     </Button>
+                  )}
 
-                    {isPlanningMode && (
+                  {/* Executive Header Bar */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
+                          Slabs & Production Planning
+                        </Typography>
+                        <Chip
+                          label={isPlanningMode ? 'Stage Configuration' : 'In Production'}
+                          size="small"
+                          sx={{
+                            bgcolor: isPlanningMode ? '#FEF3C7' : '#ECFDF5',
+                            color: isPlanningMode ? '#B45309' : '#059669',
+                            fontWeight: 800,
+                            fontSize: '0.72rem',
+                            border: '1px solid',
+                            borderColor: isPlanningMode ? '#FDE68A' : '#A7F3D0',
+                            borderRadius: '6px'
+                          }}
+                        />
+                      </Box>
+                      <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
+                        Manage slab specifications and manufacturing stages in one place.
+                      </Typography>
+                    </Box>
+
+                    {/* Summary Metric Pills & Top Actions */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                        <LayersRoundedIcon sx={{ fontSize: 18, color: '#B38B36' }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                          {projectSlabs?.length || 0} Slabs
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                        <Inventory2RoundedIcon sx={{ fontSize: 18, color: '#0284C7' }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                          {projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} Pieces
+                        </Typography>
+                      </Box>
+
                       <Button 
-                        variant="contained" 
-                        startIcon={<PlayArrowRoundedIcon />}
-                        onClick={handleStartAllWork}
+                        variant="outlined" 
+                        startIcon={<SyncIcon />} 
+                        onClick={async () => {
+                          try {
+                            await syncSlabs(id as string).unwrap();
+                            refetchSlabs();
+                            setSnackbarMessage('Synced successfully with Quotation!');
+                          } catch(err) {
+                            setSnackbarMessage('Error syncing slabs.');
+                          }
+                        }}
                         sx={{
-                          borderRadius: 2.5,
+                          borderRadius: 2,
                           textTransform: 'none',
-                          fontWeight: 800,
-                          bgcolor: '#059669',
-                          color: '#FFFFFF',
-                          boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
-                          '&:hover': { bgcolor: '#047857' }
+                          fontWeight: 700,
+                          borderColor: '#CBD5E1',
+                          color: '#1E293B',
+                          bgcolor: '#FFFFFF',
+                          '&:hover': { borderColor: '#B38B36', bgcolor: '#FFFDF5' }
                         }}
                       >
-                        Finalize & Send to Production
+                        Sync with Quotation
+                      </Button>
+
+                      {isPlanningMode && (
+                        <Button 
+                          variant="contained" 
+                          startIcon={<PlayArrowRoundedIcon />}
+                          onClick={handleStartAllWork}
+                          sx={{
+                            borderRadius: 2.5,
+                            textTransform: 'none',
+                            fontWeight: 800,
+                            bgcolor: '#059669',
+                            color: '#FFFFFF',
+                            boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                            '&:hover': { bgcolor: '#047857' }
+                          }}
+                        >
+                          Finalize & Send to Production
+                        </Button>
+                      )}
+                    </Box>
+                  </Box>
+
+                  {/* Bulk Stage Planner Card (Matches Image 1) */}
+                  <Paper 
+                    elevation={0} 
+                    sx={{ 
+                      p: 2.5, 
+                      mb: 3, 
+                      borderRadius: 3.5, 
+                      border: '1px solid #E2E8F0', 
+                      bgcolor: '#FFFFFF',
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    {/* Header row */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', width: 38, height: 38, borderRadius: 2 }}>
+                          <TuneRoundedIcon sx={{ fontSize: 22 }} />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.2 }}>
+                            Bulk Stage Planner
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748B', fontSize: '0.78rem' }}>
+                            Select slabs and choose manufacturing stages to apply in bulk.
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, bgcolor: '#F0F9FF', px: 1.5, py: 0.6, borderRadius: 2, border: '1px solid #BAE6FD' }}>
+                        <InfoOutlinedIcon sx={{ fontSize: 16, color: '#0284C7' }} />
+                        <Typography variant="caption" sx={{ color: '#0369A1', fontWeight: 600, fontSize: '0.76rem' }}>
+                          Select one or more slabs, choose the stages to update, then apply to selected slabs.
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* Controls Row */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, bgcolor: '#F8FAFC', p: 1.75, borderRadius: 2.5, border: '1px solid #E2E8F0' }}>
+                      {/* Left: Select All & Counter */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox 
+                              checked={isAllFilteredSelected}
+                              indeterminate={isSomeFilteredSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedSlabIds(Array.from(new Set([...selectedSlabIds, ...filteredSlabs.map(s => s.id)])));
+                                } else {
+                                  const filteredIds = new Set(filteredSlabs.map(s => s.id));
+                                  setSelectedSlabIds(selectedSlabIds.filter(sid => !filteredIds.has(sid)));
+                                }
+                              }}
+                              sx={{ '&.Mui-checked': { color: '#1D4ED8' } }}
+                            />
+                          }
+                          label={<Typography variant="body2" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '0.86rem' }}>Select All Stones</Typography>}
+                          sx={{ mr: 0 }}
+                        />
+                        <Chip 
+                          label={`${selectedInFilterCount} of ${filteredSlabs.length} slabs selected`} 
+                          size="small" 
+                          sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 24, border: '1px solid #DBEAFE' }}
+                        />
+                      </Box>
+
+                      {/* Center: Manufacturing Stages to Apply */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', mr: 0.5, fontSize: '0.72rem' }}>
+                          Manufacturing Stages to Apply
+                        </Typography>
+                        {[
+                          { key: 'Production', label: 'Production' },
+                          { key: 'Polishing - Honed', label: 'Polishing - Honed' },
+                          { key: 'Polishing - Mirror', label: 'Polishing - Mirror' },
+                          { key: 'Packing', label: 'Packing' },
+                          { key: 'Dispatch', label: 'Dispatch' }
+                        ].map(stage => {
+                          const isChecked = bulkStages.includes(stage.key);
+                          return (
+                            <Box
+                              key={stage.key}
+                              onClick={() => {
+                                if (isChecked) {
+                                  setBulkStages(bulkStages.filter(s => s !== stage.key));
+                                } else {
+                                  setBulkStages([...bulkStages, stage.key]);
+                                }
+                              }}
+                              sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.6,
+                                px: 1.25,
+                                py: 0.45,
+                                borderRadius: 1.75,
+                                bgcolor: isChecked ? '#F0FDF4' : '#FFFFFF',
+                                border: '1px solid',
+                                borderColor: isChecked ? '#86EFAC' : '#CBD5E1',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                '&:hover': { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
+                              }}
+                            >
+                              <Checkbox 
+                                size="small" 
+                                checked={isChecked} 
+                                sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} 
+                              />
+                              <Typography variant="caption" sx={{ fontWeight: 700, color: isChecked ? '#166534' : '#64748B', fontSize: '0.76rem' }}>
+                                {stage.label}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+
+                      {/* Right: Actions */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => setBulkStages(['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'])}
+                          sx={{ borderRadius: 1.75, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#475569', fontSize: '0.75rem', bgcolor: '#FFFFFF' }}
+                        >
+                          Select All Stages
+                        </Button>
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => setBulkStages([])}
+                          sx={{ borderRadius: 1.75, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#475569', fontSize: '0.75rem', bgcolor: '#FFFFFF' }}
+                        >
+                          Deselect All Stages
+                        </Button>
+                        <Button 
+                          size="small" 
+                          variant="contained" 
+                          startIcon={<PlayArrowRoundedIcon sx={{ fontSize: 16 }} />}
+                          onClick={handleApplyBulkStages}
+                          disabled={isBulkUpdating}
+                          sx={{ 
+                            borderRadius: 2, 
+                            textTransform: 'none', 
+                            fontWeight: 800, 
+                            bgcolor: '#1E293B', 
+                            color: '#FFFFFF',
+                            px: 2,
+                            boxShadow: '0 2px 6px rgba(30,41,59,0.25)',
+                            '&:hover': { bgcolor: '#0F172A' }
+                          }}
+                        >
+                          {isBulkUpdating ? 'Applying...' : 'Apply to Selected Slabs'}
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Paper>
+
+                  {/* Filter & Search Bar */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                      <FormControl size="small" sx={{ minWidth: 170 }}>
+                        <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Slab Category</InputLabel>
+                        <Select
+                          value={slabCategoryFilter}
+                          label="Slab Category"
+                          onChange={(e) => setSlabCategoryFilter(e.target.value)}
+                          sx={{ borderRadius: 2, bgcolor: '#FFFFFF', fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="All">All Categories</MenuItem>
+                          {categories.map((cat: string) => (
+                            <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      <TextField
+                        size="small"
+                        placeholder="Search slabs (e.g. name, spec)..."
+                        value={slabSearchQuery}
+                        onChange={(e) => setSlabSearchQuery(e.target.value)}
+                        slotProps={{
+                          input: {
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <SearchIcon sx={{ color: '#94A3B8', fontSize: 18 }} />
+                              </InputAdornment>
+                            ),
+                            sx: { borderRadius: 2, bgcolor: '#FFFFFF', fontSize: '0.85rem' }
+                          }
+                        }}
+                        sx={{ width: { xs: '100%', sm: 300 } }}
+                      />
+                    </Box>
+
+                    {(slabSearchQuery || slabCategoryFilter !== 'All') && (
+                      <Button 
+                        size="small" 
+                        startIcon={<CloseRoundedIcon />}
+                        onClick={() => { setSlabSearchQuery(''); setSlabCategoryFilter('All'); }}
+                        sx={{ color: '#64748B', textTransform: 'none', fontWeight: 700 }}
+                      >
+                        Clear Filters
                       </Button>
                     )}
                   </Box>
-                </Box>
 
-                {/* Luxury Production Table */}
-                <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', mb: 3.5 }}>
-                  <Table>
-                    <TableHead sx={{ bgcolor: '#F8FAFC' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
-                          Product / Slab Name
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
-                          Original Spec
-                        </TableCell>
-                        {activeColumns.includes('Production') && (
+                  {/* Unified Modern Slabs Table (Matches Image 1) */}
+                  <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', mb: 3.5 }}>
+                    <Table>
+                      <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                        <TableRow>
+                          <TableCell padding="checkbox" sx={{ pl: 2, py: 1.75 }}>
+                            <Checkbox 
+                              checked={isAllFilteredSelected}
+                              indeterminate={isSomeFilteredSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedSlabIds(Array.from(new Set([...selectedSlabIds, ...filteredSlabs.map(s => s.id)])));
+                                } else {
+                                  const filteredIds = new Set(filteredSlabs.map(s => s.id));
+                                  setSelectedSlabIds(selectedSlabIds.filter(sid => !filteredIds.has(sid)));
+                                }
+                              }}
+                              sx={{ '&.Mui-checked': { color: '#1D4ED8' } }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                            Product / Slab Name
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                            Original Spec
+                          </TableCell>
                           <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
                             Production
                           </TableCell>
-                        )}
-                        {activeColumns.includes('Polishing') && (
                           <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
-                            Polishing (Honed / Mirror)
+                            Polishing (Honed)
                           </TableCell>
-                        )}
-                        {activeColumns.includes('Packing') && (
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                            Polishing (Mirror)
+                          </TableCell>
                           <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
                             Packing
                           </TableCell>
-                        )}
-                        {activeColumns.includes('Dispatch') && (
                           <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
                             Dispatch
                           </TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                            Overall Status
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }} align="center">
+                            Actions
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {filteredSlabs.map((slab: any, idx: number) => (
+                          <SlabRow
+                            key={slab.id}
+                            slab={slab}
+                            index={idx}
+                            isSelected={selectedSlabIds.includes(slab.id)}
+                            onToggleSelect={() => {
+                              if (selectedSlabIds.includes(slab.id)) {
+                                setSelectedSlabIds(selectedSlabIds.filter(sid => sid !== slab.id));
+                              } else {
+                                setSelectedSlabIds([...selectedSlabIds, slab.id]);
+                              }
+                            }}
+                            onEdit={handleEditSlabClick}
+                            onDelete={handleDeleteSlab}
+                            products={products}
+                            productionLogs={productionLogs || []}
+                            isPlanningMode={isPlanningMode}
+                          />
+                        ))}
+                        {filteredSlabs.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={10} align="center" sx={{ py: 6, color: '#94A3B8' }}>
+                              <LayersRoundedIcon sx={{ fontSize: 40, color: '#CBD5E1', mb: 1, display: 'block', mx: 'auto' }} />
+                              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
+                                No slabs matching filter
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                                Click "Sync with Quotation" above to auto-generate slabs or adjust your filters.
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
                         )}
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }} align="center">
-                          Action / Status
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {projectSlabs?.map((slab: any, idx: number) => (
-                        isPlanningMode 
-                          ? <SlabPlanningRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} activeColumns={activeColumns} />
-                          : <SlabTrackingRow key={slab.id} slab={slab} index={idx} onEdit={handleEditSlabClick} onDelete={handleDeleteSlab} products={products} productionLogs={productionLogs || []} activeColumns={activeColumns} projectTotalPieces={projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} />
-                      ))}
-                      {(!projectSlabs || projectSlabs.length === 0) && (
-                         <TableRow>
-                           <TableCell colSpan={7} align="center" sx={{ py: 6, color: '#94A3B8' }}>
-                             <LayersRoundedIcon sx={{ fontSize: 40, color: '#CBD5E1', mb: 1, display: 'block', mx: 'auto' }} />
-                             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
-                               No slabs created yet
-                             </Typography>
-                             <Typography variant="caption" sx={{ color: '#94A3B8' }}>
-                               Click "Sync with Quotation" above to auto-generate slabs from your approved quotation.
-                             </Typography>
-                           </TableCell>
-                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </Paper>
+                      </TableBody>
+                    </Table>
+                  </Paper>
 
-                {/* Footer Navigation */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                  {viewingStepOverride !== null ? (
-                    <Button 
-                      variant="contained" 
-                      size="large" 
-                      onClick={handleReturnToActive} 
-                      sx={{ 
-                        px: 4, 
-                        py: 1.3, 
-                        borderRadius: 2.5, 
-                        bgcolor: '#1E293B', 
-                        color: '#FFFFFF',
-                        fontWeight: 800, 
-                        textTransform: 'none',
-                        '&:hover': { bgcolor: '#0F172A' } 
-                      }}
-                    >
-                      Back to Active Work Order
-                    </Button>
-                  ) : !isPlanningMode ? (
-                    <Button 
-                      variant="contained" 
-                      size="large" 
-                      endIcon={<ArrowForwardRoundedIcon />}
-                      onClick={async () => {
-                         await updateProject({ id: id as string, data: { status: 'work_order' } }).unwrap();
-                         setActiveStep(7);
-                         setViewingStepOverride(null);
-                         refetch();
-                      }} 
-                      sx={{ 
-                        px: 5, 
-                        py: 1.3, 
-                        borderRadius: 2.5, 
-                        bgcolor: '#059669', 
-                        color: '#FFFFFF',
-                        fontWeight: 800, 
-                        fontSize: '1rem',
-                        textTransform: 'none',
-                        boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
-                        '&:hover': { bgcolor: '#047857' } 
-                      }}
-                    >
-                      Finalize & Send to Dispatch
-                    </Button>
-                  ) : null}
-                </Box>
-              </Paper>
-            )}
+                  {/* Footer Navigation */}
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                    {viewingStepOverride !== null ? (
+                      <Button 
+                        variant="contained" 
+                        size="large" 
+                        onClick={handleReturnToActive} 
+                        sx={{ 
+                          px: 4, 
+                          py: 1.3, 
+                          borderRadius: 2.5, 
+                          bgcolor: '#1E293B', 
+                          color: '#FFFFFF',
+                          fontWeight: 800, 
+                          textTransform: 'none',
+                          '&:hover': { bgcolor: '#0F172A' } 
+                        }}
+                      >
+                        Back to Active Work Order
+                      </Button>
+                    ) : !isPlanningMode ? (
+                      <Button 
+                        variant="contained" 
+                        size="large" 
+                        endIcon={<ArrowForwardRoundedIcon />}
+                        onClick={async () => {
+                          await updateProject({ id: id as string, data: { status: 'work_order' } }).unwrap();
+                          setActiveStep(7);
+                          setViewingStepOverride(null);
+                          refetch();
+                        }} 
+                        sx={{ 
+                          px: 5, 
+                          py: 1.3, 
+                          borderRadius: 2.5, 
+                          bgcolor: '#059669', 
+                          color: '#FFFFFF',
+                          fontWeight: 800, 
+                          fontSize: '1rem',
+                          textTransform: 'none',
+                          boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                          '&:hover': { bgcolor: '#047857' } 
+                        }}
+                      >
+                        Finalize & Send to Dispatch
+                      </Button>
+                    ) : null}
+                  </Box>
+                </Paper>
+              );
+            })()}
 
             {/* STEP 6: WORK ORDER ACTIVE */}
             {stepToRender >= 7 && (

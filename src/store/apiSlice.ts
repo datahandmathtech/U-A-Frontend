@@ -518,6 +518,14 @@ export const apiSlice = createApi({
       query: ({ projectId, items }) => ({ url: `/packing-items/${projectId}`, method: 'POST', body: { items } }),
       invalidatesTags: ['Dispatch']
     }),
+    bulkUpdateSlabStages: builder.mutation<any, { slabIds: string[], requiredStages: string[] }>({
+      query: (data) => ({
+        url: '/slabs/bulk-stages',
+        method: 'PATCH',
+        body: data
+      }),
+      invalidatesTags: ['Project']
+    }),
   }),
 });
 
@@ -568,6 +576,7 @@ export const {
   useCreateSlabMutation,
   useUpdateSlabMutation,
   useDeleteSlabMutation,
+  useBulkUpdateSlabStagesMutation,
   useSyncSlabsMutation,
   useAddManualAttendanceMutation,
   useUpdatePieceMutation,

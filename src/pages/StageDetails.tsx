@@ -56,6 +56,14 @@ const StageDetails = () => {
   const slab = slabs?.find((s: any) => s.id === slabId);
   const stageFormatted = stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : '';
   
+  const matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => slab?.name?.startsWith(p.category));
+  const rawUnit = matchedProduct?.unit || (slab?.size?.toLowerCase().includes('mm') ? 'mm' : 'inch');
+  const unitDisplayName = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches' 
+    : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet' 
+    : rawUnit.toLowerCase() === 'sq_ft' || rawUnit.toLowerCase() === 'sqft' ? 'Sq.Ft' 
+    : rawUnit.toLowerCase() === 'mm' ? 'MM' 
+    : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
+
   // Filter production logs for this project & slab that represent Machine Work
   const logs = productionLogs?.filter((log: any) => 
     log.stage === 'Production Work' && 
@@ -409,11 +417,26 @@ const StageDetails = () => {
           </TableCell>
           <TableCell sx={{ py: 2 }}>
             {p.size ? (
-              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
-                <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>
-                  {String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
-                </Typography>
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
+                  <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>
+                    {String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
+                  </Typography>
+                </Box>
+                <Chip 
+                  label={unitDisplayName} 
+                  size="small" 
+                  sx={{ 
+                    bgcolor: '#F1F5F9', 
+                    color: '#475569', 
+                    fontWeight: 700, 
+                    fontSize: '0.7rem', 
+                    height: 20, 
+                    borderRadius: 1, 
+                    border: '1px solid #CBD5E1' 
+                  }} 
+                />
               </Box>
             ) : (
               <Typography variant="caption" sx={{ color: '#94A3B8' }}>Standard</Typography>
@@ -594,11 +617,27 @@ const StageDetails = () => {
                 }} 
               />
               {slab.size && (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.4 }}>
-                  <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.82rem' }}>
-                    Slab Spec: {slab.size}
-                  </Typography>
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.4 }}>
+                    <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.82rem' }}>
+                      Slab Spec: {slab.size}
+                    </Typography>
+                  </Box>
+                  <Chip 
+                    label={unitDisplayName} 
+                    size="small" 
+                    sx={{ 
+                      bgcolor: '#FFFFFF', 
+                      color: '#475569', 
+                      fontWeight: 800, 
+                      fontSize: '0.75rem', 
+                      height: 24, 
+                      borderRadius: 1.5, 
+                      border: '1px solid #CBD5E1',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                    }} 
+                  />
                 </Box>
               )}
             </Box>
