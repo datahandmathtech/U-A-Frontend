@@ -66,10 +66,10 @@ const LogBook = () => {
     }
   };
 
-  // Machine Logs filtering (Excludes internal midnight auto-splits)
+  // Machine Logs filtering
   const logs = React.useMemo(() => {
     if (!allLogs) return [];
-    let filtered = allLogs.filter((log: any) => !log.remarks?.includes('Auto-closed at 12:00 AM midnight'));
+    let filtered = [...allLogs];
     
     if (viewMode === 'day') {
       const targetDate = formattedDateParam;
