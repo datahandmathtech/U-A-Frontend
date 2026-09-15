@@ -314,7 +314,7 @@ const LogBook = () => {
                       </TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap', minWidth: 130 }}>
                         <Typography sx={{ color: log.isCarryForward ? '#D97706' : '#2E7D32', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 0.75, whiteSpace: 'nowrap' }}>
-                          <ArrowOutwardIcon fontSize="small" /> {formatTime(log.startTime)}
+                          <ArrowOutwardIcon fontSize="small" /> {log.isCarryForward ? '12:00 AM' : formatTime(log.startTime)}
                           {log.isCarryForward && (
                             <Chip 
                               label="CF" 
