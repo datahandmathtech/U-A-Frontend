@@ -28,7 +28,7 @@ export const apiSlice = createApi({
   baseQuery: baseQueryWithReauth,
   refetchOnFocus: false,
   refetchOnReconnect: false,
-  keepUnusedDataFor: 300,
+  keepUnusedDataFor: 600,
   tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste', 'Machine'],
   endpoints: (builder) => ({
     // VENDOR ENDPOINTS
