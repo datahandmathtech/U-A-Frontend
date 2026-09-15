@@ -60,21 +60,38 @@ const getDayRunDurationStr = (startTime: string | Date, endTime: string | Date |
   return `${hrs}h ${mins}m`;
 };
 
+const getTotalContinuousDurationStr = (startTime: string | Date | null, endTime: string | Date | null) => {
+  if (!startTime) return '0h 00m';
+  const startMs = new Date(startTime).getTime();
+  const endMs = endTime ? new Date(endTime).getTime() : Date.now();
+  const diffMs = Math.max(0, endMs - startMs);
+
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${String(minutes).padStart(2, '0')}m`;
+  }
+  return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+};
+
 const LiveFeed: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [filterType, setFilterType] = useState<'all' | 'running' | 'idle' | 'carry_forward' | 'completed'>('all');
+  const [filterType, setFilterType] = useState<'running' | 'idle' | 'carry_forward' | 'completed'>('running');
   
   const handlePrevDay = () => {
     setSelectedDate(prev => new Date(prev.getTime() - 24*60*60*1000));
-    setFilterType('all');
+    setFilterType('running');
   };
   const handleNextDay = () => {
     setSelectedDate(prev => new Date(prev.getTime() + 24*60*60*1000));
-    setFilterType('all');
+    setFilterType('running');
   };
   const handleJumpToday = () => {
     setSelectedDate(new Date());
-    setFilterType('all');
+    setFilterType('running');
   };
 
   const dayStart = useMemo(() => {
@@ -111,43 +128,52 @@ const LiveFeed: React.FC = () => {
 
   const rawLogs = useMemo(() => liveFeedData || [], [liveFeedData]);
 
-  // 1. RUNNING NOW (Day-wise):
-  // - On Today: machines currently active right now (status: active)
-  // - On Past Dates: 0 (since past dates have concluded)
+  // 1. RUNNING NOW (Current Date machines only):
+  // - On Today: machines currently active right now that STARTED TODAY (not carry forward)
   const activeLogs = useMemo(() => {
     if (!isToday) return [];
-    return rawLogs.filter((log: any) => log.status === 'active');
-  }, [rawLogs, isToday]);
+    return rawLogs.filter((log: any) => {
+      if (log.status !== 'active') return false;
+      const startMs = new Date(log.startTime).getTime();
+      const isCF = Boolean(log.isCarryForward) || Boolean(log.parentLogId) || startMs < dayStart.getTime();
+      return !isCF && startMs >= dayStart.getTime();
+    });
+  }, [rawLogs, isToday, dayStart]);
 
-  // 2. CARRY FORWARD (Day-wise):
-  // Started before 00:00:00 of this selected date OR marked as carry forward
+  // 2. CARRY FORWARD (Started on previous dates, currently still running):
   const carryForwardLogs = useMemo(() => {
     return rawLogs.filter((log: any) => {
+      if (log.status !== 'active') return false;
       const startMs = new Date(log.startTime).getTime();
-      return Boolean(log.isCarryForward) || startMs < dayStart.getTime();
+      const isCF = Boolean(log.isCarryForward) || Boolean(log.parentLogId) || startMs < dayStart.getTime();
+      return isCF;
     });
   }, [rawLogs, dayStart]);
 
   // 3. COMPLETED SHIFTS (Day-wise):
-  // - On Today: shifts that were closed/clocked-out today
-  // - On Past Dates: all shifts that operated on that date
+  // Shifts that were stopped/clocked-out (excludes auto midnight splits)
   const completedLogs = useMemo(() => {
-    if (!isToday) {
-      return rawLogs;
-    }
     return rawLogs.filter((log: any) => {
       if (log.status !== 'completed') return false;
       if (!log.endTime) return false;
       const endMs = new Date(log.endTime).getTime();
-      return endMs >= dayStart.getTime() && endMs <= dayEnd.getTime() && !log.remarks?.includes('Auto-closed');
+      const isClosedToday = endMs >= dayStart.getTime() && endMs <= dayEnd.getTime();
+      return isClosedToday && !log.remarks?.includes('Auto-closed at 12:00 AM midnight');
     });
-  }, [rawLogs, isToday, dayStart, dayEnd]);
+  }, [rawLogs, dayStart, dayEnd]);
 
   // Operated machine IDs on this selected date
-  const operatedMachineIds = useMemo(() => new Set(rawLogs.map((l: any) => l.machineId).filter(Boolean)), [rawLogs]);
+  const operatedMachineIds = useMemo(() => {
+    return new Set(
+      rawLogs
+        .filter((l: any) => !l.remarks?.includes('Auto-closed at 12:00 AM midnight'))
+        .map((l: any) => l.machineId)
+        .filter(Boolean)
+    );
+  }, [rawLogs]);
 
   // 4. IDLE MACHINES (Day-wise):
-  // Machines registered in system that did NOT run at all on this selected date
+  // Registered machines that did NOT run at all on this selected date
   const idleMachines = useMemo(() => {
     if (!allMachinesList) return [];
     return allMachinesList.filter((m: any) => !operatedMachineIds.has(m.id) && !operatedMachineIds.has(m._id));
@@ -157,12 +183,10 @@ const LiveFeed: React.FC = () => {
     if (filterType === 'running') return activeLogs;
     if (filterType === 'carry_forward') return carryForwardLogs;
     if (filterType === 'completed') return completedLogs;
-    if (filterType === 'idle') return [];
-    return rawLogs;
-  }, [filterType, rawLogs, activeLogs, carryForwardLogs, completedLogs]);
+    return [];
+  }, [filterType, activeLogs, carryForwardLogs, completedLogs]);
 
-  // Show Idle machines when viewing "All Machines" or "Idle Machines"
-  const showIdleCards = filterType === 'idle' || filterType === 'all';
+  const showIdleCards = filterType === 'idle';
 
   return (
     <Box sx={{ width: '100%', px: { xs: 0, sm: 0.5, md: 1 } }}>
@@ -267,18 +291,6 @@ const LiveFeed: React.FC = () => {
       <Box sx={{ mb: 3, display: 'flex', gap: 1.25, flexWrap: 'wrap', alignItems: 'center' }}>
         {[
           { 
-            key: 'all', 
-            label: 'All Machines', 
-            count: (allMachinesList && allMachinesList.length > 0 ? allMachinesList.length : rawLogs.length),
-            icon: <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />,
-            activeBg: '#0F172A',
-            activeColor: '#FFFFFF',
-            activeBorder: '#0F172A',
-            badgeBg: '#334155',
-            badgeColor: '#F8FAFC',
-            iconColor: '#C89F5A'
-          },
-          { 
             key: 'running', 
             label: 'Running Now', 
             count: activeLogs.length,
@@ -289,18 +301,6 @@ const LiveFeed: React.FC = () => {
             badgeBg: '#10B981',
             badgeColor: '#FFFFFF',
             iconColor: '#059669'
-          },
-          { 
-            key: 'idle', 
-            label: 'Idle Machines', 
-            count: idleMachines.length,
-            icon: <PowerSettingsNewIcon sx={{ fontSize: 16 }} />,
-            activeBg: '#F1F5F9',
-            activeColor: '#334155',
-            activeBorder: '#64748B',
-            badgeBg: '#64748B',
-            badgeColor: '#FFFFFF',
-            iconColor: '#64748B'
           },
           { 
             key: 'carry_forward', 
@@ -325,6 +325,18 @@ const LiveFeed: React.FC = () => {
             badgeBg: '#0284C7',
             badgeColor: '#FFFFFF',
             iconColor: '#0284C7'
+          },
+          { 
+            key: 'idle', 
+            label: 'Idle Machines', 
+            count: idleMachines.length,
+            icon: <PowerSettingsNewIcon sx={{ fontSize: 16 }} />,
+            activeBg: '#F1F5F9',
+            activeColor: '#334155',
+            activeBorder: '#64748B',
+            badgeBg: '#64748B',
+            badgeColor: '#FFFFFF',
+            iconColor: '#64748B'
           },
         ].map((tab) => {
           const isSelected = filterType === tab.key;
@@ -417,8 +429,20 @@ const LiveFeed: React.FC = () => {
               const isPending = log.approvalStatus === 'pending';
               const isActive = log.status === 'active';
               const logStartMs = new Date(log.startTime).getTime();
-              const isCarryForward = Boolean(log.isCarryForward) || logStartMs < dayStart.getTime();
-              const durationText = getDayRunDurationStr(log.startTime, log.endTime, selectedDate);
+              const isCarryForward = Boolean(log.isCarryForward) || Boolean(log.parentLogId) || logStartMs < dayStart.getTime();
+
+              const durationLabel = isCarryForward ? 'TOTAL RUN' : (isCompleted ? 'TOTAL RUN' : 'TODAY RUN');
+              const durationText = isCarryForward
+                ? getTotalContinuousDurationStr(log.initialStartTime || log.startTime, null)
+                : (isCompleted
+                    ? getTotalContinuousDurationStr(log.initialStartTime || log.startTime, log.endTime)
+                    : getDayRunDurationStr(log.startTime, log.endTime, selectedDate));
+
+              const firstOnDateStr = formatDMY(log.initialStartTime || log.startTime);
+              const firstOnTimeStr = formatTime(log.initialStartTime || log.startTime);
+              const offDateStr = log.endTime ? formatDMY(log.endTime) : '';
+              const offTimeStr = log.endTime ? formatTime(log.endTime) : '';
+              const operatorName = log.operator?.name || log.initialOperator?.name || 'Assigned Staff';
               const machineName = log.machine?.name || 'Factory Machine';
               
               return (
@@ -435,7 +459,7 @@ const LiveFeed: React.FC = () => {
                       p: 2.5, 
                       borderRadius: 3.5, 
                       border: '1px solid',
-                      borderColor: isCompleted ? '#CBD5E1' : (isPending ? '#FDE68A' : '#86EFAC'),
+                      borderColor: isCarryForward ? '#FCD34D' : (isCompleted ? '#CBD5E1' : (isPending ? '#FDE68A' : '#86EFAC')),
                       bgcolor: '#FFFFFF',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
@@ -470,13 +494,13 @@ const LiveFeed: React.FC = () => {
                             {machineName}
                           </Typography>
                           <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
-                            {log.operator?.name ? `Operator: ${log.operator.name}` : (log.machine?.type || 'Factory Unit')}
+                            {log.machine?.type || 'Factory Unit'}
                           </Typography>
                         </Box>
                       </Box>
 
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
-                        {isCarryForward && (
+                        {isCarryForward ? (
                           <Chip 
                             icon={<AutorenewRoundedIcon sx={{ fontSize: '13px !important', color: '#B45309 !important' }} />}
                             label="CARRY FORWARD" 
@@ -488,24 +512,25 @@ const LiveFeed: React.FC = () => {
                               bgcolor: '#FEF3C7',
                               color: '#B45309',
                               border: '1px solid #FCD34D',
-                              height: 20
+                              height: 22
+                            }} 
+                          />
+                        ) : (
+                          <Chip 
+                            label={isCompleted ? 'COMPLETED' : (isPending ? 'PENDING APPROVAL' : 'RUNNING NOW')} 
+                            size="small" 
+                            sx={{ 
+                              fontWeight: 800, 
+                              fontSize: '0.68rem',
+                              borderRadius: 1.5,
+                              bgcolor: isCompleted ? '#EFF6FF' : (isPending ? '#FFFBEB' : '#ECFDF5'),
+                              color: isCompleted ? '#0284C7' : (isPending ? '#B45309' : '#059669'),
+                              border: '1px solid',
+                              borderColor: isCompleted ? '#BAE6FD' : (isPending ? '#FDE68A' : '#A7F3D0'),
+                              height: 22
                             }} 
                           />
                         )}
-                        <Chip 
-                          label={isCompleted ? 'COMPLETED' : (isPending ? 'PENDING APPROVAL' : 'RUNNING NOW')} 
-                          size="small" 
-                          sx={{ 
-                            fontWeight: 800, 
-                            fontSize: '0.68rem',
-                            borderRadius: 1.5,
-                            bgcolor: isCompleted ? '#EFF6FF' : (isPending ? '#FFFBEB' : '#ECFDF5'),
-                            color: isCompleted ? '#0284C7' : (isPending ? '#B45309' : '#059669'),
-                            border: '1px solid',
-                            borderColor: isCompleted ? '#BAE6FD' : (isPending ? '#FDE68A' : '#A7F3D0'),
-                            height: 22
-                          }} 
-                        />
                       </Box>
                     </Box>
 
@@ -523,10 +548,10 @@ const LiveFeed: React.FC = () => {
                         </Typography>
                       </Box>
                       <Box sx={{ textAlign: 'right', pr: 1 }}>
-                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '0.68rem', display: 'block', textTransform: 'uppercase' }}>
-                          TODAY RUN
+                        <Typography variant="caption" sx={{ color: isCarryForward ? '#B45309' : '#94A3B8', fontWeight: 800, fontSize: '0.68rem', display: 'block', textTransform: 'uppercase' }}>
+                          {durationLabel}
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.85rem' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 900, color: isCarryForward ? '#92400E' : '#0F172A', fontSize: '0.88rem' }}>
                           {durationText}
                         </Typography>
                       </Box>
@@ -534,20 +559,43 @@ const LiveFeed: React.FC = () => {
 
                     {/* Shift Times & Proof Photos Row */}
                     <Box sx={{ pl: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5 }}>
-                      <Box>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          🟢 IN: {isCarryForward ? '12:00 AM (CF)' : formatTime(log.startTime)}
-                        </Typography>
-                        {isCompleted && log.endTime && (
-                          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mt: 0.2 }}>
-                            🔴 OUT: {new Date(log.endTime).getTime() > dayEnd.getTime() || log.remarks?.includes('Auto-closed') ? '12:00 AM (Split)' : formatTime(log.endTime)}
-                          </Typography>
+                      <Box sx={{ flex: 1, pr: 1 }}>
+                        {isCarryForward ? (
+                          <>
+                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#B45309', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.74rem' }}>
+                              🟡 FIRST ON: {firstOnDateStr} ({firstOnTimeStr})
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, display: 'block', mt: 0.3, fontSize: '0.73rem' }}>
+                              👤 OPERATOR: {operatorName}
+                            </Typography>
+                          </>
+                        ) : isCompleted ? (
+                          <>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.72rem' }}>
+                              🟢 ON: {firstOnDateStr} ({firstOnTimeStr})
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.72rem', mt: 0.2 }}>
+                              🔴 OFF: {offDateStr} ({offTimeStr})
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, display: 'block', mt: 0.2, fontSize: '0.72rem' }}>
+                              👤 CLOSED BY: {operatorName}
+                            </Typography>
+                          </>
+                        ) : (
+                          <>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.74rem' }}>
+                              🟢 ON: {firstOnTimeStr} (Today)
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, display: 'block', mt: 0.3, fontSize: '0.73rem' }}>
+                              👤 OPERATOR: {operatorName}
+                            </Typography>
+                          </>
                         )}
                       </Box>
 
                       {/* Mini Photo Proof Thumbnails */}
-                      <Box sx={{ display: 'flex', gap: 0.75 }}>
-                        {[log.machinePhotoUrl, log.unitPhotoUrl, log.softwarePhotoUrl].filter(Boolean).slice(0, 3).map((url, idx) => (
+                      <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0 }}>
+                        {[log.machinePhotoUrl, log.unitPhotoUrl, log.softwarePhotoUrl, log.endMachinePhotoUrl].filter(Boolean).slice(0, 3).map((url, idx) => (
                           <Box 
                             key={idx}
                             onClick={(e) => {
@@ -555,7 +603,7 @@ const LiveFeed: React.FC = () => {
                               setPreviewPhoto(url);
                             }}
                             sx={{ 
-                              width: 32, height: 32, borderRadius: 1.5, overflow: 'hidden', 
+                              width: 34, height: 34, borderRadius: 1.5, overflow: 'hidden', 
                               bgcolor: '#F1F5F9', border: '1px solid #E2E8F0',
                               cursor: 'pointer',
                               '&:hover': { transform: 'scale(1.1)', borderColor: '#C89F5A' }
@@ -914,8 +962,11 @@ const LiveFeed: React.FC = () => {
                               <Typography variant="body2" sx={{ color: '#059669', fontWeight: 800, letterSpacing: 0.5 }}>
                                 MACHINE CURRENTLY IN OPERATION
                               </Typography>
-                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mt: 0.5 }}>
-                                Running duration today: {getDayRunDurationStr(selectedLog.startTime, selectedLog.endTime, selectedDate)}
+                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mt: 0.5 }}>
+                                {selectedLog.isCarryForward 
+                                  ? `Total continuous run: ${getTotalContinuousDurationStr(selectedLog.initialStartTime || selectedLog.startTime, null)} (Started ${formatDMY(selectedLog.initialStartTime || selectedLog.startTime)})`
+                                  : `Running duration today: ${getDayRunDurationStr(selectedLog.startTime, selectedLog.endTime, selectedDate)}`
+                                }
                               </Typography>
                             </Box>
                           )}
