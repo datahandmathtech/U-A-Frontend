@@ -228,7 +228,10 @@ const SlabRow = ({
             {slab.name}
           </Typography>
           <Chip 
-            label={`${slab.pieces?.length || 0} Pieces`} 
+            label={(() => {
+              const displayQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : (matchedProduct?.qty || 1);
+              return `${displayQty} Piece${displayQty !== 1 ? 's' : ''}`;
+            })()} 
             size="small" 
             sx={{ 
               mt: 0.5, 
@@ -3041,7 +3044,11 @@ const ProjectDetails: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
                         <Inventory2RoundedIcon sx={{ fontSize: 18, color: '#0284C7' }} />
                         <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E293B' }}>
-                          {projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} Pieces
+                          {projectSlabs?.reduce((acc: number, s: any) => {
+                            const matchedProduct = products?.find(p => s.name.startsWith(p.category));
+                            const qty = (s.pieces && s.pieces.length > 0) ? s.pieces.length : (matchedProduct?.qty || 1);
+                            return acc + qty;
+                          }, 0) || 0} Pieces
                         </Typography>
                       </Box>
 
