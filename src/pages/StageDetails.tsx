@@ -321,7 +321,7 @@ const StageDetails = () => {
   const qtyToProcess = matchedProductForUI?.qty ? Number(matchedProductForUI.qty) : 1;
 
   const renderTableRows = () => {
-    const piecesList = slab.pieces || [];
+    const piecesList = (slab.pieces && slab.pieces.length > 0) ? slab.pieces : [{ id: slab.id, isVirtualPiece: true, productName: slab.name, pieceNumber: 1, size: slab.size }];
     const filteredPieces = piecesList.filter((p: any) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
@@ -350,7 +350,7 @@ const StageDetails = () => {
 
     return filteredPieces.map((p: any, idx: number) => {
       // Find production log associated with this piece
-      let pLog = logs.find((log: any) => log.pieceIds?.includes(p.id));
+      let pLog = logs.find((log: any) => log.pieceIds?.includes(p.id) || (!log.pieceIds?.length && (log.slabId === p.id || log.productId === p.id)));
       
       if (!pLog && logs.length > 0) {
           // Fallback: pick an unassigned machine log for manual pieces if any exists (to satisfy 1 log = 1 piece if they matched it manually)
@@ -365,7 +365,7 @@ const StageDetails = () => {
       const endDate = mLog?.endTime ? new Date(mLog.endTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
       
       // Polishing/Packing/Dispatch Logs Extraction
-      const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(p.id)) || [];
+      const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(p.id) || (!l.pieceIds?.length && (l.slabId === p.id || l.productId === p.id))) || [];
       const stageLogs = pieceProductionLogs.filter((l: any) => l.stage === stageFormatted || l.stage === `${stageFormatted} Work`);
       const outLog = stageLogs.find((l: any) => l.transactionType === 'OUT' && l.approvalStatus === 'approved');
       const inLog = stageLogs.find((l: any) => l.transactionType === 'IN' && l.approvalStatus === 'approved');
@@ -406,7 +406,7 @@ const StageDetails = () => {
               <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.9rem' }}>
                 {String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim()}
               </Typography>
-              {p.pieceNumber && (
+              {p.pieceNumber && !p.isVirtualPiece && (
                 <Chip 
                   label={`Piece #${p.pieceNumber}`} 
                   size="small" 
@@ -562,7 +562,7 @@ const StageDetails = () => {
   const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
   const stageIdx = BASE_STAGES.indexOf(stageFormatted);
   
-  const totalPieces = slab.pieces?.length || 0;
+  const totalPieces = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : 1;
   
   let completedPieces = 0;
   if (stageFormatted === 'Dispatch') {
@@ -673,7 +673,7 @@ const StageDetails = () => {
                       Spec: {slab.size}
                     </Typography>
                   </Box>
-                  <Chip label={unitDisplayName} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
+                  <Chip label={` `} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
                   {matchedProduct && (
                     <Chip label={`${calculateAreaFromSize(slab?.size as string, rawUnit, matchedProduct)} Sq.Ft`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #BFDBFE', borderRadius: 1.5 }} />
                   )}
@@ -1421,7 +1421,7 @@ const StageDetails = () => {
         </DialogTitle>
         <DialogContent dividers sx={{ p: 3.5, bgcolor: '#FAFAFA' }}>
           {(() => {
-            const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(viewPiece?.id)) || [];
+            const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(viewPiece?.id) || (!l.pieceIds?.length && (l.slabId === viewPiece?.id || l.productId === viewPiece?.id))) || [];
             
             const linkedMachineLogIds = pieceProductionLogs
               .filter((l: any) => l.stage === 'Production Work' && l.parentLogId)
