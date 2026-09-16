@@ -1696,33 +1696,33 @@ const ManagerDashboard: React.FC = () => {
                       <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 0.6 }}>
                         1. Select Client / Project
                       </Typography>
-                      <TextField 
-                        select
-                        fullWidth 
+                      <Autocomplete
                         size="small"
-                        value={selectedProjectId}
-                        onChange={(e) => {
-                          setSelectedProjectId(e.target.value);
+                        options={projectsData || []}
+                        getOptionLabel={(p: any) => `${p.projectId ? `[${p.projectId}] ` : ''}${p.name || ''}`}
+                        value={projectsData?.find((p: any) => p.id === selectedProjectId) || null}
+                        onChange={(_, p: any) => {
+                          setSelectedProjectId(p ? p.id : '');
                           setSelectedSlabId('');
                           setSelectedProductName('');
                           setMaterialQuantity('');
                         }}
-                        sx={{ 
-                          '& .MuiOutlinedInput-root': { 
-                            borderRadius: 2.5, 
-                            bgcolor: '#F8FAFC',
-                            '& fieldset': { borderColor: '#E2E8F0' },
-                            '&:hover fieldset': { borderColor: '#CBD5E1' }
-                          } 
-                        }}
-                      >
-                        <MenuItem value="" disabled>-- Select Work Order --</MenuItem>
-                        {projectsData?.map((p: any) => (
-                          <MenuItem key={p.id} value={p.id} sx={{ fontSize: '0.88rem' }}>
-                            {p.projectId ? `[${p.projectId}] ` : ''}{p.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
+                        isOptionEqualToValue={(option: any, val: any) => option.id === val?.id}
+                        renderInput={(params) => (
+                          <TextField 
+                            {...params} 
+                            placeholder="-- Click to Select Work Order --"
+                            sx={{ 
+                              '& .MuiOutlinedInput-root': { 
+                                borderRadius: 2.5, 
+                                bgcolor: '#F8FAFC',
+                                '& fieldset': { borderColor: '#E2E8F0' },
+                                '&:hover fieldset': { borderColor: '#CBD5E1' }
+                              } 
+                            }}
+                          />
+                        )}
+                      />
                     </Box>
 
                     {/* Polishing: Skip Step 2 and show project-wide stats */}
