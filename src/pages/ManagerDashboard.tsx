@@ -314,6 +314,47 @@ const ManagerDashboard: React.FC = () => {
 
   const [selectedOutLogId, setSelectedOutLogId] = useState('');
 
+  // Calculate project-wide production & polishing limits for the selected project
+  const selectedProjectObj = projectsData?.find((p: any) => p.id === selectedProjectId);
+  const polishingStats = React.useMemo(() => {
+    if (!selectedProjectObj) return { totalProjectPieces: 0, producedPieces: 0, polishedPieces: 0, availableToPolish: 0 };
+    
+    let totalProjectPieces = 0;
+    let producedPieces = 0;
+    let polishedPieces = 0;
+
+    const slabs = selectedProjectObj.slabs || [];
+    if (slabs.length > 0) {
+      slabs.forEach((slab: any) => {
+        const pList = slab.pieces || [];
+        totalProjectPieces += (pList.length > 0 ? pList.length : 1);
+        
+        pList.forEach((p: any) => {
+          // Check if piece has completed Production stage
+          const isProdCompleted = p.status === 'completed' || 
+            (p.stage && p.stage !== 'Production' && p.stage !== 'Production Work') ||
+            p.logs?.some((l: any) => (l.stage === 'Production' || l.stage === 'Production Work') && (l.status === 'completed' || l.status === 'approved'));
+          
+          if (isProdCompleted) {
+            producedPieces++;
+          }
+
+          // Check if piece has already completed Polishing
+          const isPolishCompleted = p.logs?.some((l: any) => l.stage?.startsWith('Polishing') && (l.status === 'completed' || l.status === 'approved'));
+          if (isPolishCompleted) {
+            polishedPieces++;
+          }
+        });
+      });
+    } else {
+      totalProjectPieces = selectedProjectObj.totalPieces || 1;
+      producedPieces = selectedProjectObj.completedPieces || 0;
+    }
+
+    const availableToPolish = Math.max(0, producedPieces - polishedPieces);
+    return { totalProjectPieces, producedPieces, polishedPieces, availableToPolish };
+  }, [selectedProjectObj]);
+
   // Helper to check if a slab has completed a stage
   const isSlabStageCompleted = (slab: any, stageName: string) => {
     if (!slab) return false;
@@ -685,6 +726,21 @@ const ManagerDashboard: React.FC = () => {
     if (materialStage === 'Dispatch' && (!dispatchBoxCodes || dispatchBoxCodes.length === 0) && (!materialQuantity || Number(materialQuantity) <= 0)) {
       showToast('Quantity or Packed Box is required for Dispatch!', 'error');
       return;
+    }
+
+    if (materialStage === 'Polishing' || materialStage.startsWith('Polishing')) {
+      if (!selectedProjectId) {
+        showToast('Please select a project!', 'error');
+        return;
+      }
+      if (!materialQuantity || Number(materialQuantity) <= 0) {
+        showToast('Please enter a valid polishing quantity!', 'error');
+        return;
+      }
+      if (Number(materialQuantity) > polishingStats.availableToPolish) {
+        showToast(`Cannot polish ${materialQuantity} pieces! Only ${polishingStats.availableToPolish} stone(s) are completed in production and ready to polish.`, 'error');
+        return;
+      }
     }
 
     const finalBoxCode = materialStage === 'Dispatch' 
@@ -1635,85 +1691,128 @@ const ManagerDashboard: React.FC = () => {
                       </TextField>
                     </Box>
 
-                    {selectedProjectId && (
-                      <Box>
-                        <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 0.6 }}>
-                          2. Select Main Stone / Product
-                        </Typography>
-                        <TextField
-                          select
-                          fullWidth
-                          size="small"
-                          value={selectedSlabId}
-                          onChange={(e) => {
-                            const sId = e.target.value;
-                            setSelectedSlabId(sId);
-                            const slab = projectSlabs?.find((s: any) => s.id === sId);
-                            if (slab) {
-                              setSelectedProductName(slab.name);
-                              const totalPieces = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
-                              setMaterialQuantity(String(totalPieces));
-                            } else {
-                              setSelectedProductName('');
-                              setMaterialQuantity('');
-                            }
-                          }}
-                          sx={{ 
-                            '& .MuiOutlinedInput-root': { 
-                              borderRadius: 2.5, 
-                              bgcolor: '#F8FAFC',
-                              '& fieldset': { borderColor: '#E2E8F0' },
-                              '&:hover fieldset': { borderColor: '#CBD5E1' }
-                            } 
-                          }}
-                        >
-                          {(() => {
-                            const filteredSlabs = projectSlabs?.filter((s: any) => {
-                              if (s.requiredStages && s.requiredStages.length > 0) {
-                                if (materialStage === 'Polishing' || materialStage.startsWith('Polishing')) {
-                                  if (!s.requiredStages.some((rs: string) => rs.startsWith('Polishing'))) return false;
-                                } else if (materialStage === 'Packing') {
-                                  if (!s.requiredStages.includes('Packing')) return false;
-                                } else if (materialStage === 'Production') {
-                                  if (!s.requiredStages.includes('Production')) return false;
-                                }
+                    {/* Polishing: Skip Step 2 and show project-wide stats */}
+                    {(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) ? (
+                      selectedProjectId && (
+                        <Box sx={{ p: 2, bgcolor: '#F0F9FF', borderRadius: 2.5, border: '1px solid #BAE6FD', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#0369A1' }}>Total Order Stones:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#0369A1' }}>{polishingStats.totalProjectPieces} Pcs</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669' }}>Production Completed (Ready to Polish):</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669' }}>{polishingStats.producedPieces} Pcs</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>Already Polished:</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#64748B' }}>{polishingStats.polishedPieces} Pcs</Typography>
+                          </Box>
+                          <Divider sx={{ borderColor: '#BAE6FD' }} />
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A' }}>Available to Polish:</Typography>
+                            <Chip 
+                              label={`${polishingStats.availableToPolish} Pcs Remaining`} 
+                              size="small" 
+                              sx={{ 
+                                bgcolor: polishingStats.availableToPolish > 0 ? '#10B981' : '#EF4444', 
+                                color: '#FFF', 
+                                fontWeight: 800 
+                              }} 
+                            />
+                          </Box>
+                        </Box>
+                      )
+                    ) : (
+                      selectedProjectId && (
+                        <Box>
+                          <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 0.6 }}>
+                            2. Select Main Stone / Product
+                          </Typography>
+                          <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            value={selectedSlabId}
+                            onChange={(e) => {
+                              const sId = e.target.value;
+                              setSelectedSlabId(sId);
+                              const slab = projectSlabs?.find((s: any) => s.id === sId);
+                              if (slab) {
+                                setSelectedProductName(slab.name);
+                                const totalPieces = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
+                                setMaterialQuantity(String(totalPieces));
+                              } else {
+                                setSelectedProductName('');
+                                setMaterialQuantity('');
                               }
-                              return !isSlabStageCompleted(s, materialStage);
-                            }) || [];
+                            }}
+                            sx={{ 
+                              '& .MuiOutlinedInput-root': { 
+                                borderRadius: 2.5, 
+                                bgcolor: '#F8FAFC',
+                                '& fieldset': { borderColor: '#E2E8F0' },
+                                '&:hover fieldset': { borderColor: '#CBD5E1' }
+                              } 
+                            }}
+                          >
+                            {(() => {
+                              const filteredSlabs = projectSlabs?.filter((s: any) => {
+                                if (s.requiredStages && s.requiredStages.length > 0) {
+                                  if (materialStage === 'Packing') {
+                                    if (!s.requiredStages.includes('Packing')) return false;
+                                  } else if (materialStage === 'Production') {
+                                    if (!s.requiredStages.includes('Production')) return false;
+                                  }
+                                }
+                                return !isSlabStageCompleted(s, materialStage);
+                              }) || [];
 
-                            if (filteredSlabs.length === 0) {
-                              return (
-                                <MenuItem value="" disabled sx={{ fontSize: '0.88rem', color: '#EF4444', fontWeight: 700 }}>
-                                  -- All stones in this project have completed {materialStage} --
-                                </MenuItem>
-                              );
-                            }
+                              if (filteredSlabs.length === 0) {
+                                return (
+                                  <MenuItem value="" disabled sx={{ fontSize: '0.88rem', color: '#EF4444', fontWeight: 700 }}>
+                                    -- All stones in this project have completed {materialStage} --
+                                  </MenuItem>
+                                );
+                              }
 
-                            return [
-                              <MenuItem key="default" value="" disabled sx={{ fontSize: '0.88rem' }}>-- Select Main Stone / Product --</MenuItem>,
-                              ...filteredSlabs.map((s: any) => (
-                                <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.88rem' }}>
-                                  {s.name} ({s.pieces?.length || 1} Pcs)
-                                </MenuItem>
-                              ))
-                            ];
-                          })()}
-                        </TextField>
-                      </Box>
+                              return [
+                                <MenuItem key="default" value="" disabled sx={{ fontSize: '0.88rem' }}>-- Select Main Stone / Product --</MenuItem>,
+                                ...filteredSlabs.map((s: any) => (
+                                  <MenuItem key={s.id} value={s.id} sx={{ fontSize: '0.88rem' }}>
+                                    {s.name} ({s.pieces?.length || 1} Pcs)
+                                  </MenuItem>
+                                ))
+                              ];
+                            })()}
+                          </TextField>
+                        </Box>
+                      )
                     )}
 
                     {materialStage !== 'Dispatch' && (
                       <Box>
                         <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 0.6 }}>
-                          3. Quantity Produced / Completed
+                          {(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) ? '2. Quantity Polished / Completed' : '3. Quantity Produced / Completed'}
                         </Typography>
                         <TextField 
                           fullWidth 
                           size="small"
                           type="number"
                           value={materialQuantity}
-                          onChange={(e) => setMaterialQuantity(e.target.value)}
-                          placeholder="e.g. 5 pieces"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (materialStage === 'Polishing' || materialStage.startsWith('Polishing')) {
+                              if (Number(val) > polishingStats.availableToPolish) {
+                                showToast(`Cannot exceed produced pieces! Only ${polishingStats.availableToPolish} pieces available to polish.`, 'error');
+                                setMaterialQuantity(String(polishingStats.availableToPolish));
+                                return;
+                              }
+                            }
+                            setMaterialQuantity(val);
+                          }}
+                          placeholder={(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) ? `Max ${polishingStats.availableToPolish} pieces` : "e.g. 5 pieces"}
+                          helperText={(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) && selectedProjectId ? (polishingStats.availableToPolish === 0 ? "⚠️ 0 stones ready to polish (Complete Production first)" : `Max allowed: ${polishingStats.availableToPolish} pcs (limited by production completion)`) : undefined}
+                          error={(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) && selectedProjectId ? (Number(materialQuantity) > polishingStats.availableToPolish || polishingStats.availableToPolish === 0) : false}
                           sx={{ 
                             '& .MuiOutlinedInput-root': { 
                               borderRadius: 2.5, 

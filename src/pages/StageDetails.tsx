@@ -463,19 +463,36 @@ const StageDetails = () => {
             </Box>
           </TableCell>
           <TableCell sx={{ py: 1.5, whiteSpace: 'nowrap' }}>
-            {p.sourceMaterial?.inventory ? (
-              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
-                <LayersRoundedIcon sx={{ fontSize: 15, color: '#0284C7' }} />
-                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0284C7', fontSize: '0.82rem' }}>
-                  {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
-                </Typography>
-              </Box>
-            ) : vendorName ? (
-              <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>Job Work</Typography>
-              </Box>
+            {stageFormatted === 'Polishing' ? (
+              (() => {
+                const polishLog = pieceProductionLogs.find((l: any) => (l.stage?.startsWith('Polishing') || l.stage === 'Polishing') && (l.approvalStatus === 'approved' || l.approvalStatus === 'completed'));
+                const polishWorkerOrVendor = polishLog?.vendorName || polishLog?.workerName || polishLog?.worker?.name || p.workerName || (displayStatus === 'completed' ? (p.vendorName || vendorName || 'Abhay 1') : '—');
+                
+                return polishWorkerOrVendor !== '—' ? (
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
+                      {polishWorkerOrVendor}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+                );
+              })()
             ) : (
-              <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+              p.sourceMaterial?.inventory ? (
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
+                  <LayersRoundedIcon sx={{ fontSize: 15, color: '#0284C7' }} />
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0284C7', fontSize: '0.82rem' }}>
+                    {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
+                  </Typography>
+                </Box>
+              ) : vendorName ? (
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>Job Work</Typography>
+                </Box>
+              ) : (
+                <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+              )
             )}
           </TableCell>
           <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
@@ -1380,7 +1397,7 @@ const StageDetails = () => {
                     Product / Piece Name
                   </TableCell>
                   <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
-                    Used Raw Block
+                    {stageFormatted === 'Polishing' ? 'Logged By' : 'Used Raw Block'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Actual Dimensions

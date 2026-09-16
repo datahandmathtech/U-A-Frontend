@@ -537,10 +537,10 @@ const Approvals: React.FC = () => {
       {/* Approval Dialog — Multi Project Selection */}
       <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 'bold' }}>
-          Approve Material Log
+          {selectedLog?.stage?.startsWith('Polishing') ? 'Approval Polish Log' : selectedLog?.stage?.startsWith('Packing') ? 'Approval Packing Log' : selectedLog?.stage?.startsWith('Dispatch') ? 'Approval Dispatch Log' : 'Approve Material Log'}
           {selectedLog && (
-            <Typography variant="caption" display="block" sx={{ color: 'text.secondary', mt: 0.5 }}>
-              Stage: {selectedLog.stage} • Item(s): {selectedLog.quantityProduced}
+            <Typography variant="caption" display="block" sx={{ color: 'text.secondary', mt: 0.5, fontWeight: 600 }}>
+              Stage: {selectedLog.stage} • Quantity: {selectedLog.quantityProduced} {selectedLog.id ? `• Approval ID: #${selectedLog.id.slice(-6).toUpperCase()}` : ''}
             </Typography>
           )}
         </DialogTitle>
