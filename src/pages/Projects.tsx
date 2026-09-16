@@ -1010,7 +1010,7 @@ const Projects: React.FC = () => {
                           </IconButton>
                         )}
 
-                        <Grid container spacing={1.5} alignItems="center">
+                        <Grid container spacing={1.5} sx={{ alignItems: 'center' }}>
                           <Grid size={{ xs: 12, sm: 4 }}>
                             <TextField
                               label="Product / Material Name"
