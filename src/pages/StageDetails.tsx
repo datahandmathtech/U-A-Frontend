@@ -58,11 +58,18 @@ const StageDetails = () => {
   
   const matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => slab?.name?.startsWith(p.category));
   const rawUnit = matchedProduct?.unit || (slab?.size?.toLowerCase().includes('mm') ? 'mm' : 'inch');
+  
+  const unitDisplayName = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches' 
+    : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet' 
+    : rawUnit.toLowerCase() === 'sq_ft' || rawUnit.toLowerCase() === 'sqft' ? 'Sq.Ft' 
+    : rawUnit.toLowerCase() === 'mm' ? 'MM' 
+    : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
+
   let dimU = rawUnit;
   if (rawUnit.toLowerCase().startsWith('piece') || rawUnit.toLowerCase() === 'pcs') {
     dimU = matchedProduct?.dimensionUnit || 'inch';
   }
-  const unitDisplayName = dimU.toLowerCase() === 'inch' || dimU.toLowerCase() === 'inches' ? 'Inches' 
+  const dimensionUnitName = dimU.toLowerCase() === 'inch' || dimU.toLowerCase() === 'inches' ? 'Inches' 
     : dimU.toLowerCase() === 'feet' || dimU.toLowerCase() === 'ft' ? 'Feet' 
     : dimU.toLowerCase() === 'sq_ft' || dimU.toLowerCase() === 'sqft' ? 'Sq.Ft' 
     : dimU.toLowerCase() === 'mm' ? 'MM' 
@@ -325,7 +332,7 @@ const StageDetails = () => {
   const qtyToProcess = matchedProductForUI?.qty ? Number(matchedProductForUI.qty) : 1;
 
   const renderTableRows = () => {
-    const piecesList = (slab.pieces && slab.pieces.length > 0) ? slab.pieces : [{ id: slab.id, isVirtualPiece: true, productName: slab.name, pieceNumber: 1, size: slab.size }];
+    const piecesList = slab.pieces || [];
     const filteredPieces = piecesList.filter((p: any) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
@@ -450,7 +457,7 @@ const StageDetails = () => {
                   </Typography>
                 </Box>
                 <Chip 
-                  label={unitDisplayName} 
+                  label={dimensionUnitName} 
                   size="small" 
                   sx={{ 
                     bgcolor: '#F1F5F9', 
@@ -566,7 +573,7 @@ const StageDetails = () => {
   const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
   const stageIdx = BASE_STAGES.indexOf(stageFormatted);
   
-  const totalPieces = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : 1;
+  const totalPieces = slab.pieces?.length || 0;
   
   let completedPieces = 0;
   if (stageFormatted === 'Dispatch') {
@@ -854,8 +861,8 @@ const StageDetails = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '28%' }}>Piece Name</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '12%' }}>Serial No</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Length (L) in {unitDisplayName}</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Width (W) in {unitDisplayName}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Length (L) in {dimensionUnitName}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Width (W) in {dimensionUnitName}</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Thickness (MM)</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Area (Sq.Ft)</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }} align="center">Action</TableCell>
