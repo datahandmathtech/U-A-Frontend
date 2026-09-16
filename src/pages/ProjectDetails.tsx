@@ -4086,8 +4086,30 @@ const ProjectDetails: React.FC = () => {
                         Take Photo
                       </Button>
                     </Box>
+                    {(() => {
+                      const u = (ep.unit || '').toLowerCase().trim();
+                      if (u === 'pieces' || u === 'piece' || u === 'pcs') {
+                        return (
+                          <Box sx={{ width: 150, ml: 'auto' }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Dimension In</Typography>
+                            <Select 
+                              size="small" 
+                              fullWidth 
+                              value={(ep as any).dimensionUnit || 'inch'} 
+                              onChange={e => handleUpdateEditingProduct(index, 'dimensionUnit', e.target.value)}
+                            >
+                              <MenuItem value="inch">Inches</MenuItem>
+                              <MenuItem value="mm">MM</MenuItem>
+                              <MenuItem value="sq_ft">Sq. Feet</MenuItem>
+                              <MenuItem value="per_piece">Per Piece</MenuItem>
+                            </Select>
+                          </Box>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </Box>
                 </Box>
-              </Box>
 
               <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                 <Box sx={{ flex: 1 }}>
@@ -4102,28 +4124,6 @@ const ProjectDetails: React.FC = () => {
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>MM</Typography>
                   <TextField size="small" type="number" value={ep.breadth === 0 ? '' : ep.breadth} onChange={e => handleUpdateEditingProduct(index, 'breadth', Number(e.target.value))} fullWidth />
                 </Box>
-                {(() => {
-                  const u = (ep.unit || '').toLowerCase().trim();
-                  if (u === 'pieces' || u === 'piece' || u === 'pcs') {
-                    return (
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Dimension In</Typography>
-                        <Select 
-                          size="small" 
-                          fullWidth 
-                          value={(ep as any).dimensionUnit || 'inch'} 
-                          onChange={e => handleUpdateEditingProduct(index, 'dimensionUnit', e.target.value)}
-                        >
-                          <MenuItem value="inch">Inches</MenuItem>
-                          <MenuItem value="mm">MM</MenuItem>
-                          <MenuItem value="sq_ft">Sq. Feet</MenuItem>
-                          <MenuItem value="per_piece">Per Piece</MenuItem>
-                        </Select>
-                      </Box>
-                    );
-                  }
-                  return null;
-                })()}
               </Box>
 
               <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
