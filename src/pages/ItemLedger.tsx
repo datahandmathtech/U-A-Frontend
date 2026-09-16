@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableFooter, Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Autocomplete, Alert } from '@mui/material';
+import { 
+  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, 
+  TableRow, TableFooter, Button, IconButton, Dialog, DialogTitle, DialogContent, 
+  DialogActions, TextField, Autocomplete, Alert, Chip, Select, MenuItem, FormControl, InputLabel 
+} from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
@@ -22,8 +26,20 @@ const ItemLedger = () => {
     ? itemLogsData.item 
     : (logs.length > 0 && logs[0]?.inventory ? logs[0].inventory : null);
 
+  const parsePieceDimensions = (sizeStr: string) => {
+    if (!sizeStr) return { l: 0, w: 0, t: 0, sqft: 0 };
+    const lMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*L/i);
+    const wMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*W/i);
+    const tMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*MM/i);
+    const l = lMatch ? parseFloat(lMatch[1]) : 0;
+    const w = wMatch ? parseFloat(wMatch[1]) : 0;
+    const t = tMatch ? parseFloat(tMatch[1]) : 0;
+    const sqft = (l > 0 && w > 0) ? (l * w) / 144 : 0;
+    return { l, w, t, sqft };
+  };
+
   const [openDeduct, setOpenDeduct] = useState(false);
-  const [deductForm, setDeductForm] = useState({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0,10), productName: '' });
+  const [deductForm, setDeductForm] = useState({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0,10), productName: '', unit: 'inch' });
   const [openEdit, setOpenEdit] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
   
@@ -90,7 +106,9 @@ const ItemLedger = () => {
   const handleDeductSubmit = async () => {
     try {
       setDeductError('');
-      const usedArea = (Number(deductForm.length) || 0) * (Number(deductForm.width) || 0);
+      const len = Number(deductForm.length) || 0;
+      const wid = Number(deductForm.width) || 0;
+      const usedArea = deductForm.unit === 'feet' ? (len * wid) : (len * wid) / 144;
       
       if (usedArea <= 0) {
         setDeductError('Please enter valid length and width');
@@ -99,27 +117,22 @@ const ItemLedger = () => {
 
       // Size check: Used size cannot be smaller than the required piece size ("kam se kabhi nahi banega")
       if (selectedPiece?.size) {
-        const lMatch = selectedPiece.size.match(/(\d+(?:\.\d+)?)L/i);
-        const wMatch = selectedPiece.size.match(/(\d+(?:\.\d+)?)W/i);
-        const tMatch = selectedPiece.size.match(/(\d+(?:\.\d+)?)MM/i);
-        const minL = lMatch ? parseFloat(lMatch[1]) : 0;
-        const minW = wMatch ? parseFloat(wMatch[1]) : 0;
-        const minT = tMatch ? parseFloat(tMatch[1]) : 0;
+        const parsed = parsePieceDimensions(selectedPiece.size);
 
-        if (minL > 0 && Number(deductForm.length) < minL) {
-          const msg = `Used Length (${deductForm.length}) cannot be smaller than piece original length (${minL})! Larger or equal size is required.`;
+        if (parsed.l > 0 && len < parsed.l) {
+          const msg = `Used Length (${deductForm.length}) cannot be smaller than piece original length (${parsed.l})! Larger or equal size is required.`;
           setDeductError(msg);
           alert(msg);
           return;
         }
-        if (minW > 0 && Number(deductForm.width) < minW) {
-          const msg = `Used Width (${deductForm.width}) cannot be smaller than piece original width (${minW})! Larger or equal size is required.`;
+        if (parsed.w > 0 && wid < parsed.w) {
+          const msg = `Used Width (${deductForm.width}) cannot be smaller than piece original width (${parsed.w})! Larger or equal size is required.`;
           setDeductError(msg);
           alert(msg);
           return;
         }
-        if (minT > 0 && deductForm.thickness && Number(deductForm.thickness) < minT) {
-          const msg = `Used Thickness (${deductForm.thickness}MM) cannot be smaller than piece original thickness (${minT}MM)! Larger or equal size is required.`;
+        if (parsed.t > 0 && deductForm.thickness && Number(deductForm.thickness) < parsed.t) {
+          const msg = `Used Thickness (${deductForm.thickness}MM) cannot be smaller than piece original thickness (${parsed.t}MM)! Larger or equal size is required.`;
           setDeductError(msg);
           alert(msg);
           return;
@@ -127,7 +140,8 @@ const ItemLedger = () => {
       }
 
       if (usedArea > (inventory?.quantity || 0)) {
-        setDeductError(`Not enough stock available! Remaining stock is only ${(inventory?.quantity || 0).toFixed(2)} ${inventory?.unit || 'sq_ft'}`);
+        const msg = `Not enough stock available! Remaining stock is only ${(inventory?.quantity || 0).toFixed(2)} Sq.Ft (Requested: ${usedArea.toFixed(2)} Sq.Ft)`;
+        setDeductError(msg);
         return;
       }
 
@@ -149,7 +163,7 @@ const ItemLedger = () => {
       setSelectedProject(null);
       setSelectedSlab(null);
       setSelectedPiece(null);
-      setDeductForm({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0,10), productName: '' });
+      setDeductForm({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0,10), productName: '', unit: 'inch' });
       refetch();
     } catch (error: any) {
       console.error(error);
@@ -327,7 +341,7 @@ const ItemLedger = () => {
         <Paper elevation={1} sx={{ p: 2.5, borderRadius: 2, borderLeft: '4px solid #2e7d32' }}>
           <Typography variant="caption" color="text.secondary" fontWeight="bold">Available / IN (+) First</Typography>
           <Typography variant="h5" fontWeight="bold" color="success.main" sx={{ my: 0.5 }}>
-            {totalIn.toFixed(2)} {inventory?.unit || 'sq_ft'}
+            {totalIn.toFixed(2)} Sq.Ft
           </Typography>
           <Typography variant="caption" color="text.secondary">100% (Base)</Typography>
         </Paper>
@@ -335,7 +349,7 @@ const ItemLedger = () => {
         <Paper elevation={1} sx={{ p: 2.5, borderRadius: 2, borderLeft: '4px solid #1976d2' }}>
           <Typography variant="caption" color="text.secondary" fontWeight="bold">Total Used (Production)</Typography>
           <Typography variant="h5" fontWeight="bold" color="primary.main" sx={{ my: 0.5 }}>
-            {totalUsed.toFixed(2)} {inventory?.unit || 'sq_ft'}
+            {totalUsed.toFixed(2)} Sq.Ft
           </Typography>
           <Typography variant="caption" fontWeight="bold" color="primary.main">{usedPct}%</Typography>
         </Paper>
@@ -346,7 +360,7 @@ const ItemLedger = () => {
             {wastePct}%
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {totalWaste.toFixed(2)} {inventory?.unit || 'sq_ft'}
+            {totalWaste.toFixed(2)} Sq.Ft
           </Typography>
         </Paper>
       </Box>
@@ -372,13 +386,13 @@ const ItemLedger = () => {
                   <TableCell>{new Date(log.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell sx={{ color: 'text.secondary' }}>{log.remarks || '-'}</TableCell>
                   <TableCell sx={{ color: 'green', fontWeight: log.type === 'IN' ? 'bold' : 'normal' }}>
-                    {log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : `${log.previousBalance.toFixed(2)} ${inventory?.unit || ''}`}
+                    {log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} Sq.Ft` : `${log.previousBalance.toFixed(2)} Sq.Ft`}
                   </TableCell>
                   <TableCell sx={{ color: 'error.main', fontWeight: log.type === 'OUT' ? 'bold' : 'normal' }}>
-                    {log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} ${inventory?.unit || ''}` : '-'}
+                    {log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} Sq.Ft` : '-'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                    {log.balance.toFixed(2)} {inventory?.unit || ''}
+                    {log.balance.toFixed(2)} Sq.Ft
                   </TableCell>
                   <TableCell align="center">
                     {log.remarks === 'Initial stock addition' ? (
@@ -405,13 +419,13 @@ const ItemLedger = () => {
                 Used: {usedPct}% | Waste: {wastePct}%
               </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: 'green' }}>
-                + {totalIn.toFixed(2)} {inventory?.unit || ''}
+                + {totalIn.toFixed(2)} Sq.Ft
               </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                - {(totalUsed + totalWaste).toFixed(2)} {inventory?.unit || ''}
+                - {(totalUsed + totalWaste).toFixed(2)} Sq.Ft
               </TableCell>
               <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                {remBalance.toFixed(2)} {inventory?.unit || ''}
+                {remBalance.toFixed(2)} Sq.Ft
               </TableCell>
               <TableCell align="center">
                 <Typography variant="caption" fontWeight="bold" sx={{ color: '#ed6c02' }}>
@@ -455,16 +469,32 @@ const ItemLedger = () => {
       </Dialog>
 
       {/* Deduct Stock Dialog */}
-      <Dialog open={openDeduct} onClose={() => setOpenDeduct(false)} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={openDeduct} 
+        onClose={() => setOpenDeduct(false)} 
+        maxWidth="sm" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5 } } }}
+      >
         <DialogTitle sx={{ fontWeight: 'bold', bgcolor: '#f8f9fa' }}>Deduct Stock for Block {inventory?.blockNumber}</DialogTitle>
         <DialogContent sx={{ p: 3 }}>
-          <Alert severity="info" sx={{ mb: 2 }}>Available Balance: {inventory?.quantity?.toFixed(2)} {inventory?.unit}</Alert>
+          <Alert severity="info" sx={{ mb: 2, fontWeight: 600 }}>
+            Available Balance: <strong>{(inventory?.quantity || 0).toFixed(2)} Sq.Ft</strong>
+          </Alert>
           {deductError && <Alert severity="error" sx={{ mb: 2 }}>{deductError}</Alert>}
-          {Number(deductForm.length) > 0 && Number(deductForm.width) > 0 && (Number(deductForm.length) * Number(deductForm.width)) > (inventory?.quantity || 0) && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Entered area ({((Number(deductForm.length) * Number(deductForm.width))).toFixed(2)} {inventory?.unit}) exceeds available balance ({(inventory?.quantity || 0).toFixed(2)} {inventory?.unit})!
-            </Alert>
-          )}
+          {(() => {
+            const l = Number(deductForm.length) || 0;
+            const w = Number(deductForm.width) || 0;
+            const calcArea = deductForm.unit === 'feet' ? (l * w) : (l * w) / 144;
+            if (l > 0 && w > 0 && calcArea > (inventory?.quantity || 0)) {
+              return (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  Entered area ({calcArea.toFixed(2)} Sq.Ft) exceeds available balance ({(inventory?.quantity || 0).toFixed(2)} Sq.Ft)!
+                </Alert>
+              );
+            }
+            return null;
+          })()}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
             <TextField
               label="Date"
@@ -531,10 +561,24 @@ const ItemLedger = () => {
                 <Autocomplete
                   options={uncompletedPieces}
                   noOptionsText="All pieces in this slab are already completed/allocated!"
-                  getOptionLabel={(option: any) => `${option.productName || `Piece ${option.pieceNumber}`} ${option.size ? `(${option.size})` : ''}`}
+                  getOptionLabel={(option: any) => {
+                    const parsed = parsePieceDimensions(option.size);
+                    const sqFtText = parsed.sqft > 0 ? ` • Inches • ${parsed.sqft.toFixed(2)} Sq.Ft` : '';
+                    return `${option.productName || `Piece ${option.pieceNumber}`} ${option.size ? `(${option.size})` : ''}${sqFtText}`;
+                  }}
                   value={selectedPiece}
                   onChange={(_, val: any) => {
                     setSelectedPiece(val);
+                    if (val?.size) {
+                      const parsed = parsePieceDimensions(val.size);
+                      setDeductForm(prev => ({
+                        ...prev,
+                        length: parsed.l ? String(parsed.l) : prev.length,
+                        width: parsed.w ? String(parsed.w) : prev.width,
+                        thickness: parsed.t ? String(parsed.t) : prev.thickness,
+                        unit: 'inch'
+                      }));
+                    }
                   }}
                   renderInput={(params) => (
                     <TextField 
@@ -549,19 +593,42 @@ const ItemLedger = () => {
             })()}
 
             {/* Display Original Size Banner */}
-            {(selectedPiece?.size || selectedSlab?.size) && (
-              <Paper sx={{ p: 2, bgcolor: '#FFF8E1', border: '1px solid #FFE082', borderRadius: 2 }}>
-                <Typography variant="caption" fontWeight="bold" color="#B78103" display="block">
-                  ORIGINAL SIZE IN PRODUCTION:
-                </Typography>
-                <Typography variant="h6" fontWeight="bold" color="#795548">
-                  {selectedPiece?.size ? `${selectedPiece.productName || 'Piece'}: ${selectedPiece.size}` : `${selectedSlab.name}: ${selectedSlab.size}`}
-                </Typography>
-              </Paper>
-            )}
+            {(selectedPiece?.size || selectedSlab?.size) && (() => {
+              const targetSize = selectedPiece?.size || selectedSlab?.size;
+              const parsed = parsePieceDimensions(targetSize);
+              return (
+                <Paper sx={{ p: 2, bgcolor: '#FFFDF5', border: '1px solid #FDE68A', borderRadius: 2.5 }}>
+                  <Typography variant="caption" fontWeight="800" color="#B45309" display="block" textTransform="uppercase" letterSpacing={0.5}>
+                    ORIGINAL SIZE IN PRODUCTION:
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                    <Typography variant="h6" fontWeight="900" color="#78350F">
+                      {selectedPiece?.productName || selectedSlab?.name || 'Piece'}: {targetSize}
+                    </Typography>
+                    <Chip label="Inches" size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 800, fontSize: '0.75rem' }} />
+                    {parsed.sqft > 0 && (
+                      <Chip label={`${parsed.sqft.toFixed(2)} Sq.Ft`} size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 900, fontSize: '0.75rem', border: '1px solid #A7F3D0' }} />
+                    )}
+                  </Box>
+                </Paper>
+              );
+            })()}
 
-            <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1.2fr 1fr 1fr 1fr' }, gap: 1.5 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel id="deduct-unit-label">Unit</InputLabel>
+                <Select
+                  labelId="deduct-unit-label"
+                  label="Unit"
+                  value={deductForm.unit || 'inch'}
+                  onChange={(e) => setDeductForm({ ...deductForm, unit: e.target.value })}
+                >
+                  <MenuItem value="inch">Inches</MenuItem>
+                  <MenuItem value="feet">Sq. Feet</MenuItem>
+                </Select>
+              </FormControl>
               <TextField 
+                size="small"
                 label="Used Length (L)" 
                 type="number" 
                 fullWidth 
@@ -569,6 +636,7 @@ const ItemLedger = () => {
                 onChange={(e) => setDeductForm({ ...deductForm, length: e.target.value })} 
               />
               <TextField 
+                size="small"
                 label="Used Width (W)" 
                 type="number" 
                 fullWidth 
@@ -576,7 +644,8 @@ const ItemLedger = () => {
                 onChange={(e) => setDeductForm({ ...deductForm, width: e.target.value })} 
               />
               <TextField 
-                label="Used Thickness (MM)" 
+                size="small"
+                label="Thick (MM)" 
                 type="number" 
                 fullWidth 
                 value={deductForm.thickness} 
@@ -584,11 +653,24 @@ const ItemLedger = () => {
               />
             </Box>
 
-            {(Number(deductForm.length) > 0 && Number(deductForm.width) > 0) && (
-              <Typography variant="subtitle1" fontWeight="bold" color="primary.main">
-                Total Used: {(Number(deductForm.length) * Number(deductForm.width)).toFixed(2)} {inventory?.unit || 'sq_ft'}
-              </Typography>
-            )}
+            {(() => {
+              const l = Number(deductForm.length) || 0;
+              const w = Number(deductForm.width) || 0;
+              if (l > 0 && w > 0) {
+                const usedArea = deductForm.unit === 'feet' ? (l * w) : (l * w) / 144;
+                return (
+                  <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="#64748B" fontWeight="600">
+                      Calculated Area ({deductForm.unit === 'inch' ? `${l}" x ${w}" Inches` : `${l}ft x ${w}ft`}):
+                    </Typography>
+                    <Typography variant="subtitle1" fontWeight="900" color="#059669">
+                      {usedArea.toFixed(2)} Sq.Ft
+                    </Typography>
+                  </Box>
+                );
+              }
+              return null;
+            })()}
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>
@@ -598,14 +680,23 @@ const ItemLedger = () => {
             setSelectedSlab(null);
             setSelectedPiece(null);
           }}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            color="error" 
-            onClick={handleDeductSubmit} 
-            disabled={!(Number(deductForm.length) > 0 && Number(deductForm.width) > 0) || ((Number(deductForm.length) * Number(deductForm.width)) > (inventory?.quantity || 0))}
-          >
-            Confirm Deduction
-          </Button>
+          {(() => {
+            const l = Number(deductForm.length) || 0;
+            const w = Number(deductForm.width) || 0;
+            const usedArea = deductForm.unit === 'feet' ? (l * w) : (l * w) / 144;
+            const isDisabled = !(l > 0 && w > 0) || (usedArea > (inventory?.quantity || 0));
+            return (
+              <Button 
+                variant="contained" 
+                color="error" 
+                onClick={handleDeductSubmit} 
+                disabled={isDisabled}
+                sx={{ fontWeight: 800 }}
+              >
+                Confirm Deduction
+              </Button>
+            );
+          })()}
         </DialogActions>
       </Dialog>
 

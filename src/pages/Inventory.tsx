@@ -255,7 +255,7 @@ const Inventory: React.FC = () => {
                 Total Available Stock
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 900, color: '#059669', mt: 0.2 }}>
-                {totalStockQuantity.toLocaleString('en-IN')} <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Units / Sq.Ft</span>
+                {totalStockQuantity.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Sq.Ft</span>
               </Typography>
             </Box>
           </Paper>
@@ -387,7 +387,7 @@ const Inventory: React.FC = () => {
                       </TableCell>
                       <TableCell sx={{ py: 2 }}>
                         <Typography sx={{ fontWeight: 800, color: '#059669', fontSize: '0.92rem' }}>
-                          {row.totalQty.toLocaleString('en-IN')} <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Units</span>
+                          {row.totalQty.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Sq.Ft</span>
                         </Typography>
                       </TableCell>
                       <TableCell align="center" sx={{ py: 2 }}>
