@@ -132,7 +132,7 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
         <IconButton onClick={onClose} sx={{ bgcolor: '#F1F5F9' }}><CloseIcon /></IconButton>
       </DialogTitle>
       <DialogContent sx={{ p: 3.5 }}>
-        <Typography variant="subtitle2" fontWeight="bold" color="#475569" mb={1} textTransform="uppercase" letterSpacing={0.5}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#475569', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           1. Select Active Project
         </Typography>
         <Autocomplete

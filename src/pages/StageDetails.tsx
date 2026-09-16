@@ -519,25 +519,46 @@ const StageDetails = () => {
                 const blockNum = p.sourceMaterial?.inventory?.blockNumber || slab?.inventory?.blockNumber || '';
 
                 let rawSqFt = 0;
+                let primaryDim = '';
+                let equivFtStr = '';
+                let thickStr = '';
+
                 if (rawDimStr) {
-                  const isFt = /\b(?:ft|feet)\b/i.test(rawDimStr);
-                  const isInch = /\b(?:in|inch|inches)\b/i.test(rawDimStr);
-                  const sizePart = rawDimStr.split('|')[0].trim();
-                  const parts = sizePart.split(/\s*[xX×]\s*/);
-                  let l = 0, w = 0;
-                  if (parts.length >= 2) {
-                    const lMatch = parts[0].match(/(\d+(?:\.\d+)?)/);
-                    const wMatch = parts[1].match(/(\d+(?:\.\d+)?)/);
-                    l = lMatch ? parseFloat(lMatch[1]) : 0;
-                    w = wMatch ? parseFloat(wMatch[1]) : 0;
+                  const sqftMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*Sq\.Ft/i);
+                  if (sqftMatch) {
+                    rawSqFt = parseFloat(sqftMatch[1]);
                   }
-                  if (l > 0 && w > 0) {
-                    if (isFt) {
-                      rawSqFt = l * w;
-                    } else if (isInch || (l > 12 && w > 12)) {
-                      rawSqFt = (l * w) / 144;
-                    } else {
-                      rawSqFt = l * w;
+
+                  const tMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*MM/i);
+                  if (tMatch) thickStr = `${tMatch[1]}MM`;
+
+                  const equivMatch = rawDimStr.match(/\(([^)]+)\)/);
+                  if (equivMatch) {
+                    equivFtStr = equivMatch[1];
+                  }
+
+                  const cleanMain = rawDimStr.split('|')[0].replace(/\([^)]+\)/g, '').trim();
+                  primaryDim = cleanMain;
+
+                  if (rawSqFt === 0) {
+                    const isFt = /\b(?:ft|feet)\b/i.test(cleanMain);
+                    const isMM = /\b(?:mm)\b/i.test(cleanMain);
+                    const parts = cleanMain.split(/\s*[xX×]\s*/);
+                    let l = 0, w = 0;
+                    if (parts.length >= 2) {
+                      const lMatch = parts[0].match(/(\d+(?:\.\d+)?)/);
+                      const wMatch = parts[1].match(/(\d+(?:\.\d+)?)/);
+                      l = lMatch ? parseFloat(lMatch[1]) : 0;
+                      w = wMatch ? parseFloat(wMatch[1]) : 0;
+                    }
+                    if (l > 0 && w > 0) {
+                      if (isMM || (l > 500 && w > 500)) {
+                        rawSqFt = (l * w) / 92903.04;
+                      } else if (isFt) {
+                        rawSqFt = l * w;
+                      } else {
+                        rawSqFt = (l * w) / 144;
+                      }
                     }
                   }
                 }
@@ -550,27 +571,35 @@ const StageDetails = () => {
 
                 return (
                   <Box sx={{ display: 'inline-flex', flexDirection: 'column', gap: 0.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                    {cleanDim && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.84rem' }}>
-                          {cleanDim}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.85rem' }}>
+                        {primaryDim || cleanDim}
+                      </Typography>
+                      {equivFtStr && (
+                        <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700, bgcolor: '#ECFDF5', px: 0.75, py: 0.25, borderRadius: 1, border: '1px solid #A7F3D0' }}>
+                          {equivFtStr}
                         </Typography>
-                        {rawSqFt > 0 && (
-                          <Chip 
-                            label={`${rawSqFt.toFixed(2)} Sq.Ft`} 
-                            size="small" 
-                            sx={{ 
-                              height: 18, 
-                              fontSize: '0.68rem', 
-                              fontWeight: 800, 
-                              bgcolor: '#EFF6FF', 
-                              color: '#1D4ED8', 
-                              border: '1px solid #DBEAFE' 
-                            }} 
-                          />
-                        )}
-                      </Box>
-                    )}
+                      )}
+                      {thickStr && !primaryDim.includes(thickStr) && (
+                        <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, bgcolor: '#F1F5F9', px: 0.75, py: 0.25, borderRadius: 1 }}>
+                          {thickStr}
+                        </Typography>
+                      )}
+                      {rawSqFt > 0 && (
+                        <Chip 
+                          label={`${rawSqFt.toFixed(2)} Sq.Ft`} 
+                          size="small" 
+                          sx={{ 
+                            height: 20, 
+                            fontSize: '0.72rem', 
+                            fontWeight: 900, 
+                            bgcolor: '#EFF6FF', 
+                            color: '#1D4ED8', 
+                            border: '1px solid #DBEAFE' 
+                          }} 
+                        />
+                      )}
+                    </Box>
                     {matName && (
                       <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', fontSize: '0.75rem' }}>
                         {matName}{blockNum ? ` (Block ${blockNum})` : ''}
