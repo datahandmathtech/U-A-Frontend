@@ -992,11 +992,12 @@ const StageDetails = () => {
                   if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
                   
                   const nextNum = lastPieceNum + 1;
+                  const lastUnit = piecesData.length > 0 ? piecesData[piecesData.length - 1].unit : undefined;
                   setPiecesData([...piecesData, { 
                     pieceNumber: nextNum,
                     baseName: slab.name,
                     name: `${slab.name}.${nextNum}`,
-                    l: 0, w: 0, t: 0
+                    l: 0, w: 0, t: 0, unit: lastUnit
                   }]);
                 }}
                 sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#1E293B', bgcolor: '#FFFFFF' }}
@@ -1028,13 +1029,14 @@ const StageDetails = () => {
                       let lastPieceNum = parseInt(piecesData[piecesData.length - 1]?.pieceNumber as any);
                       if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
                       
+                      const lastUnit = piecesData.length > 0 ? piecesData[piecesData.length - 1].unit : undefined;
                       const newPieces = Array.from({ length: count }).map((_, idx) => {
                         const nextNum = lastPieceNum + idx + 1;
                         return {
                           pieceNumber: nextNum,
                           baseName: slab.name,
                           name: `${slab.name}.${nextNum}`,
-                          l: 0, w: 0, t: 0
+                          l: 0, w: 0, t: 0, unit: lastUnit
                         };
                       });
                       setPiecesData([...piecesData, ...newPieces]);
@@ -1053,7 +1055,7 @@ const StageDetails = () => {
                 onClick={() => {
                   if (piecesData.length > 1) {
                     const firstPiece = piecesData[0];
-                    const newData = piecesData.map((p, i) => i === 0 ? p : { ...p, l: firstPiece.l, w: firstPiece.w, t: firstPiece.t });
+                    const newData = piecesData.map((p, i) => i === 0 ? p : { ...p, l: firstPiece.l, w: firstPiece.w, t: firstPiece.t, unit: firstPiece.unit });
                     setPiecesData(newData);
                   }
                 }}

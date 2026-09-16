@@ -234,33 +234,46 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
 
   // Table Data
   const tableBody = products.map((p, index) => {
-    let totalQty = p.qty || 1;
     const unitSafe = (p.unit || '').toLowerCase().trim();
     const lengthDec = p.length || 0;
     const widthDec = p.width || 0;
-    const qtyDec = p.qty || 1;
+    const qtyDec = p.qty || 1; // Nos
     
     let displayUnit = p.unit || '';
+    let areaPerPiece = 0;
     
     if (unitSafe.includes('inch')) {
-      totalQty = ((lengthDec * widthDec) / 144) * qtyDec;
+      areaPerPiece = (lengthDec * widthDec) / 144;
       displayUnit = 'Inches';
     } else if (unitSafe === 'mm') {
-      totalQty = ((lengthDec * widthDec) / 92903.04) * qtyDec;
+      areaPerPiece = (lengthDec * widthDec) / 92903.04;
       displayUnit = 'MM';
     } else if (unitSafe === 'pieces' || unitSafe === 'piece' || unitSafe === 'pcs') {
       const dimUnit = (p.dimensionUnit || 'inch').toLowerCase();
-      totalQty = qtyDec;
-      if (dimUnit === 'inch') displayUnit = 'Inches';
-      else if (dimUnit === 'mm') displayUnit = 'MM';
-      else if (dimUnit === 'sq_ft') displayUnit = 'Sq.Ft';
-      else displayUnit = 'Pieces';
+      if (dimUnit === 'inch') {
+        areaPerPiece = (lengthDec * widthDec) / 144;
+        displayUnit = 'Inches';
+      } else if (dimUnit === 'mm') {
+        areaPerPiece = (lengthDec * widthDec) / 92903.04;
+        displayUnit = 'MM';
+      } else if (dimUnit === 'sq_ft') {
+        areaPerPiece = lengthDec * widthDec;
+        displayUnit = 'Sq.Ft';
+      } else {
+        areaPerPiece = lengthDec * widthDec;
+        displayUnit = 'Pieces';
+      }
     } else {
-      totalQty = lengthDec * widthDec * qtyDec;
+      areaPerPiece = lengthDec * widthDec;
       displayUnit = 'Sq.Ft';
     }
     
-    const qtySqft = totalQty ? Number(totalQty.toFixed(2)).toString() : '0';
+    // If Length and Width are 0 but unit is Pieces, it might just be a flat quantity.
+    // In that case, we can set area to 0 or 1.
+    // If length=0 and width=0, let's keep areaPerPiece as 0, but if amount > 0 it's handled in totalAmount.
+    
+    const totalFeetStr = areaPerPiece ? Number(areaPerPiece.toFixed(2)).toString() : (lengthDec || widthDec ? '0' : '-');
+    const nosStr = String(qtyDec);
 
     let dimensionsStr = 'sizes as per\nshared\ndrawing';
     if (p.length || p.width) {
@@ -273,7 +286,8 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
       '', // Image placeholder
       (p.category || 'MATERIAL').toUpperCase(),
       dimensionsStr,
-      qtySqft,
+      totalFeetStr,
+      nosStr,
       String(p.rate || 0),
       String(p.amount || 0)
     ];
@@ -291,6 +305,7 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
       '',
       '-',
       '-',
+      '-',
       String(pCost)
     ]);
   }
@@ -305,6 +320,7 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
       '',
       '-',
       '-',
+      '-',
       String(tCost)
     ]);
   }
@@ -312,7 +328,7 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   autoTable(doc, {
     startY: 95,
     margin: { left: 25, right: 5 },
-    head: [['SR. NO.', 'IMAGE', 'MATERIAL', 'DIMENSIONS', 'QUANTITY', 'RATE', 'AMOUNT']],
+    head: [['Sr No', 'Image', 'Material', 'Dimension', 'Total Feet', 'Nos', 'Rate', 'Amount']],
     body: tableBody,
     theme: 'plain',
     headStyles: { 
@@ -335,9 +351,10 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
       1: { cellWidth: 25 }, // Image column
       2: { cellWidth: 35, fontStyle: 'bold', fontSize: 8 },
       3: { cellWidth: 25, textColor: [100,100,100], fontSize: 8 },
-      4: { cellWidth: 15 },
-      5: { cellWidth: 15 },
-      6: { cellWidth: 25 }
+      4: { cellWidth: 17 }, // Total Feet
+      5: { cellWidth: 12 }, // Nos
+      6: { cellWidth: 15 }, // Rate
+      7: { cellWidth: 25 }  // Amount
     },
     didDrawCell: function(data) {
       // Draw bottom border for body rows
