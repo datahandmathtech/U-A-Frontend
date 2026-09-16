@@ -58,11 +58,15 @@ const StageDetails = () => {
   
   const matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => slab?.name?.startsWith(p.category));
   const rawUnit = matchedProduct?.unit || (slab?.size?.toLowerCase().includes('mm') ? 'mm' : 'inch');
-  const unitDisplayName = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches' 
-    : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet' 
-    : rawUnit.toLowerCase() === 'sq_ft' || rawUnit.toLowerCase() === 'sqft' ? 'Sq.Ft' 
-    : rawUnit.toLowerCase() === 'mm' ? 'MM' 
-    : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
+  let dimU = rawUnit;
+  if (rawUnit.toLowerCase().startsWith('piece') || rawUnit.toLowerCase() === 'pcs') {
+    dimU = matchedProduct?.dimensionUnit || 'inch';
+  }
+  const unitDisplayName = dimU.toLowerCase() === 'inch' || dimU.toLowerCase() === 'inches' ? 'Inches' 
+    : dimU.toLowerCase() === 'feet' || dimU.toLowerCase() === 'ft' ? 'Feet' 
+    : dimU.toLowerCase() === 'sq_ft' || dimU.toLowerCase() === 'sqft' ? 'Sq.Ft' 
+    : dimU.toLowerCase() === 'mm' ? 'MM' 
+    : (dimU.charAt(0).toUpperCase() + dimU.slice(1));
 
   const calculateAreaFromSize = (sizeStr: string, unitStr: string, productContext?: any) => {
     if (!sizeStr) return 0;
@@ -429,11 +433,11 @@ const StageDetails = () => {
               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
                 <LayersRoundedIcon sx={{ fontSize: 15, color: '#0284C7' }} />
                 <Typography variant="body2" sx={{ fontWeight: 700, color: '#0284C7', fontSize: '0.82rem' }}>
-                  {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
+                  {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ Ã— (\d+MM)/i, ' | $1')}
                 </Typography>
               </Box>
             ) : (
-              <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+              <Typography variant="caption" sx={{ color: '#94A3B8' }}>â€”</Typography>
             )}
           </TableCell>
           <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
@@ -442,7 +446,7 @@ const StageDetails = () => {
                 <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
                   <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
                   <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                    {String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
+                    {String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ Ã— (\d+MM)/i, ' | $1')}
                   </Typography>
                 </Box>
                 <Chip 
@@ -850,8 +854,8 @@ const StageDetails = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '28%' }}>Piece Name</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '12%' }}>Serial No</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Length (L)</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Width (W)</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Length (L) in {unitDisplayName}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Width (W) in {unitDisplayName}</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Thickness (MM)</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Area (Sq.Ft)</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }} align="center">Action</TableCell>
@@ -1301,7 +1305,7 @@ const StageDetails = () => {
                               <DeleteIcon sx={{ fontSize: 16 }} />
                             </IconButton>
                           ) : (
-                            <Typography variant="caption" sx={{ color: '#CBD5E1' }}>—</Typography>
+                            <Typography variant="caption" sx={{ color: '#CBD5E1' }}>â€”</Typography>
                           )}
                         </TableCell>
                       </TableRow>
