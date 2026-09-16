@@ -46,6 +46,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonIcon from '@mui/icons-material/Person';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import { calculateOrderProgress } from '../utils/progressCalculator';
 
 import {
   useGetProjectsQuery,
@@ -211,7 +212,7 @@ const Projects: React.FC = () => {
   }, [projects]);
 
   // Reusable Production Progress Calculation Helper
-  const getProjectStoneProgress = (project: any) => {
+  const calculateOrderProgress = (project: any) => {
     const slabs = project.slabs && project.slabs.length > 0 ? project.slabs : [];
     if (slabs.length === 0) {
       const totalPieces = project.totalPieces || 1;
@@ -295,9 +296,9 @@ const Projects: React.FC = () => {
     const today = new Date();
 
     workOrders.forEach((wo: any) => {
-      const prog = getProjectStoneProgress(wo);
-      totalMainStones += prog.totalStones;
-      completedMainStones += prog.completedStones;
+      const prog = calculateOrderProgress(wo);
+      totalMainStones += prog.totalProductRows;
+      completedMainStones += prog.productionEquivalentCompleted;
 
       const targetDate = wo.deadline || wo.deliveryDate;
       if (targetDate && new Date(targetDate) < today && wo.status !== 'completed') {
@@ -629,8 +630,8 @@ const Projects: React.FC = () => {
               </TableRow>
             ) : (
               filteredWorkOrders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((project: any) => {
-                const stoneProg = getProjectStoneProgress(project);
-                const percent = stoneProg.percent;
+                const stoneProg = calculateOrderProgress(project);
+                const percent = stoneProg.overallProgressPercent;
 
                 const finalEndDate = project.deadline || project.deliveryDate;
                 let statusChip = { label: 'On Schedule', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
@@ -748,7 +749,7 @@ const Projects: React.FC = () => {
                       <Box sx={{ width: '100%', maxWidth: 180 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                           <Typography variant="caption" sx={{ fontWeight: 700, color: '#1E293B' }}>
-                            {stoneProg.completedStones.toFixed(2)} / {stoneProg.totalStones} Pcs
+                            {stoneProg.productionProgressDisplay}
                           </Typography>
                           <Typography variant="caption" sx={{ fontWeight: 700, color: '#B38B36' }}>
                             {percent}%
