@@ -140,7 +140,6 @@ const CRM: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState({
     name: '',
     clientName: '',
@@ -150,6 +149,7 @@ const CRM: React.FC = () => {
     requirements: '',
     status: 'enquiry',
     createdAt: new Date().toISOString().split('T')[0],
+    deadline: '',
     customerPhoto: ''
   });
 
@@ -305,8 +305,10 @@ const CRM: React.FC = () => {
       requirements: '',
       status: 'enquiry',
       createdAt: new Date().toISOString().split('T')[0],
+      deadline: '',
       customerPhoto: ''
     });
+    setEditingId(null);
     setOpen(true);
   };
 
@@ -322,6 +324,7 @@ const CRM: React.FC = () => {
       requirements: enq.description || enq.requirements || '',
       status: enq.status || 'enquiry',
       createdAt: enq.createdAt ? new Date(enq.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      deadline: enq.deadline ? new Date(enq.deadline).toISOString().split('T')[0] : '',
       customerPhoto: enq.customerPhoto || ''
     });
     setOpen(true);
@@ -347,7 +350,8 @@ const CRM: React.FC = () => {
             name: finalName,
             description: formData.requirements,
             requirements: formData.requirements,
-            createdAt: new Date(formData.createdAt).toISOString()
+            createdAt: new Date(formData.createdAt).toISOString(),
+            deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined
           }
         }).unwrap();
       } else {
@@ -356,7 +360,8 @@ const CRM: React.FC = () => {
           name: finalName,
           description: formData.requirements,
           requirements: formData.requirements,
-          createdAt: new Date(formData.createdAt).toISOString()
+          createdAt: new Date(formData.createdAt).toISOString(),
+          deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined
         }).unwrap();
       }
       handleClose();
@@ -1386,7 +1391,7 @@ const CRM: React.FC = () => {
                 1. Project & Timeline
               </Typography>
               <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 8 }}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                     label="Project / Enquiry Title *"
                     fullWidth
@@ -1396,7 +1401,7 @@ const CRM: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <TextField
                     label="Enquiry Date"
                     type="date"
@@ -1407,6 +1412,19 @@ const CRM: React.FC = () => {
                     slotProps={{
                       inputLabel: { shrink: true },
                       htmlInput: { max: new Date().toISOString().split('T')[0] }
+                    }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <TextField
+                    label="End Date (Target)"
+                    type="date"
+                    fullWidth
+                    size="small"
+                    value={formData.deadline || ''}
+                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                    slotProps={{
+                      inputLabel: { shrink: true }
                     }}
                   />
                 </Grid>

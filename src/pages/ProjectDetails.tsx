@@ -150,7 +150,7 @@ const SlabRow = ({
 
     const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
     const stageIdx = BASE_STAGES.indexOf(normalizedStageName);
-    const targetQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : (matchedProduct?.qty || 0);
+    const targetQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : 1;
 
     let piecesCompleted = 0;
     let piecesActive = 0;
@@ -229,7 +229,7 @@ const SlabRow = ({
           </Typography>
           <Chip 
             label={(() => {
-              const displayQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : (matchedProduct?.qty || 1);
+              const displayQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : 1;
               return `${displayQty} Piece${displayQty !== 1 ? 's' : ''}`;
             })()} 
             size="small" 
@@ -735,11 +735,45 @@ const ProjectDetails: React.FC = () => {
     localStorage.setItem(`gstPercentDraft_${id}`, gstPercent.toString());
   }, [gstPercent, id]);
 
-  const [packageCostEnabled, setPackageCostEnabled] = useState(false);
-  const [transportCostEnabled, setTransportCostEnabled] = useState(false);
-  const [packageCost, setPackageCost] = useState<number>(0);
-  const [transportCost, setTransportCost] = useState<number>(0);
-  const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
+  const [packageCostEnabled, setPackageCostEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`quotePackageCostEnabled_${id}`);
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  React.useEffect(() => {
+    localStorage.setItem(`quotePackageCostEnabled_${id}`, JSON.stringify(packageCostEnabled));
+  }, [packageCostEnabled, id]);
+
+  const [transportCostEnabled, setTransportCostEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`quoteTransportCostEnabled_${id}`);
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  React.useEffect(() => {
+    localStorage.setItem(`quoteTransportCostEnabled_${id}`, JSON.stringify(transportCostEnabled));
+  }, [transportCostEnabled, id]);
+
+  const [packageCost, setPackageCost] = useState<number>(() => {
+    const saved = localStorage.getItem(`quotePackageCost_${id}`);
+    return saved !== null ? Number(saved) : 0;
+  });
+  React.useEffect(() => {
+    localStorage.setItem(`quotePackageCost_${id}`, packageCost.toString());
+  }, [packageCost, id]);
+
+  const [transportCost, setTransportCost] = useState<number>(() => {
+    const saved = localStorage.getItem(`quoteTransportCost_${id}`);
+    return saved !== null ? Number(saved) : 0;
+  });
+  React.useEffect(() => {
+    localStorage.setItem(`quoteTransportCost_${id}`, transportCost.toString());
+  }, [transportCost, id]);
+
+  const [selectedTerms, setSelectedTerms] = useState<string[]>(() => {
+    const saved = localStorage.getItem(`quoteTerms_${id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+  React.useEffect(() => {
+    localStorage.setItem(`quoteTerms_${id}`, JSON.stringify(selectedTerms));
+  }, [selectedTerms, id]);
 
   const { data: categories = [] } = useGetCategoriesQuery();
   const [createCategory] = useCreateCategoryMutation();
@@ -803,12 +837,12 @@ const ProjectDetails: React.FC = () => {
         const savedDraft = savedDraftStr ? JSON.parse(savedDraftStr) : null;
 
         if (isPastQuotation || savedProducts.length === 0) {
-          if (latestQuote.products) {
+          if (latestQuote.products && Array.isArray(latestQuote.products) && latestQuote.products.length > 0) {
             setProducts(latestQuote.products as any);
           }
         }
 
-        if (!savedDraft) {
+        if (isPastQuotation || !savedDraft) {
           if (latestQuote.additionalCosts && typeof latestQuote.additionalCosts === 'object') {
             if (Array.isArray(latestQuote.additionalCosts)) {
                setQuoteDetails({ default: latestQuote.additionalCosts });
@@ -829,6 +863,25 @@ const ProjectDetails: React.FC = () => {
           } else {
             setQuoteDetails({});
           }
+        }
+
+        // Terms
+        if (latestQuote.terms && Array.isArray(latestQuote.terms) && latestQuote.terms.length > 0) {
+          const savedTermsStr = localStorage.getItem(`quoteTerms_${id}`);
+          const savedTerms = savedTermsStr ? JSON.parse(savedTermsStr) : null;
+          if (isPastQuotation || !savedTerms || savedTerms.length === 0) {
+            setSelectedTerms(latestQuote.terms);
+          }
+        }
+
+        // Load global costs (Packaging, Transport, GST) from saved quotation
+        const gc = (latestQuote as any).globalCosts;
+        if (gc) {
+          if (gc.packageCostEnabled !== undefined) setPackageCostEnabled(Boolean(gc.packageCostEnabled));
+          if (gc.packageCost !== undefined) setPackageCost(Number(gc.packageCost) || 0);
+          if (gc.transportCostEnabled !== undefined) setTransportCostEnabled(Boolean(gc.transportCostEnabled));
+          if (gc.transportCost !== undefined) setTransportCost(Number(gc.transportCost) || 0);
+          if (gc.gstPercent !== undefined) setGstPercent(Number(gc.gstPercent));
         }
       }
     }
@@ -940,16 +993,7 @@ const ProjectDetails: React.FC = () => {
       // (L * W) / 92903.04 gives exact Sq.Ft. Often industry uses this for Sq.Ft pricing.
       amount = ((lengthDec * widthDec) / 92903.04) * qtyDec * p.rate;
     } else if (unitSafe === 'pieces' || unitSafe === 'piece' || unitSafe === 'pcs') {
-      const dimUnit = (p.dimensionUnit || 'inch').toLowerCase();
-      if (dimUnit === 'inch') {
-        amount = ((lengthDec * widthDec) / 144) * qtyDec * p.rate;
-      } else if (dimUnit === 'mm') {
-        amount = ((lengthDec * widthDec) / 92903.04) * qtyDec * p.rate;
-      } else if (dimUnit === 'sq_ft') {
-        amount = lengthDec * widthDec * qtyDec * p.rate;
-      } else { // per_piece
-        amount = qtyDec * p.rate;
-      }
+      amount = qtyDec * p.rate;
     } else {
       amount = lengthDec * widthDec * qtyDec * p.rate;
     }
@@ -1061,11 +1105,75 @@ const ProjectDetails: React.FC = () => {
     }
   };
 
+  const handleSaveWholeQuotation = async () => {
+    try {
+      if (id) {
+        localStorage.setItem(`quoteProducts_${id}`, JSON.stringify(products));
+        localStorage.setItem(`quoteDraft_${id}`, JSON.stringify(quoteDetails));
+        localStorage.setItem(`quoteTerms_${id}`, JSON.stringify(selectedTerms));
+        localStorage.setItem(`quotePackageCostEnabled_${id}`, JSON.stringify(packageCostEnabled));
+        localStorage.setItem(`quotePackageCost_${id}`, packageCost.toString());
+        localStorage.setItem(`quoteTransportCostEnabled_${id}`, JSON.stringify(transportCostEnabled));
+        localStorage.setItem(`quoteTransportCost_${id}`, transportCost.toString());
+        localStorage.setItem(`gstPercentDraft_${id}`, gstPercent.toString());
+      }
+
+      const payload = {
+        projectId: id,
+        products,
+        additionalCosts: quoteDetails,
+        terms: selectedTerms,
+        globalCosts: {
+          packageCostEnabled,
+          packageCost,
+          transportCostEnabled,
+          transportCost,
+          gstPercent
+        }
+      };
+
+      let existingQuoteId = project?.quotations?.[0]?.id;
+      if (!existingQuoteId) {
+        try {
+          const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+          const r = await fetch(`/api/quotations/project/${id}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (r.ok) {
+            const list = await r.json();
+            if (list && list.length > 0) {
+              existingQuoteId = list[0].id;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not check quotations by project', e);
+        }
+      }
+
+      if (existingQuoteId) {
+        await updateQuotation({ id: existingQuoteId, data: payload }).unwrap();
+      } else {
+        await createQuotation(payload).unwrap();
+      }
+
+      try {
+        await syncSlabs(id as string).unwrap();
+        refetchSlabs();
+      } catch (e) {
+        // optional sync
+      }
+      refetch();
+
+      setSnackbarMessage('Quotation & all costing details saved successfully!');
+    } catch (err: any) {
+      console.error('Failed to save quotation:', err);
+      setSnackbarMessage('Failed to save quotation: ' + (err?.data?.message || err?.message || 'Error'));
+    }
+  };
+
   const handleCreateQuotation = async () => {
     try {
-      await createQuotation({ projectId: id, products, additionalCosts: quoteDetails }).unwrap();
-      localStorage.removeItem(`quoteDraft_${id}`);
-      localStorage.removeItem(`quoteProducts_${id}`);
+      await handleSaveWholeQuotation();
       await handleNextStage('advance_payment');
     } catch (err) {
       console.error(err);
@@ -2017,9 +2125,28 @@ const ProjectDetails: React.FC = () => {
                     <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B' }}>
                       Product Estimation Breakdown
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                      {products.length} {products.length === 1 ? 'item' : 'items'} in quotation
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                        {products.length} {products.length === 1 ? 'item' : 'items'} in quotation
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleSaveWholeQuotation}
+                        sx={{
+                          bgcolor: '#B38B36',
+                          color: '#fff',
+                          fontWeight: 700,
+                          textTransform: 'none',
+                          borderRadius: 2,
+                          px: 2,
+                          fontSize: '0.78rem',
+                          '&:hover': { bgcolor: '#9a7628' }
+                        }}
+                      >
+                        💾 Save Quotation
+                      </Button>
+                    </Box>
                   </Box>
 
                   <TableContainer
@@ -2300,6 +2427,28 @@ const ProjectDetails: React.FC = () => {
                                     ₹{finalBill.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                   </Typography>
                                 </Box>
+
+                                <Button
+                                  variant="contained"
+                                  fullWidth
+                                  onClick={handleSaveWholeQuotation}
+                                  sx={{
+                                    mt: 2,
+                                    py: 1.25,
+                                    borderRadius: 2,
+                                    bgcolor: '#1E293B',
+                                    color: '#fff',
+                                    fontWeight: 700,
+                                    textTransform: 'none',
+                                    boxShadow: '0 2px 4px rgba(30, 41, 59, 0.2)',
+                                    '&:hover': {
+                                      bgcolor: '#0F172A',
+                                      boxShadow: '0 4px 6px rgba(30, 41, 59, 0.3)'
+                                    }
+                                  }}
+                                >
+                                  Save Quotation
+                                </Button>
                               </Box>
                             </Card>
                           </Grid>
@@ -2391,31 +2540,54 @@ const ProjectDetails: React.FC = () => {
                     {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : 'Back'}
                   </Button>
 
-                  <Button
-                    variant="contained"
-                    size="large"
-                    endIcon={<CheckCircleRoundedIcon />}
-                    onClick={async () => {
-                      if (viewingStepOverride !== null || isProjectActive) {
-                        handleReturnToActive();
-                      } else {
-                        await handleCreateQuotation();
-                      }
-                    }}
-                    sx={{
-                      px: 4,
-                      py: 1.2,
-                      borderRadius: 2.5,
-                      bgcolor: '#1E293B',
-                      color: '#FFFFFF',
-                      fontWeight: 700,
-                      textTransform: 'none',
-                      boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
-                      '&:hover': { bgcolor: '#0F172A' }
-                    }}
-                  >
-                    {viewingStepOverride !== null || isProjectActive ? 'Back to Active Work Order' : 'Save & Proceed to Advance Payment'}
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    {(viewingStepOverride !== null || isProjectActive) && (
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={handleSaveWholeQuotation}
+                        sx={{
+                          px: 3.5,
+                          py: 1.2,
+                          borderRadius: 2.5,
+                          bgcolor: '#B38B36',
+                          color: '#FFFFFF',
+                          fontWeight: 700,
+                          textTransform: 'none',
+                          boxShadow: '0 4px 14px rgba(179, 139, 54, 0.2)',
+                          '&:hover': { bgcolor: '#9A7628' }
+                        }}
+                      >
+                        💾 Save Quotation
+                      </Button>
+                    )}
+                    <Button
+                      variant="contained"
+                      size="large"
+                      endIcon={<CheckCircleRoundedIcon />}
+                      onClick={async () => {
+                        if (viewingStepOverride !== null || isProjectActive) {
+                          await handleSaveWholeQuotation();
+                          handleReturnToActive();
+                        } else {
+                          await handleCreateQuotation();
+                        }
+                      }}
+                      sx={{
+                        px: 4,
+                        py: 1.2,
+                        borderRadius: 2.5,
+                        bgcolor: '#1E293B',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                        '&:hover': { bgcolor: '#0F172A' }
+                      }}
+                    >
+                      {viewingStepOverride !== null || isProjectActive ? 'Save & Back to Work Order' : 'Save & Proceed to Advance Payment'}
+                    </Button>
+                  </Box>
                 </Box>
               </Paper>
             )}
@@ -3112,7 +3284,7 @@ const ProjectDetails: React.FC = () => {
                             <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
                               {projectSlabs?.reduce((acc: number, s: any) => {
                                 const matchedProduct = products?.find(p => s.name.startsWith(p.category));
-                                const qty = (s.pieces && s.pieces.length > 0) ? s.pieces.length : (matchedProduct?.qty || 1);
+                                const qty = (s.pieces && s.pieces.length > 0) ? s.pieces.length : 1;
                                 return acc + qty;
                               }, 0) || 0}
                             </Typography>
@@ -4028,7 +4200,6 @@ const ProjectDetails: React.FC = () => {
                               <MenuItem value="inch">Inches</MenuItem>
                               <MenuItem value="mm">MM</MenuItem>
                               <MenuItem value="sq_ft">Sq. Feet</MenuItem>
-                              <MenuItem value="per_piece">Per Piece</MenuItem>
                             </Select>
                           </Box>
                         );
@@ -4089,9 +4260,11 @@ const ProjectDetails: React.FC = () => {
                   size="small" type="number" 
                   label={(() => {
                     const u = (ep.unit || '').toLowerCase().trim();
+                    if (u.includes('inch') || u === 'mm' || u === 'sq_ft' || u.includes('sq.ft') || u.includes('sq') || u.includes('feet')) {
+                      return "Rate per Sq. Feet";
+                    }
                     if (u === 'pieces' || u === 'piece' || u === 'pcs') {
-                      const dimU = ((ep as any).dimensionUnit || 'inch').toLowerCase();
-                      return dimU === 'per_piece' ? "Rate (per piece)" : "Rate (per Sq.Ft)";
+                      return "Rate (per piece)";
                     }
                     return "Rate (per unit)";
                   })()}

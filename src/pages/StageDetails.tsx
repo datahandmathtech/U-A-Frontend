@@ -81,6 +81,18 @@ const StageDetails = () => {
 
   const calculateAreaFromSize = (sizeStr: string, unitStr: string, productContext?: any) => {
     if (!sizeStr) return 0;
+    
+    // Override unit if explicit in size string (e.g. "10L x 10W (inch)")
+    let overrideUnit = unitStr;
+    const sizeLower = sizeStr.toLowerCase();
+    if (sizeLower.includes('(inch)')) overrideUnit = 'inch';
+    else if (sizeLower.includes('(mm)')) overrideUnit = 'mm';
+    else if (sizeLower.includes('(sq.ft)') || sizeLower.includes('(sq_ft)')) overrideUnit = 'sq_ft';
+    
+    // Explicit Area override?
+    const explicitSqFtMatch = sizeStr.match(/([\d\.]+)\s*Sq\.?Ft/i);
+    if (explicitSqFtMatch) return Number(parseFloat(explicitSqFtMatch[1]).toFixed(2));
+
     const lMatch = sizeStr.match(/([\d\.]+)\s*L/i);
     const wMatch = sizeStr.match(/([\d\.]+)\s*W/i);
     
@@ -95,7 +107,7 @@ const StageDetails = () => {
       return 0;
     }
 
-    const u = (unitStr || '').toLowerCase().trim();
+    const u = (overrideUnit || '').toLowerCase().trim();
     let sqft = 0;
     if (u === 'pieces' || u === 'piece' || u === 'pcs') {
       const dimU = (productContext?.dimensionUnit || 'inch').toLowerCase();
@@ -175,14 +187,14 @@ const StageDetails = () => {
         }
       });
 
-      const newArea = piecesData.reduce((sum, p) => sum + calculateAreaFromSize(`${p.l}L x ${p.w}W`, rawUnit, matchedProduct), 0);
+      const newArea = piecesData.reduce((sum, p) => sum + calculateAreaFromSize(`${p.l}L x ${p.w}W`, p.unit || rawUnit, matchedProduct), 0);
       
       // Round to 2 decimal places to avoid floating point precision issues
       const totalArea = Math.round((existingArea + newArea) * 100) / 100;
       const roundedSlabArea = Math.round(slabArea * 100) / 100;
 
       if (totalArea > roundedSlabArea) {
-        alert(`Cannot add pieces. Total size exceeds original slab size.\nSlab Size: ${roundedSlabArea.toFixed(2)} Sq.Ft\nUsed Size: ${existingArea.toFixed(2)} Sq.Ft\nNew Pieces Size: ${newArea.toFixed(2)} Sq.Ft\nRemaining: ${(roundedSlabArea - existingArea).toFixed(2)} Sq.Ft`);
+        alert(`Total size exceeds allowed slab limit!\nAllowed: ${roundedSlabArea.toFixed(2)} Sq.Ft\nYou are making: ${totalArea.toFixed(2)} Sq.Ft\nPlease reduce: ${(totalArea - roundedSlabArea).toFixed(2)} Sq.Ft`);
         setIsSaving(false);
         return;
       }
@@ -193,10 +205,17 @@ const StageDetails = () => {
       const formattedPieces = piecesData.map(p => {
         const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
         const finalName = p.pieceNumber ? `${base}.${p.pieceNumber}` : (p.name || base);
+        
+        const pieceUnit = p.unit || rawUnit;
+        let suffix = '';
+        if (pieceUnit === 'inch') suffix = ' (inch)';
+        if (pieceUnit === 'mm') suffix = ' (mm)';
+        if (pieceUnit === 'sq_ft') suffix = ' (sq_ft)';
+
         return {
           name: finalName,
           pieceNumber: (p.pieceNumber && !isNaN(Number(p.pieceNumber))) ? Number(p.pieceNumber) : undefined,
-          size: p.t ? `${p.l}L x ${p.w}W | ${p.t}MM` : `${p.l}L x ${p.w}W`,
+          size: p.t ? `${p.l}L x ${p.w}W | ${p.t}MM${suffix}` : `${p.l}L x ${p.w}W${suffix}`,
           length: p.l,
           width: p.w,
           thickness: p.t
@@ -849,19 +868,22 @@ const StageDetails = () => {
                 Configure individual cut dimensions and serial numbers. The system validates total area against the original slab.
               </Typography>
             </Box>
-            <Button size="small" onClick={() => { setCutPiecesOption(null); setPiecesData([]); }} sx={{ color: '#78350F', fontWeight: 700, textTransform: 'none' }}>
-              Close Generator
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Button size="small" onClick={() => { setCutPiecesOption(null); setPiecesData([]); }} sx={{ color: '#78350F', fontWeight: 700, textTransform: 'none' }}>
+                Close Generator
+              </Button>
+            </Box>
           </Box>
 
           <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', mb: 3 }}>
             <Table size="small">
               <TableHead sx={{ bgcolor: '#F8FAFC' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '28%' }}>Piece Name</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '25%' }}>Piece Name</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '12%' }}>Serial No</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Length (L) in {dimensionUnitName}</TableCell>
-                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Width (W) in {dimensionUnitName}</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Unit</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Length (L)</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Width (W)</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Thickness (MM)</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Area (Sq.Ft)</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }} align="center">Action</TableCell>
@@ -901,6 +923,18 @@ const StageDetails = () => {
                       />
                     </TableCell>
                     <TableCell sx={{ py: 1.25 }}>
+                      <Select
+                        size="small"
+                        value={p.unit || rawUnit}
+                        onChange={(e) => handlePieceChange(idx, 'unit', e.target.value)}
+                        sx={{ bgcolor: '#FFF', height: 36, minWidth: 80, '& .MuiSelect-select': { py: 0.5, fontSize: '0.8rem', fontWeight: 700 } }}
+                      >
+                        <MenuItem value="inch">Inches</MenuItem>
+                        <MenuItem value="mm">MM</MenuItem>
+                        <MenuItem value="sq_ft">Sq.Ft</MenuItem>
+                      </Select>
+                    </TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
                       <TextField 
                         size="small" type="number" 
                         value={p.l === 0 ? '' : p.l}
@@ -926,7 +960,7 @@ const StageDetails = () => {
                     </TableCell>
                     <TableCell sx={{ py: 1.25 }}>
                       <Chip 
-                        label={`${calculateAreaFromSize(`${p.l}L x ${p.w}W`, rawUnit, matchedProduct)} Sq.Ft`} 
+                        label={`${calculateAreaFromSize(`${p.l}L x ${p.w}W`, p.unit || rawUnit, matchedProduct)} Sq.Ft`} 
                         size="small" 
                         sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 800, fontSize: '0.72rem' }} 
                       />

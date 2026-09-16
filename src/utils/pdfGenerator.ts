@@ -8,7 +8,25 @@ export const getBase64ImageFromUrl = async (imageUrl: string) => {
     const blob = await res.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', 0.95));
+          } else {
+            resolve(reader.result);
+          }
+        };
+        img.onerror = () => resolve(reader.result);
+        img.src = reader.result as string;
+      };
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
@@ -23,7 +41,7 @@ export const generateReceiptPDF = async (project: any, advanceAmount: number) =>
   
   const logoBase64 = await getBase64ImageFromUrl('/logo.png');
   if (logoBase64) {
-    doc.addImage(logoBase64 as string, 'PNG', 15, 10, 45, 18);
+    doc.addImage(logoBase64 as string, 'JPEG', 15, 10, 45, 18);
   }
 
   // Header
@@ -82,7 +100,7 @@ export const generateWorkOrderPDF = async (project: any, advanceAmount: number) 
   
   const logoBase64 = await getBase64ImageFromUrl('/logo.png');
   if (logoBase64) {
-    doc.addImage(logoBase64 as string, 'PNG', 15, 10, 45, 18);
+    doc.addImage(logoBase64 as string, 'JPEG', 15, 10, 45, 18);
   }
 
   doc.setFontSize(22);
@@ -160,7 +178,7 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
   // Header Text - Left (Logo)
   const logoBase64 = await getBase64ImageFromUrl('/logo.png');
   if (logoBase64) {
-    doc.addImage(logoBase64 as string, 'PNG', 24, 18, 52, 24);
+    doc.addImage(logoBase64 as string, 'JPEG', 24, 18, 52, 24);
   } else {
     doc.setFontSize(36);
     doc.setTextColor(0, 0, 0);
@@ -216,13 +234,39 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
 
   // Table Data
   const tableBody = products.map((p, index) => {
-    let dimensionsStr = 'sizes as per\nshared\ndrawing';
-    if (p.length || p.width) {
-      dimensionsStr = `${p.length || 0} x ${p.width || 0}`;
-      if (p.breadth) dimensionsStr += ` | ${p.breadth} MM`;
+    let totalQty = p.qty || 1;
+    const unitSafe = (p.unit || '').toLowerCase().trim();
+    const lengthDec = p.length || 0;
+    const widthDec = p.width || 0;
+    const qtyDec = p.qty || 1;
+    
+    let displayUnit = p.unit || '';
+    
+    if (unitSafe.includes('inch')) {
+      totalQty = ((lengthDec * widthDec) / 144) * qtyDec;
+      displayUnit = 'Inches';
+    } else if (unitSafe === 'mm') {
+      totalQty = ((lengthDec * widthDec) / 92903.04) * qtyDec;
+      displayUnit = 'MM';
+    } else if (unitSafe === 'pieces' || unitSafe === 'piece' || unitSafe === 'pcs') {
+      const dimUnit = (p.dimensionUnit || 'inch').toLowerCase();
+      totalQty = qtyDec;
+      if (dimUnit === 'inch') displayUnit = 'Inches';
+      else if (dimUnit === 'mm') displayUnit = 'MM';
+      else if (dimUnit === 'sq_ft') displayUnit = 'Sq.Ft';
+      else displayUnit = 'Pieces';
+    } else {
+      totalQty = lengthDec * widthDec * qtyDec;
+      displayUnit = 'Sq.Ft';
     }
     
-    const qtySqft = p.unit === 'Sq. Ft' ? String(Number(((p.length || 0) * (p.width || 0)).toFixed(2))) : String(p.qty || 1);
+    const qtySqft = totalQty ? Number(totalQty.toFixed(2)).toString() : '0';
+
+    let dimensionsStr = 'sizes as per\nshared\ndrawing';
+    if (p.length || p.width) {
+      dimensionsStr = `${p.length || 0} x ${p.width || 0} ${displayUnit}`;
+      if (p.breadth) dimensionsStr += ` | ${p.breadth} MM`;
+    }
 
     return [
       String(index + 1),
@@ -235,31 +279,40 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
     ];
   });
 
-  // Calculate global costs as a separate row if any
+  // Calculate global costs as separate rows
   let globalCostTotal = 0;
-  if (globalCosts?.packageCostEnabled) globalCostTotal += Number(globalCosts.packageCost || 0);
-  if (globalCosts?.transportCostEnabled) globalCostTotal += Number(globalCosts.transportCost || 0);
-  
-  if (globalCostTotal > 0) {
-    let globalCostDesc = [];
-    if (globalCosts?.packageCostEnabled) globalCostDesc.push('PACKING CHARGES');
-    if (globalCosts?.transportCostEnabled) globalCostDesc.push('INSTALLATION COST');
-    
+  if (globalCosts?.packageCostEnabled && Number(globalCosts.packageCost || 0) > 0) {
+    const pCost = Number(globalCosts.packageCost);
+    globalCostTotal += pCost;
     tableBody.push([
       String(tableBody.length + 1),
       '',
-      globalCostDesc.join(' + \n'),
+      'PACKAGING / CRATING CHARGES',
       '',
       '-',
       '-',
-      String(globalCostTotal)
+      String(pCost)
+    ]);
+  }
+  
+  if (globalCosts?.transportCostEnabled && Number(globalCosts.transportCost || 0) > 0) {
+    const tCost = Number(globalCosts.transportCost);
+    globalCostTotal += tCost;
+    tableBody.push([
+      String(tableBody.length + 1),
+      '',
+      'TRANSPORT / INSTALLATION COST',
+      '',
+      '-',
+      '-',
+      String(tCost)
     ]);
   }
 
   autoTable(doc, {
     startY: 95,
     margin: { left: 25, right: 5 },
-    head: [['SR. NO.', 'IMAGE', 'MATERIAL', 'DIMENSIONS', 'QUANTITY\n(SQFT)', 'RATE\n(RS/SQFT)', 'AMOUNT']],
+    head: [['SR. NO.', 'IMAGE', 'MATERIAL', 'DIMENSIONS', 'QUANTITY', 'RATE', 'AMOUNT']],
     body: tableBody,
     theme: 'plain',
     headStyles: { 
@@ -318,8 +371,8 @@ export const generateQuotationPDF = async (project: any, products: any[], quoteD
 
   // Draw Bank Details and Totals
   const productsTotal = products.reduce((acc, p) => acc + (p.amount || 0), 0);
-  const subTotal = productsTotal + globalCostTotal;
-  const gstAmount = (subTotal * gstPercent) / 100;
+  const subTotal = Math.round(productsTotal + globalCostTotal);
+  const gstAmount = Math.round((subTotal * gstPercent) / 100);
   const finalGrandTotal = subTotal + gstAmount;
 
   // Subtotal & Totals on Right
