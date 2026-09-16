@@ -929,13 +929,14 @@ const ProjectDetails: React.FC = () => {
     const widthDec = p.width || 0;
     const breadthDec = p.breadth || 1; // Default to 1 if breadth is 0
     const qtyDec = p.qty || 1; // 0 pe bhi 1 calculate hoga, as requested
+    const unitSafe = (p.unit || '').toLowerCase().trim();
 
-    if (p.unit?.toLowerCase().includes('inch')) {
+    if (unitSafe.includes('inch')) {
       amount = ((lengthDec * widthDec) / 144) * qtyDec * p.rate;
-    } else if (p.unit?.toLowerCase() === 'mm') {
+    } else if (unitSafe === 'mm') {
       // (L * W) / 92903.04 gives exact Sq.Ft. Often industry uses this for Sq.Ft pricing.
       amount = ((lengthDec * widthDec) / 92903.04) * qtyDec * p.rate;
-    } else if (p.unit?.toLowerCase() !== 'pieces' && p.unit?.toLowerCase() !== 'piece' && p.unit?.toLowerCase() !== 'pcs') {
+    } else if (unitSafe !== 'pieces' && unitSafe !== 'piece' && unitSafe !== 'pcs') {
       amount = lengthDec * widthDec * qtyDec * p.rate;
     } else {
       amount = qtyDec * p.rate;
@@ -4104,31 +4105,45 @@ const ProjectDetails: React.FC = () => {
               <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                 <TextField 
                   size="small" type="number" 
-                  label={ep.unit === 'Pieces' ? 'Total Sq.Ft' : (ep.unit?.toLowerCase().includes('inch') || ep.unit?.toLowerCase() === 'mm' ? 'Total Sq.Ft' : `Total ${ep.unit || ''}`)} 
+                  label={(() => {
+                    const u = (ep.unit || '').toLowerCase().trim();
+                    if (u === 'pieces' || u === 'piece' || u === 'pcs') return 'Total Sq.Ft';
+                    if (u.includes('inch') || u === 'mm') return 'Total Sq.Ft';
+                    return `Total ${ep.unit || ''}`;
+                  })()}
                   value={(() => {
                     const l = ep.length || 0;
                     const w = ep.width || 0;
-                    if (ep.unit === 'Pieces') {
+                    const u = (ep.unit || '').toLowerCase().trim();
+                    if (u === 'pieces' || u === 'piece' || u === 'pcs') {
                       return ((ep as any).dimensionUnit || 'inch') === 'inch' ? Number(((l * w) / 144).toFixed(2)) : l * w;
                     }
-                    if (ep.unit?.toLowerCase() === 'mm') {
+                    if (u === 'mm') {
                       return Number(((l * w) / 92903.04).toFixed(2));
                     }
-                    return ep.unit?.toLowerCase().includes('inch') ? Number(((l * w) / 144).toFixed(2)) : l * w;
+                    return u.includes('inch') ? Number(((l * w) / 144).toFixed(2)) : l * w;
                   })()} 
                   disabled 
                   fullWidth 
                   sx={{ bgcolor: '#f5f5f5' }}
                 />
                 <TextField 
-                  size="small" type="number" label={ep.unit === 'Pieces' ? "Rate (per piece)" : "Rate (per unit)"} 
+                  size="small" type="number" 
+                  label={(() => {
+                    const u = (ep.unit || '').toLowerCase().trim();
+                    return (u === 'pieces' || u === 'piece' || u === 'pcs') ? "Rate (per piece)" : "Rate (per unit)";
+                  })()}
                   value={ep.rate === 0 ? '' : ep.rate} 
                   onChange={e => handleUpdateEditingProduct(index, 'rate', Number(e.target.value))} 
                   fullWidth 
                   slotProps={{ input: { startAdornment: <Typography variant="body2" color="text.secondary" sx={{mr: 0.5}}>₹</Typography> } as any }}
                 />
                 <TextField 
-                  size="small" type="number" label={ep.unit === 'Pieces' ? "Quantity (Pieces)" : "No. of Pieces"} 
+                  size="small" type="number" 
+                  label={(() => {
+                    const u = (ep.unit || '').toLowerCase().trim();
+                    return (u === 'pieces' || u === 'piece' || u === 'pcs') ? "Quantity (Pieces)" : "No. of Pieces";
+                  })()} 
                   value={ep.qty === 0 ? '' : ep.qty} 
                   onChange={e => handleUpdateEditingProduct(index, 'qty', Number(e.target.value))} 
                   fullWidth 
