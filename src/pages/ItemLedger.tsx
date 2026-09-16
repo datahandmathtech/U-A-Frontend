@@ -556,7 +556,10 @@ const ItemLedger = () => {
                   Project: <span style={{ fontSize: '1rem', color: '#15803D' }}>{activeProject.name}</span>
                 </Typography>
                 <Typography variant="caption" sx={{ bgcolor: '#DCFCE7', px: 1, py: 0.5, borderRadius: 1, color: '#166534', fontWeight: 'bold' }}>
-                  {(activeProject.slabs || []).length} Slabs Available
+                  {(() => {
+                    const prodCount = (activeProject.slabs || []).filter((s: any) => s.hasProduction || (s.pieces || []).some((p: any) => p.hasProduction)).length;
+                    return prodCount > 0 ? `${prodCount} Slabs in Production` : `${(activeProject.slabs || []).length} Slabs Available`;
+                  })()}
                 </Typography>
               </Box>
             ) : (
@@ -575,36 +578,44 @@ const ItemLedger = () => {
             )}
 
             {/* 1. Select Slab / Stone (Pattar) */}
-            {activeProject && (
-              <Autocomplete
-                options={activeProject.slabs || []}
-                getOptionLabel={(option: any) => {
-                  const pendingCount = (option.pieces || []).filter((p: any) => !p.sourceMaterialId).length;
-                  return `${option.name} ${option.size ? `(${option.size})` : ''} - ${pendingCount > 0 ? `${pendingCount} Pieces Pending` : 'All Pieces Completed'}`;
-                }}
-                value={selectedSlab}
-                onChange={(_, val: any) => {
-                  setSelectedSlab(val);
-                  setSelectedPiece(null);
-                }}
-                renderInput={(params) => (
-                  <TextField 
-                    {...params} 
-                    label="Select Slab / Stone (Pattar)" 
-                    placeholder="Choose slab / stone..." 
-                    helperText={`Total Slabs for Project: ${(activeProject.slabs || []).length}`}
-                  />
-                )}
-              />
-            )}
+            {activeProject && (() => {
+              const slabsWithProduction = (activeProject.slabs || []).filter((s: any) => {
+                return s.hasProduction || (s.pieces || []).some((p: any) => p.hasProduction);
+              });
+              const displaySlabs = slabsWithProduction.length > 0 ? slabsWithProduction : (activeProject.slabs || []);
+
+              return (
+                <Autocomplete
+                  options={displaySlabs}
+                  getOptionLabel={(option: any) => {
+                    const pendingCount = (option.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false)).length;
+                    return `${option.name} ${option.size ? `(${option.size})` : ''} - ${pendingCount > 0 ? `${pendingCount} Pieces Pending` : 'All Pieces Completed'}`;
+                  }}
+                  value={selectedSlab}
+                  onChange={(_, val: any) => {
+                    setSelectedSlab(val);
+                    setSelectedPiece(null);
+                  }}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label="Select Slab / Stone (Pattar)" 
+                      placeholder="Choose slab / stone..." 
+                      helperText={`Slabs in Production: ${displaySlabs.length} of ${(activeProject.slabs || []).length}`}
+                    />
+                  )}
+                />
+              );
+            })()}
 
             {/* 2. Select Piece (Pic) */}
             {selectedSlab && (() => {
-              const uncompletedPieces = (selectedSlab.pieces || []).filter((p: any) => !p.sourceMaterialId);
+              const piecesInProduction = (selectedSlab.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false));
+              const displayPieces = piecesInProduction.length > 0 ? piecesInProduction : (selectedSlab.pieces || []).filter((p: any) => !p.sourceMaterialId);
               return (
                 <Autocomplete
-                  options={uncompletedPieces}
-                  noOptionsText="All pieces in this slab are already completed/allocated!"
+                  options={displayPieces}
+                  noOptionsText="No pending pieces in production for this slab!"
                   getOptionLabel={(option: any) => {
                     const parsed = parsePieceDimensions(option.size);
                     const sqFtText = parsed.sqft > 0 ? ` • Inches • ${parsed.sqft.toFixed(2)} Sq.Ft` : '';
@@ -629,7 +640,7 @@ const ItemLedger = () => {
                       {...params} 
                       label="Select Piece (Pic)" 
                       placeholder="Choose specific piece..." 
-                      helperText={uncompletedPieces.length > 0 ? `Pending Pieces: ${uncompletedPieces.length} of ${(selectedSlab.pieces || []).length}` : 'All pieces already deducted!'}
+                      helperText={displayPieces.length > 0 ? `Pending Pieces: ${displayPieces.length} of ${(selectedSlab.pieces || []).length}` : 'All pieces already deducted!'}
                     />
                   )}
                 />
