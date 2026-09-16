@@ -437,6 +437,38 @@ const StageDetails = () => {
                     border: '1px solid #CBD5E1' 
                   }} 
                 />
+                {matchedProduct && (
+                  <Chip 
+                    label={(() => {
+                      const l = matchedProduct.length || 0;
+                      const w = matchedProduct.width || 0;
+                      const u = (matchedProduct.unit || '').toLowerCase().trim();
+                      let sqft = 0;
+                      if (u === 'pieces' || u === 'piece' || u === 'pcs') {
+                        const dimU = (matchedProduct.dimensionUnit || 'inch').toLowerCase();
+                        if (dimU === 'inch') sqft = ((l * w) / 144);
+                        else if (dimU === 'mm') sqft = ((l * w) / 92903.04);
+                        else if (dimU === 'sq_ft') sqft = l * w;
+                        else sqft = 1;
+                      } else if (u === 'mm') {
+                        sqft = ((l * w) / 92903.04);
+                      } else {
+                        sqft = u.includes('inch') ? ((l * w) / 144) : (l * w);
+                      }
+                      return `${Number(sqft.toFixed(2))} Sq.Ft`;
+                    })()}
+                    size="small" 
+                    sx={{ 
+                      bgcolor: '#EFF6FF', 
+                      color: '#1D4ED8', 
+                      fontWeight: 700, 
+                      fontSize: '0.7rem',
+                      height: 20,
+                      borderRadius: 1,
+                      border: '1px solid #BFDBFE'
+                    }} 
+                  />
+                )}
               </Box>
             ) : (
               <Typography variant="caption" sx={{ color: '#94A3B8' }}>Standard</Typography>
@@ -638,6 +670,38 @@ const StageDetails = () => {
                       boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                     }} 
                   />
+                  {matchedProduct && (
+                    <Chip 
+                      label={(() => {
+                        const l = matchedProduct.length || 0;
+                        const w = matchedProduct.width || 0;
+                        const u = (matchedProduct.unit || '').toLowerCase().trim();
+                        let sqft = 0;
+                        if (u === 'pieces' || u === 'piece' || u === 'pcs') {
+                          const dimU = (matchedProduct.dimensionUnit || 'inch').toLowerCase();
+                          if (dimU === 'inch') sqft = ((l * w) / 144);
+                          else if (dimU === 'mm') sqft = ((l * w) / 92903.04);
+                          else if (dimU === 'sq_ft') sqft = l * w;
+                          else sqft = 1;
+                        } else if (u === 'mm') {
+                          sqft = ((l * w) / 92903.04);
+                        } else {
+                          sqft = u.includes('inch') ? ((l * w) / 144) : (l * w);
+                        }
+                        return `${Number(sqft.toFixed(2))} Sq.Ft`;
+                      })()}
+                      size="small" 
+                      sx={{ 
+                        bgcolor: '#EFF6FF', 
+                        color: '#1D4ED8', 
+                        fontWeight: 800, 
+                        fontSize: '0.75rem',
+                        height: 24,
+                        border: '1px solid #BFDBFE',
+                        borderRadius: 1.5
+                      }} 
+                    />
+                  )}
                 </Box>
               )}
             </Box>
