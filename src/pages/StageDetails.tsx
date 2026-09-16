@@ -1176,6 +1176,9 @@ const StageDetails = () => {
                   <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Date & Time
                   </TableCell>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
+                    Logged By
+                  </TableCell>
                   {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
                     <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                       Box Number
@@ -1230,6 +1233,8 @@ const StageDetails = () => {
                       if (dLog) matchedDispatchIds.add(dLog.id);
                       return {
                         id: pLog.id,
+                        workerName: dLog?.workerName || dLog?.worker?.name || pLog.workerName || pLog.worker?.name,
+                        vendorName: dLog?.vendorName || pLog.vendorName,
                         isDispatched: !!dLog,
                         dispatchLogId: dLog?.id,
                         createdAt: dLog ? dLog.createdAt : pLog.createdAt,
@@ -1248,10 +1253,12 @@ const StageDetails = () => {
                       return matchesSlab;
                     }).map((dLog: any) => ({
                       id: dLog.id,
+                      workerName: dLog.workerName || dLog.worker?.name,
+                      vendorName: dLog.vendorName,
                       isDispatched: true,
                       dispatchLogId: dLog.id,
                       createdAt: dLog.createdAt,
-                      boxCode: dLog.boxCode,
+                      boxCode: dLog.boxCode || 'DIRECT DISPATCH|DIRECT|-',
                       vehicleNumber: dLog.vehicleNumber || '-',
                       quantityProduced: dLog.quantityProduced,
                       photo: dLog.startPhotos?.machine || dLog.startPhotos?.unit || dLog.startPhotos?.software || dLog.startPhotos?.endPhoto,
@@ -1278,7 +1285,7 @@ const StageDetails = () => {
                   if (displayLogs.length === 0) {
                     return (
                       <TableRow>
-                        <TableCell colSpan={stageFormatted === 'Packing' || stageFormatted === 'Dispatch' ? 8 : 5} align="center" sx={{ py: 6, color: '#94A3B8' }}>
+                        <TableCell colSpan={stageFormatted === 'Dispatch' ? 9 : 8} align="center" sx={{ py: 6, color: '#94A3B8' }}>
                           <Inventory2RoundedIcon sx={{ fontSize: 40, color: '#CBD5E1', mb: 1, display: 'block', mx: 'auto' }} />
                           <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
                             {searchQuery ? 'No matching logs found' : 'No stage entries recorded yet.'}
@@ -1293,6 +1300,11 @@ const StageDetails = () => {
                     const formattedDate = `${logDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })} | ${logDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
                     const photo = stageFormatted === 'Dispatch' ? log.photo : (log.startPhotos?.machine || log.startPhotos?.unit || log.startPhotos?.software || log.startPhotos?.endPhoto);
                     
+                    const isDirect = log.boxCode?.toUpperCase().includes('DIRECT DISPATCH') || (stageFormatted === 'Dispatch' && !log.boxCode);
+                    const boxPart0 = isDirect ? 'DIRECT DISPATCH' : (log.boxCode?.split('|')[0] || '-');
+                    const boxPart1 = isDirect ? '-' : (log.boxCode?.split('|')[1] || '-');
+                    const boxPart2 = isDirect ? '-' : (log.boxCode?.split('|')[2] || '-');
+
                     return (
                       <TableRow key={log.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, opacity: stageFormatted === 'Dispatch' && !log.isDispatched ? 0.7 : 1 }}>
                         <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
@@ -1301,19 +1313,43 @@ const StageDetails = () => {
                           </Typography>
                         </TableCell>
                         
+                        {/* Logged By */}
+                        <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                          {(() => {
+                            const logger = log.workerName || log.worker?.name || log.vendorName || 'Abhay 1';
+                            const approvalId = log.id ? `#${log.id.slice(-6).toUpperCase()}` : null;
+                            return (
+                              <Box sx={{ display: 'inline-flex', flexDirection: 'column', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
+                                  {logger}
+                                </Typography>
+                                {approvalId && (
+                                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.7rem' }}>
+                                    ID: {approvalId}
+                                  </Typography>
+                                )}
+                              </Box>
+                            );
+                          })()}
+                        </TableCell>
+
                         {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
                           <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
-                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, bgcolor: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 1.5, px: 1, py: 0.3 }}>
-                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#166534' }}>
-                                {log.boxCode?.split('|')[0] || '-'}
-                              </Typography>
-                            </Box>
+                            {isDirect ? (
+                              <Chip label="DIRECT DISPATCH" size="small" sx={{ fontWeight: 800, bgcolor: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0', height: 22 }} />
+                            ) : (
+                              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, bgcolor: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 1.5, px: 1, py: 0.3 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 800, color: '#166534' }}>
+                                  {boxPart0}
+                                </Typography>
+                              </Box>
+                            )}
                           </TableCell>
                         )}
                         {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
                           <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
                             <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
-                              {log.boxCode?.split('|')[1] || '-'}
+                              {boxPart1}
                             </Typography>
                           </TableCell>
                         )}
@@ -1329,7 +1365,7 @@ const StageDetails = () => {
                         {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
                           <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
                             <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.82rem', fontWeight: 500 }}>
-                              {log.boxCode?.split('|')[2] || '-'}
+                              {boxPart2}
                             </Typography>
                           </TableCell>
                         )}

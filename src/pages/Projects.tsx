@@ -48,6 +48,98 @@ import PersonIcon from '@mui/icons-material/Person';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { calculateOrderProgress } from '../utils/progressCalculator';
 
+export const calculateProjectWorkSize = (project: any): string => {
+  if (!project) return '-';
+
+  // 1. Check products array directly on project (from quotation)
+  if (project.products && Array.isArray(project.products) && project.products.length > 0) {
+    let totalSqFt = 0;
+    project.products.forEach((prod: any) => {
+      const l = Number(prod.length) || 0;
+      const w = Number(prod.width) || 0;
+      const qty = Number(prod.qty || prod.quantity) || 1;
+      const u = (prod.unit || 'inch').toLowerCase().trim();
+      let sqftPerUnit = 0;
+      if (u.includes('inch')) {
+        sqftPerUnit = (l * w) / 144;
+      } else if (u === 'mm') {
+        sqftPerUnit = (l * w) / 92903.04;
+      } else if (u.includes('sq_ft') || u.includes('sqft') || u.includes('ft') || u.includes('feet')) {
+        sqftPerUnit = l * w;
+      } else if (u.includes('pieces') || u.includes('piece') || u.includes('pcs')) {
+        sqftPerUnit = (l * w) > 0 ? (l * w) / 144 : 1;
+      } else {
+        sqftPerUnit = (l * w) / 144;
+      }
+      totalSqFt += sqftPerUnit * qty;
+    });
+    if (totalSqFt > 0) {
+      return `${totalSqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Sq.Ft`;
+    }
+  }
+
+  // 2. Check quotations array if present
+  if (project.quotations && project.quotations.length > 0) {
+    const q = project.quotations[0];
+    if (q.products && Array.isArray(q.products) && q.products.length > 0) {
+      let totalSqFt = 0;
+      q.products.forEach((prod: any) => {
+        const l = Number(prod.length) || 0;
+        const w = Number(prod.width) || 0;
+        const qty = Number(prod.qty || prod.quantity) || 1;
+        const u = (prod.unit || 'inch').toLowerCase().trim();
+        let sqftPerUnit = 0;
+        if (u.includes('inch')) {
+          sqftPerUnit = (l * w) / 144;
+        } else if (u === 'mm') {
+          sqftPerUnit = (l * w) / 92903.04;
+        } else if (u.includes('sq_ft') || u.includes('sqft') || u.includes('ft') || u.includes('feet')) {
+          sqftPerUnit = l * w;
+        } else if (u.includes('pieces') || u.includes('piece') || u.includes('pcs')) {
+          sqftPerUnit = (l * w) > 0 ? (l * w) / 144 : 1;
+        } else {
+          sqftPerUnit = (l * w) / 144;
+        }
+        totalSqFt += sqftPerUnit * qty;
+      });
+      if (totalSqFt > 0) {
+        return `${totalSqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Sq.Ft`;
+      }
+    }
+  }
+
+  // 3. Fallback: slabs / pieces
+  if (project.slabs && project.slabs.length > 0) {
+    let totalSqFt = 0;
+    project.slabs.forEach((slab: any) => {
+      const pList = slab.pieces || [];
+      if (pList.length > 0) {
+        pList.forEach((p: any) => {
+          const str = p.size || slab.size || '';
+          const match = str.match(/(\d+(\.\d+)?)\s*L?\s*[xX*×]\s*(\d+(\.\d+)?)\s*W?/i);
+          if (match) {
+            const l = parseFloat(match[1]);
+            const w = parseFloat(match[3]);
+            totalSqFt += (l * w) / 144;
+          }
+        });
+      } else if (slab.size) {
+        const match = slab.size.match(/(\d+(\.\d+)?)\s*L?\s*[xX*×]\s*(\d+(\.\d+)?)\s*W?/i);
+        if (match) {
+          const l = parseFloat(match[1]);
+          const w = parseFloat(match[3]);
+          totalSqFt += (l * w) / 144;
+        }
+      }
+    });
+    if (totalSqFt > 0) {
+      return `${totalSqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Sq.Ft`;
+    }
+  }
+
+  return '-';
+};
+
 import {
   useGetProjectsQuery,
   useCreateProjectMutation,
@@ -508,7 +600,8 @@ const Projects: React.FC = () => {
           <TableHead sx={{ bgcolor: '#F8FAFC' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>WORK ORDER ID / TITLE</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>WORK ORDER CODE & MANAGER</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>CODE</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>WORK SIZE</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>START DATE</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8, minWidth: 160 }}>PRODUCTION PROGRESS</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.82rem', py: 1.8 }}>DEADLINE</TableCell>
@@ -521,6 +614,7 @@ const Projects: React.FC = () => {
                 <TableRow key={k}>
                   <TableCell><Skeleton variant="text" width="80%" height={28} /></TableCell>
                   <TableCell><Skeleton variant="text" width="60%" height={24} /></TableCell>
+                  <TableCell><Skeleton variant="text" width="60%" height={24} /></TableCell>
                   <TableCell><Skeleton variant="text" width="50%" height={24} /></TableCell>
                   <TableCell><Skeleton variant="rectangular" height={16} sx={{ borderRadius: 1 }} /></TableCell>
                   <TableCell><Skeleton variant="text" width="40%" height={24} /></TableCell>
@@ -529,7 +623,7 @@ const Projects: React.FC = () => {
               ))
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                   <Typography variant="body1" color="error" sx={{ fontWeight: 'bold', mb: 1.5 }}>
                     Failed to load work orders from server.
                   </Typography>
@@ -540,7 +634,7 @@ const Projects: React.FC = () => {
               </TableRow>
             ) : filteredWorkOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                   <Avatar sx={{ bgcolor: '#FFF4E5', color: '#B38B36', width: 54, height: 54, mx: 'auto', mb: 1.5 }}>
                     <WorkIcon sx={{ fontSize: 28 }} />
                   </Avatar>
@@ -650,6 +744,15 @@ const Projects: React.FC = () => {
                           </Typography>
                         </Box>
                       )}
+                    </TableCell>
+
+                    {/* Work Size (Total Sq.Ft) */}
+                    <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+                      <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 1.5, px: 1.25, py: 0.4 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#0369A1', fontSize: '0.84rem' }}>
+                          {calculateProjectWorkSize(project)}
+                        </Typography>
+                      </Box>
                     </TableCell>
 
                     {/* Start Date */}

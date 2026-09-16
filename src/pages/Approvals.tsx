@@ -542,13 +542,43 @@ const Approvals: React.FC = () => {
 
 
       {/* Approval Dialog — Multi Project Selection */}
-      <Dialog open={approvalDialogOpen} onClose={() => setApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>
-          {selectedLog?.stage?.startsWith('Polishing') ? 'Approval Polish Log' : selectedLog?.stage?.startsWith('Packing') ? 'Approval Packing Log' : selectedLog?.stage?.startsWith('Dispatch') ? 'Approval Dispatch Log' : 'Approve Material Log'}
-          {selectedLog && (
-            <Typography variant="caption" display="block" sx={{ color: 'text.secondary', mt: 0.5, fontWeight: 600 }}>
-              Stage: {selectedLog.stage} • Quantity: {selectedLog.quantityProduced} {selectedLog.id ? `• Approval ID: #${selectedLog.id.slice(-6).toUpperCase()}` : ''}
+      <Dialog 
+        open={approvalDialogOpen} 
+        onClose={() => setApprovalDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 0.5 } } }}
+      >
+        <DialogTitle sx={{ pb: 1.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 900, color: '#0F172A', fontSize: '1.25rem', letterSpacing: '-0.02em' }}>
+              {selectedLog?.stage?.startsWith('Polishing') ? 'Approval Polish Log' 
+                : selectedLog?.stage?.startsWith('Packing') ? 'Approval Packing Log' 
+                : selectedLog?.stage?.startsWith('Dispatch') ? 'Approval Dispatch Log' 
+                : selectedLog?.stage?.startsWith('Production') ? 'Approval Production Log'
+                : 'Approve Material Log'}
             </Typography>
+            {selectedLog?.id && (
+              <Chip 
+                label={`ID: #${selectedLog.id.slice(-6).toUpperCase()}`}
+                size="small" 
+                sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 800, fontSize: '0.72rem', border: '1px solid #CBD5E1' }} 
+              />
+            )}
+          </Box>
+          {selectedLog && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+              <Chip 
+                label={`Stage: ${selectedLog.stage}`} 
+                size="small" 
+                sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.72rem', height: 22, border: '1px solid #DBEAFE' }} 
+              />
+              <Chip 
+                label={`Item(s): ${selectedLog.quantityProduced || 1} Pcs`} 
+                size="small" 
+                sx={{ bgcolor: '#F0FDF4', color: '#166534', fontWeight: 700, fontSize: '0.72rem', height: 22, border: '1px solid #BBF7D0' }} 
+              />
+            </Box>
           )}
         </DialogTitle>
         <DialogContent dividers>
