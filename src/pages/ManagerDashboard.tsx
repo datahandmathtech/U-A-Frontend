@@ -11,7 +11,7 @@ import {
   useMachineClockOutMutation, useCreateMaterialLogMutation, useGetStaffListQuery, 
   useGetActiveOutLogsQuery, useGetProjectsQuery, useGetVendorsQuery, 
   useGetRejectedLogsQuery, useApproveMaterialLogMutation, useGetPackingItemsQuery, 
-  useGetApprovedLogsQuery, useGetSlabsQuery 
+  useGetProductionLogsQuery, useGetSlabsQuery 
 } from '../store/apiSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../store/authSlice';
@@ -277,8 +277,11 @@ const ManagerDashboard: React.FC = () => {
   const { data: projectSlabs } = useGetSlabsQuery(selectedProjectId, { skip: !selectedProjectId });
   const [selectedSlabId, setSelectedSlabId] = useState('');
   const [selectedProductName, setSelectedProductName] = useState('');
-  const { data: approvedLogs } = useGetApprovedLogsQuery(undefined);
-  const packedBoxes = approvedLogs?.filter((log: any) => log.stage === 'Packing' && log.projectId === selectedProjectId) || [];
+  const { data: productionLogs } = useGetProductionLogsQuery(undefined, {
+    pollingInterval: 15000,
+    skipPollingIfUnfocused: true
+  });
+  const packedBoxes = productionLogs?.filter((log: any) => log.stage === 'Packing' && log.projectId === selectedProjectId && log.approvalStatus === 'approved') || [];
   const [selectedProductId, setSelectedProductId] = useState('');
   const [estimatedHours, setEstimatedHours] = useState('');
   const [photos, setPhotos] = useState({ machine: '', unit: '', software: '' });
@@ -350,7 +353,7 @@ const ManagerDashboard: React.FC = () => {
                 const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
                 return ls === 'Production' && (l.status === 'completed' || l.status === 'approved');
               });
-              const hasApprovedProd = approvedLogs && approvedLogs.some((l: any) => {
+              const hasApprovedProd = productionLogs && productionLogs.some((l: any) => {
                 if (l.approvalStatus !== 'approved') return false;
                 const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
                 return ls === 'Production' && ((l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0)));
@@ -364,7 +367,7 @@ const ManagerDashboard: React.FC = () => {
                 const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
                 return (ls === 'Polishing' || ls.startsWith('Polishing')) && (l.status === 'completed' || l.status === 'approved');
               });
-              const hasApprovedPolish = approvedLogs && approvedLogs.some((l: any) => {
+              const hasApprovedPolish = productionLogs && productionLogs.some((l: any) => {
                 if (l.approvalStatus !== 'approved') return false;
                 const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
                 return (ls === 'Polishing' || ls.startsWith('Polishing')) && ((l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0)));
@@ -376,12 +379,12 @@ const ManagerDashboard: React.FC = () => {
           } else {
             if (slab.status === 'completed') slabProduced += targetQty;
             
-            if (approvedLogs) {
-              const pLogs = approvedLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Production' || l.stage === 'Production Work') && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
+            if (productionLogs) {
+              const pLogs = productionLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Production' || l.stage === 'Production Work') && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
               const pQty = pLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
               if (pQty > slabProduced) slabProduced = Math.min(targetQty, pQty);
 
-              const polLogs = approvedLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Polishing' || l.stage.startsWith('Polishing')) && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
+              const polLogs = productionLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Polishing' || l.stage.startsWith('Polishing')) && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
               const polQty = polLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
               if (polQty > slabPolished) slabPolished = Math.min(targetQty, polQty);
             }
@@ -416,7 +419,7 @@ const ManagerDashboard: React.FC = () => {
       availableToPolish: totalAvailableToPolish,
       readySlabsInfo 
     };
-  }, [selectedProjectId, selectedProjectObj, projectSlabs, approvedLogs]);
+  }, [selectedProjectId, selectedProjectObj, projectSlabs, productionLogs]);
 
   // Helper to check if a slab has completed a stage
   const isSlabStageCompleted = (slab: any, stageName: string) => {
