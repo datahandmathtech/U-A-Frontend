@@ -64,6 +64,38 @@ const StageDetails = () => {
     : rawUnit.toLowerCase() === 'mm' ? 'MM' 
     : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
 
+  const calculateAreaFromSize = (sizeStr: string, unitStr: string, productContext?: any) => {
+    if (!sizeStr) return 0;
+    const lMatch = sizeStr.match(/([\d\.]+)\s*L/i);
+    const wMatch = sizeStr.match(/([\d\.]+)\s*W/i);
+    
+    let l = 0, w = 0;
+    if (lMatch && wMatch) {
+      l = parseFloat(lMatch[1]);
+      w = parseFloat(wMatch[1]);
+    } else if (productContext) {
+      l = productContext.length || 0;
+      w = productContext.width || 0;
+    } else {
+      return 0;
+    }
+
+    const u = (unitStr || '').toLowerCase().trim();
+    let sqft = 0;
+    if (u === 'pieces' || u === 'piece' || u === 'pcs') {
+      const dimU = (productContext?.dimensionUnit || 'inch').toLowerCase();
+      if (dimU === 'inch') sqft = ((l * w) / 144);
+      else if (dimU === 'mm') sqft = ((l * w) / 92903.04);
+      else if (dimU === 'sq_ft') sqft = l * w;
+      else sqft = 1;
+    } else if (u === 'mm') {
+      sqft = ((l * w) / 92903.04);
+    } else {
+      sqft = u.includes('inch') ? ((l * w) / 144) : (l * w);
+    }
+    return Number(sqft.toFixed(2));
+  };
+
   // Filter production logs for this project & slab that represent Machine Work
   const logs = productionLogs?.filter((log: any) => 
     log.stage === 'Production Work' && 
@@ -116,30 +148,19 @@ const StageDetails = () => {
     setIsSaving(true);
     
     // --- SIZE VALIDATION ---
-    let slabArea = 0;
-    if (slab.size) {
-      const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/i);
-      const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/i);
-      if (lMatch && wMatch) {
-        slabArea = (parseFloat(lMatch[1]) * parseFloat(wMatch[1])) / 144;
-      }
-    }
+    let slabArea = calculateAreaFromSize(slab.size, rawUnit, matchedProduct);
 
     if (slabArea > 0) {
       let existingArea = 0;
       (slab.pieces || []).forEach((p: any) => {
-        if (p.length && p.width) {
-          existingArea += (p.length * p.width) / 144;
-        } else if (p.size) {
-           const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
-           const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
-           if (lMatch && wMatch) {
-             existingArea += (parseFloat(lMatch[1]) * parseFloat(wMatch[1])) / 144;
-           }
+        if (p.size) {
+           existingArea += calculateAreaFromSize(p.size, (p as any).unit || rawUnit, matchedProduct);
+        } else if (p.length && p.width) {
+           existingArea += calculateAreaFromSize(`${p.length}L x ${p.width}W`, (p as any).unit || rawUnit, matchedProduct);
         }
       });
 
-      const newArea = piecesData.reduce((sum, p) => sum + (((p.l || 0) * (p.w || 0)) / 144), 0);
+      const newArea = piecesData.reduce((sum, p) => sum + calculateAreaFromSize(`${p.l}L x ${p.w}W`, rawUnit, matchedProduct), 0);
       
       // Round to 2 decimal places to avoid floating point precision issues
       const totalArea = Math.round((existingArea + newArea) * 100) / 100;
@@ -439,24 +460,7 @@ const StageDetails = () => {
                 />
                 {matchedProduct && (
                   <Chip 
-                    label={(() => {
-                      const l = matchedProduct.length || 0;
-                      const w = matchedProduct.width || 0;
-                      const u = (matchedProduct.unit || '').toLowerCase().trim();
-                      let sqft = 0;
-                      if (u === 'pieces' || u === 'piece' || u === 'pcs') {
-                        const dimU = (matchedProduct.dimensionUnit || 'inch').toLowerCase();
-                        if (dimU === 'inch') sqft = ((l * w) / 144);
-                        else if (dimU === 'mm') sqft = ((l * w) / 92903.04);
-                        else if (dimU === 'sq_ft') sqft = l * w;
-                        else sqft = 1;
-                      } else if (u === 'mm') {
-                        sqft = ((l * w) / 92903.04);
-                      } else {
-                        sqft = u.includes('inch') ? ((l * w) / 144) : (l * w);
-                      }
-                      return `${Number(sqft.toFixed(2))} Sq.Ft`;
-                    })()}
+                    label={`${calculateAreaFromSize(p.size as string, (p as any).unit || rawUnit, matchedProduct)} Sq.Ft`}
                     size="small" 
                     sx={{ 
                       bgcolor: '#EFF6FF', 
@@ -672,24 +676,7 @@ const StageDetails = () => {
                   />
                   {matchedProduct && (
                     <Chip 
-                      label={(() => {
-                        const l = matchedProduct.length || 0;
-                        const w = matchedProduct.width || 0;
-                        const u = (matchedProduct.unit || '').toLowerCase().trim();
-                        let sqft = 0;
-                        if (u === 'pieces' || u === 'piece' || u === 'pcs') {
-                          const dimU = (matchedProduct.dimensionUnit || 'inch').toLowerCase();
-                          if (dimU === 'inch') sqft = ((l * w) / 144);
-                          else if (dimU === 'mm') sqft = ((l * w) / 92903.04);
-                          else if (dimU === 'sq_ft') sqft = l * w;
-                          else sqft = 1;
-                        } else if (u === 'mm') {
-                          sqft = ((l * w) / 92903.04);
-                        } else {
-                          sqft = u.includes('inch') ? ((l * w) / 144) : (l * w);
-                        }
-                        return `${Number(sqft.toFixed(2))} Sq.Ft`;
-                      })()}
+                      label={`${calculateAreaFromSize(slab?.size as string, rawUnit, matchedProduct)} Sq.Ft`}
                       size="small" 
                       sx={{ 
                         bgcolor: '#EFF6FF', 
@@ -1004,7 +991,7 @@ const StageDetails = () => {
                     </TableCell>
                     <TableCell sx={{ py: 1.25 }}>
                       <Chip 
-                        label={`${((p.l * p.w) / 144).toFixed(2)} Sq.Ft`} 
+                        label={`${calculateAreaFromSize(`${p.l}L x ${p.w}W`, rawUnit, matchedProduct)} Sq.Ft`} 
                         size="small" 
                         sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 800, fontSize: '0.72rem' }} 
                       />
