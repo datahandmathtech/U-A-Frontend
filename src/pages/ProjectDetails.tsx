@@ -3020,252 +3020,178 @@ const ProjectDetails: React.FC = () => {
 
                   {/* Executive Header Bar */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
-                    <Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px' }}>
-                          Slabs & Production Planning
-                        </Typography>
-                        <Chip
-                          label={isPlanningMode ? 'Stage Configuration' : 'In Production'}
-                          size="small"
-                          sx={{
-                            bgcolor: isPlanningMode ? '#FEF3C7' : '#ECFDF5',
-                            color: isPlanningMode ? '#B45309' : '#059669',
-                            fontWeight: 800,
-                            fontSize: '0.72rem',
-                            border: '1px solid',
-                            borderColor: isPlanningMode ? '#FDE68A' : '#A7F3D0',
-                            borderRadius: '6px'
-                          }}
-                        />
-                      </Box>
-                      <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5, fontWeight: 500 }}>
-                        Manage slab specifications and manufacturing stages in one place.
-                      </Typography>
-                    </Box>
-
-                    {/* Summary Metric Pills & Top Actions */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
-                        <LayersRoundedIcon sx={{ fontSize: 18, color: '#B38B36' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E293B' }}>
-                          {projectSlabs?.length || 0} Slabs
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F8FAFC', px: 1.5, py: 0.75, borderRadius: 2, border: '1px solid #E2E8F0' }}>
-                        <Inventory2RoundedIcon sx={{ fontSize: 18, color: '#0284C7' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E293B' }}>
-                          {projectSlabs?.reduce((acc: number, s: any) => {
-                            const matchedProduct = products?.find(p => s.name.startsWith(p.category));
-                            const qty = (s.pieces && s.pieces.length > 0) ? s.pieces.length : (matchedProduct?.qty || 1);
-                            return acc + qty;
-                          }, 0) || 0} Pieces
-                        </Typography>
-                      </Box>
-
-                      <Button 
-                        variant="outlined" 
-                        startIcon={<SyncIcon />} 
-                        onClick={async () => {
-                          try {
-                            await syncSlabs(id as string).unwrap();
-                            refetchSlabs();
-                            setSnackbarMessage('Synced successfully with Quotation!');
-                          } catch(err) {
-                            setSnackbarMessage('Error syncing slabs.');
-                          }
-                        }}
-                        sx={{
-                          borderRadius: 2,
-                          textTransform: 'none',
-                          fontWeight: 700,
-                          borderColor: '#CBD5E1',
-                          color: '#1E293B',
-                          bgcolor: '#FFFFFF',
-                          '&:hover': { borderColor: '#B38B36', bgcolor: '#FFFDF5' }
-                        }}
-                      >
-                        Sync with Quotation
-                      </Button>
-
-                      {isPlanningMode && (
-                        <Button 
-                          variant="contained" 
-                          startIcon={<PlayArrowRoundedIcon />}
-                          onClick={handleStartAllWork}
-                          sx={{
-                            borderRadius: 2.5,
-                            textTransform: 'none',
-                            fontWeight: 800,
-                            bgcolor: '#059669',
-                            color: '#FFFFFF',
-                            boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
-                            '&:hover': { bgcolor: '#047857' }
-                          }}
-                        >
-                          Finalize & Send to Production
-                        </Button>
-                      )}
-                    </Box>
-                  </Box>
-
-                  {/* Bulk Stage Planner Card (Matches Image 1) */}
-                  <Paper 
-                    elevation={0} 
-                    sx={{ 
-                      p: 2.5, 
-                      mb: 3, 
-                      borderRadius: 3.5, 
-                      border: '1px solid #E2E8F0', 
-                      bgcolor: '#FFFFFF',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.02)'
-                    }}
-                  >
-                    {/* Header row */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', width: 38, height: 38, borderRadius: 2 }}>
-                          <TuneRoundedIcon sx={{ fontSize: 22 }} />
-                        </Avatar>
+                    <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 4, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 2.5, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
                         <Box>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.2 }}>
-                            Bulk Stage Planner
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                            <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.3px' }}>
+                              Slabs & Production Planning
+                            </Typography>
+                            <Chip
+                              label={isPlanningMode ? 'Stage Configuration' : 'In Production'}
+                              size="small"
+                              sx={{
+                                bgcolor: isPlanningMode ? '#FEF3C7' : '#ECFDF5',
+                                color: isPlanningMode ? '#B45309' : '#059669',
+                                fontWeight: 800,
+                                fontSize: '0.72rem',
+                                border: '1px solid',
+                                borderColor: isPlanningMode ? '#FDE68A' : '#A7F3D0',
+                                borderRadius: '6px'
+                              }}
+                            />
+                          </Box>
+                          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>
+                            Configure manufacturing stages for each slab and track their production progress.
                           </Typography>
-                          <Typography variant="caption" sx={{ color: '#64748B', fontSize: '0.78rem' }}>
-                            Select slabs and choose manufacturing stages to apply in bulk.
-                          </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                          <Button 
+                            variant="outlined" 
+                            startIcon={<SyncIcon />} 
+                            onClick={async () => {
+                              try {
+                                await syncSlabs(id as string).unwrap();
+                                refetchSlabs();
+                                setSnackbarMessage('Synced successfully with Quotation!');
+                              } catch(err) {
+                                setSnackbarMessage('Error syncing slabs.');
+                              }
+                            }}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 700,
+                              borderColor: '#CBD5E1',
+                              color: '#475569',
+                              bgcolor: '#FFFFFF',
+                              '&:hover': { borderColor: '#B38B36', bgcolor: '#FFFDF5' }
+                            }}
+                          >
+                            Sync with Quotation
+                          </Button>
+
+                          {isPlanningMode && (
+                            <Button 
+                              variant="contained" 
+                              startIcon={<PlayArrowRoundedIcon />}
+                              onClick={handleStartAllWork}
+                              sx={{
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                fontWeight: 800,
+                                bgcolor: '#059669',
+                                color: '#FFFFFF',
+                                boxShadow: '0 2px 10px rgba(5, 150, 105, 0.2)',
+                                '&:hover': { bgcolor: '#047857' }
+                              }}
+                            >
+                              Send to Production
+                            </Button>
+                          )}
                         </Box>
                       </Box>
 
-                      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, bgcolor: '#F0F9FF', px: 1.5, py: 0.6, borderRadius: 2, border: '1px solid #BAE6FD' }}>
-                        <InfoOutlinedIcon sx={{ fontSize: 16, color: '#0284C7' }} />
-                        <Typography variant="caption" sx={{ color: '#0369A1', fontWeight: 600, fontSize: '0.76rem' }}>
-                          Select one or more slabs, choose the stages to update, then apply to selected slabs.
-                        </Typography>
-                      </Box>
-                    </Box>
+                      <Divider sx={{ borderColor: '#F1F5F9' }} />
 
-                    {/* Controls Row */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, bgcolor: '#F8FAFC', p: 1.75, borderRadius: 2.5, border: '1px solid #E2E8F0' }}>
-                      {/* Left: Select All & Counter */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', color: '#B38B36', width: 40, height: 40, borderRadius: 2 }}>
+                            <LayersRoundedIcon sx={{ fontSize: 20 }} />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>{projectSlabs?.length || 0}</Typography>
+                            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Slabs</Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', color: '#0284C7', width: 40, height: 40, borderRadius: 2 }}>
+                            <Inventory2RoundedIcon sx={{ fontSize: 20 }} />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>
+                              {projectSlabs?.reduce((acc: number, s: any) => {
+                                const matchedProduct = products?.find(p => s.name.startsWith(p.category));
+                                const qty = (s.pieces && s.pieces.length > 0) ? s.pieces.length : (matchedProduct?.qty || 1);
+                                return acc + qty;
+                              }, 0) || 0}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Pieces</Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Paper>
+
+                  {/* Bulk Operations Toolbar */}
+                  {selectedSlabIds.length > 0 && (
+                    <Box sx={{ p: 1.5, px: 2, mb: 3, borderRadius: 2.5, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox 
-                              checked={isAllFilteredSelected}
-                              indeterminate={isSomeFilteredSelected}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedSlabIds(Array.from(new Set([...selectedSlabIds, ...filteredSlabs.map(s => s.id)])));
-                                } else {
-                                  const filteredIds = new Set(filteredSlabs.map(s => s.id));
-                                  setSelectedSlabIds(selectedSlabIds.filter(sid => !filteredIds.has(sid)));
-                                }
-                              }}
-                              sx={{ '&.Mui-checked': { color: '#1D4ED8' } }}
-                            />
-                          }
-                          label={<Typography variant="body2" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '0.86rem' }}>Select All Stones</Typography>}
-                          sx={{ mr: 0 }}
-                        />
-                        <Chip 
-                          label={`${selectedInFilterCount} of ${filteredSlabs.length} slabs selected`} 
-                          size="small" 
-                          sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 24, border: '1px solid #DBEAFE' }}
-                        />
-                      </Box>
-
-                      {/* Center: Manufacturing Stages to Apply */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', mr: 0.5, fontSize: '0.72rem' }}>
-                          Manufacturing Stages to Apply
+                        <TuneRoundedIcon sx={{ color: '#0284C7', fontSize: 20 }} />
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#0369A1' }}>
+                          Batch Update ({selectedSlabIds.length} Slabs Selected)
                         </Typography>
-                        {[
-                          { key: 'Production', label: 'Production' },
-                          { key: 'Polishing - Honed', label: 'Polishing - Honed' },
-                          { key: 'Polishing - Mirror', label: 'Polishing - Mirror' },
-                          { key: 'Packing', label: 'Packing' },
-                          { key: 'Dispatch', label: 'Dispatch' }
-                        ].map(stage => {
-                          const isChecked = bulkStages.includes(stage.key);
-                          return (
-                            <Box
-                              key={stage.key}
-                              onClick={() => {
-                                if (isChecked) {
-                                  setBulkStages(bulkStages.filter(s => s !== stage.key));
-                                } else {
-                                  setBulkStages([...bulkStages, stage.key]);
-                                }
-                              }}
-                              sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 0.6,
-                                px: 1.25,
-                                py: 0.45,
-                                borderRadius: 1.75,
-                                bgcolor: isChecked ? '#F0FDF4' : '#FFFFFF',
-                                border: '1px solid',
-                                borderColor: isChecked ? '#86EFAC' : '#CBD5E1',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                '&:hover': { borderColor: '#16A34A', bgcolor: '#DCFCE7' }
-                              }}
-                            >
-                              <Checkbox 
-                                size="small" 
-                                checked={isChecked} 
-                                sx={{ p: 0, '&.Mui-checked': { color: '#16A34A' } }} 
-                              />
-                              <Typography variant="caption" sx={{ fontWeight: 700, color: isChecked ? '#166534' : '#64748B', fontSize: '0.76rem' }}>
-                                {stage.label}
-                              </Typography>
-                            </Box>
-                          );
-                        })}
                       </Box>
-
-                      {/* Right: Actions */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Button 
-                          size="small" 
-                          variant="outlined" 
-                          onClick={() => setBulkStages(['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'])}
-                          sx={{ borderRadius: 1.75, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#475569', fontSize: '0.75rem', bgcolor: '#FFFFFF' }}
-                        >
-                          Select All Stages
-                        </Button>
-                        <Button 
-                          size="small" 
-                          variant="outlined" 
-                          onClick={() => setBulkStages([])}
-                          sx={{ borderRadius: 1.75, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#475569', fontSize: '0.75rem', bgcolor: '#FFFFFF' }}
-                        >
-                          Deselect All Stages
-                        </Button>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#0284C7', textTransform: 'uppercase', fontSize: '0.7rem' }}>
+                          Stages to Apply:
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          {[
+                            { key: 'Production', label: 'Production' },
+                            { key: 'Polishing - Honed', label: 'Honed' },
+                            { key: 'Polishing - Mirror', label: 'Mirror' },
+                            { key: 'Packing', label: 'Packing' },
+                            { key: 'Dispatch', label: 'Dispatch' }
+                          ].map(stage => {
+                            const isChecked = bulkStages.includes(stage.key);
+                            return (
+                              <Chip
+                                key={stage.key}
+                                label={stage.label}
+                                size="small"
+                                onClick={() => {
+                                  if (isChecked) setBulkStages(bulkStages.filter(s => s !== stage.key));
+                                  else setBulkStages([...bulkStages, stage.key]);
+                                }}
+                                sx={{
+                                  bgcolor: isChecked ? '#0284C7' : '#E0F2FE',
+                                  color: isChecked ? '#FFFFFF' : '#0369A1',
+                                  fontWeight: 700,
+                                  fontSize: '0.7rem',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  '&:hover': { bgcolor: isChecked ? '#0369A1' : '#BAE6FD' }
+                                }}
+                              />
+                            );
+                          })}
+                        </Box>
+                        
                         <Button 
                           size="small" 
                           variant="contained" 
                           startIcon={<PlayArrowRoundedIcon sx={{ fontSize: 16 }} />}
                           onClick={handleApplyBulkStages}
-                          disabled={isBulkUpdating}
+                          disabled={isBulkUpdating || bulkStages.length === 0}
                           sx={{ 
-                            borderRadius: 2, 
+                            borderRadius: 1.5, 
                             textTransform: 'none', 
                             fontWeight: 800, 
-                            bgcolor: '#1E293B', 
+                            bgcolor: '#0284C7', 
                             color: '#FFFFFF',
+                            ml: 1,
                             px: 2,
-                            boxShadow: '0 2px 6px rgba(30,41,59,0.25)',
-                            '&:hover': { bgcolor: '#0F172A' }
+                            boxShadow: 'none',
+                            '&:hover': { bgcolor: '#0369A1' }
                           }}
                         >
-                          {isBulkUpdating ? 'Applying...' : 'Apply to Selected Slabs'}
+                          {isBulkUpdating ? 'Applying...' : 'Apply'}
                         </Button>
                       </Box>
                     </Box>
-                  </Paper>
+                  )}
 
                   {/* Filter & Search Bar */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 2 }}>
