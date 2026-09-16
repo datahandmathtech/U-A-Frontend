@@ -425,23 +425,21 @@ const StageDetails = () => {
       return (
         <TableRow key={p.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
           {stageFormatted === 'Production' && (
-            <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+            <TableCell sx={{ py: 1.5, whiteSpace: 'nowrap' }}>
               {mName ? (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
-                  <PrecisionManufacturingRoundedIcon sx={{ fontSize: 16, color: '#64748B' }} />
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.82rem' }}>{mName}</Typography>
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>{mName}</Typography>
                 </Box>
               ) : vendorName ? (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-                  <Chip label={vendorName} size="small" sx={{ bgcolor: '#FFF7ED', color: '#C2410C', border: '1px solid #FDBA74', fontWeight: 700, fontSize: '0.78rem' }} />
-                  <Chip label="Job Work" size="small" sx={{ bgcolor: '#F0F9FF', color: '#0284C7', border: '1px solid #BAE6FD', fontWeight: 700, fontSize: '0.7rem', height: 20 }} />
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>{vendorName}</Typography>
                 </Box>
               ) : (
                 <Typography variant="caption" sx={{ color: '#94A3B8' }}>Unassigned</Typography>
               )}
             </TableCell>
           )}
-          <TableCell sx={{ py: 2, minWidth: 180 }}>
+          <TableCell sx={{ py: 1.5, minWidth: 160 }}>
             <Box>
               <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.9rem' }}>
                 {String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim()}
@@ -464,13 +462,17 @@ const StageDetails = () => {
               )}
             </Box>
           </TableCell>
-          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+          <TableCell sx={{ py: 1.5, whiteSpace: 'nowrap' }}>
             {p.sourceMaterial?.inventory ? (
               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
                 <LayersRoundedIcon sx={{ fontSize: 15, color: '#0284C7' }} />
                 <Typography variant="body2" sx={{ fontWeight: 700, color: '#0284C7', fontSize: '0.82rem' }}>
-                  {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ Ã— (\d+MM)/i, ' | $1')}
+                  {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
                 </Typography>
+              </Box>
+            ) : vendorName ? (
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>Job Work</Typography>
               </Box>
             ) : (
               <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
@@ -1366,7 +1368,7 @@ const StageDetails = () => {
         ) : (
           /* Production & Polishing: Piece-based table */
           <TableContainer sx={{ maxHeight: 600 }}>
-            <Table stickyHeader sx={{ minWidth: 1100 }}>
+            <Table stickyHeader sx={{ minWidth: 950 }}>
               <TableHead>
                 <TableRow>
                   {stageFormatted === 'Production' && (
