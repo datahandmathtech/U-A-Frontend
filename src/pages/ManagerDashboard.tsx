@@ -317,43 +317,74 @@ const ManagerDashboard: React.FC = () => {
   // Calculate project-wide production & polishing limits for the selected project
   const selectedProjectObj = projectsData?.find((p: any) => p.id === selectedProjectId);
   const polishingStats = React.useMemo(() => {
-    if (!selectedProjectObj) return { totalProjectPieces: 0, producedPieces: 0, polishedPieces: 0, availableToPolish: 0 };
+    if (!selectedProjectId) return { totalProjectPieces: 0, producedPieces: 0, polishedPieces: 0, availableToPolish: 0 };
     
     let totalProjectPieces = 0;
     let producedPieces = 0;
     let polishedPieces = 0;
 
-    const slabs = selectedProjectObj.slabs || [];
+    const slabs = (projectSlabs && projectSlabs.length > 0) ? projectSlabs : (selectedProjectObj?.slabs || []);
     if (slabs.length > 0) {
       slabs.forEach((slab: any) => {
         const pList = slab.pieces || [];
-        totalProjectPieces += (pList.length > 0 ? pList.length : 1);
+        const slabTargetPieces = pList.length > 0 ? pList.length : 1;
+        totalProjectPieces += slabTargetPieces;
         
-        pList.forEach((p: any) => {
-          // Check if piece has completed Production stage
-          const isProdCompleted = p.status === 'completed' || 
-            (p.stage && p.stage !== 'Production' && p.stage !== 'Production Work') ||
-            p.logs?.some((l: any) => (l.stage === 'Production' || l.stage === 'Production Work') && (l.status === 'completed' || l.status === 'approved'));
-          
-          if (isProdCompleted) {
-            producedPieces++;
-          }
+        if (pList.length > 0) {
+          pList.forEach((p: any) => {
+            // Check if piece has completed Production stage
+            const isProdCompleted = p.status === 'completed' || 
+              (p.stage && p.stage !== 'Production' && p.stage !== 'Production Work') ||
+              p.logs?.some((l: any) => (l.stage === 'Production' || l.stage === 'Production Work') && (l.status === 'completed' || l.status === 'approved'));
+            
+            if (isProdCompleted) {
+              producedPieces++;
+            }
 
-          // Check if piece has already completed Polishing
-          const isPolishCompleted = p.logs?.some((l: any) => l.stage?.startsWith('Polishing') && (l.status === 'completed' || l.status === 'approved'));
-          if (isPolishCompleted) {
-            polishedPieces++;
+            // Check if piece has already completed Polishing
+            const isPolishCompleted = p.logs?.some((l: any) => l.stage?.startsWith('Polishing') && (l.status === 'completed' || l.status === 'approved'));
+            if (isPolishCompleted) {
+              polishedPieces++;
+            }
+          });
+        } else {
+          if (slab.status === 'completed') {
+            producedPieces += slabTargetPieces;
           }
-        });
+        }
       });
     } else {
-      totalProjectPieces = selectedProjectObj.totalPieces || 1;
-      producedPieces = selectedProjectObj.completedPieces || 0;
+      totalProjectPieces = selectedProjectObj?.totalPieces || 1;
+      producedPieces = selectedProjectObj?.completedPieces || 0;
     }
 
-    const availableToPolish = Math.max(0, producedPieces - polishedPieces);
+    // Also check approved production & polishing logs
+    if (approvedLogs && approvedLogs.length > 0) {
+      const prodLogsForProj = approvedLogs.filter((l: any) => 
+        l.projectId === selectedProjectId && 
+        (l.stage === 'Production' || l.stage === 'Production Work') &&
+        (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
+      );
+      const prodLogQty = prodLogsForProj.reduce((sum: number, l: any) => sum + (Number(l.quantityProduced) || l.pieceIds?.length || 1), 0);
+      if (prodLogQty > producedPieces) {
+        producedPieces = prodLogQty;
+      }
+
+      const polishLogsForProj = approvedLogs.filter((l: any) => 
+        l.projectId === selectedProjectId && 
+        (l.stage?.startsWith('Polishing') || l.stage === 'Polishing') &&
+        (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
+      );
+      const polishLogQty = polishLogsForProj.reduce((sum: number, l: any) => sum + (Number(l.quantityProduced) || l.pieceIds?.length || 1), 0);
+      if (polishLogQty > polishedPieces) {
+        polishedPieces = polishLogQty;
+      }
+    }
+
+    const maxPossible = Math.min(totalProjectPieces, producedPieces);
+    const availableToPolish = Math.max(0, maxPossible - polishedPieces);
     return { totalProjectPieces, producedPieces, polishedPieces, availableToPolish };
-  }, [selectedProjectObj]);
+  }, [selectedProjectId, selectedProjectObj, projectSlabs, approvedLogs]);
 
   // Helper to check if a slab has completed a stage
   const isSlabStageCompleted = (slab: any, stageName: string) => {
