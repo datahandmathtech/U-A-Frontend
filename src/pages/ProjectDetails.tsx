@@ -202,6 +202,63 @@ const SlabRow = ({
     { key: 'Dispatch', label: 'Dispatch', route: 'dispatch' }
   ];
 
+  const calculateSlabCompletedPieces = () => {
+    const totalSubPieces = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
+    const reqStages = slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const hasProduction = reqStages.includes('Production');
+    const hasPolishing = reqStages.some((s: string) => s.startsWith('Polishing'));
+    const hasPacking = reqStages.includes('Packing');
+    const hasDispatch = reqStages.includes('Dispatch');
+
+    let wProd = hasProduction ? (hasPolishing ? 60 : 80) : 0;
+    let wPoli = hasPolishing ? 20 : 0;
+    let wPack = hasPacking ? 10 : 0;
+    let wDisp = hasDispatch ? 10 : 0;
+
+    const totalWeight = wProd + wPoli + wPack + wDisp;
+    if (totalWeight > 0) {
+      wProd = (wProd / totalWeight);
+      wPoli = (wPoli / totalWeight);
+      wPack = (wPack / totalWeight);
+      wDisp = (wDisp / totalWeight);
+    } else {
+      return 0;
+    }
+
+    const getStageCompletionRatio = (stageName: string) => {
+      if (slab.pieces && slab.pieces.length > 0) {
+        let completedCount = 0;
+        slab.pieces.forEach((p: any) => {
+          const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+          const hasLog = p.logs && p.logs.some((l: any) => {
+            const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+            return (lStage === stageName || lStage.startsWith(stageName)) && (l.status === 'completed' || l.status === 'approved');
+          });
+          const hasApprovedProdLog = productionLogs && productionLogs.some((l: any) => {
+            if (l.approvalStatus !== 'approved') return false;
+            const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+            if (lStage !== stageName && !lStage.startsWith(stageName)) return false;
+            return (l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
+          });
+          if (hasLog || hasApprovedProdLog || (pStage === stageName && p.status === 'completed')) {
+            completedCount++;
+          }
+        });
+        return Math.min(1.0, completedCount / totalSubPieces);
+      }
+      return slab.status === 'completed' ? 1.0 : 0;
+    };
+
+    const cProd = hasProduction ? (slab.status === 'completed' ? 1.0 : getStageCompletionRatio('Production')) : 0;
+    const cPoli = hasPolishing ? getStageCompletionRatio('Polishing') : 0;
+    const cPack = hasPacking ? getStageCompletionRatio('Packing') : 0;
+    const cDisp = hasDispatch ? getStageCompletionRatio('Dispatch') : 0;
+
+    const fraction = (wProd * cProd) + (wPoli * cPoli) + (wPack * cPack) + (wDisp * cDisp);
+    return parseFloat((fraction * totalSubPieces).toFixed(2));
+  };
+
+  const completedPiecesVal = calculateSlabCompletedPieces();
   const overallStatus = slab.status === 'completed' ? 'Completed' : (slab.status === 'active' ? 'In Production' : 'Not Started');
 
   return (
@@ -223,12 +280,13 @@ const SlabRow = ({
 
       {/* Product / Slab Name */}
       <TableCell sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem', textTransform: 'uppercase' }}>
-            {slab.name}
-          </Typography>
-          <Chip 
-            label={(() => {
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem', textTransform: 'uppercase' }}>
+              {slab.name}
+            </Typography>
+            <Chip 
+              label={(() => {
               const displayQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : 1;
               return `${displayQty} Piece${displayQty !== 1 ? 's' : ''}`;
             })()} 
@@ -244,6 +302,27 @@ const SlabRow = ({
               border: '1px solid #DBEAFE' 
             }} 
           />
+          </Box>
+          <Box 
+            sx={{ 
+              ml: 1, 
+              px: 1.5, 
+              py: 0.5, 
+              border: '1px solid #E2E8F0', 
+              borderRadius: 2, 
+              bgcolor: '#F8FAFC', 
+              color: '#334155', 
+              fontWeight: 800,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 32
+            }}
+            title={`${completedPiecesVal} pieces completed (based on weighted stages)`}
+          >
+            {completedPiecesVal}
+          </Box>
         </Box>
       </TableCell>
 
