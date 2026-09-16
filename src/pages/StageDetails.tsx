@@ -718,7 +718,7 @@ const StageDetails = () => {
 
         {/* Bottom Section: KPIs and Progress */}
         <Box sx={{ bgcolor: '#F8FAFC', p: { xs: 2, sm: 3 } }}>
-           <Grid container spacing={4} alignItems="center">
+           <Grid container spacing={4} sx={{ alignItems: 'center' }}>
              {/* Left side: The 3 stats */}
              <Grid size={{ xs: 12, md: 7 }}>
                 <Box sx={{ display: 'flex', gap: { xs: 2, sm: 4 }, justifyContent: { xs: 'space-between', md: 'flex-start' }, flexWrap: 'wrap' }}>
