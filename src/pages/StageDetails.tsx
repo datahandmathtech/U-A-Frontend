@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, IconButton, TextField, 
   Switch, FormControlLabel, Breadcrumbs, Link, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, Select, MenuItem, Grid, LinearProgress, InputAdornment, Avatar
+  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, Select, MenuItem, Grid, LinearProgress, InputAdornment, Avatar, Divider
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -620,246 +620,171 @@ const StageDetails = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 1.5, md: 2 }, maxWidth: '100%', width: '100%', margin: '0 auto' }}>
-      {/* HEADER & NAVIGATION */}
-      <Box sx={{ mb: 4, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton 
-            onClick={() => navigate(-1)} 
-            sx={{ 
-              bgcolor: '#FFFFFF', 
-              border: '1px solid #CBD5E1', 
-              color: '#1E293B',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-              '&:hover': { bgcolor: '#F8FAFC', borderColor: '#94A3B8' } 
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
+      {/* HEADER & NAVIGATION BREADCRUMBS */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5, gap: 1.5 }}>
+        <IconButton 
+          onClick={() => navigate(-1)} 
+          size="small"
+          sx={{ 
+            bgcolor: '#FFFFFF', 
+            border: '1px solid #CBD5E1', 
+            color: '#1E293B',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            '&:hover': { bgcolor: '#F8FAFC', borderColor: '#94A3B8' } 
+          }}
+        >
+          <ArrowBackIcon fontSize="small" />
+        </IconButton>
+        <Breadcrumbs sx={{ '& .MuiBreadcrumbs-separator': { color: '#94A3B8' } }}>
+          <Link color="inherit" sx={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#64748B', '&:hover': { color: '#0284C7' } }} onClick={() => navigate('/projects')}>Projects</Link>
+          <Link color="inherit" sx={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#64748B', '&:hover': { color: '#0284C7' } }} onClick={() => navigate(`/projects/${projectId}`)}>{project?.name || 'Project'}</Link>
+          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#1E293B' }}>{slab.name}</Typography>
+        </Breadcrumbs>
+      </Box>
+
+      {/* DASHBOARD UNIFIED BANNER */}
+      <Paper elevation={0} sx={{ 
+        mb: 4, 
+        borderRadius: 4, 
+        bgcolor: '#FFFFFF', 
+        border: '1px solid #E2E8F0',
+        overflow: 'hidden',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+      }}>
+        {/* Top Section: Title & Spec Info */}
+        <Box sx={{ p: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 2.5 }, borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: '#1E293B', letterSpacing: '-0.3px' }}>
-                {stageFormatted} Tracking Workspace
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.25 }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#0F172A', letterSpacing: '-0.3px' }}>
+                {stageFormatted} Workspace
               </Typography>
               <Chip 
                 label={`Stage ${stageIdx + 1} of 4`} 
                 size="small" 
-                sx={{ 
-                  bgcolor: '#EFF6FF', 
-                  color: '#1D4ED8', 
-                  fontWeight: 700, 
-                  fontSize: '0.72rem', 
-                  border: '1px solid #DBEAFE',
-                  borderRadius: '6px'
-                }} 
+                sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.72rem', border: '1px solid #DBEAFE', borderRadius: 1.5 }} 
               />
-              {slab.size && (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.4 }}>
-                    <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
+            </Box>
+            
+            {slab.size && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5 }}>
+                    <StraightenRoundedIcon sx={{ fontSize: 16, color: '#64748B' }} />
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.82rem' }}>
-                      Slab Spec: {slab.size}
+                      Spec: {slab.size}
                     </Typography>
                   </Box>
-                  <Chip 
-                    label={unitDisplayName} 
-                    size="small" 
-                    sx={{ 
-                      bgcolor: '#FFFFFF', 
-                      color: '#475569', 
-                      fontWeight: 800, 
-                      fontSize: '0.75rem', 
-                      height: 24, 
-                      borderRadius: 1.5, 
-                      border: '1px solid #CBD5E1',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                    }} 
-                  />
+                  <Chip label={unitDisplayName} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
                   {matchedProduct && (
-                    <Chip 
-                      label={`${calculateAreaFromSize(slab?.size as string, rawUnit, matchedProduct)} Sq.Ft`}
-                      size="small" 
-                      sx={{ 
-                        bgcolor: '#EFF6FF', 
-                        color: '#1D4ED8', 
-                        fontWeight: 800, 
-                        fontSize: '0.75rem',
-                        height: 24,
-                        border: '1px solid #BFDBFE',
-                        borderRadius: 1.5
-                      }} 
-                    />
+                    <Chip label={`${calculateAreaFromSize(slab?.size as string, rawUnit, matchedProduct)} Sq.Ft`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #BFDBFE', borderRadius: 1.5 }} />
                   )}
                 </Box>
-              )}
-            </Box>
-            <Breadcrumbs sx={{ mt: 1, '& .MuiBreadcrumbs-separator': { color: '#94A3B8' } }}>
-              <Link color="inherit" sx={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#64748B', '&:hover': { color: '#0284C7' } }} onClick={() => navigate('/projects')}>Projects</Link>
-              <Link color="inherit" sx={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#64748B', '&:hover': { color: '#0284C7' } }} onClick={() => navigate(`/projects/${projectId}`)}>{project?.name || 'Project'}</Link>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#1E293B' }}>{slab.name}</Typography>
-            </Breadcrumbs>
+            )}
           </Box>
+          
+          {/* Break Slab Spec Toggle */}
+          {stageFormatted === 'Production' && (
+             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: '#F8FAFC', p: 0.75, pr: { xs: 0.75, sm: 1.5 }, borderRadius: 2.5, border: '1px solid #E2E8F0', flexWrap: 'wrap' }}>
+               <Typography variant="body2" sx={{ fontWeight: 800, color: '#334155', ml: 1 }}>Break into pieces?</Typography>
+               <ToggleButtonGroup
+                  value={cutPiecesOption}
+                  exclusive
+                  onChange={(e, val) => setCutPiecesOption(val !== null ? val : null)}
+                  sx={{ 
+                    bgcolor: '#FFFFFF', 
+                    p: 0.5,
+                    borderRadius: 2,
+                    border: '1px solid #E2E8F0',
+                    '& .MuiToggleButton-root': { 
+                      py: 0.4, 
+                      px: 2, 
+                      fontWeight: 800, 
+                      fontSize: '0.75rem',
+                      border: 'none',
+                      borderRadius: 1.5,
+                      color: '#64748B',
+                      transition: 'all 0.15s ease'
+                    },
+                    '& .MuiToggleButton-root:hover': { bgcolor: '#F1F5F9' },
+                    '& .MuiToggleButton-root[value="yes"].Mui-selected': { bgcolor: '#059669', color: '#FFFFFF !important', boxShadow: '0 2px 6px rgba(5,150,105,0.3)' },
+                    '& .MuiToggleButton-root[value="no"].Mui-selected': { bgcolor: '#1E293B', color: '#FFFFFF !important', boxShadow: '0 2px 6px rgba(30,41,59,0.3)' }
+                  }}
+                >
+                  <ToggleButton value="yes">YES</ToggleButton>
+                  <ToggleButton value="no">NO</ToggleButton>
+                </ToggleButtonGroup>
+             </Box>
+          )}
         </Box>
 
-        {stageFormatted === 'Production' && (
-          <Paper elevation={0} sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#FFFFFF', p: 1.25, px: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.2 }}>
-                Break Slab Spec?
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#64748B', fontSize: '0.72rem' }}>
-                Split into custom piece matrix
-              </Typography>
-            </Box>
-            <ToggleButtonGroup
-              value={cutPiecesOption}
-              exclusive
-              onChange={(e, val) => {
-                if (val !== null) setCutPiecesOption(val);
-                else setCutPiecesOption(null);
-              }}
-              sx={{ 
-                bgcolor: '#F8FAFC', 
-                p: 0.5,
-                borderRadius: 2,
-                '& .MuiToggleButton-root': { 
-                  py: 0.4, 
-                  px: 2.5, 
-                  fontWeight: 800, 
-                  fontSize: '0.78rem',
-                  border: 'none',
-                  borderRadius: 1.5,
-                  color: '#64748B',
-                  transition: 'all 0.15s ease'
-                },
-                '& .MuiToggleButton-root:hover': {
-                  bgcolor: '#E2E8F0'
-                },
-                '& .MuiToggleButton-root[value="yes"].Mui-selected': {
-                  bgcolor: '#059669',
-                  color: '#FFFFFF !important',
-                  boxShadow: '0 2px 6px rgba(5,150,105,0.3)'
-                },
-                '& .MuiToggleButton-root[value="no"].Mui-selected': {
-                  bgcolor: '#1E293B',
-                  color: '#FFFFFF !important',
-                  boxShadow: '0 2px 6px rgba(30,41,59,0.3)'
-                }
-              }}
-            >
-              <ToggleButton value="yes">YES</ToggleButton>
-              <ToggleButton value="no">NO</ToggleButton>
-            </ToggleButtonGroup>
-          </Paper>
-        )}
-      </Box>
+        {/* Bottom Section: KPIs and Progress */}
+        <Box sx={{ bgcolor: '#F8FAFC', p: { xs: 2, sm: 3 } }}>
+           <Grid container spacing={4} alignItems="center">
+             {/* Left side: The 3 stats */}
+             <Grid size={{ xs: 12, md: 7 }}>
+                <Box sx={{ display: 'flex', gap: { xs: 2, sm: 4 }, justifyContent: { xs: 'space-between', md: 'flex-start' }, flexWrap: 'wrap' }}>
+                   {/* Stat 1 */}
+                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: '#DBEAFE', color: '#1D4ED8' }}>
+                        <ViewModuleIcon sx={{ fontSize: 24 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', lineHeight: 1 }}>{totalPieces}</Typography>
+                        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, mt: 0.5, display: 'block', textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Pieces</Typography>
+                      </Box>
+                   </Box>
+                   
+                   <Divider orientation="vertical" flexItem sx={{ borderColor: '#E2E8F0', display: { xs: 'none', sm: 'block' } }} />
 
-      {/* EXECUTIVE KPI SUMMARY CARDS */}
-      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 2.5, 
-              borderRadius: 3.5, 
-              bgcolor: '#FFFFFF', 
-              border: '1px solid #E2E8F0', 
-              boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 2 
-            }}
-          >
-            <Avatar sx={{ width: 52, height: 52, borderRadius: 2.5, bgcolor: '#EFF6FF', color: '#1D4ED8' }}>
-              <ViewModuleIcon sx={{ fontSize: 28 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Total Stage Pieces
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.25 }}>
-                {totalPieces}
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
+                   {/* Stat 2 */}
+                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: '#D1FAE5', color: '#059669' }}>
+                        <CheckCircleRoundedIcon sx={{ fontSize: 24 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#059669', lineHeight: 1 }}>{completedPieces}</Typography>
+                        <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700, mt: 0.5, display: 'block', textTransform: 'uppercase', fontSize: '0.65rem' }}>Completed</Typography>
+                      </Box>
+                   </Box>
 
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 2.5, 
-              borderRadius: 3.5, 
-              bgcolor: '#FFFFFF', 
-              border: '1px solid #E2E8F0', 
-              boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 2 
-            }}
-          >
-            <Avatar sx={{ width: 52, height: 52, borderRadius: 2.5, bgcolor: '#ECFDF5', color: '#059669' }}>
-              <CheckCircleRoundedIcon sx={{ fontSize: 28 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#059669', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Completed Pieces
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#059669', mt: 0.25 }}>
-                {completedPieces}
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
+                   <Divider orientation="vertical" flexItem sx={{ borderColor: '#E2E8F0', display: { xs: 'none', sm: 'block' } }} />
 
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 2.5, 
-              borderRadius: 3.5, 
-              bgcolor: '#FFFFFF', 
-              border: '1px solid #E2E8F0', 
-              boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 2 
-            }}
-          >
-            <Avatar sx={{ width: 52, height: 52, borderRadius: 2.5, bgcolor: '#FFFBEB', color: '#D97706' }}>
-              <PendingActionsIcon sx={{ fontSize: 28 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#D97706', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Pending / In Process
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#D97706', mt: 0.25 }}>
-                {pendingPieces}
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* STAGE COMPLETION PROGRESS BAR */}
-      <Paper elevation={0} sx={{ p: 2, px: 3, mb: 4, borderRadius: 3, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Workstation Stage Progress
-          </Typography>
-          <Typography variant="caption" sx={{ fontWeight: 800, color: '#059669', fontSize: '0.8rem' }}>
-            {completedPieces} of {totalPieces} Pieces Finished ({progressPercent}%)
-          </Typography>
+                   {/* Stat 3 */}
+                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: '#FEF3C7', color: '#D97706' }}>
+                        <PendingActionsIcon sx={{ fontSize: 24 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#D97706', lineHeight: 1 }}>{pendingPieces}</Typography>
+                        <Typography variant="caption" sx={{ color: '#D97706', fontWeight: 700, mt: 0.5, display: 'block', textTransform: 'uppercase', fontSize: '0.65rem' }}>Pending</Typography>
+                      </Box>
+                   </Box>
+                </Box>
+             </Grid>
+             
+             {/* Right side: Progress Bar */}
+             <Grid size={{ xs: 12, md: 5 }}>
+                <Box sx={{ bgcolor: '#FFFFFF', p: 2, borderRadius: 3, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, alignItems: 'center' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', letterSpacing: '0.5px' }}>STAGE PROGRESS</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#059669', fontSize: '0.8rem' }}>{progressPercent}%</Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={progressPercent} 
+                    sx={{ 
+                      height: 8, 
+                      borderRadius: 4, 
+                      bgcolor: '#F1F5F9',
+                      '& .MuiLinearProgress-bar': { bgcolor: '#059669', borderRadius: 4 } 
+                    }} 
+                  />
+                  <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, mt: 1, display: 'block', textAlign: 'right', fontSize: '0.65rem' }}>
+                    {completedPieces} of {totalPieces} Pieces Finished
+                  </Typography>
+                </Box>
+             </Grid>
+           </Grid>
         </Box>
-        <LinearProgress 
-          variant="determinate" 
-          value={progressPercent} 
-          sx={{ 
-            height: 8, 
-            borderRadius: 4, 
-            bgcolor: '#F1F5F9',
-            '& .MuiLinearProgress-bar': { bgcolor: '#059669', borderRadius: 4 } 
-          }} 
-        />
       </Paper>
 
       {/* PROCESS FULL SLAB PROMPT */}
@@ -1158,36 +1083,36 @@ const StageDetails = () => {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Date & Time
                   </TableCell>
                   {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
-                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                       Box Number
                     </TableCell>
                   )}
                   {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
-                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                       Box Code
                     </TableCell>
                   )}
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Pieces Count
                   </TableCell>
                   {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') && (
-                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                       Box Spec / Size
                     </TableCell>
                   )}
                   {stageFormatted === 'Dispatch' && (
-                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                       Vehicle Number
                     </TableCell>
                   )}
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Photo
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }} align="right">
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }} align="right">
                     Action
                   </TableCell>
                 </TableRow>
@@ -1393,38 +1318,38 @@ const StageDetails = () => {
               <TableHead>
                 <TableRow>
                   {stageFormatted === 'Production' && (
-                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                       Machine / Workstation
                     </TableCell>
                   )}
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Product / Piece Name
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Used Raw Block
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Actual Dimensions
                   </TableCell>
                   {stageFormatted === 'Production' && (
                     <>
-                      <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                      <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                         Start Time
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                      <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                         End Time
                       </TableCell>
                     </>
                   )}
                   {stageFormatted === 'Polishing' && (
-                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                       Completed Date
                     </TableCell>
                   )}
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }}>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Live Status
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75 }} align="right">
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }} align="right">
                     Actions
                   </TableCell>
                 </TableRow>
