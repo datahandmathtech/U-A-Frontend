@@ -932,6 +932,9 @@ const ProjectDetails: React.FC = () => {
 
     if (p.unit?.toLowerCase().includes('inch')) {
       amount = ((lengthDec * widthDec) / 144) * qtyDec * p.rate;
+    } else if (p.unit?.toLowerCase() === 'mm') {
+      // (L * W) / 92903.04 gives exact Sq.Ft. Often industry uses this for Sq.Ft pricing.
+      amount = ((lengthDec * widthDec) / 92903.04) * qtyDec * p.rate;
     } else if (p.unit?.toLowerCase() !== 'pieces' && p.unit?.toLowerCase() !== 'piece' && p.unit?.toLowerCase() !== 'pcs') {
       amount = lengthDec * widthDec * qtyDec * p.rate;
     } else {
@@ -4101,12 +4104,15 @@ const ProjectDetails: React.FC = () => {
               <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                 <TextField 
                   size="small" type="number" 
-                  label={ep.unit === 'Pieces' ? 'Total Sq.Ft' : (ep.unit?.toLowerCase().includes('inch') ? 'Total Sq.Ft' : `Total ${ep.unit || ''}`)} 
+                  label={ep.unit === 'Pieces' ? 'Total Sq.Ft' : (ep.unit?.toLowerCase().includes('inch') || ep.unit?.toLowerCase() === 'mm' ? 'Total Sq.Ft' : `Total ${ep.unit || ''}`)} 
                   value={(() => {
                     const l = ep.length || 0;
                     const w = ep.width || 0;
                     if (ep.unit === 'Pieces') {
                       return ((ep as any).dimensionUnit || 'inch') === 'inch' ? Number(((l * w) / 144).toFixed(2)) : l * w;
+                    }
+                    if (ep.unit?.toLowerCase() === 'mm') {
+                      return Number(((l * w) / 92903.04).toFixed(2));
                     }
                     return ep.unit?.toLowerCase().includes('inch') ? Number(((l * w) / 144).toFixed(2)) : l * w;
                   })()} 
