@@ -390,7 +390,7 @@ const StageDetails = () => {
       return (
         <TableRow key={p.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
           {stageFormatted === 'Production' && (
-            <TableCell sx={{ py: 2 }}>
+            <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
               {mName !== '-' ? (
                 <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
                   <PrecisionManufacturingRoundedIcon sx={{ fontSize: 16, color: '#64748B' }} />
@@ -424,7 +424,7 @@ const StageDetails = () => {
               )}
             </Box>
           </TableCell>
-          <TableCell sx={{ py: 2 }}>
+          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
             {p.sourceMaterial?.inventory ? (
               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
                 <LayersRoundedIcon sx={{ fontSize: 15, color: '#0284C7' }} />
@@ -436,12 +436,12 @@ const StageDetails = () => {
               <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
             )}
           </TableCell>
-          <TableCell sx={{ py: 2 }}>
+          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
             {p.size ? (
               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
                 <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
                   <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                     {String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
                   </Typography>
                 </Box>
@@ -506,7 +506,7 @@ const StageDetails = () => {
               </Typography>
             </TableCell>
           )}
-          <TableCell sx={{ py: 2 }}>
+          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
             <Chip 
               icon={displayStatus === 'completed' ? <CheckCircleRoundedIcon sx={{ fontSize: '14px !important', color: '#059669 !important' }} /> : displayStatus === 'pending' ? <CircleIcon sx={{ fontSize: '8px !important', color: '#94A3B8 !important' }} /> : <CircleIcon sx={{ fontSize: '10px !important', color: '#D97706 !important' }} />}
               label={displayStatus === 'completed' ? 'Completed' : displayStatus === 'pending' ? 'Not Started' : 'Under Process'} 
@@ -523,7 +523,7 @@ const StageDetails = () => {
               }}
             />
           </TableCell>
-          <TableCell align="right" sx={{ py: 2 }}>
+          <TableCell align="right" sx={{ py: 2, whiteSpace: 'nowrap' }}>
             <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
               <Tooltip title="View Timeline & Photos">
                 <IconButton 
@@ -655,8 +655,8 @@ const StageDetails = () => {
         <Box sx={{ p: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 2.5 }, borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.25 }}>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#0F172A', letterSpacing: '-0.3px' }}>
-                {stageFormatted} Workspace
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#0F172A', letterSpacing: '-0.3px', textTransform: 'capitalize' }}>
+                {slab.name} - {stageFormatted} Workspace
               </Typography>
               <Chip 
                 label={`Stage ${stageIdx + 1} of 4`} 
@@ -666,14 +666,14 @@ const StageDetails = () => {
             </Box>
             
             {slab.size && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'nowrap' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5 }}>
                     <StraightenRoundedIcon sx={{ fontSize: 16, color: '#64748B' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.82rem' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                       Spec: {slab.size}
                     </Typography>
                   </Box>
-                  <Chip label={` `} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
+                  <Chip label={unitDisplayName} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
                   {matchedProduct && (
                     <Chip label={`${calculateAreaFromSize(slab?.size as string, rawUnit, matchedProduct)} Sq.Ft`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #BFDBFE', borderRadius: 1.5 }} />
                   )}
@@ -1080,7 +1080,7 @@ const StageDetails = () => {
         {/* Packing & Dispatch: Log-based table */}
         {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') ? (
           <TableContainer sx={{ maxHeight: 600 }}>
-            <Table stickyHeader>
+            <Table stickyHeader sx={{ minWidth: 1100 }}>
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
@@ -1206,7 +1206,7 @@ const StageDetails = () => {
                     return (
                       <TableRow key={log.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, opacity: stageFormatted === 'Dispatch' && !log.isDispatched ? 0.7 : 1 }}>
                         <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                             {stageFormatted === 'Dispatch' && !log.isDispatched ? '-' : formattedDate}
                           </Typography>
                         </TableCell>
@@ -1259,7 +1259,7 @@ const StageDetails = () => {
                           </TableCell>
                         )}
                         
-                        <TableCell sx={{ py: 2 }}>
+                        <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
                           {photo ? (
                             <Box 
                               onClick={() => setPreviewPhotoUrl(photo)} 
@@ -1281,7 +1281,7 @@ const StageDetails = () => {
                           )}
                         </TableCell>
                         
-                        <TableCell align="right" sx={{ py: 2 }}>
+                        <TableCell align="right" sx={{ py: 2, whiteSpace: 'nowrap' }}>
                           {!(stageFormatted === 'Dispatch' && !log.isDispatched) ? (
                             <IconButton 
                               size="small" 
@@ -1314,7 +1314,7 @@ const StageDetails = () => {
         ) : (
           /* Production & Polishing: Piece-based table */
           <TableContainer sx={{ maxHeight: 600 }}>
-            <Table stickyHeader>
+            <Table stickyHeader sx={{ minWidth: 1100 }}>
               <TableHead>
                 <TableRow>
                   {stageFormatted === 'Production' && (
