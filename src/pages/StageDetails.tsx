@@ -466,13 +466,32 @@ const StageDetails = () => {
             {stageFormatted === 'Polishing' ? (
               (() => {
                 const polishLog = pieceProductionLogs.find((l: any) => (l.stage?.startsWith('Polishing') || l.stage === 'Polishing') && (l.approvalStatus === 'approved' || l.approvalStatus === 'completed'));
-                const polishWorkerOrVendor = polishLog?.vendorName || polishLog?.workerName || polishLog?.worker?.name || p.workerName || (displayStatus === 'completed' ? (p.vendorName || vendorName || 'Abhay 1') : '—');
-                
-                return polishWorkerOrVendor !== '—' ? (
-                  <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                const isVendor = !!(polishLog?.vendorName || p.vendorName || (vendorName && !pLog?.machine));
+                const vendorLabel = polishLog?.vendorName || p.vendorName || vendorName;
+                const workerLabel = polishLog?.workerName || polishLog?.worker?.name || p.workerName || (displayStatus === 'completed' ? 'Abhay 1' : '—');
+                const approvalId = polishLog?.id ? `#${polishLog.id.slice(-6).toUpperCase()}` : (displayStatus === 'completed' ? '#AP-PLSH' : null);
+
+                if (isVendor && vendorLabel) {
+                  return (
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
+                        {vendorLabel}
+                      </Typography>
+                      <Chip label="Job Work" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#FFF7ED', color: '#EA580C', border: '1px solid #FFEDD5' }} />
+                    </Box>
+                  );
+                }
+
+                return workerLabel !== '—' ? (
+                  <Box sx={{ display: 'inline-flex', flexDirection: 'column', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
-                      {polishWorkerOrVendor}
+                      {workerLabel}
                     </Typography>
+                    {approvalId && (
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.7rem' }}>
+                        ID: {approvalId}
+                      </Typography>
+                    )}
                   </Box>
                 ) : (
                   <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>

@@ -275,7 +275,14 @@ const Approvals: React.FC = () => {
                 {logsToRender.map((log: any) => (
                   <Grid size={{ xs: 12, md: 6, lg: 4 }} key={log.id}>
                     <Card sx={{ borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', position: 'relative', bgcolor: 'white' }}>
-                      <Box sx={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+                      <Box sx={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: 0.75, alignItems: 'center' }}>
+                        {log.id && (
+                          <Chip 
+                            label={`#${log.id.slice(-6).toUpperCase()}`}
+                            size="small"
+                            sx={{ fontWeight: 'bold', fontSize: '0.7rem', bgcolor: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}
+                          />
+                        )}
                         {log.stage !== 'Packing' && log.stage !== 'Dispatch' && (
                           <Chip 
                             label={log.transactionType === 'OUT' ? 'MATERIAL OUT' : 'MATERIAL IN'} 
