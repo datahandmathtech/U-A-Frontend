@@ -222,7 +222,7 @@ const SlabRow = ({
       </TableCell>
 
       {/* Product / Slab Name */}
-      <TableCell sx={{ py: 1.75 }}>
+      <TableCell sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
         <Box>
           <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem', textTransform: 'uppercase' }}>
             {slab.name}
@@ -248,9 +248,9 @@ const SlabRow = ({
       </TableCell>
 
       {/* Original Spec + Unit Badge */}
-      <TableCell sx={{ py: 1.75 }}>
+      <TableCell sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
         {dimensionStr ? (
-          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, flexWrap: 'nowrap' }}>
             <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
               <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
               <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>
@@ -283,7 +283,7 @@ const SlabRow = ({
         
         if (isPlanningMode) {
           return (
-            <TableCell key={col.key} sx={{ verticalAlign: 'middle', py: 1.75 }}>
+            <TableCell key={col.key} sx={{ verticalAlign: 'middle', py: 1.75, whiteSpace: 'nowrap' }}>
               <Box
                 onClick={(e) => handleToggleStage(col.key, e)}
                 sx={{
@@ -317,7 +317,7 @@ const SlabRow = ({
         // Active production tracking mode
         if (!isChecked) {
           return (
-            <TableCell key={col.key} sx={{ py: 1.75 }}>
+            <TableCell key={col.key} sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
               <Chip label="N/A" size="small" sx={{ bgcolor: '#F1F5F9', color: '#94A3B8', fontSize: '0.7rem', height: 20 }} />
             </TableCell>
           );
@@ -342,7 +342,7 @@ const SlabRow = ({
         }
 
         return (
-          <TableCell key={col.key} sx={{ verticalAlign: 'middle', py: 1.75 }}>
+          <TableCell key={col.key} sx={{ verticalAlign: 'middle', py: 1.75, whiteSpace: 'nowrap' }}>
             <Tooltip title={`Open ${col.label} Workspace`}>
               <Box
                 onClick={() => navigate(`/projects/${projectId}/slab/${slab.id}/stage/${col.route}`)}
@@ -373,7 +373,7 @@ const SlabRow = ({
       })}
 
       {/* Overall Status */}
-      <TableCell sx={{ py: 1.75 }}>
+      <TableCell sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
         <Chip 
           label={overallStatus} 
           size="small" 
@@ -390,7 +390,7 @@ const SlabRow = ({
       </TableCell>
 
       {/* Actions */}
-      <TableCell align="center" sx={{ py: 1.75 }}>
+      <TableCell align="center" sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
           <Button
             size="small"
@@ -3242,8 +3242,8 @@ const ProjectDetails: React.FC = () => {
                   </Box>
 
                   {/* Unified Modern Slabs Table (Matches Image 1) */}
-                  <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', mb: 3.5 }}>
-                    <Table>
+                  <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, mb: 3.5, overflowX: 'auto' }}>
+                    <Table sx={{ minWidth: 1300 }}>
                       <TableHead sx={{ bgcolor: '#F8FAFC' }}>
                         <TableRow>
                           <TableCell padding="checkbox" sx={{ pl: 2, py: 1.75 }}>
@@ -3261,31 +3261,31 @@ const ProjectDetails: React.FC = () => {
                               sx={{ '&.Mui-checked': { color: '#1D4ED8' } }}
                             />
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
                             Product / Slab Name
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
                             Original Spec
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
                             Production
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
                             Polishing (Honed)
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
                             Polishing (Mirror)
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
                             Packing
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
                             Dispatch
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }}>
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
                             Overall Status
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75 }} align="center">
+                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }} align="center">
                             Actions
                           </TableCell>
                         </TableRow>
@@ -3326,7 +3326,7 @@ const ProjectDetails: React.FC = () => {
                         )}
                       </TableBody>
                     </Table>
-                  </Paper>
+                  </TableContainer>
 
                   {/* Footer Navigation */}
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
