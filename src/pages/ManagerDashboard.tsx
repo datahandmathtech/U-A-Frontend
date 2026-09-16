@@ -435,7 +435,7 @@ const ManagerDashboard: React.FC = () => {
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
           return (lStage === normalizedStage || lStage.startsWith(normalizedStage)) && (l.status === 'completed' || l.status === 'approved');
         });
-        const hasProdLog = approvedLogs && approvedLogs.some((l: any) => {
+        const hasProdLog = productionLogs && productionLogs.some((l: any) => {
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
           if (lStage !== normalizedStage && !lStage.startsWith(normalizedStage)) return false;
           return (l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
@@ -447,18 +447,18 @@ const ManagerDashboard: React.FC = () => {
     }
 
     // 2. Production logs check
-    if (approvedLogs) {
+    if (productionLogs) {
       let sumQty = 0;
       if (normalizedStage === 'Dispatch') {
-        const directDispatchLogs = approvedLogs.filter((l: any) => 
+        const directDispatchLogs = productionLogs.filter((l: any) => 
           (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
           (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
         );
-        const packedLogs = approvedLogs.filter((l: any) => 
+        const packedLogs = productionLogs.filter((l: any) => 
           (l.stage === 'Packing' || l.stage === 'Packing Work') &&
           (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id)
         );
-        const allDispatchLogs = approvedLogs.filter((l: any) => (l.stage === 'Dispatch' || l.stage === 'Dispatch Work'));
+        const allDispatchLogs = productionLogs.filter((l: any) => (l.stage === 'Dispatch' || l.stage === 'Dispatch Work'));
         const dispatchedPackedLogs = packedLogs.filter((pLog: any) => 
            allDispatchLogs.some((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode))
         );
@@ -466,7 +466,7 @@ const ManagerDashboard: React.FC = () => {
         const packedDispatchedQty = dispatchedPackedLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
         sumQty = Math.max(directQty, packedDispatchedQty);
       } else {
-        const stageLogs = approvedLogs.filter((l: any) => 
+        const stageLogs = productionLogs.filter((l: any) => 
           (l.stage === normalizedStage || l.stage === `${normalizedStage} Work` || l.stage.startsWith(normalizedStage)) &&
           (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
         );
