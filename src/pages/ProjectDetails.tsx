@@ -1019,6 +1019,8 @@ const ProjectDetails: React.FC = () => {
       }).then(r => r.json()).then(data => ({ data }));
       if (quotations && quotations.length > 0) {
         await updateQuotation({ id: quotations[0].id, data: { products: newProducts } });
+        await syncSlabs(id as string).unwrap();
+        refetchSlabs();
       }
     } catch (e) {
       // Silent fail - products are still updated in local state
