@@ -328,6 +328,12 @@ const Approvals: React.FC = () => {
                             <Typography variant="body1">{log.worker?.name || 'Unknown'}</Typography>
                           )}
                         </Box>
+                        {log.remarks && (
+                          <Box sx={{ mb: 2, bgcolor: '#FFFBEB', p: 1, borderRadius: 1, border: '1px solid #FEF3C7' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#B45309' }}>Remarks:</Typography>
+                            <Typography variant="body2" sx={{ color: '#92400E', whiteSpace: 'pre-wrap' }}>{log.remarks}</Typography>
+                          </Box>
+                        )}
                         <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 2 }}>
                           Submitted: {new Date(log.createdAt).toLocaleString()}
                         </Typography>
@@ -653,8 +659,7 @@ const Approvals: React.FC = () => {
                           size="small"
                           options={projectSlabs}
                           getOptionLabel={(option: any) => {
-                            const pendingCount = option.pieces ? option.pieces.filter(isPieceEligible).length : 0;
-                            return `${option.name} (${pendingCount} Pending Pieces)`;
+                            return option.name;
                           }}
                           value={projectSlabs.find((s: any) => s.id === split.slabId) || null}
                           onChange={(e, newValue: any) => {

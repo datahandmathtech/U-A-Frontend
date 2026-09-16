@@ -916,7 +916,7 @@ const WorkerDashboard: React.FC = () => {
                 >
                   {activeMachineLogs?.filter((l: any) => l.status === 'active').map((log: any) => (
                     <MenuItem key={log.id} value={log.id} sx={{ py: 0.8, fontWeight: 500, fontSize: '0.88rem' }}>
-                      {log.machine?.name} — Started {new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {log.machine?.name}
                     </MenuItem>
                   ))}
                 </TextField>
