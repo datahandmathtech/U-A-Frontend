@@ -939,10 +939,19 @@ const ProjectDetails: React.FC = () => {
     } else if (unitSafe === 'mm') {
       // (L * W) / 92903.04 gives exact Sq.Ft. Often industry uses this for Sq.Ft pricing.
       amount = ((lengthDec * widthDec) / 92903.04) * qtyDec * p.rate;
-    } else if (unitSafe !== 'pieces' && unitSafe !== 'piece' && unitSafe !== 'pcs') {
-      amount = lengthDec * widthDec * qtyDec * p.rate;
+    } else if (unitSafe === 'pieces' || unitSafe === 'piece' || unitSafe === 'pcs') {
+      const dimUnit = (p.dimensionUnit || 'inch').toLowerCase();
+      if (dimUnit === 'inch') {
+        amount = ((lengthDec * widthDec) / 144) * qtyDec * p.rate;
+      } else if (dimUnit === 'mm') {
+        amount = ((lengthDec * widthDec) / 92903.04) * qtyDec * p.rate;
+      } else if (dimUnit === 'sq_ft') {
+        amount = lengthDec * widthDec * qtyDec * p.rate;
+      } else { // per_piece
+        amount = qtyDec * p.rate;
+      }
     } else {
-      amount = qtyDec * p.rate;
+      amount = lengthDec * widthDec * qtyDec * p.rate;
     }
     return Math.round(amount);
   };
@@ -4093,20 +4102,28 @@ const ProjectDetails: React.FC = () => {
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>MM</Typography>
                   <TextField size="small" type="number" value={ep.breadth === 0 ? '' : ep.breadth} onChange={e => handleUpdateEditingProduct(index, 'breadth', Number(e.target.value))} fullWidth />
                 </Box>
-                {ep.unit === 'Pieces' && (
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Dimension In</Typography>
-                    <Select 
-                      size="small" 
-                      fullWidth 
-                      value={(ep as any).dimensionUnit || 'inch'} 
-                      onChange={e => handleUpdateEditingProduct(index, 'dimensionUnit', e.target.value)}
-                    >
-                      <MenuItem value="inch">Inches</MenuItem>
-                      <MenuItem value="sq_ft">Sq. Feet</MenuItem>
-                    </Select>
-                  </Box>
-                )}
+                {(() => {
+                  const u = (ep.unit || '').toLowerCase().trim();
+                  if (u === 'pieces' || u === 'piece' || u === 'pcs') {
+                    return (
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Dimension In</Typography>
+                        <Select 
+                          size="small" 
+                          fullWidth 
+                          value={(ep as any).dimensionUnit || 'inch'} 
+                          onChange={e => handleUpdateEditingProduct(index, 'dimensionUnit', e.target.value)}
+                        >
+                          <MenuItem value="inch">Inches</MenuItem>
+                          <MenuItem value="mm">MM</MenuItem>
+                          <MenuItem value="sq_ft">Sq. Feet</MenuItem>
+                          <MenuItem value="per_piece">Per Piece</MenuItem>
+                        </Select>
+                      </Box>
+                    );
+                  }
+                  return null;
+                })()}
               </Box>
 
               <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
@@ -4114,7 +4131,10 @@ const ProjectDetails: React.FC = () => {
                   size="small" type="number" 
                   label={(() => {
                     const u = (ep.unit || '').toLowerCase().trim();
-                    if (u === 'pieces' || u === 'piece' || u === 'pcs') return 'Total Sq.Ft';
+                    if (u === 'pieces' || u === 'piece' || u === 'pcs') {
+                       const dimU = ((ep as any).dimensionUnit || 'inch').toLowerCase();
+                       return dimU === 'per_piece' ? 'Total Pieces' : 'Total Sq.Ft';
+                    }
                     if (u.includes('inch') || u === 'mm') return 'Total Sq.Ft';
                     return `Total ${ep.unit || ''}`;
                   })()}
@@ -4123,7 +4143,11 @@ const ProjectDetails: React.FC = () => {
                     const w = ep.width || 0;
                     const u = (ep.unit || '').toLowerCase().trim();
                     if (u === 'pieces' || u === 'piece' || u === 'pcs') {
-                      return ((ep as any).dimensionUnit || 'inch') === 'inch' ? Number(((l * w) / 144).toFixed(2)) : l * w;
+                      const dimU = ((ep as any).dimensionUnit || 'inch').toLowerCase();
+                      if (dimU === 'inch') return Number(((l * w) / 144).toFixed(2));
+                      if (dimU === 'mm') return Number(((l * w) / 92903.04).toFixed(2));
+                      if (dimU === 'sq_ft') return l * w;
+                      return 1; // per_piece -> total is 1 unit size? or just leave 1
                     }
                     if (u === 'mm') {
                       return Number(((l * w) / 92903.04).toFixed(2));
@@ -4138,7 +4162,11 @@ const ProjectDetails: React.FC = () => {
                   size="small" type="number" 
                   label={(() => {
                     const u = (ep.unit || '').toLowerCase().trim();
-                    return (u === 'pieces' || u === 'piece' || u === 'pcs') ? "Rate (per piece)" : "Rate (per unit)";
+                    if (u === 'pieces' || u === 'piece' || u === 'pcs') {
+                      const dimU = ((ep as any).dimensionUnit || 'inch').toLowerCase();
+                      return dimU === 'per_piece' ? "Rate (per piece)" : "Rate (per Sq.Ft)";
+                    }
+                    return "Rate (per unit)";
                   })()}
                   value={ep.rate === 0 ? '' : ep.rate} 
                   onChange={e => handleUpdateEditingProduct(index, 'rate', Number(e.target.value))} 
