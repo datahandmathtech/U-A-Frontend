@@ -381,7 +381,10 @@ const ManagerDashboard: React.FC = () => {
       }
     }
 
-    const maxPossible = Math.min(totalProjectPieces, producedPieces);
+    // If production pieces are recorded (> 0), strictly limit to produced pieces.
+    // If no production logs are tracked yet, allow up to total project pieces so user is never blocked.
+    const effectiveProduced = producedPieces > 0 ? producedPieces : totalProjectPieces;
+    const maxPossible = Math.min(totalProjectPieces, effectiveProduced);
     const availableToPolish = Math.max(0, maxPossible - polishedPieces);
     return { totalProjectPieces, producedPieces, polishedPieces, availableToPolish };
   }, [selectedProjectId, selectedProjectObj, projectSlabs, approvedLogs]);
@@ -1842,8 +1845,8 @@ const ManagerDashboard: React.FC = () => {
                             setMaterialQuantity(val);
                           }}
                           placeholder={(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) ? `Max ${polishingStats.availableToPolish} pieces` : "e.g. 5 pieces"}
-                          helperText={(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) && selectedProjectId ? (polishingStats.availableToPolish === 0 ? "⚠️ 0 stones ready to polish (Complete Production first)" : `Max allowed: ${polishingStats.availableToPolish} pcs (limited by production completion)`) : undefined}
-                          error={(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) && selectedProjectId ? (Number(materialQuantity) > polishingStats.availableToPolish || polishingStats.availableToPolish === 0) : false}
+                          helperText={(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) && selectedProjectId ? `Max allowed: ${polishingStats.availableToPolish} pcs (${polishingStats.producedPieces > 0 ? `Production: ${polishingStats.producedPieces} completed` : `Total Order: ${polishingStats.totalProjectPieces} pcs`})` : undefined}
+                          error={(materialStage === 'Polishing' || materialStage.startsWith('Polishing')) && selectedProjectId && materialQuantity !== '' ? Number(materialQuantity) > polishingStats.availableToPolish : false}
                           sx={{ 
                             '& .MuiOutlinedInput-root': { 
                               borderRadius: 2.5, 
