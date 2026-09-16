@@ -294,9 +294,13 @@ const ItemLedger = () => {
     );
   }
 
-  // Compute Balance dynamically in chronological order
+  // Compute Balance dynamically: Initial stock addition (IN) is ALWAYS the starting baseline
   const sortedLogsAsc = Array.isArray(logs)
     ? [...logs].sort((a, b) => {
+        const aIsInitial = a.remarks?.toLowerCase().includes('initial') || a.type === 'IN';
+        const bIsInitial = b.remarks?.toLowerCase().includes('initial') || b.type === 'IN';
+        if (aIsInitial && !bIsInitial) return -1;
+        if (!aIsInitial && bIsInitial) return 1;
         const timeDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         if (timeDiff !== 0) return timeDiff;
         if (a.type === 'IN' && b.type !== 'IN') return -1;
@@ -320,12 +324,14 @@ const ItemLedger = () => {
     };
   });
 
-  // Display newest logs on top
+  // Display logs: Initial stock addition first (Row 1), followed by deductions in order
   const ledgerRows = [...computedWithBalance].sort((a, b) => {
-    const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    const aIsInitial = a.remarks?.toLowerCase().includes('initial') || a.type === 'IN';
+    const bIsInitial = b.remarks?.toLowerCase().includes('initial') || b.type === 'IN';
+    if (aIsInitial && !bIsInitial) return -1;
+    if (!aIsInitial && bIsInitial) return 1;
+    const timeDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     if (timeDiff !== 0) return timeDiff;
-    if (a.type === 'OUT' && b.type !== 'OUT') return -1;
-    if (b.type === 'OUT' && a.type !== 'OUT') return 1;
     return 0;
   });
 
@@ -424,7 +430,7 @@ const ItemLedger = () => {
                   <TableCell>{new Date(log.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell sx={{ color: 'text.secondary' }}>{log.remarks || '-'}</TableCell>
                   <TableCell sx={{ color: 'green', fontWeight: log.type === 'IN' ? 'bold' : 'normal' }}>
-                    {log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} Sq.Ft` : `${log.previousBalance.toFixed(2)} Sq.Ft`}
+                    {log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} Sq.Ft` : '-'}
                   </TableCell>
                   <TableCell sx={{ color: 'error.main', fontWeight: log.type === 'OUT' ? 'bold' : 'normal' }}>
                     {log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} Sq.Ft` : '-'}
