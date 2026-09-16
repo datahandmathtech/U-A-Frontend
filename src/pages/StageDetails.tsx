@@ -76,7 +76,7 @@ const StageDetails = () => {
     : (dimU.charAt(0).toUpperCase() + dimU.slice(1));
 
   const combinedUnitDisplay = rawUnit.toLowerCase().startsWith('piece') || rawUnit.toLowerCase() === 'pcs' 
-    ? `Pieces • ${dimensionUnitName}` 
+    ? `Pieces -> ${dimensionUnitName}` 
     : unitDisplayName;
 
   const calculateAreaFromSize = (sizeStr: string, unitStr: string, productContext?: any) => {
@@ -673,11 +673,6 @@ const StageDetails = () => {
               <Typography variant="h5" sx={{ fontWeight: 800, color: '#0F172A', letterSpacing: '-0.3px', textTransform: 'capitalize' }}>
                 {slab.name} - {stageFormatted} Workspace
               </Typography>
-              <Chip 
-                label={`Stage ${stageIdx + 1} of 4`} 
-                size="small" 
-                sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.72rem', border: '1px solid #DBEAFE', borderRadius: 1.5 }} 
-              />
             </Box>
             
             {slab.size && (
@@ -688,10 +683,7 @@ const StageDetails = () => {
                       Spec: {slab.size}
                     </Typography>
                   </Box>
-                  <Chip label={unitDisplayName} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
-                  {(rawUnit.toLowerCase().startsWith('piece') || rawUnit.toLowerCase() === 'pcs') && (
-                    <Chip label={dimensionUnitName} size="small" sx={{ bgcolor: '#F8FAFC', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #E2E8F0', borderRadius: 1.5 }} />
-                  )}
+                  <Chip label={combinedUnitDisplay} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
                   {matchedProduct && (
                     <Chip label={`${calculateAreaFromSize(slab?.size as string, rawUnit, matchedProduct)} Sq.Ft`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #BFDBFE', borderRadius: 1.5 }} />
                   )}
