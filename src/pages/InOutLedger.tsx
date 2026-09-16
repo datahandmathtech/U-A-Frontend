@@ -325,7 +325,14 @@ const InOutLedger: React.FC = () => {
                   <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'center' }}>
                     {log.approvalStatus === 'pending' && (
                       <Tooltip title="Approve Log">
-                        <IconButton size="small" onClick={() => handleApproveClick(log)} sx={{ bgcolor: '#ECFDF5', color: '#059669', '&:hover': { bgcolor: '#D1FAE5' } }}>
+                        <IconButton size="small" onClick={() => handleApproveClick(log)} sx={{ bgcolor: '#FEF2F2', color: '#DC2626', '&:hover': { bgcolor: '#FEE2E2' } }}>
+                          <CheckCircleIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {log.approvalStatus === 'approved' && (
+                      <Tooltip title="Approved">
+                        <IconButton size="small" disabled sx={{ bgcolor: '#ECFDF5', color: '#059669', '&.Mui-disabled': { bgcolor: '#ECFDF5', color: '#059669', opacity: 0.8 } }}>
                           <CheckCircleIcon sx={{ fontSize: 18 }} />
                         </IconButton>
                       </Tooltip>
