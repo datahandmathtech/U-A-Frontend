@@ -317,9 +317,10 @@ const ManagerDashboard: React.FC = () => {
   // Calculate project-wide production & polishing limits for the selected project
   const selectedProjectObj = projectsData?.find((p: any) => p.id === selectedProjectId);
   const polishingStats = React.useMemo(() => {
-    if (!selectedProjectId) return { totalProjectPieces: 0, producedPieces: 0, polishedPieces: 0, availableToPolish: 0 };
+    if (!selectedProjectId) return { totalProjectPieces: 0, totalNeedPolish: 0, producedPieces: 0, polishedPieces: 0, availableToPolish: 0 };
     
     let totalProjectPieces = 0;
+    let totalNeedPolish = 0;
     let producedPieces = 0;
     let polishedPieces = 0;
 
@@ -329,64 +330,49 @@ const ManagerDashboard: React.FC = () => {
         const pList = slab.pieces || [];
         const slabTargetPieces = pList.length > 0 ? pList.length : 1;
         totalProjectPieces += slabTargetPieces;
-        
-        if (pList.length > 0) {
-          pList.forEach((p: any) => {
-            // Check if piece has completed Production stage
-            const isProdCompleted = p.status === 'completed' || 
-              (p.stage && p.stage !== 'Production' && p.stage !== 'Production Work') ||
-              p.logs?.some((l: any) => (l.stage === 'Production' || l.stage === 'Production Work') && (l.status === 'completed' || l.status === 'approved'));
-            
-            if (isProdCompleted) {
-              producedPieces++;
-            }
 
-            // Check if piece has already completed Polishing
-            const isPolishCompleted = p.logs?.some((l: any) => l.stage?.startsWith('Polishing') && (l.status === 'completed' || l.status === 'approved'));
-            if (isPolishCompleted) {
-              polishedPieces++;
+        const reqStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+        const slabNeedsPolish = reqStages.some((s: string) => s.startsWith('Polishing') || s === 'Polishing');
+        
+        if (slabNeedsPolish) {
+          totalNeedPolish += slabTargetPieces;
+
+          if (pList.length > 0) {
+            pList.forEach((p: any) => {
+              // Check if piece has completed Production stage
+              const isProdCompleted = p.status === 'completed' || 
+                (p.stage && p.stage !== 'Production' && p.stage !== 'Production Work') ||
+                p.logs?.some((l: any) => (l.stage === 'Production' || l.stage === 'Production Work') && (l.status === 'completed' || l.status === 'approved'));
+              
+              if (isProdCompleted) {
+                producedPieces++;
+              }
+
+              // Check if piece has already completed Polishing
+              const isPolishCompleted = p.logs?.some((l: any) => l.stage?.startsWith('Polishing') && (l.status === 'completed' || l.status === 'approved'));
+              if (isPolishCompleted) {
+                polishedPieces++;
+              }
+            });
+          } else {
+            if (slab.status === 'completed') {
+              producedPieces += slabTargetPieces;
             }
-          });
-        } else {
-          if (slab.status === 'completed') {
-            producedPieces += slabTargetPieces;
           }
         }
       });
     } else {
       totalProjectPieces = selectedProjectObj?.totalPieces || 1;
+      totalNeedPolish = totalProjectPieces;
       producedPieces = selectedProjectObj?.completedPieces || 0;
     }
 
-    // Also check approved production & polishing logs
-    if (approvedLogs && approvedLogs.length > 0) {
-      const prodLogsForProj = approvedLogs.filter((l: any) => 
-        l.projectId === selectedProjectId && 
-        (l.stage === 'Production' || l.stage === 'Production Work') &&
-        (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
-      );
-      const prodLogQty = prodLogsForProj.reduce((sum: number, l: any) => sum + (Number(l.quantityProduced) || l.pieceIds?.length || 1), 0);
-      if (prodLogQty > producedPieces) {
-        producedPieces = prodLogQty;
-      }
-
-      const polishLogsForProj = approvedLogs.filter((l: any) => 
-        l.projectId === selectedProjectId && 
-        (l.stage?.startsWith('Polishing') || l.stage === 'Polishing') &&
-        (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
-      );
-      const polishLogQty = polishLogsForProj.reduce((sum: number, l: any) => sum + (Number(l.quantityProduced) || l.pieceIds?.length || 1), 0);
-      if (polishLogQty > polishedPieces) {
-        polishedPieces = polishLogQty;
-      }
-    }
-
     // If production pieces are recorded (> 0), strictly limit to produced pieces.
-    // If no production logs are tracked yet, allow up to total project pieces so user is never blocked.
-    const effectiveProduced = producedPieces > 0 ? producedPieces : totalProjectPieces;
-    const maxPossible = Math.min(totalProjectPieces, effectiveProduced);
+    // If no production logs are tracked yet in this project, allow up to totalNeedPolish so user is never blocked.
+    const effectiveProduced = producedPieces > 0 ? producedPieces : totalNeedPolish;
+    const maxPossible = Math.min(totalNeedPolish, effectiveProduced);
     const availableToPolish = Math.max(0, maxPossible - polishedPieces);
-    return { totalProjectPieces, producedPieces, polishedPieces, availableToPolish };
+    return { totalProjectPieces, totalNeedPolish, producedPieces, polishedPieces, availableToPolish };
   }, [selectedProjectId, selectedProjectObj, projectSlabs, approvedLogs]);
 
   // Helper to check if a slab has completed a stage
@@ -1731,7 +1717,9 @@ const ManagerDashboard: React.FC = () => {
                         <Box sx={{ p: 2, bgcolor: '#F0F9FF', borderRadius: 2.5, border: '1px solid #BAE6FD', display: 'flex', flexDirection: 'column', gap: 1 }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Typography variant="caption" sx={{ fontWeight: 700, color: '#0369A1' }}>Total Order Stones:</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#0369A1' }}>{polishingStats.totalProjectPieces} Pcs</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#0369A1' }}>
+                              {polishingStats.totalProjectPieces} Pcs {polishingStats.totalNeedPolish !== polishingStats.totalProjectPieces ? `(${polishingStats.totalNeedPolish} Require Polish)` : ''}
+                            </Typography>
                           </Box>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669' }}>Production Completed (Ready to Polish):</Typography>
