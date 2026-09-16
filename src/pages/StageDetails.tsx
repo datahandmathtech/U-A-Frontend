@@ -123,9 +123,9 @@ const StageDetails = () => {
     return Number(sqft.toFixed(2));
   };
 
-  // Filter production logs for this project & slab that represent Machine Work
+  // Filter production logs for this project & slab that represent Machine Work or vendor job work
   const logs = productionLogs?.filter((log: any) => 
-    log.stage === 'Production Work' && 
+    (log.stage === 'Production Work' || log.stage === 'Production') && 
     (log.productName === slab?.name || log.slabId === slab?.id) && 
     log.approvalStatus === 'approved'
   ) || [];
@@ -393,7 +393,8 @@ const StageDetails = () => {
 
       // Find original machine log via parentLogId
       const mLog = pLog?.parentLogId ? machineLogs?.find((m: any) => m.id === pLog.parentLogId) : null;
-      const mName = mLog?.machine?.name || pLog?.machine?.name || '-';
+      const mName = mLog?.machine?.name || pLog?.machine?.name || '';
+      const vendorName = pLog?.vendorName || '';
       
       const startDate = mLog?.startTime ? new Date(mLog.startTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
       const endDate = mLog?.endTime ? new Date(mLog.endTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
@@ -425,10 +426,15 @@ const StageDetails = () => {
         <TableRow key={p.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
           {stageFormatted === 'Production' && (
             <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
-              {mName !== '-' ? (
+              {mName ? (
                 <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5 }}>
                   <PrecisionManufacturingRoundedIcon sx={{ fontSize: 16, color: '#64748B' }} />
                   <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.82rem' }}>{mName}</Typography>
+                </Box>
+              ) : vendorName ? (
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                  <Chip label={vendorName} size="small" sx={{ bgcolor: '#FFF7ED', color: '#C2410C', border: '1px solid #FDBA74', fontWeight: 700, fontSize: '0.78rem' }} />
+                  <Chip label="Job Work" size="small" sx={{ bgcolor: '#F0F9FF', color: '#0284C7', border: '1px solid #BAE6FD', fontWeight: 700, fontSize: '0.7rem', height: 20 }} />
                 </Box>
               ) : (
                 <Typography variant="caption" sx={{ color: '#94A3B8' }}>Unassigned</Typography>
@@ -467,7 +473,7 @@ const StageDetails = () => {
                 </Typography>
               </Box>
             ) : (
-              <Typography variant="caption" sx={{ color: '#94A3B8' }}>â€”</Typography>
+              <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
             )}
           </TableCell>
           <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
