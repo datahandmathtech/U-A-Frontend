@@ -498,20 +498,69 @@ const StageDetails = () => {
                 );
               })()
             ) : (
-              p.sourceMaterial?.inventory ? (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
-                  <LayersRoundedIcon sx={{ fontSize: 15, color: '#0284C7' }} />
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0284C7', fontSize: '0.82rem' }}>
-                    {String(p.vendorName || p.size || '-').replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1')}
-                  </Typography>
-                </Box>
-              ) : vendorName ? (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>Job Work</Typography>
-                </Box>
-              ) : (
-                <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
-              )
+              (() => {
+                const rawDimStr = p.vendorName || (p.sourceMaterial?.inventory ? `${p.sourceMaterial.inventory.length}L x ${p.sourceMaterial.inventory.width}W${p.sourceMaterial.inventory.thickness ? ` | ${p.sourceMaterial.inventory.thickness}MM` : ''}` : '');
+                const matName = p.sourceMaterial?.inventory?.itemName || slab?.inventory?.itemName || (vendorName && !pLog?.machine ? vendorName : '');
+                const blockNum = p.sourceMaterial?.inventory?.blockNumber || slab?.inventory?.blockNumber || '';
+
+                if (rawDimStr || matName) {
+                  let rawSqFt = 0;
+                  const lMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*(?:L|ft)/i) || rawDimStr.match(/^(\d+(?:\.\d+)?)\s*[xX]/i);
+                  const wMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*(?:W|ft)/i) || rawDimStr.match(/[xX]\s*(\d+(?:\.\d+)?)/i);
+                  if (lMatch && wMatch) {
+                    const l = parseFloat(lMatch[1]);
+                    const w = parseFloat(wMatch[1]);
+                    const isFt = rawDimStr.toLowerCase().includes('ft') || rawDimStr.toLowerCase().includes('feet');
+                    const isInch = !isFt && (rawDimStr.toLowerCase().includes('inch') || (l > 12 && w > 12));
+                    rawSqFt = isFt ? (l * w) : (isInch ? (l * w) / 144 : (l * w));
+                  } else if (p.sourceMaterial?.quantity) {
+                    rawSqFt = Number(p.sourceMaterial.quantity);
+                  }
+
+                  const cleanDim = rawDimStr ? rawDimStr.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : (p.size || '-');
+
+                  return (
+                    <Box sx={{ display: 'inline-flex', flexDirection: 'column', gap: 0.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.84rem' }}>
+                          {cleanDim}
+                        </Typography>
+                        {rawSqFt > 0 && (
+                          <Chip 
+                            label={`${rawSqFt.toFixed(2)} Sq.Ft`} 
+                            size="small" 
+                            sx={{ 
+                              height: 18, 
+                              fontSize: '0.68rem', 
+                              fontWeight: 800, 
+                              bgcolor: '#EFF6FF', 
+                              color: '#1D4ED8', 
+                              border: '1px solid #DBEAFE' 
+                            }} 
+                          />
+                        )}
+                      </Box>
+                      {matName && (
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', fontSize: '0.75rem' }}>
+                          {matName}{blockNum ? ` (Block ${blockNum})` : ''}
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                }
+
+                if (vendorName) {
+                  return (
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>Job Work</Typography>
+                    </Box>
+                  );
+                }
+
+                return (
+                  <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+                );
+              })()
             )}
           </TableCell>
           <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>

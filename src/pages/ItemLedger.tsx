@@ -27,15 +27,20 @@ const ItemLedger = () => {
     : (logs.length > 0 && logs[0]?.inventory ? logs[0].inventory : null);
 
   const parsePieceDimensions = (sizeStr: string) => {
-    if (!sizeStr) return { l: 0, w: 0, t: 0, sqft: 0 };
+    if (!sizeStr) return { l: 0, w: 0, t: 0, sqft: 0, lFeet: 0, wFeet: 0, lInch: 0, wInch: 0, isFt: false };
     const lMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*L/i);
     const wMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*W/i);
     const tMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*MM/i);
     const l = lMatch ? parseFloat(lMatch[1]) : 0;
     const w = wMatch ? parseFloat(wMatch[1]) : 0;
     const t = tMatch ? parseFloat(tMatch[1]) : 0;
-    const sqft = (l > 0 && w > 0) ? (l * w) / 144 : 0;
-    return { l, w, t, sqft };
+    const isFt = sizeStr.toLowerCase().includes('ft') || sizeStr.toLowerCase().includes('feet');
+    const sqft = (l > 0 && w > 0) ? (isFt ? (l * w) : (l * w) / 144) : 0;
+    const lFeet = isFt ? l : l / 12;
+    const wFeet = isFt ? w : w / 12;
+    const lInch = isFt ? l * 12 : l;
+    const wInch = isFt ? w * 12 : w;
+    return { l, w, t, sqft, lFeet, wFeet, lInch, wInch, isFt };
   };
 
   const [openDeduct, setOpenDeduct] = useState(false);
@@ -119,18 +124,40 @@ const ItemLedger = () => {
       if (selectedPiece?.size) {
         const parsed = parsePieceDimensions(selectedPiece.size);
 
-        if (parsed.l > 0 && len < parsed.l) {
-          const msg = `Used Length (${deductForm.length}) cannot be smaller than piece original length (${parsed.l})! Larger or equal size is required.`;
-          setDeductError(msg);
-          alert(msg);
-          return;
+        if (deductForm.unit === 'feet') {
+          // Compare in Feet
+          const minL = Number(parsed.lFeet.toFixed(2));
+          const minW = Number(parsed.wFeet.toFixed(2));
+          if (parsed.lFeet > 0 && len < (parsed.lFeet - 0.05)) {
+            const msg = `Used Length (${len} ft) cannot be smaller than piece original length (${minL} ft / ${parsed.lInch}")! Larger or equal size is required.`;
+            setDeductError(msg);
+            alert(msg);
+            return;
+          }
+          if (parsed.wFeet > 0 && wid < (parsed.wFeet - 0.05)) {
+            const msg = `Used Width (${wid} ft) cannot be smaller than piece original width (${minW} ft / ${parsed.wInch}")! Larger or equal size is required.`;
+            setDeductError(msg);
+            alert(msg);
+            return;
+          }
+        } else {
+          // Compare in Inches
+          const minL = Number(parsed.lInch.toFixed(2));
+          const minW = Number(parsed.wInch.toFixed(2));
+          if (parsed.lInch > 0 && len < minL) {
+            const msg = `Used Length (${len}") cannot be smaller than piece original length (${minL}" / ${parsed.lFeet.toFixed(2)} ft)! Larger or equal size is required.`;
+            setDeductError(msg);
+            alert(msg);
+            return;
+          }
+          if (parsed.wInch > 0 && wid < minW) {
+            const msg = `Used Width (${wid}") cannot be smaller than piece original width (${minW}" / ${parsed.wFeet.toFixed(2)} ft)! Larger or equal size is required.`;
+            setDeductError(msg);
+            alert(msg);
+            return;
+          }
         }
-        if (parsed.w > 0 && wid < parsed.w) {
-          const msg = `Used Width (${deductForm.width}) cannot be smaller than piece original width (${parsed.w})! Larger or equal size is required.`;
-          setDeductError(msg);
-          alert(msg);
-          return;
-        }
+
         if (parsed.t > 0 && deductForm.thickness && Number(deductForm.thickness) < parsed.t) {
           const msg = `Used Thickness (${deductForm.thickness}MM) cannot be smaller than piece original thickness (${parsed.t}MM)! Larger or equal size is required.`;
           setDeductError(msg);
@@ -157,6 +184,7 @@ const ItemLedger = () => {
         length: deductForm.length,
         width: deductForm.width,
         thickness: deductForm.thickness,
+        unit: deductForm.unit,
         date: deductForm.date
       }).unwrap();
       setOpenDeduct(false);
@@ -198,16 +226,22 @@ const ItemLedger = () => {
 
   const handleEditClick = (log: any) => {
     let l = '', w = '';
-    const match = log.remarks?.match(/(.*?)\s*\((.*?)L x (.*?)W\)/);
-    if (match) {
-      l = match[2];
-      w = match[3];
+    let cleanName = (log.remarks || '').replace('Project: ', '').trim();
+    
+    const matches = [...cleanName.matchAll(/\((\d+(?:\.\d+)?)\s*L?\s*[xX]\s*(\d+(?:\.\d+)?)\s*W?[^)]*\)/gi)];
+    if (matches.length > 0) {
+      const lastMatch = matches[matches.length - 1];
+      l = lastMatch[1];
+      w = lastMatch[2];
     }
+
+    cleanName = cleanName.replace(/\s*\(\d+(?:\.\d+)?\s*L?\s*[xX]\s*\d+(?:\.\d+)?\s*W?[^)]*\)/gi, '').trim();
+
     setEditForm({ 
       id: log.id, 
-      productName: match ? match[1].trim() : (log.remarks || '').replace('Project: ', ''),
-      length: l, 
-      width: w,
+      productName: cleanName,
+      length: l || '', 
+      width: w || '',
       date: new Date(log.createdAt).toISOString().substring(0,10) 
     });
     setOpenEdit(true);
@@ -215,11 +249,15 @@ const ItemLedger = () => {
 
   const handleEditSubmit = async () => {
     try {
-      const usedArea = (Number(editForm.length) || 0) * (Number(editForm.width) || 0);
-      let remarks = editForm.productName;
-      if (editForm.length && editForm.width) {
-        remarks = `${editForm.productName} (${editForm.length}L x ${editForm.width}W | ${usedArea.toFixed(2)} ${inventory?.unit || 'sq_ft'})`;
-      }
+      const len = Number(editForm.length) || 0;
+      const wid = Number(editForm.width) || 0;
+      if (len <= 0 || wid <= 0) return;
+      
+      const isInch = len > 12 && wid > 12;
+      const usedArea = isInch ? (len * wid) / 144 : (len * wid);
+      
+      let cleanBaseName = (editForm.productName || '').replace(/\s*\(\d+(?:\.\d+)?\s*L?\s*[xX]\s*\d+(?:\.\d+)?\s*W?[^)]*\)/gi, '').trim();
+      let remarks = `${cleanBaseName} (${len}L x ${wid}W | ${usedArea.toFixed(2)} Sq.Ft)`;
       
       await updateLog({
         id: editForm.id,
@@ -592,7 +630,7 @@ const ItemLedger = () => {
               );
             })()}
 
-            {/* Display Original Size Banner */}
+            {/* Display Original Size Banner with Converted Equivalents */}
             {(selectedPiece?.size || selectedSlab?.size) && (() => {
               const targetSize = selectedPiece?.size || selectedSlab?.size;
               const parsed = parsePieceDimensions(targetSize);
@@ -610,6 +648,19 @@ const ItemLedger = () => {
                       <Chip label={`${parsed.sqft.toFixed(2)} Sq.Ft`} size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 900, fontSize: '0.75rem', border: '1px solid #A7F3D0' }} />
                     )}
                   </Box>
+                  {parsed.l > 0 && parsed.w > 0 && (
+                    <Box sx={{ mt: 1.5, pt: 1.2, borderTop: '1px dashed #FDE68A', display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 700 }}>
+                        📐 Inches: <strong>{parsed.lInch}" L × {parsed.wInch}" W</strong>
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#047857', fontWeight: 700 }}>
+                        📏 Feet Equivalent: <strong>{parsed.lFeet.toFixed(2)} ft L × {parsed.wFeet.toFixed(2)} ft W</strong>
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#1D4ED8', fontWeight: 700 }}>
+                        📦 Area: <strong>{parsed.sqft.toFixed(2)} Sq.Ft</strong>
+                      </Typography>
+                    </Box>
+                  )}
                 </Paper>
               );
             })()}
@@ -621,15 +672,36 @@ const ItemLedger = () => {
                   labelId="deduct-unit-label"
                   label="Unit"
                   value={deductForm.unit || 'inch'}
-                  onChange={(e) => setDeductForm({ ...deductForm, unit: e.target.value })}
+                  onChange={(e) => {
+                    const newUnit = e.target.value;
+                    const currentL = Number(deductForm.length) || 0;
+                    const currentW = Number(deductForm.width) || 0;
+                    if (newUnit === 'feet' && deductForm.unit === 'inch' && currentL > 0) {
+                      setDeductForm(prev => ({
+                        ...prev,
+                        unit: newUnit,
+                        length: (currentL / 12).toFixed(2),
+                        width: (currentW / 12).toFixed(2)
+                      }));
+                    } else if (newUnit === 'inch' && deductForm.unit === 'feet' && currentL > 0) {
+                      setDeductForm(prev => ({
+                        ...prev,
+                        unit: newUnit,
+                        length: (currentL * 12).toFixed(1),
+                        width: (currentW * 12).toFixed(1)
+                      }));
+                    } else {
+                      setDeductForm(prev => ({ ...prev, unit: newUnit }));
+                    }
+                  }}
                 >
-                  <MenuItem value="inch">Inches</MenuItem>
-                  <MenuItem value="feet">Sq. Feet</MenuItem>
+                  <MenuItem value="inch">Inches (in)</MenuItem>
+                  <MenuItem value="feet">Feet (ft)</MenuItem>
                 </Select>
               </FormControl>
               <TextField 
                 size="small"
-                label="Used Length (L)" 
+                label={`Used Length (${deductForm.unit === 'feet' ? 'ft' : 'in'})`} 
                 type="number" 
                 fullWidth 
                 value={deductForm.length} 
@@ -637,7 +709,7 @@ const ItemLedger = () => {
               />
               <TextField 
                 size="small"
-                label="Used Width (W)" 
+                label={`Used Width (${deductForm.unit === 'feet' ? 'ft' : 'in'})`} 
                 type="number" 
                 fullWidth 
                 value={deductForm.width} 
@@ -657,12 +729,21 @@ const ItemLedger = () => {
               const l = Number(deductForm.length) || 0;
               const w = Number(deductForm.width) || 0;
               if (l > 0 && w > 0) {
-                const usedArea = deductForm.unit === 'feet' ? (l * w) : (l * w) / 144;
+                const isFt = deductForm.unit === 'feet';
+                const usedArea = isFt ? (l * w) : (l * w) / 144;
+                const equivFt = isFt ? `${l} ft × ${w} ft` : `${(l / 12).toFixed(2)} ft × ${(w / 12).toFixed(2)} ft`;
+                const equivIn = isFt ? `${(l * 12).toFixed(1)}" × ${(w * 12).toFixed(1)}"` : `${l}" × ${w}"`;
+
                 return (
-                  <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2" color="#64748B" fontWeight="600">
-                      Calculated Area ({deductForm.unit === 'inch' ? `${l}" x ${w}" Inches` : `${l}ft x ${w}ft`}):
-                    </Typography>
+                  <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                    <Box>
+                      <Typography variant="body2" color="#64748B" fontWeight="600">
+                        Deduction: <strong>{isFt ? `${l} ft × ${w} ft (Feet)` : `${l}" × ${w}" (Inches)`}</strong>
+                      </Typography>
+                      <Typography variant="caption" color="#94A3B8">
+                        Equivalent: {isFt ? `${equivIn} Inches` : `${equivFt} Feet`}
+                      </Typography>
+                    </Box>
                     <Typography variant="subtitle1" fontWeight="900" color="#059669">
                       {usedArea.toFixed(2)} Sq.Ft
                     </Typography>
