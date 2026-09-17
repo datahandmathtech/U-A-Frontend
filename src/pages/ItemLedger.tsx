@@ -26,11 +26,16 @@ const ItemLedger = () => {
     ? itemLogsData.item 
     : (logs.length > 0 && logs[0]?.inventory ? logs[0].inventory : null);
 
-  const parsePieceDimensions = (sizeStr: string) => {
+  const parsePieceDimensions = (sizeStr: string, unitHint?: string) => {
     if (!sizeStr) return { l: 0, w: 0, t: 0, sqft: 0, lFeet: 0, wFeet: 0, lInch: 0, wInch: 0, lMM: 0, wMM: 0, isFt: false, isMM: false, unit: 'inch' };
     
-    const isFt = /\b(?:ft|feet)\b/i.test(sizeStr);
-    const isMM = /\b(?:mm)\b/i.test(sizeStr.replace(/\|\s*\d+\s*MM/i, '')) || sizeStr.toLowerCase().includes('(mm)');
+    const normalizedUnitHint = (unitHint || '').toLowerCase().trim();
+    const isFtHint = normalizedUnitHint === 'sq_ft' || normalizedUnitHint === 'sqft' || normalizedUnitHint === 'sq. ft' || normalizedUnitHint === 'feet' || normalizedUnitHint === 'ft' || normalizedUnitHint.includes('ft') || normalizedUnitHint.includes('sq');
+    const isMMHint = normalizedUnitHint === 'mm';
+    const isInchHint = normalizedUnitHint === 'inch' || normalizedUnitHint === 'inches' || normalizedUnitHint === 'in';
+
+    const isFt = isFtHint || /\b(?:ft|feet)\b/i.test(sizeStr);
+    const isMM = isMMHint || /\b(?:mm)\b/i.test(sizeStr.replace(/\|\s*\d+\s*MM/i, '')) || sizeStr.toLowerCase().includes('(mm)');
     
     // Extract thickness (e.g. | 12MM)
     const tMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*MM/i);
@@ -53,7 +58,7 @@ const ItemLedger = () => {
 
     // If dimensions are large (> 500), they are MM (e.g. 7898 x 6589)
     const effectiveIsMM = isMM || (l > 500 && w > 500);
-    const effectiveIsFt = !effectiveIsMM && isFt;
+    const effectiveIsFt = !effectiveIsMM && (isFt || (!isInchHint && isFtHint));
 
     let lFeet = 0, wFeet = 0, lInch = 0, wInch = 0, lMM = 0, wMM = 0, sqft = 0, unit = 'inch';
 
@@ -177,7 +182,7 @@ const ItemLedger = () => {
 
       // Size check: Used size cannot be smaller than the required piece size ("kam se kabhi nahi banega")
       if (selectedPiece?.size) {
-        const parsed = parsePieceDimensions(selectedPiece.size);
+        const parsed = parsePieceDimensions(selectedPiece.size, selectedPiece.unit || selectedSlab?.unit);
 
         if (deductForm.unit === 'feet') {
           const minL = Number(parsed.lFeet.toFixed(2));
@@ -685,17 +690,18 @@ const ItemLedger = () => {
 
             {/* 1. Select Slab / Stone (Pattar) */}
             {activeProject && (() => {
-              const slabsWithProduction = (activeProject.slabs || []).filter((s: any) => {
-                return s.hasProduction || (s.pieces || []).some((p: any) => p.hasProduction);
+              const slabsWithPending = (activeProject.slabs || []).filter((s: any) => {
+                const pendingCount = (s.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false)).length;
+                return pendingCount > 0;
               });
-              const displaySlabs = slabsWithProduction.length > 0 ? slabsWithProduction : (activeProject.slabs || []);
 
               return (
                 <Autocomplete
-                  options={displaySlabs}
+                  options={slabsWithPending}
+                  noOptionsText="No pending slabs/stones for this project!"
                   getOptionLabel={(option: any) => {
                     const pendingCount = (option.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false)).length;
-                    return `${option.name} ${option.size ? `(${option.size})` : ''} - ${pendingCount > 0 ? `${pendingCount} Pieces Pending` : 'All Pieces Completed'}`;
+                    return `${option.name} ${option.size ? `(${option.size})` : ''} - ${pendingCount} Pieces Pending`;
                   }}
                   value={selectedSlab}
                   onChange={(_, val: any) => {
@@ -707,7 +713,7 @@ const ItemLedger = () => {
                       {...params} 
                       label="Select Slab / Stone (Pattar)" 
                       placeholder="Choose slab / stone..." 
-                      helperText={`Slabs in Production: ${displaySlabs.length} of ${(activeProject.slabs || []).length}`}
+                      helperText={slabsWithPending.length > 0 ? `Pending Slabs: ${slabsWithPending.length} of ${(activeProject.slabs || []).length}` : 'All slabs/stones are completed!'}
                     />
                   )}
                 />
@@ -723,7 +729,7 @@ const ItemLedger = () => {
                   options={displayPieces}
                   noOptionsText="No pending pieces in production for this slab!"
                   getOptionLabel={(option: any) => {
-                    const parsed = parsePieceDimensions(option.size);
+                    const parsed = parsePieceDimensions(option.size, option.unit || selectedSlab?.unit);
                     const unitLabel = parsed.isMM ? 'MM' : (parsed.isFt ? 'Feet' : 'Inches');
                     const sqFtText = parsed.sqft > 0 ? ` • ${unitLabel} • ${parsed.sqft.toFixed(2)} Sq.Ft` : '';
                     return `${option.productName || `Piece ${option.pieceNumber}`} ${option.size ? `(${option.size})` : ''}${sqFtText}`;
@@ -732,13 +738,13 @@ const ItemLedger = () => {
                   onChange={(_, val: any) => {
                     setSelectedPiece(val);
                     if (val?.size) {
-                      const parsed = parsePieceDimensions(val.size);
+                      const parsed = parsePieceDimensions(val.size, val.unit || selectedSlab?.unit);
                       setDeductForm(prev => ({
                         ...prev,
                         length: parsed.l ? String(parsed.l) : prev.length,
                         width: parsed.w ? String(parsed.w) : prev.width,
                         thickness: parsed.t ? String(parsed.t) : prev.thickness,
-                        unit: parsed.unit || 'inch'
+                        unit: parsed.unit || 'feet'
                       }));
                     }
                   }}
@@ -757,7 +763,8 @@ const ItemLedger = () => {
             {/* Display Original Size Banner with Converted Equivalents */}
             {(selectedPiece?.size || selectedSlab?.size) && (() => {
               const targetSize = selectedPiece?.size || selectedSlab?.size;
-              const parsed = parsePieceDimensions(targetSize);
+              const targetUnit = selectedPiece?.unit || selectedSlab?.unit;
+              const parsed = parsePieceDimensions(targetSize, targetUnit);
               const unitBadge = parsed.isMM ? 'MM' : (parsed.isFt ? 'Feet' : 'Inches');
               return (
                 <Paper sx={{ p: 2, bgcolor: '#FFFDF5', border: '1px solid #FDE68A', borderRadius: 2.5 }}>
@@ -776,33 +783,18 @@ const ItemLedger = () => {
                   {parsed.l > 0 && parsed.w > 0 && (
                     <Box sx={{ mt: 1.5, pt: 1.2, borderTop: '1px dashed #FDE68A', display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                       {parsed.isMM ? (
-                        <>
-                          <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 700 }}>
-                            📐 MM: <strong>{parsed.lMM} mm L × {parsed.wMM} mm W</strong>
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#047857', fontWeight: 700 }}>
-                            📏 Feet Equivalent: <strong>{parsed.lFeet.toFixed(2)} ft L × {parsed.wFeet.toFixed(2)} ft W</strong>
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 700 }}>
-                            📐 Inches: <strong>{parsed.lInch.toFixed(1)}" L × {parsed.wInch.toFixed(1)}" W</strong>
-                          </Typography>
-                        </>
+                        <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 700 }}>
+                          📐 MM: <strong>{parsed.lMM} mm L × {parsed.wMM} mm W</strong>
+                        </Typography>
+                      ) : parsed.isFt ? (
+                        <Typography variant="caption" sx={{ color: '#047857', fontWeight: 700 }}>
+                          📏 Feet: <strong>{parsed.lFeet.toFixed(2)} ft L × {parsed.wFeet.toFixed(2)} ft W</strong>
+                        </Typography>
                       ) : (
-                        <>
-                          <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 700 }}>
-                            📐 Inches: <strong>{parsed.lInch.toFixed(1)}" L × {parsed.wInch.toFixed(1)}" W</strong>
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#047857', fontWeight: 700 }}>
-                            📏 Feet Equivalent: <strong>{parsed.lFeet.toFixed(2)} ft L × {parsed.wFeet.toFixed(2)} ft W</strong>
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#6366F1', fontWeight: 700 }}>
-                            📐 MM: <strong>{Math.round(parsed.lMM)} mm L × {Math.round(parsed.wMM)} mm W</strong>
-                          </Typography>
-                        </>
+                        <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 700 }}>
+                          📐 Inches: <strong>{parsed.lInch.toFixed(1)}" L × {parsed.wInch.toFixed(1)}" W</strong>
+                        </Typography>
                       )}
-                      <Typography variant="caption" sx={{ color: '#1D4ED8', fontWeight: 700 }}>
-                        📦 Area: <strong>{parsed.sqft.toFixed(2)} Sq.Ft</strong>
-                      </Typography>
                     </Box>
                   )}
                 </Paper>
@@ -899,27 +891,19 @@ const ItemLedger = () => {
                 if (deductForm.unit === 'feet') {
                   usedArea = l * w;
                   primaryText = `${l} ft × ${w} ft (Feet)`;
-                  equivText = `Equivalent: ${(l * 12).toFixed(1)}" × ${(w * 12).toFixed(1)}" Inches | ${Math.round(l * 304.8)} mm × ${Math.round(w * 304.8)} mm MM`;
                 } else if (deductForm.unit === 'mm') {
                   usedArea = (l * w) / 92903.04;
                   primaryText = `${l} mm × ${w} mm (MM)`;
-                  equivText = `Equivalent: ${(l / 304.8).toFixed(2)} ft × ${(w / 304.8).toFixed(2)} ft Feet | ${(l / 25.4).toFixed(1)}" × ${(w / 25.4).toFixed(1)}" Inches`;
                 } else {
                   usedArea = (l * w) / 144;
                   primaryText = `${l}" × ${w}" (Inches)`;
-                  equivText = `Equivalent: ${(l / 12).toFixed(2)} ft × ${(w / 12).toFixed(2)} ft Feet | ${Math.round(l * 25.4)} mm × ${Math.round(w * 25.4)} mm MM`;
                 }
 
                 return (
                   <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    <Box>
-                      <Typography variant="body2" color="#64748B" fontWeight="600">
-                        Deduction: <strong>{primaryText}</strong>
-                      </Typography>
-                      <Typography variant="caption" color="#94A3B8">
-                        {equivText}
-                      </Typography>
-                    </Box>
+                    <Typography variant="body2" color="#64748B" fontWeight="600">
+                      Deduction: <strong>{primaryText}</strong>
+                    </Typography>
                     <Typography variant="subtitle1" fontWeight="900" color="#059669">
                       {usedArea.toFixed(2)} Sq.Ft
                     </Typography>
@@ -1073,27 +1057,19 @@ const ItemLedger = () => {
                 if (editForm?.unit === 'feet') {
                   usedArea = l * w;
                   primaryText = `${l} ft × ${w} ft (Feet)`;
-                  equivText = `Equivalent: ${(l * 12).toFixed(1)}" × ${(w * 12).toFixed(1)}" Inches | ${Math.round(l * 304.8)} mm × ${Math.round(w * 304.8)} mm MM`;
                 } else if (editForm?.unit === 'mm') {
                   usedArea = (l * w) / 92903.04;
                   primaryText = `${l} mm × ${w} mm (MM)`;
-                  equivText = `Equivalent: ${(l / 304.8).toFixed(2)} ft × ${(w / 304.8).toFixed(2)} ft Feet | ${(l / 25.4).toFixed(1)}" × ${(w / 25.4).toFixed(1)}" Inches`;
                 } else {
                   usedArea = (l * w) / 144;
                   primaryText = `${l}" × ${w}" (Inches)`;
-                  equivText = `Equivalent: ${(l / 12).toFixed(2)} ft × ${(w / 12).toFixed(2)} ft Feet | ${Math.round(l * 25.4)} mm × ${Math.round(w * 25.4)} mm MM`;
                 }
 
                 return (
                   <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    <Box>
-                      <Typography variant="body2" color="#64748B" fontWeight="600">
-                        Total Used: <strong>{primaryText}</strong>
-                      </Typography>
-                      <Typography variant="caption" color="#94A3B8">
-                        {equivText}
-                      </Typography>
-                    </Box>
+                    <Typography variant="body2" color="#64748B" fontWeight="600">
+                      Total Used: <strong>{primaryText}</strong>
+                    </Typography>
                     <Typography variant="subtitle1" fontWeight="900" color="#1976d2">
                       {usedArea.toFixed(2)} Sq.Ft
                     </Typography>

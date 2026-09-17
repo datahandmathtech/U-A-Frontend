@@ -318,8 +318,129 @@ const ManagerDashboard: React.FC = () => {
 
   const [selectedOutLogId, setSelectedOutLogId] = useState('');
 
+  // Helper to normalize any stage string
+  const normStage = (stageName: string) => {
+    if (!stageName) return '';
+    return stageName.split(' - ')[0].replace(' Work', '').trim();
+  };
+
+  // Helper to check if a piece has completed a stage
+  const isPieceStageDone = (p: any, slab: any, targetStage: string) => {
+    const norm = normStage(targetStage);
+    
+    // 1. Piece's individual logs
+    if (p.logs && p.logs.length > 0) {
+      const hasLog = p.logs.some((l: any) => {
+        const ls = normStage(l.stage);
+        return (ls === norm || l.stage?.startsWith(norm)) && 
+               (l.status === 'completed' || l.status === 'approved');
+      });
+      if (hasLog) return true;
+    }
+
+    // 2. Production logs (matching pieceId or slab/productName)
+    if (productionLogs && productionLogs.length > 0) {
+      const hasProdLog = productionLogs.some((l: any) => {
+        if (l.approvalStatus !== 'approved' && l.status !== 'completed') return false;
+        const ls = normStage(l.stage);
+        if (ls !== norm && !l.stage?.startsWith(norm)) return false;
+
+        if (l.pieceIds && Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) return true;
+        if (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name || (p.productName && l.productName === p.productName)) {
+          return true;
+        }
+        return false;
+      });
+      if (hasProdLog) return true;
+    }
+
+    // 3. Piece stage / status
+    const pStage = normStage(p.stage || 'Production');
+    const ORDER = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const pIdx = ORDER.indexOf(pStage);
+    const sIdx = ORDER.indexOf(norm);
+    if (pIdx > sIdx) return true;
+    if (pIdx === sIdx && (p.status === 'completed' || p.status === 'approved')) return true;
+
+    return false;
+  };
+
+  // Helper to count completed pieces for a slab in a stage
+  const getSlabStageCompletedCount = (slab: any, stageName: string) => {
+    const norm = normStage(stageName);
+    const targetQty = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
+
+    if (slab.pieces && slab.pieces.length > 0) {
+      let count = 0;
+      for (const p of slab.pieces) {
+        if (isPieceStageDone(p, slab, norm)) count++;
+      }
+      if (count < targetQty && productionLogs) {
+        const stageLogs = productionLogs.filter((l: any) =>
+          (l.approvalStatus === 'approved' || l.status === 'completed') &&
+          (normStage(l.stage) === norm || l.stage?.startsWith(norm)) &&
+          (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name)
+        );
+        const sum = stageLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
+        count = Math.max(count, Math.min(targetQty, sum));
+      }
+      return Math.min(targetQty, count);
+    } else {
+      let count = (slab.status === 'completed') ? targetQty : 0;
+      if (productionLogs) {
+        const stageLogs = productionLogs.filter((l: any) =>
+          (l.approvalStatus === 'approved' || l.status === 'completed') &&
+          (normStage(l.stage) === norm || l.stage?.startsWith(norm)) &&
+          (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name)
+        );
+        const sum = stageLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
+        count = Math.max(count, Math.min(targetQty, sum));
+      }
+      return Math.min(targetQty, count);
+    }
+  };
+
+  // Helper to get preceding required stage for any slab
+  const getPrecedingRequiredStage = (slab: any, currentStage: string) => {
+    const reqStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+    const hasProd = reqStages.includes('Production');
+    const hasPoli = reqStages.some((s: string) => s.startsWith('Polishing') || s === 'Polishing');
+    const hasPack = reqStages.includes('Packing');
+    const hasDisp = reqStages.includes('Dispatch');
+
+    const norm = normStage(currentStage);
+
+    if (norm === 'Production') {
+      return null;
+    }
+    if (norm === 'Polishing') {
+      return hasProd ? 'Production' : null;
+    }
+    if (norm === 'Packing') {
+      if (hasPoli) return 'Polishing';
+      if (hasProd) return 'Production';
+      return null;
+    }
+    if (norm === 'Dispatch') {
+      if (hasPack) return 'Packing';
+      if (hasPoli) return 'Polishing';
+      if (hasProd) return 'Production';
+      return null;
+    }
+    return null;
+  };
+
+  // Helper to check if a slab has completed a stage
+  const isSlabStageCompleted = (slab: any, stageName: string) => {
+    if (!slab) return false;
+    const targetQty = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
+    const completed = getSlabStageCompletedCount(slab, stageName);
+    return completed >= targetQty;
+  };
+
   // Calculate project-wide production & polishing limits for the selected project
   const selectedProjectObj = projectsData?.find((p: any) => p.id === selectedProjectId);
+  
   const polishingStats = React.useMemo(() => {
     if (!selectedProjectId) return { totalProjectPieces: 0, totalNeedPolish: 0, producedPieces: 0, polishedPieces: 0, availableToPolish: 0, readySlabsInfo: [] };
     
@@ -334,8 +455,7 @@ const ManagerDashboard: React.FC = () => {
     
     if (slabs.length > 0) {
       slabs.forEach((slab: any) => {
-        const pList = slab.pieces || [];
-        const targetQty = pList.length > 0 ? pList.length : 1;
+        const targetQty = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
         totalProjectPieces += targetQty;
 
         const reqStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
@@ -344,64 +464,17 @@ const ManagerDashboard: React.FC = () => {
         if (slabNeedsPolish) {
           totalNeedPolish += targetQty;
 
-          let slabProduced = 0;
-          let slabPolished = 0;
+          const precedingStage = getPrecedingRequiredStage(slab, 'Polishing');
+          const slabReady = precedingStage ? getSlabStageCompletedCount(slab, precedingStage) : targetQty;
+          const slabPolished = getSlabStageCompletedCount(slab, 'Polishing');
+          const slabAvailable = Math.max(0, slabReady - slabPolished);
 
-          if (pList.length > 0) {
-            pList.forEach((p: any) => {
-              // Production check
-              const hasProdLog = p.logs && p.logs.some((l: any) => {
-                const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                return ls === 'Production' && (l.status === 'completed' || l.status === 'approved');
-              });
-              const hasApprovedProd = productionLogs && productionLogs.some((l: any) => {
-                if (l.approvalStatus !== 'approved') return false;
-                const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                return ls === 'Production' && ((l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0)));
-              });
-              const isPastProd = (p.stage && p.stage !== 'Production' && p.stage !== 'Production Work');
-              const isProdDone = hasProdLog || hasApprovedProd || isPastProd || (p.stage === 'Production' && p.status === 'completed');
-              if (isProdDone) slabProduced++;
-
-              // Polishing check
-              const hasPolishLog = p.logs && p.logs.some((l: any) => {
-                const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                return (ls === 'Polishing' || ls.startsWith('Polishing')) && (l.status === 'completed' || l.status === 'approved');
-              });
-              const hasApprovedPolish = productionLogs && productionLogs.some((l: any) => {
-                if (l.approvalStatus !== 'approved') return false;
-                const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                return (ls === 'Polishing' || ls.startsWith('Polishing')) && ((l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0)));
-              });
-              const isPastPolish = (p.stage && ['Packing', 'Dispatch'].includes(p.stage));
-              const isPolishDone = hasPolishLog || hasApprovedPolish || isPastPolish;
-              if (isPolishDone) slabPolished++;
-            });
-          } else {
-            if (slab.status === 'completed') slabProduced += targetQty;
-            
-            if (productionLogs) {
-              const pLogs = productionLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Production' || l.stage === 'Production Work') && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
-              const pQty = pLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
-              if (pQty > slabProduced) slabProduced = Math.min(targetQty, pQty);
-
-              const polLogs = productionLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Polishing' || l.stage.startsWith('Polishing')) && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
-              const polQty = polLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
-              if (polQty > slabPolished) slabPolished = Math.min(targetQty, polQty);
-            }
-          }
-
-          slabProduced = Math.min(targetQty, slabProduced);
-          slabPolished = Math.min(targetQty, slabPolished);
-
-          const slabAvailable = Math.max(0, slabProduced - slabPolished);
-
-          totalProducedForPolish += slabProduced;
+          totalProducedForPolish += slabReady;
           totalPolished += slabPolished;
           totalAvailableToPolish += slabAvailable;
 
           if (slabAvailable > 0) {
-            readySlabsInfo.push({ slabName: slab.name, available: slabAvailable, produced: slabProduced, polished: slabPolished, total: targetQty });
+            readySlabsInfo.push({ slabName: slab.name, available: slabAvailable, produced: slabReady, polished: slabPolished, total: targetQty });
           }
         }
       });
@@ -437,94 +510,26 @@ const ManagerDashboard: React.FC = () => {
     
     if (slabs.length > 0) {
       slabs.forEach((slab: any) => {
-        const pList = slab.pieces || [];
-        const targetQty = pList.length > 0 ? pList.length : 1;
+        const targetQty = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
         totalProjectPieces += targetQty;
 
         const reqStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
         const slabNeedsPack = reqStages.includes('Packing');
-        const slabNeedsPolish = reqStages.some((s: string) => s.startsWith('Polishing') || s === 'Polishing');
 
         if (slabNeedsPack) {
           totalNeedPack += targetQty;
 
-          let slabPreStageDone = 0;
-          let slabPacked = 0;
+          const precedingStage = getPrecedingRequiredStage(slab, 'Packing');
+          const slabReady = precedingStage ? getSlabStageCompletedCount(slab, precedingStage) : targetQty;
+          const slabPacked = getSlabStageCompletedCount(slab, 'Packing');
+          const slabAvailable = Math.max(0, slabReady - slabPacked);
 
-          if (pList.length > 0) {
-            pList.forEach((p: any) => {
-              if (slabNeedsPolish) {
-                // Must have polished
-                const hasPolishLog = p.logs && p.logs.some((l: any) => {
-                  const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                  return (ls === 'Polishing' || ls.startsWith('Polishing')) && (l.status === 'completed' || l.status === 'approved');
-                });
-                const hasApprovedPolish = productionLogs && productionLogs.some((l: any) => {
-                  if (l.approvalStatus !== 'approved') return false;
-                  const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                  return (ls === 'Polishing' || ls.startsWith('Polishing')) && ((l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0)));
-                });
-                const isPastPolish = (p.stage && ['Packing', 'Dispatch'].includes(p.stage));
-                if (hasPolishLog || hasApprovedPolish || isPastPolish) slabPreStageDone++;
-              } else {
-                // Preceding is Production
-                const hasProdLog = p.logs && p.logs.some((l: any) => {
-                  const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                  return ls === 'Production' && (l.status === 'completed' || l.status === 'approved');
-                });
-                const hasApprovedProd = productionLogs && productionLogs.some((l: any) => {
-                  if (l.approvalStatus !== 'approved') return false;
-                  const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                  return ls === 'Production' && ((l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0)));
-                });
-                const isPastProd = (p.stage && p.stage !== 'Production' && p.stage !== 'Production Work');
-                if (hasProdLog || hasApprovedProd || isPastProd || (p.stage === 'Production' && p.status === 'completed')) slabPreStageDone++;
-              }
-
-              // Packing check
-              const hasPackLog = p.logs && p.logs.some((l: any) => {
-                const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                return ls === 'Packing' && (l.status === 'completed' || l.status === 'approved');
-              });
-              const hasApprovedPack = productionLogs && productionLogs.some((l: any) => {
-                if (l.approvalStatus !== 'approved') return false;
-                const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-                return ls === 'Packing' && ((l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0)));
-              });
-              const isPastPack = (p.stage && p.stage === 'Dispatch');
-              if (hasPackLog || hasApprovedPack || isPastPack) slabPacked++;
-            });
-          } else {
-            if (slab.status === 'completed') slabPreStageDone += targetQty;
-
-            if (productionLogs) {
-              if (slabNeedsPolish) {
-                const polLogs = productionLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Polishing' || l.stage.startsWith('Polishing')) && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
-                const polQty = polLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
-                if (polQty > slabPreStageDone) slabPreStageDone = Math.min(targetQty, polQty);
-              } else {
-                const pLogs = productionLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Production' || l.stage === 'Production Work') && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
-                const pQty = pLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
-                if (pQty > slabPreStageDone) slabPreStageDone = Math.min(targetQty, pQty);
-              }
-
-              const packLogs = productionLogs.filter((l: any) => l.approvalStatus === 'approved' && (l.stage === 'Packing' || l.stage === 'Packing Work') && (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name));
-              const packQty = packLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
-              if (packQty > slabPacked) slabPacked = Math.min(targetQty, packQty);
-            }
-          }
-
-          slabPreStageDone = Math.min(targetQty, slabPreStageDone);
-          slabPacked = Math.min(targetQty, slabPacked);
-
-          const slabAvailable = Math.max(0, slabPreStageDone - slabPacked);
-
-          totalReadyForPack += slabPreStageDone;
+          totalReadyForPack += slabReady;
           totalPacked += slabPacked;
           totalAvailableToPack += slabAvailable;
 
           if (slabAvailable > 0) {
-            readySlabsInfo.push({ slabName: slab.name, available: slabAvailable, ready: slabPreStageDone, packed: slabPacked, total: targetQty });
+            readySlabsInfo.push({ slabName: slab.name, available: slabAvailable, ready: slabReady, packed: slabPacked, total: targetQty });
           }
         }
       });
@@ -544,64 +549,6 @@ const ManagerDashboard: React.FC = () => {
       readySlabsInfo
     };
   }, [selectedProjectId, selectedProjectObj, projectSlabs, productionLogs]);
-
-  // Helper to check if a slab has completed a stage
-  const isSlabStageCompleted = (slab: any, stageName: string) => {
-    if (!slab) return false;
-    const normalizedStage = stageName.split(' - ')[0].replace(' Work', '').trim();
-    const targetQty = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
-
-    // 1. Piece-level tracking
-    if (slab.pieces && slab.pieces.length > 0) {
-      const completedPiecesCount = slab.pieces.filter((p: any) => {
-        const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
-        const hasLog = p.logs && p.logs.some((l: any) => {
-          const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-          return (lStage === normalizedStage || lStage.startsWith(normalizedStage)) && (l.status === 'completed' || l.status === 'approved');
-        });
-        const hasProdLog = productionLogs && productionLogs.some((l: any) => {
-          const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
-          if (lStage !== normalizedStage && !lStage.startsWith(normalizedStage)) return false;
-          return (l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
-        });
-        return hasLog || hasProdLog || (pStage === normalizedStage && p.status === 'completed');
-      }).length;
-
-      if (completedPiecesCount >= targetQty) return true;
-    }
-
-    // 2. Production logs check
-    if (productionLogs) {
-      let sumQty = 0;
-      if (normalizedStage === 'Dispatch') {
-        const directDispatchLogs = productionLogs.filter((l: any) => 
-          (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
-          (l.slabId === slab.id || l.productId === slab.id || l.productName === slab.name || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
-        );
-        const packedLogs = productionLogs.filter((l: any) => 
-          (l.stage === 'Packing' || l.stage === 'Packing Work') &&
-          (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id)
-        );
-        const allDispatchLogs = productionLogs.filter((l: any) => (l.stage === 'Dispatch' || l.stage === 'Dispatch Work'));
-        const dispatchedPackedLogs = packedLogs.filter((pLog: any) => 
-           allDispatchLogs.some((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode))
-        );
-        const directQty = directDispatchLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
-        const packedDispatchedQty = dispatchedPackedLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
-        sumQty = Math.max(directQty, packedDispatchedQty);
-      } else {
-        const stageLogs = productionLogs.filter((l: any) => 
-          (l.stage === normalizedStage || l.stage === `${normalizedStage} Work` || l.stage.startsWith(normalizedStage)) &&
-          (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
-        );
-        sumQty = stageLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
-      }
-
-      if (sumQty >= targetQty) return true;
-    }
-
-    return false;
-  };
 
   // Auto-select single pending stone when project is selected
   React.useEffect(() => {
@@ -1599,22 +1546,34 @@ const ManagerDashboard: React.FC = () => {
                       }}
                     >
                       <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
-                        {(log.startPhotos?.rejectionPhoto || log.rejectionPhoto || log.startPhotos?.machine || log.startPhotos?.unit) && (
-                          <Box 
-                            component="img" 
-                            src={log.startPhotos?.rejectionPhoto || log.rejectionPhoto || log.startPhotos?.machine || log.startPhotos?.unit} 
-                            onClick={() => setPreviewPhoto(log.startPhotos?.rejectionPhoto || log.rejectionPhoto || log.startPhotos?.machine || log.startPhotos?.unit)}
-                            sx={{ 
-                              width: 55, 
-                              height: 55, 
-                              borderRadius: 2, 
-                              objectFit: 'cover', 
-                              border: (log.startPhotos?.rejectionPhoto || log.rejectionPhoto) ? '2px solid #DC2626' : '1px solid #FDA4AF', 
-                              cursor: 'pointer',
-                              flexShrink: 0 
-                            }} 
-                          />
-                        )}
+                        {(() => {
+                          const hasDefectPhoto = Boolean(log.startPhotos?.rejectionPhoto || log.rejectionPhoto);
+                          const photoUrl = log.startPhotos?.rejectionPhoto || log.rejectionPhoto || log.startPhotos?.machine || log.startPhotos?.unit;
+                          if (!photoUrl) return null;
+                          return (
+                            <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                              <Box 
+                                component="img" 
+                                src={photoUrl} 
+                                onClick={() => setPreviewPhoto(photoUrl)}
+                                sx={{ 
+                                  width: 55, 
+                                  height: 55, 
+                                  borderRadius: 2, 
+                                  objectFit: 'cover', 
+                                  border: hasDefectPhoto ? '2px solid #DC2626' : '1px solid #FDA4AF', 
+                                  cursor: 'pointer',
+                                  display: 'block'
+                                }} 
+                              />
+                              {hasDefectPhoto && (
+                                <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(220, 38, 38, 0.85)', color: '#FFF', fontSize: '0.55rem', fontWeight: 800, textAlign: 'center', py: 0.2, borderBottomLeftRadius: 6, borderBottomRightRadius: 6 }}>
+                                  DEFECT
+                                </Box>
+                              )}
+                            </Box>
+                          );
+                        })()}
                         
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
@@ -1627,6 +1586,25 @@ const ManagerDashboard: React.FC = () => {
                               sx={{ bgcolor: '#FFE4E6', color: '#BE123C', fontWeight: 800, fontSize: '0.65rem', height: 18 }} 
                             />
                           </Box>
+
+                          {(() => {
+                            let displayProductName = log.productName || (log.project?.projectId ? `${log.project.projectId} - ${log.project.name}` : log.project?.name);
+                            if (displayProductName && displayProductName.includes(' - ')) {
+                              const parts = displayProductName.split(' - ');
+                              const slabName = parts[0];
+                              const piecesStr = parts.slice(1).join(' - ');
+                              const pieceList = piecesStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+                              const qty = Number(log.quantityProduced) || 1;
+                              if (pieceList.length > qty) {
+                                displayProductName = `${slabName} - ${pieceList.slice(0, qty).join(', ')}`;
+                              }
+                            }
+                            return displayProductName ? (
+                              <Typography variant="body2" sx={{ color: '#881337', fontWeight: 700, fontSize: '0.78rem', mt: 0.5 }}>
+                                {displayProductName}
+                              </Typography>
+                            ) : null;
+                          })()}
 
                           {log.remarks && (
                             <Box sx={{ 

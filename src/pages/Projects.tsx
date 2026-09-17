@@ -29,13 +29,16 @@ import {
   Tooltip,
   InputAdornment,
   Card,
-  Skeleton
+  Skeleton,
+  Autocomplete,
+  createFilterOptions
 } from '@mui/material';
 
 // Icons
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RemoveIcon from '@mui/icons-material/Remove';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import WorkIcon from '@mui/icons-material/Work';
@@ -145,8 +148,14 @@ import {
   useCreateProjectMutation,
   useUpdateProjectMutation,
   useDeleteProjectMutation,
-  useCreateSlabMutation
+  useCreateSlabMutation,
+  useCreateQuotationMutation,
+  useGetUnitsQuery,
+  useCreateUnitMutation,
+  useDeleteUnitMutation
 } from '../store/apiSlice';
+
+const filter = createFilterOptions<any>();
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();
@@ -155,6 +164,10 @@ const Projects: React.FC = () => {
   const [updateProject] = useUpdateProjectMutation();
   const [deleteProject] = useDeleteProjectMutation();
   const [createSlab] = useCreateSlabMutation();
+  const [createQuotation] = useCreateQuotationMutation();
+  const { data: units = [] } = useGetUnitsQuery();
+  const [createUnit] = useCreateUnitMutation();
+  const [deleteUnit] = useDeleteUnitMutation();
 
   const [open, setOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -165,7 +178,7 @@ const Projects: React.FC = () => {
     description: '',
     status: 'work_order',
     totalPieces: 0,
-    products: [{ name: '', length: '', width: '', thickness: '', unit: 'inch' }],
+    products: [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }],
     deliveryDate: '',
     startDate: '',
     deadline: '',
@@ -183,7 +196,7 @@ const Projects: React.FC = () => {
         description: project.description || '',
         status: project.status || 'work_order',
         totalPieces: project.totalPieces || 0,
-        products: [{ name: '', length: '', width: '', thickness: '', unit: 'inch' }],
+        products: [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }],
         deliveryDate: project.deliveryDate ? new Date(project.deliveryDate).toISOString().split('T')[0] : '',
         startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
         deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
@@ -197,7 +210,7 @@ const Projects: React.FC = () => {
         description: '',
         status: 'work_order',
         totalPieces: 0,
-        products: [{ name: '', length: '', width: '', thickness: '', unit: 'inch' }],
+        products: [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }],
         deliveryDate: '',
         startDate: new Date().toISOString().split('T')[0],
         deadline: '',
@@ -243,15 +256,74 @@ const Projects: React.FC = () => {
           deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined
         }).unwrap();
 
-        // Create slabs for each product without automatically creating internal pieces
+        // Create quotation and slabs for each product
         if (formData.products && formData.products.length > 0) {
+          const quotationProducts = formData.products
+            .filter((prod: any) => prod.name && (prod.length || prod.width))
+            .map((prod: any, i: number) => {
+              const u = (prod.unit || 'pieces').toLowerCase().trim();
+              const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
+              let isFt = false;
+              let isMM = false;
+              if (isPieces) {
+                const dimU = (prod.dimensionUnit || 'inch').toLowerCase().trim();
+                isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft';
+                isMM = dimU === 'mm';
+              } else {
+                isFt = u === 'sq_ft' || u === 'sqft' || u === 'sq. ft' || u === 'sq ft' || u.includes('feet') || u.includes('sq') || u.includes('ft') || u.includes('rft');
+                isMM = u === 'mm' || u.includes('millimeter');
+              }
+              const dimUnit = isFt ? 'sq_ft' : (isMM ? 'mm' : 'inch');
+              const l = parseFloat(prod.length) || 0;
+              const w = parseFloat(prod.width) || 0;
+              const sqft = isFt ? l * w : (isMM ? (l * w) / 92903.04 : (l * w) / 144);
+              return {
+                id: `prod_${Date.now()}_${i}`,
+                category: prod.name,
+                productName: prod.name,
+                unit: prod.unit || 'pieces',
+                dimensionUnit: dimUnit,
+                length: l,
+                width: w,
+                breadth: parseFloat(prod.thickness) || 0,
+                qty: 1,
+                rate: 0,
+                amount: 0,
+                sqft: Number(sqft.toFixed(2))
+              };
+            });
+
+          if (quotationProducts.length > 0) {
+            await createQuotation({
+              projectId: createdProject.id,
+              products: quotationProducts,
+              status: 'approved'
+            }).unwrap().catch((e: any) => console.error('Quotation create error:', e));
+          }
+
           for (const prod of formData.products) {
             if (prod.name && (prod.length || prod.width)) {
-              const unitLabel = prod.unit === 'feet' || prod.unit === 'sq_ft' ? 'Feet' : 'Inch';
+              const u = (prod.unit || 'pieces').toLowerCase().trim();
+              const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
+              let isFt = false;
+              let isMM = false;
+              if (isPieces) {
+                const dimU = (prod.dimensionUnit || 'inch').toLowerCase().trim();
+                isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft';
+                isMM = dimU === 'mm';
+              } else {
+                isFt = u === 'sq_ft' || u === 'sqft' || u === 'sq. ft' || u === 'sq ft' || u.includes('feet') || u.includes('sq') || u.includes('ft') || u.includes('rft');
+                isMM = u === 'mm' || u.includes('millimeter');
+              }
+              const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
+              const l = parseFloat(prod.length) || 0;
+              const w = parseFloat(prod.width) || 0;
               const calcSqFt = (
-                prod.unit === 'feet' || prod.unit === 'sq_ft'
-                  ? (parseFloat(prod.length) || 0) * (parseFloat(prod.width) || 0)
-                  : ((parseFloat(prod.length) || 0) * (parseFloat(prod.width) || 0)) / 144
+                isFt
+                  ? l * w
+                  : isMM
+                  ? (l * w) / 92903.04
+                  : (l * w) / 144
               ).toFixed(2);
 
               const sizeFormatted = `${prod.length || 0}L x ${prod.width || 0}W ${unitLabel}${prod.thickness ? ` | ${prod.thickness}MM` : ''} (${calcSqFt} Sq.Ft)`;
@@ -980,7 +1052,7 @@ const Projects: React.FC = () => {
                     onClick={() =>
                       setFormData({
                         ...formData,
-                        products: [...(formData.products || []), { name: '', length: '', width: '', thickness: '', unit: 'inch' }]
+                        products: [...(formData.products || []), { name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }]
                       })
                     }
                     sx={{
@@ -999,10 +1071,21 @@ const Projects: React.FC = () => {
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   {formData.products?.map((prod: any, index: number) => {
-                    const isFeet = prod.unit === 'feet' || prod.unit === 'sq_ft';
+                    const u = (prod.unit || '').toLowerCase().trim();
+                    const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
+                    let isFt = false;
+                    let isMM = false;
+                    if (isPieces) {
+                      const dimU = (prod.dimensionUnit || 'inch').toLowerCase().trim();
+                      isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft';
+                      isMM = dimU === 'mm';
+                    } else {
+                      isFt = u === 'sq_ft' || u === 'sqft' || u === 'sq. ft' || u === 'sq ft' || u.includes('feet') || u.includes('sq') || u.includes('ft') || u.includes('rft');
+                      isMM = u === 'mm' || u.includes('millimeter');
+                    }
                     const l = parseFloat(prod.length) || 0;
                     const w = parseFloat(prod.width) || 0;
-                    const area = isFeet ? l * w : (l * w) / 144;
+                    const area = isFt ? l * w : (isMM ? (l * w) / 92903.04 : (l * w) / 144);
 
                     return (
                       <Paper
@@ -1039,7 +1122,7 @@ const Projects: React.FC = () => {
                         )}
 
                         <Grid container spacing={1.5} sx={{ alignItems: 'center' }}>
-                          <Grid size={{ xs: 12, sm: 4 }}>
+                          <Grid size={{ xs: 12, sm: 3 }}>
                             <TextField
                               label="Product / Material Name"
                               fullWidth
@@ -1053,7 +1136,106 @@ const Projects: React.FC = () => {
                               }}
                             />
                           </Grid>
-                          <Grid size={{ xs: 6, sm: 2 }}>
+                          <Grid size={{ xs: 6, sm: isPieces ? 2 : 3 }}>
+                            <FormControl fullWidth size="small">
+                              <Autocomplete
+                                freeSolo
+                                selectOnFocus
+                                clearOnBlur
+                                handleHomeEndKeys
+                                options={units}
+                                getOptionLabel={(option) => {
+                                  if (typeof option === 'string') return option;
+                                  if (option.inputValue) return option.inputValue;
+                                  return option.name;
+                                }}
+                                filterOptions={(options, params) => {
+                                  const filtered = filter(options, params);
+                                  const { inputValue } = params;
+                                  const isExisting = options.some((option) => inputValue === option.name);
+                                  if (inputValue !== '' && !isExisting) {
+                                    filtered.push({
+                                      inputValue,
+                                      name: `Add "${inputValue}"`,
+                                      isNew: true,
+                                    });
+                                  }
+                                  return filtered;
+                                }}
+                                value={units.find((item: any) => item.name === prod.unit) || prod.unit || 'pieces'}
+                                onChange={(e, newValue) => {
+                                  const newProds = [...formData.products];
+                                  if (typeof newValue === 'string') {
+                                    newProds[index].unit = newValue;
+                                  } else if (newValue && newValue.inputValue) {
+                                    newProds[index].unit = newValue.inputValue;
+                                    createUnit({ name: newValue.inputValue });
+                                  } else if (newValue && newValue.name) {
+                                    newProds[index].unit = newValue.name;
+                                  } else {
+                                    newProds[index].unit = '';
+                                  }
+                                  setFormData({ ...formData, products: newProds });
+                                }}
+                                onInputChange={(e, newInputValue) => {
+                                  const newProds = [...formData.products];
+                                  newProds[index].unit = newInputValue;
+                                  setFormData({ ...formData, products: newProds });
+                                }}
+                                renderInput={(params) => <TextField {...params} label="Unit" size="small" />}
+                                renderOption={(props, option) => {
+                                  const { key, ...restProps } = props as any;
+                                  if (option.isNew) {
+                                    return (
+                                      <li key={key} {...restProps} style={{ color: '#B38B36', fontWeight: 'bold' }}>
+                                        {option.name}
+                                      </li>
+                                    );
+                                  }
+                                  return (
+                                    <li key={key} {...restProps} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                      <span>{option.name}</span>
+                                      <IconButton 
+                                        size="small" 
+                                        color="error"
+                                        onMouseDown={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          if (window.confirm(`Are you sure you want to remove "${option.name}" from the unit list?`)) {
+                                            deleteUnit(option.id);
+                                          }
+                                        }}
+                                      >
+                                        <RemoveIcon fontSize="small" />
+                                      </IconButton>
+                                    </li>
+                                  );
+                                }}
+                                fullWidth
+                              />
+                            </FormControl>
+                          </Grid>
+                          {isPieces && (
+                            <Grid size={{ xs: 6, sm: 2 }}>
+                              <FormControl fullWidth size="small">
+                                <InputLabel>Dimension In</InputLabel>
+                                <Select
+                                  label="Dimension In"
+                                  value={prod.dimensionUnit || 'inch'}
+                                  onChange={(e) => {
+                                    const newProds = [...formData.products];
+                                    newProds[index].dimensionUnit = e.target.value;
+                                    setFormData({ ...formData, products: newProds });
+                                  }}
+                                >
+                                  <MenuItem value="inch">Inches</MenuItem>
+                                  <MenuItem value="mm">MM</MenuItem>
+                                  <MenuItem value="sq_ft">Sq. Feet</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                          )}
+                          <Grid size={{ xs: 6, sm: isPieces ? 1.5 : 2 }}>
                             <TextField
                               label="Length (L)"
                               size="small"
@@ -1067,7 +1249,7 @@ const Projects: React.FC = () => {
                               }}
                             />
                           </Grid>
-                          <Grid size={{ xs: 6, sm: 2 }}>
+                          <Grid size={{ xs: 6, sm: isPieces ? 1.5 : 2 }}>
                             <TextField
                               label="Width (W)"
                               size="small"
@@ -1081,24 +1263,7 @@ const Projects: React.FC = () => {
                               }}
                             />
                           </Grid>
-                          <Grid size={{ xs: 6, sm: 2 }}>
-                            <FormControl fullWidth size="small">
-                              <InputLabel>Unit</InputLabel>
-                              <Select
-                                label="Unit"
-                                value={prod.unit || 'inch'}
-                                onChange={(e) => {
-                                  const newProds = [...formData.products];
-                                  newProds[index].unit = e.target.value;
-                                  setFormData({ ...formData, products: newProds });
-                                }}
-                              >
-                                <MenuItem value="inch">Inch</MenuItem>
-                                <MenuItem value="feet">Feet (Sq.Ft)</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </Grid>
-                          <Grid size={{ xs: 6, sm: 2 }}>
+                          <Grid size={{ xs: 6, sm: isPieces ? 2 : 2 }}>
                             <TextField
                               label="Thickness (MM)"
                               size="small"

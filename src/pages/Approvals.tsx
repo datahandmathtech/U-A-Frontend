@@ -14,6 +14,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import CloseIcon from '@mui/icons-material/Close';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 
 const Approvals: React.FC = () => {
   const { data: pendingLogs, isLoading, refetch: refetchPending } = useGetPendingApprovalsQuery(undefined, {
@@ -56,8 +57,16 @@ const Approvals: React.FC = () => {
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectLogId, setRejectLogId] = useState<string | null>(null);
+  const [rejectTargetLog, setRejectTargetLog] = useState<any>(null);
+  const [rejectMode, setRejectMode] = useState<'all' | 'partial'>('all');
+  const [partialRejectQty, setPartialRejectQty] = useState<number>(1);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectPhoto, setRejectPhoto] = useState<string | null>(null);
+
+  // Rejection state inside the Approval dialog for remaining pieces
+  const [rejectRemaining, setRejectRemaining] = useState(false);
+  const [rejectRemainingRemarks, setRejectRemainingRemarks] = useState('');
+  const [rejectRemainingPhoto, setRejectRemainingPhoto] = useState<string | null>(null);
 
   const activeProjectId = editHistoryDialogOpen ? editingHistoryLog?.projectId : detailsDialogOpen ? detailsLog?.projectId : projectSplits[0]?.projectId;
   const { data: slabs } = useGetSlabsQuery(activeProjectId, { skip: !activeProjectId });
@@ -67,17 +76,24 @@ const Approvals: React.FC = () => {
   const handleApproveClick = async (log: any) => {
     setSelectedLog(log);
     setProjectSplits([{ projectId: log.projectId || '', qty: log.quantityProduced || 0, productId: log.productId || '', productName: log.productName || '', slabId: log.slabId || '', pieceIds: log.pieceIds || [] }]);
+    setRejectRemaining(false);
+    setRejectRemainingRemarks('');
+    setRejectRemainingPhoto(null);
     setApprovalDialogOpen(true);
   };
 
-  const handleRejectClick = (logId: string) => {
-    setRejectLogId(logId);
+  const handleRejectClick = (log: any) => {
+    const logObj = typeof log === 'object' && log !== null ? log : (pendingLogs || []).find((l: any) => l.id === log);
+    setRejectLogId(logObj?.id || log);
+    setRejectTargetLog(logObj);
+    setRejectMode('all');
+    setPartialRejectQty(1);
     setRejectReason('');
     setRejectPhoto(null);
     setRejectDialogOpen(true);
   };
 
-  const handleRejectPhotoUpload = () => {
+  const handlePhotoUploadHelper = (setter: (val: string | null) => void) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -87,7 +103,7 @@ const Approvals: React.FC = () => {
       if (file) {
         const reader = new FileReader();
         reader.onloadend = () => {
-          setRejectPhoto(reader.result as string);
+          setter(reader.result as string);
         };
         reader.readAsDataURL(file);
       }
@@ -95,29 +111,65 @@ const Approvals: React.FC = () => {
     input.click();
   };
 
+  const handleRejectPhotoUpload = () => handlePhotoUploadHelper(setRejectPhoto);
+
   const submitReject = async () => {
     if (!rejectLogId) return;
     try {
-      const targetLog = (pendingLogs || []).find((l: any) => l.id === rejectLogId);
+      const targetLog = rejectTargetLog || (pendingLogs || []).find((l: any) => l.id === rejectLogId);
+      const totalQty = Number(targetLog?.quantityProduced) || 1;
+      const isPartial = rejectMode === 'partial' && partialRejectQty < totalQty && partialRejectQty > 0;
+      const finalRejectQty = isPartial ? partialRejectQty : totalQty;
+
+      let rejectedProductName = targetLog?.productName;
+      let rejectedPieceIds = Array.isArray(targetLog?.pieceIds) ? targetLog.pieceIds : [];
+
+      if (isPartial) {
+        const baseName = (targetLog?.productName || '').split(' - ')[0].trim();
+        if (rejectedPieceIds.length > 0) {
+          const targetSlab = slabs?.find((s: any) => s.id === targetLog?.slabId);
+          const chosenIds = rejectedPieceIds.slice(0, finalRejectQty);
+          const pieceNames = chosenIds.map((id: string) => {
+            const piece = targetSlab?.pieces?.find((p: any) => p.id === id);
+            return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
+          });
+          rejectedProductName = targetSlab ? `${targetSlab.name} - ${pieceNames.join(', ')}` : `${baseName || 'Piece'} - ${pieceNames.join(', ')}`;
+          rejectedPieceIds = chosenIds;
+        } else {
+          rejectedProductName = baseName ? `${baseName} (${finalRejectQty} Pcs)` : `Rejected (${finalRejectQty} Pcs)`;
+        }
+      }
+
       await approveLog({ 
         id: rejectLogId, 
         data: { 
           approvalStatus: 'rejected_admin', 
+          rejectedQty: finalRejectQty,
           remarks: rejectReason,
           rejectionPhoto: rejectPhoto,
+          productName: rejectedProductName,
+          pieceIds: rejectedPieceIds,
           startPhotos: {
             ...(targetLog?.startPhotos || {}),
             rejectionPhoto: rejectPhoto
           }
         } 
       }).unwrap();
-      setToast({ open: true, message: 'Log Rejected successfully', severity: 'success' });
+      
+      setToast({ 
+        open: true, 
+        message: isPartial 
+          ? `Rejected ${finalRejectQty} of ${totalQty} pieces. Remaining ${totalQty - finalRejectQty} stay pending.` 
+          : 'Log rejected successfully and sent to Manager Dashboard.', 
+        severity: 'success' 
+      });
       refetchPending();
     } catch (err: any) {
       setToast({ open: true, message: err?.data?.message || 'Failed to reject', severity: 'error' });
     } finally {
       setRejectDialogOpen(false);
       setRejectLogId(null);
+      setRejectTargetLog(null);
       setRejectReason('');
       setRejectPhoto(null);
     }
@@ -133,7 +185,7 @@ const Approvals: React.FC = () => {
         }
         setToast({ open: true, message: 'Pending log deleted permanently', severity: 'success' });
         refetchPending();
-      } catch (err: any) {
+      } catch (err) {
         setToast({ open: true, message: err?.data?.message || 'Failed to delete log', severity: 'error' });
       }
     }
@@ -155,24 +207,68 @@ const Approvals: React.FC = () => {
 
       const totalSplitQty = validSplits.reduce((acc, split) => acc + (Number(split.qty) || 0), 0);
       const expectedQty = Number(selectedLog.quantityProduced) || 0;
+      const remainingQty = expectedQty - totalSplitQty;
 
-      if (expectedQty > 0 && totalSplitQty !== expectedQty) {
-        setToast({ open: true, message: `Total assigned item count (${totalSplitQty}) must exactly match the reported item count (${expectedQty}).`, severity: 'error' });
+      if (remainingQty < 0) {
+        setToast({ open: true, message: `Total assigned items (${totalSplitQty}) cannot exceed reported items (${expectedQty}).`, severity: 'error' });
         return;
+      }
+
+      if (remainingQty > 0 && rejectRemaining && !rejectRemainingRemarks.trim()) {
+        setToast({ open: true, message: 'Please enter remarks explaining the rejection reason for the remaining pieces.', severity: 'error' });
+        return;
+      }
+
+      const payload: any = {
+        approvalStatus: 'approved',
+        splits: validSplits
+      };
+
+      if (remainingQty > 0 && rejectRemaining) {
+        const allAssignedPieceIds = validSplits.flatMap(s => s.pieceIds || []);
+        const originalPieceIds = Array.isArray(selectedLog?.pieceIds) ? selectedLog.pieceIds : [];
+        const remainingPieceIds = originalPieceIds.filter((id: string) => !allAssignedPieceIds.includes(id)).slice(0, remainingQty);
+        
+        let rejectedProductName = '';
+        const baseName = (selectedLog?.productName || '').split(' - ')[0].trim();
+        if (remainingPieceIds.length > 0) {
+          const targetSlab = slabs?.find((s: any) => s.id === validSplits[0]?.slabId || s.id === selectedLog?.slabId);
+          const pieceNames = remainingPieceIds.map((id: string) => {
+            const piece = targetSlab?.pieces?.find((p: any) => p.id === id);
+            return piece ? (piece.productName || `Piece ${piece.pieceNumber}`) : id.substring(0, 4);
+          });
+          rejectedProductName = targetSlab ? `${targetSlab.name} - ${pieceNames.join(', ')}` : `${baseName || 'Piece'} - ${pieceNames.join(', ')}`;
+        } else {
+          rejectedProductName = baseName ? `${baseName} (${remainingQty} Pcs)` : `Rejected (${remainingQty} Pcs)`;
+        }
+
+        payload.rejectedPieces = {
+          qty: remainingQty,
+          remarks: rejectRemainingRemarks,
+          rejectionPhoto: rejectRemainingPhoto,
+          pieceIds: remainingPieceIds,
+          productName: rejectedProductName
+        };
       }
 
       await approveLog({ 
         id: selectedLog.id, 
-        data: { 
-          approvalStatus: 'approved', 
-          splits: validSplits
-        } 
+        data: payload 
       }).unwrap();
       
       refetchApproved();
       setApprovalDialogOpen(false);
       setProjectSplits([{projectId: '', qty: 0}]);
-      setToast({ open: true, message: 'Approval saved successfully', severity: 'success' });
+      setRejectRemaining(false);
+      setRejectRemainingRemarks('');
+      setRejectRemainingPhoto(null);
+      setToast({ 
+        open: true, 
+        message: remainingQty > 0 && rejectRemaining 
+          ? `Approved ${totalSplitQty} pcs & Rejected ${remainingQty} pcs (sent to Manager for rework).` 
+          : 'Approval saved successfully', 
+        severity: 'success' 
+      });
       refetchPending();
     } catch (err: any) {
       console.error("Approval submit error:", err);
@@ -232,7 +328,7 @@ const Approvals: React.FC = () => {
     }
   };
 
-  if (isLoading) return <Box sx={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
+  if (isLoading && !pendingLogs) return <Box sx={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
 
   return (
     <Box>
@@ -627,46 +723,87 @@ const Approvals: React.FC = () => {
                 
                 {/* Dynamically extract slabs for this project */}
                 {(() => {
-                  const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                  const cleanLogStage = (selectedLog?.stage || '').replace(' Work', '').trim();
-                  const logStageIdx = stages.indexOf(cleanLogStage);
+                  const cleanLogStage = (selectedLog?.stage || '').split(' - ')[0].replace(' Work', '').trim();
 
-                  const isPieceEligible = (p: any) => {
-                    if (logStageIdx === -1) {
-                      return p.status !== 'completed';
+                  const isPieceEligible = (p: any, slab: any) => {
+                    const reqStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+                    const hasProd = reqStages.includes('Production');
+                    const hasPoli = reqStages.some((s: string) => s.startsWith('Polishing') || s === 'Polishing');
+                    const hasPack = reqStages.includes('Packing');
+                    const hasDisp = reqStages.includes('Dispatch');
+
+                    // 1. Is this stage required for this slab?
+                    let isStageRequired = false;
+                    if (cleanLogStage === 'Production') isStageRequired = hasProd;
+                    else if (cleanLogStage === 'Polishing') isStageRequired = hasPoli;
+                    else if (cleanLogStage === 'Packing') isStageRequired = hasPack;
+                    else if (cleanLogStage === 'Dispatch') isStageRequired = hasDisp;
+                    else isStageRequired = true;
+
+                    if (!isStageRequired) return false;
+
+                    // 2. What is the preceding required stage for this slab?
+                    let precedingStage: string | null = null;
+                    if (cleanLogStage === 'Polishing') {
+                      precedingStage = hasProd ? 'Production' : null;
+                    } else if (cleanLogStage === 'Packing') {
+                      if (hasPoli) precedingStage = 'Polishing';
+                      else if (hasProd) precedingStage = 'Production';
+                    } else if (cleanLogStage === 'Dispatch') {
+                      if (hasPack) precedingStage = 'Packing';
+                      else if (hasPoli) precedingStage = 'Polishing';
+                      else if (hasProd) precedingStage = 'Production';
                     }
 
-                    const pStage = (p.stage || 'Production').replace(' Work', '').trim();
-                    const pStageIdx = stages.indexOf(pStage);
+                    // Helper to check if a piece has completed a specific stage
+                    const isDoneInStage = (piece: any, stageName: string) => {
+                      if (!piece) return false;
+                      const norm = stageName.split(' - ')[0].replace(' Work', '').trim();
 
-                    // If piece has already progressed past this stage, it's done!
-                    if (pStageIdx > logStageIdx) return false;
+                      if (piece.logs && piece.logs.length > 0) {
+                        const hasLog = piece.logs.some((l: any) => {
+                          const ls = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+                          return (ls === norm || l.stage?.startsWith(norm)) && (l.status === 'completed' || l.status === 'approved');
+                        });
+                        if (hasLog) return true;
+                      }
 
-                    // If piece is at this stage:
-                    if (pStageIdx === logStageIdx) {
-                      // If already completed in this stage, it should NOT appear again for this stage!
-                      if (p.status === 'completed') return false;
-                      // If pending or active, it's currently being worked on!
-                      return true;
-                    }
+                      const pStage = (piece.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+                      const ORDER = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                      const pIdx = ORDER.indexOf(pStage);
+                      const sIdx = ORDER.indexOf(norm);
+                      if (pIdx > sIdx) return true;
+                      if (pIdx === sIdx && (piece.status === 'completed' || piece.status === 'approved')) return true;
 
-                    // If piece is at ANY prior stage (e.g. Production, Polishing, Packing):
-                    // Decoupled pipeline: Any piece completed at any prior stage (or created in production) is eligible!
-                    if (pStageIdx < logStageIdx && (p.status === 'completed' || pStageIdx === 0)) {
-                      return true;
-                    }
+                      return false;
+                    };
 
-                    return false;
+                    // Current stage must NOT be completed
+                    if (isDoneInStage(p, cleanLogStage)) return false;
+
+                    // Preceding stage MUST be completed
+                    if (precedingStage && !isDoneInStage(p, precedingStage)) return false;
+
+                    return true;
                   };
 
                   // Filter slabs for this project:
-                  // Only include slabs that either have no pieces generated yet, OR have at least 1 eligible piece for this stage!
+                  // Only include slabs that require this stage AND have at least 1 eligible piece (or pending slab)
                   const projectSlabs = slabs ? slabs.filter((s: any) => {
                     if (s.projectId !== split.projectId) return false;
+
+                    const reqStages = s.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+                    if (cleanLogStage === 'Production' && !reqStages.includes('Production')) return false;
+                    if (cleanLogStage === 'Polishing' && !reqStages.some((rs: string) => rs.startsWith('Polishing') || rs === 'Polishing')) return false;
+                    if (cleanLogStage === 'Packing' && !reqStages.includes('Packing')) return false;
+                    if (cleanLogStage === 'Dispatch' && !reqStages.includes('Dispatch')) return false;
+
                     if (s.pieces && s.pieces.length > 0) {
-                      const eligible = s.pieces.filter(isPieceEligible);
+                      const eligible = s.pieces.filter((p: any) => isPieceEligible(p, s));
                       return eligible.length > 0;
                     }
+
+                    if (cleanLogStage === 'Production') return s.status !== 'completed';
                     return true;
                   }) : [];
 
@@ -674,7 +811,7 @@ const Approvals: React.FC = () => {
                     return (
                       <Box sx={{ p: 1.5, bgcolor: '#FFF8E1', borderRadius: 2, border: '1px dashed #FFE082' }}>
                         <Typography variant="body2" color="#B26A00" fontWeight={500}>
-                          Notice: No pending pieces found for stage <strong>{selectedLog?.stage || 'this stage'}</strong> under this project. (All items are already completed).
+                          Notice: No pending pieces found for stage <strong>{selectedLog?.stage || 'this stage'}</strong> under this project. (All items are either not required, already completed, or waiting for prior stages).
                         </Typography>
                       </Box>
                     );
@@ -686,7 +823,7 @@ const Approvals: React.FC = () => {
                     split.productName = projectSlabs[0].name;
                   }
 
-                  const eligiblePiecesForSlab = currentSlab?.pieces ? currentSlab.pieces.filter(isPieceEligible) : [];
+                  const eligiblePiecesForSlab = currentSlab?.pieces ? currentSlab.pieces.filter((p: any) => isPieceEligible(p, currentSlab)) : [];
                   
                   return (
                     <>
@@ -696,7 +833,10 @@ const Approvals: React.FC = () => {
                           size="small"
                           options={projectSlabs}
                           getOptionLabel={(option: any) => {
-                            return option.name;
+                            const pendingCount = (option.pieces && option.pieces.length > 0)
+                              ? option.pieces.filter((p: any) => isPieceEligible(p, option)).length
+                              : 1;
+                            return `${option.name} (${pendingCount} Pc${pendingCount > 1 ? 's' : ''} Pending)`;
                           }}
                           value={projectSlabs.find((s: any) => s.id === split.slabId) || null}
                           onChange={(e, newValue: any) => {
@@ -704,12 +844,40 @@ const Approvals: React.FC = () => {
                             if (newValue) {
                               newSplits[idx].slabId = newValue.id;
                               newSplits[idx].productName = newValue.name;
+                              const pending = (newValue.pieces && newValue.pieces.length > 0)
+                                ? newValue.pieces.filter((p: any) => isPieceEligible(p, newValue)).length
+                                : 1;
+                              const totalAssignedOther = newSplits.reduce((acc, s, i) => i === idx ? acc : acc + (Number(s.qty) || 0), 0);
+                              const remainingExpected = Math.max(1, (Number(selectedLog?.quantityProduced) || 1) - totalAssignedOther);
+                              newSplits[idx].qty = Math.min(pending, remainingExpected);
                             } else {
                               newSplits[idx].slabId = '';
                               newSplits[idx].productName = '';
+                              newSplits[idx].qty = 0;
                             }
                             newSplits[idx].pieceIds = [];
                             setProjectSplits(newSplits);
+                          }}
+                          renderOption={(props, option: any) => {
+                            const { key, ...restProps } = props as any;
+                            const pending = (option.pieces && option.pieces.length > 0)
+                              ? option.pieces.filter((p: any) => isPieceEligible(p, option)).length
+                              : 1;
+                            return (
+                              <li key={key} {...restProps}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', py: 0.5 }}>
+                                  <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{option.name}</Typography>
+                                    {option.size && <Typography variant="caption" sx={{ color: 'text.secondary' }}>{option.size}</Typography>}
+                                  </Box>
+                                  <Chip 
+                                    label={`${pending} Pc${pending > 1 ? 's' : ''} Pending`} 
+                                    size="small" 
+                                    sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 800, fontSize: '0.72rem' }} 
+                                  />
+                                </Box>
+                              </li>
+                            );
                           }}
                           renderInput={(params) => (
                             <TextField 
@@ -719,6 +887,21 @@ const Approvals: React.FC = () => {
                               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                             />
                           )}
+                        />
+
+                        {/* Quantity Input */}
+                        <TextField
+                          size="small"
+                          label="Qty (Pcs) *"
+                          type="number"
+                          value={split.qty || ''}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0;
+                            const newSplits = [...projectSplits];
+                            newSplits[idx].qty = val;
+                            setProjectSplits(newSplits);
+                          }}
+                          sx={{ width: 130, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                         />
                       </Box>
                       
@@ -840,19 +1023,118 @@ const Approvals: React.FC = () => {
           >
             Add Project Split
           </Button>
+
+          {/* Partial / Remaining Piece Rejection Section */}
+          {(() => {
+            const totalSplitQty = projectSplits.reduce((acc, s) => acc + (Number(s.qty) || 0), 0);
+            const expectedQty = Number(selectedLog?.quantityProduced) || 0;
+            const remainingQty = expectedQty - totalSplitQty;
+
+            if (remainingQty > 0) {
+              return (
+                <Paper elevation={0} sx={{ p: 2, bgcolor: '#FFF1F2', border: '1.5px dashed #FDA4AF', borderRadius: 3, mt: 2.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <ReportProblemIcon sx={{ color: '#E11D48', fontSize: 22 }} />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#9F1239' }}>
+                        Remaining Unassigned: {remainingQty} Piece(s)
+                      </Typography>
+                    </Box>
+                    <FormControlLabel
+                      control={
+                        <Checkbox 
+                          checked={rejectRemaining} 
+                          onChange={(e) => setRejectRemaining(e.target.checked)}
+                          sx={{ color: '#E11D48', '&.Mui-checked': { color: '#E11D48' } }} 
+                        />
+                      }
+                      label={
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#BE123C' }}>
+                          Reject Remaining {remainingQty} Pcs (Send for Rework)
+                        </Typography>
+                      }
+                    />
+                  </Box>
+
+                  {rejectRemaining ? (
+                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <Typography variant="caption" sx={{ color: '#9F1239', fontWeight: 600 }}>
+                        These {remainingQty} rejected piece(s) will automatically move to the Manager App under "Admin Rejected Tasks" with your remarks and defect photograph.
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={2}
+                        size="small"
+                        label="Rejection Reason / Defect Remarks *"
+                        placeholder="e.g. Dimensions mismatch / surface scratch / chipped edge..."
+                        value={rejectRemainingRemarks}
+                        onChange={(e) => setRejectRemainingRemarks(e.target.value)}
+                        sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                      />
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          size="small"
+                          startIcon={<PhotoCameraIcon />}
+                          onClick={() => handlePhotoUploadHelper(setRejectRemainingPhoto)}
+                          sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                        >
+                          {rejectRemainingPhoto ? 'Change Defect Photo' : 'Capture / Upload Defect Photo'}
+                        </Button>
+                        {rejectRemainingPhoto && (
+                          <Box sx={{ position: 'relative', display: 'inline-block' }}>
+                            <img src={rejectRemainingPhoto} alt="Defect" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, border: '2px solid #E11D48' }} />
+                            <IconButton
+                              size="small"
+                              onClick={() => setRejectRemainingPhoto(null)}
+                              sx={{ position: 'absolute', top: -6, right: -6, bgcolor: '#E11D48', color: '#FFF', width: 18, height: 18, '&:hover': { bgcolor: '#9F1239' } }}
+                            >
+                              <CloseIcon sx={{ fontSize: 12 }} />
+                            </IconButton>
+                          </Box>
+                        )}
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.5 }}>
+                      Note: If not marked for rejection, the remaining {remainingQty} pcs will stay in the Pending queue for future project assignment.
+                    </Typography>
+                  )}
+                </Paper>
+              );
+            }
+            return null;
+          })()}
           </>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
             <Button onClick={() => setApprovalDialogOpen(false)} color="inherit">Cancel</Button>
-            <Button 
-              variant="contained" 
-              color="success" 
-              onClick={submitApproval}
-              disabled={!projectSplits.some(s => s.projectId && s.qty > 0) || isApproving}
-              sx={{ fontWeight: 'bold' }}
-            >
-            {isApproving ? 'Approving...' : 'Confirm Approval'}
-          </Button>
+            {(() => {
+              const totalSplitQty = projectSplits.reduce((acc, s) => acc + (Number(s.qty) || 0), 0);
+              const expectedQty = Number(selectedLog?.quantityProduced) || 0;
+              const remainingQty = expectedQty - totalSplitQty;
+
+              return (
+                <Button 
+                  variant="contained" 
+                  color="success" 
+                  onClick={submitApproval}
+                  disabled={!projectSplits.some(s => s.projectId && s.qty > 0) || (remainingQty > 0 && rejectRemaining && !rejectRemainingRemarks.trim()) || isApproving}
+                  sx={{ fontWeight: 'bold' }}
+                >
+                  {isApproving 
+                    ? 'Processing...' 
+                    : remainingQty > 0 && rejectRemaining 
+                    ? `Approve (${totalSplitQty} Pcs) & Reject (${remainingQty} Pcs)` 
+                    : remainingQty > 0 
+                    ? `Approve Partial (${totalSplitQty} Pcs)` 
+                    : 'Confirm Approval'}
+                </Button>
+              );
+            })()}
         </DialogActions>
       </Dialog>
 
@@ -1223,18 +1505,74 @@ const Approvals: React.FC = () => {
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 4 } } }}>
-        <DialogTitle sx={{ fontWeight: 'bold', color: '#DC2626' }}>Reject Log</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 'bold', color: '#DC2626', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CancelIcon color="error" />
+          Reject Item / Piece Log
+        </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" mb= {2}>
-            Please enter the reason for rejecting this log and optionally upload a photo. This will be visible to the worker/manager.
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Please enter the reason for rejecting this work. Rejected items immediately reflect in the Manager App under "Admin Rejected Tasks" with your remarks and photo for rework.
           </Typography>
+
+          {rejectTargetLog && Number(rejectTargetLog.quantityProduced) > 1 && (
+            <Box sx={{ mb: 2.5, p: 2, bgcolor: '#FEF2F2', borderRadius: 2.5, border: '1px solid #FECDD3' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#991B1B', mb: 1 }}>
+                Total Reported Items: {rejectTargetLog.quantityProduced} Pieces
+              </Typography>
+              <RadioGroup
+                row
+                value={rejectMode}
+                onChange={(e) => {
+                  const mode = e.target.value as 'all' | 'partial';
+                  setRejectMode(mode);
+                  if (mode === 'partial' && partialRejectQty >= Number(rejectTargetLog.quantityProduced)) {
+                    setPartialRejectQty(1);
+                  }
+                }}
+              >
+                <FormControlLabel 
+                  value="all" 
+                  control={<Radio color="error" />} 
+                  label={<Typography variant="body2" sx={{ fontWeight: 700 }}>Reject All ({rejectTargetLog.quantityProduced} Pcs)</Typography>} 
+                />
+                <FormControlLabel 
+                  value="partial" 
+                  control={<Radio color="error" />} 
+                  label={<Typography variant="body2" sx={{ fontWeight: 700 }}>Reject Specific Quantity</Typography>} 
+                />
+              </RadioGroup>
+
+              {rejectMode === 'partial' && (
+                <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <TextField
+                    size="small"
+                    type="number"
+                    label="Quantity to Reject"
+                    value={partialRejectQty}
+                    onChange={(e) => {
+                      const maxVal = Number(rejectTargetLog.quantityProduced) - 1;
+                      const val = Math.max(1, Math.min(maxVal, Number(e.target.value) || 1));
+                      setPartialRejectQty(val);
+                    }}
+                    inputProps={{ min: 1, max: Number(rejectTargetLog.quantityProduced) - 1 }}
+                    sx={{ width: 160, bgcolor: '#FFFFFF', borderRadius: 2 }}
+                  />
+                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                    {Number(rejectTargetLog.quantityProduced) - partialRejectQty} Pcs will remain in pending queue for approval.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+
           <TextField
             autoFocus
             fullWidth
             multiline
             rows={3}
             variant="outlined"
-            label="Rejection Remarks"
+            label="Rejection Reason / Defect Remarks *"
+            placeholder="Explain why this piece/work is rejected so the manager/worker can redo it properly..."
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
             sx={{ mb: 2 }}
@@ -1245,10 +1583,10 @@ const Approvals: React.FC = () => {
               variant="outlined"
               color="error"
               startIcon={<PhotoCameraIcon />}
-              onClick={handleRejectPhotoUpload}
+              onClick={() => handlePhotoUploadHelper(setRejectPhoto)}
               sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 800 }}
             >
-              {rejectPhoto ? 'Change Rejection Photo' : 'Upload / Capture Rejection Photo'}
+              {rejectPhoto ? 'Change Defect Photo' : 'Upload / Capture Defect Photo'}
             </Button>
             {rejectPhoto && (
               <Box sx={{ mt: 2, position: 'relative', display: 'inline-block' }}>
@@ -1267,7 +1605,9 @@ const Approvals: React.FC = () => {
         <DialogActions sx={{ p: 3, pt: 0 }}>
           <Button onClick={() => setRejectDialogOpen(false)} color="inherit">Cancel</Button>
           <Button onClick={submitReject} variant="contained" color="error" disabled={!rejectReason.trim()} sx={{ fontWeight: 'bold' }}>
-            Reject Log
+            {rejectMode === 'partial' && rejectTargetLog && Number(rejectTargetLog.quantityProduced) > 1
+              ? `Reject ${partialRejectQty} Piece(s)`
+              : 'Reject Log'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -483,15 +483,10 @@ const StageDetails = () => {
                 }
 
                 return workerLabel !== '—' ? (
-                  <Box sx={{ display: 'inline-flex', flexDirection: 'column', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
                       {workerLabel}
                     </Typography>
-                    {approvalId && (
-                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.7rem' }}>
-                        ID: {approvalId}
-                      </Typography>
-                    )}
                   </Box>
                 ) : (
                   <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
@@ -499,7 +494,10 @@ const StageDetails = () => {
               })()
             ) : (
               (() => {
-                const hasAllocatedMaterial = !!(p.sourceMaterialId || p.sourceMaterial || (p.vendorName && (p.vendorName.includes('x') || p.vendorName.includes('×') || p.vendorName.includes('ft') || p.vendorName.includes('MM'))));
+                const hasAllocatedMaterial = Boolean(
+                  (p.sourceMaterialId && p.sourceMaterial && ((p.sourceMaterial.usedQuantity !== undefined && p.sourceMaterial.usedQuantity > 0) || (p.sourceMaterial.quantity && p.sourceMaterial.quantity > 0))) ||
+                  (p.sourceMaterialId && p.sourceMaterial?.inventory)
+                );
                 
                 if (!hasAllocatedMaterial) {
                   if (vendorName) {
@@ -520,7 +518,6 @@ const StageDetails = () => {
 
                 let rawSqFt = 0;
                 let primaryDim = '';
-                let equivFtStr = '';
                 let thickStr = '';
 
                 if (rawDimStr) {
@@ -529,13 +526,8 @@ const StageDetails = () => {
                     rawSqFt = parseFloat(sqftMatch[1]);
                   }
 
-                  const tMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*MM/i);
+                  const tMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*MM/i) || p.size?.match(/(\d+(?:\.\d+)?)\s*MM/i) || (p.sourceMaterial?.inventory?.thickness ? [`${p.sourceMaterial.inventory.thickness}MM`, `${p.sourceMaterial.inventory.thickness}`] : null);
                   if (tMatch) thickStr = `${tMatch[1]}MM`;
-
-                  const equivMatch = rawDimStr.match(/\(([^)]+)\)/);
-                  if (equivMatch) {
-                    equivFtStr = equivMatch[1];
-                  }
 
                   const cleanMain = rawDimStr.split('|')[0].replace(/\([^)]+\)/g, '').trim();
                   primaryDim = cleanMain;
@@ -567,24 +559,14 @@ const StageDetails = () => {
                   rawSqFt = Number(p.sourceMaterial.quantity);
                 }
 
-                const cleanDim = rawDimStr ? rawDimStr.replace(/ x (\d+MM)/i, ' | $1').replace(/ × (\d+MM)/i, ' | $1') : '';
+                const displayDim = primaryDim ? `${primaryDim}${thickStr && !primaryDim.includes(thickStr) ? ` | ${thickStr}` : ''}` : '';
 
                 return (
                   <Box sx={{ display: 'inline-flex', flexDirection: 'column', gap: 0.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.85rem' }}>
-                        {primaryDim || cleanDim}
+                        {displayDim || rawDimStr}
                       </Typography>
-                      {equivFtStr && (
-                        <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700, bgcolor: '#ECFDF5', px: 0.75, py: 0.25, borderRadius: 1, border: '1px solid #A7F3D0' }}>
-                          {equivFtStr}
-                        </Typography>
-                      )}
-                      {thickStr && !primaryDim.includes(thickStr) && (
-                        <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, bgcolor: '#F1F5F9', px: 0.75, py: 0.25, borderRadius: 1 }}>
-                          {thickStr}
-                        </Typography>
-                      )}
                       {rawSqFt > 0 && (
                         <Chip 
                           label={`${rawSqFt.toFixed(2)} Sq.Ft`} 
@@ -1413,17 +1395,11 @@ const StageDetails = () => {
                         <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
                           {(() => {
                             const logger = log.workerName || log.worker?.name || log.vendorName || 'Abhay 1';
-                            const approvalId = log.id ? `#${log.id.slice(-6).toUpperCase()}` : null;
                             return (
-                              <Box sx={{ display: 'inline-flex', flexDirection: 'column', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                              <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
                                   {logger}
                                 </Typography>
-                                {approvalId && (
-                                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.7rem' }}>
-                                    ID: {approvalId}
-                                  </Typography>
-                                )}
                               </Box>
                             );
                           })()}
