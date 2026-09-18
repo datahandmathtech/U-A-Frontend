@@ -17,6 +17,7 @@ import ProjectDetails from './pages/ProjectDetails';
 import SlabPieceTracker from './pages/SlabPieceTracker';
 import StageDetails from './pages/StageDetails';
 import Approvals from './pages/Approvals';
+import ManualApproval from './pages/ManualApproval';
 import InOutLedger from './pages/InOutLedger';
 import VendorsList from './pages/VendorsList';
 import Accounts from './pages/Accounts';
@@ -98,6 +99,10 @@ const router = createBrowserRouter([
       {
         path: 'approvals',
         element: <Approvals />
+      },
+      {
+        path: 'manual-approval',
+        element: <ManualApproval />
       },
       {
         path: 'in-out-ledger',

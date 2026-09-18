@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel, Autocomplete, Tooltip } from '@mui/material';
+import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel, Autocomplete, Tooltip, Table, TableHead, TableRow, TableCell, TableBody, Divider, Accordion, AccordionSummary, AccordionDetails, RadioGroup, Radio } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
-import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetApprovedLogsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useGetActiveOutLogsQuery } from '../store/apiSlice';
+import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetApprovedLogsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useGetActiveOutLogsQuery, useManualApprovePiecesMutation } from '../store/apiSlice';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
@@ -15,6 +16,11 @@ import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import CloseIcon from '@mui/icons-material/Close';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
+import FlashOnIcon from '@mui/icons-material/FlashOn';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
+import LayersIcon from '@mui/icons-material/Layers';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import SearchIcon from '@mui/icons-material/Search';
 
 const Approvals: React.FC = () => {
   const { data: pendingLogs, isLoading, refetch: refetchPending } = useGetPendingApprovalsQuery(undefined, {
@@ -71,6 +77,40 @@ const Approvals: React.FC = () => {
   const activeProjectId = editHistoryDialogOpen ? editingHistoryLog?.projectId : detailsDialogOpen ? detailsLog?.projectId : projectSplits[0]?.projectId;
   const { data: slabs } = useGetSlabsQuery(activeProjectId, { skip: !activeProjectId });
   
+  // Manual Approval State
+  const [manualApprovePieces, { isLoading: isManualApproving }] = useManualApprovePiecesMutation();
+  const [manualApprovalOpen, setManualApprovalOpen] = useState(false);
+  const [manualProjectId, setManualProjectId] = useState<string>('');
+  const [manualStage, setManualStage] = useState<string>('Production');
+  const [manualRemarks, setManualRemarks] = useState<string>('');
+  const [selectedPieceIds, setSelectedPieceIds] = useState<string[]>([]);
+  const [pieceSearchQuery, setPieceSearchQuery] = useState<string>('');
+
+  const { data: manualProjectSlabs, isLoading: isManualSlabsLoading, refetch: refetchManualSlabs } = useGetSlabsQuery(manualProjectId, { skip: !manualProjectId });
+
+  const handleBulkManualApprove = async () => {
+    if (selectedPieceIds.length === 0) {
+      setToast({ open: true, message: 'Please select at least one piece to approve', severity: 'error' });
+      return;
+    }
+    try {
+      await manualApprovePieces({
+        projectId: manualProjectId,
+        pieceIds: selectedPieceIds,
+        stage: manualStage,
+        remarks: manualRemarks || `Manual Direct Approval for ${manualStage}`
+      }).unwrap();
+
+      setToast({ open: true, message: `Successfully approved ${selectedPieceIds.length} piece(s) for ${manualStage}!`, severity: 'success' });
+      setSelectedPieceIds([]);
+      if (refetchManualSlabs) refetchManualSlabs();
+      refetchApproved();
+      refetchPending();
+    } catch (err: any) {
+      setToast({ open: true, message: err?.data?.message || err?.message || 'Manual approval failed', severity: 'error' });
+    }
+  };
+
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
 
   const handleApproveClick = async (log: any) => {
@@ -332,11 +372,36 @@ const Approvals: React.FC = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
           <PendingActionsIcon fontSize="large" color="warning" />
           Pending Approvals
         </Typography>
+
+        <Button
+          variant="contained"
+          startIcon={<FlashOnIcon />}
+          onClick={() => {
+            setManualApprovalOpen(true);
+            if (!manualProjectId && projects && projects.length > 0) {
+              setManualProjectId(projects[0].id);
+            }
+          }}
+          sx={{
+            borderRadius: 2.5,
+            textTransform: 'none',
+            fontWeight: 800,
+            fontSize: '0.95rem',
+            px: 2.5,
+            py: 1,
+            bgcolor: '#059669',
+            color: '#FFFFFF',
+            boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+            '&:hover': { bgcolor: '#047857' }
+          }}
+        >
+          ⚡ Manual Approval
+        </Button>
       </Box>
 
       {(!pendingLogs) ? (
@@ -1608,6 +1673,374 @@ const Approvals: React.FC = () => {
             {rejectMode === 'partial' && rejectTargetLog && Number(rejectTargetLog.quantityProduced) > 1
               ? `Reject ${partialRejectQty} Piece(s)`
               : 'Reject Log'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* MANUAL DIRECT APPROVAL MODAL */}
+      <Dialog 
+        open={manualApprovalOpen} 
+        onClose={() => setManualApprovalOpen(false)} 
+        maxWidth="lg" 
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, maxHeight: '90vh' } }}
+      >
+        <DialogTitle sx={{ p: 3, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', bgcolor: '#F8FAFC' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ p: 1, bgcolor: '#ECFDF5', color: '#059669', borderRadius: 2.5, display: 'flex' }}>
+              <FlashOnIcon fontSize="medium" />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
+                Manual Direct Approval
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                Select Active Work Order project, pick slabs & pieces, and approve them directly.
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setManualApprovalOpen(false)} size="small" sx={{ bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: { xs: 2, md: 3 } }}>
+          {/* STEP 1: PROJECT SELECTION & STAGE CONFIG */}
+          <Grid container spacing={2.5} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <FolderSpecialIcon sx={{ fontSize: 18, color: '#059669' }} /> Select Active Project *
+              </Typography>
+              <Autocomplete
+                options={projects || []}
+                getOptionLabel={(p: any) => `${p.name || 'Unnamed'} ${p.projectId ? `(${p.projectId})` : ''} - ${p.clientName || 'Client'}`}
+                value={(projects || []).find((p: any) => p.id === manualProjectId) || null}
+                onChange={(_, newValue: any) => {
+                  setManualProjectId(newValue ? newValue.id : '');
+                  setSelectedPieceIds([]);
+                }}
+                renderOption={(props: any, option: any) => {
+                  const { key, ...restProps } = props;
+                  return (
+                    <li key={key} {...restProps}>
+                      <Box sx={{ py: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>{option.name || 'Unnamed Project'}</Typography>
+                        <Typography variant="caption" sx={{ color: '#64748B' }}>Client: {option.clientName || 'N/A'} {option.projectId ? `• ID: ${option.projectId}` : ''}</Typography>
+                      </Box>
+                    </li>
+                  );
+                }}
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    size="small" 
+                    placeholder="Search project by name or ID..."
+                    sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <AssignmentTurnedInIcon sx={{ fontSize: 18, color: '#0284C7' }} /> Target Approval Stage *
+              </Typography>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={manualStage}
+                  onChange={(e) => setManualStage(e.target.value)}
+                  sx={{ bgcolor: '#FFFFFF', borderRadius: 2, fontWeight: 700 }}
+                >
+                  <MenuItem value="Production">⚙️ Production Work</MenuItem>
+                  <MenuItem value="Polishing">✨ Polishing Work</MenuItem>
+                  <MenuItem value="Packing">📦 Packing Work</MenuItem>
+                  <MenuItem value="Dispatch">🚚 Dispatch Ready</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+
+          {/* STEP 2: SEARCH & SELECTION CONTROLS */}
+          {manualProjectId && (
+            <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px solid #E2E8F0' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+                <TextField
+                  size="small"
+                  placeholder="Search pieces/sub-pieces by name or serial..."
+                  value={pieceSearchQuery}
+                  onChange={(e) => setPieceSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ color: '#94A3B8', mr: 1, fontSize: 20 }} />
+                  }}
+                  sx={{ width: { xs: '100%', sm: 300 }, bgcolor: '#FFFFFF', borderRadius: 2 }}
+                />
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                  {(() => {
+                    const allPieces = (manualProjectSlabs || []).flatMap((s: any) => s.pieces || []);
+                    const allPieceIds = allPieces.map((p: any) => p.id);
+                    const isAllSelected = allPieceIds.length > 0 && allPieceIds.every((id: string) => selectedPieceIds.includes(id));
+                    
+                    return (
+                      <>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<DoneAllIcon />}
+                          onClick={() => {
+                            if (isAllSelected) {
+                              setSelectedPieceIds([]);
+                            } else {
+                              setSelectedPieceIds(allPieceIds);
+                            }
+                          }}
+                          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#334155' }}
+                        >
+                          {isAllSelected ? 'Deselect All' : `Select All (${allPieceIds.length})`}
+                        </Button>
+                        <Chip 
+                          label={`Selected: ${selectedPieceIds.length} / ${allPieceIds.length} Pieces`} 
+                          color={selectedPieceIds.length > 0 ? 'success' : 'default'}
+                          sx={{ fontWeight: 800, borderRadius: 2 }}
+                        />
+                      </>
+                    );
+                  })()}
+                </Box>
+              </Box>
+            </Paper>
+          )}
+
+          {/* STEP 3: HIERARCHICAL SLABS & PIECES VIEW */}
+          {!manualProjectId ? (
+            <Paper elevation={0} sx={{ p: 5, textAlign: 'center', bgcolor: '#F8FAFC', borderRadius: 4, border: '2px dashed #E2E8F0' }}>
+              <FolderSpecialIcon sx={{ fontSize: 50, color: '#94A3B8', mb: 1.5 }} />
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#475569' }}>Please select a Project above</Typography>
+              <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
+                Choose an active work order to view its Slabs, Pieces, and Sub-pieces for approval.
+              </Typography>
+            </Paper>
+          ) : isManualSlabsLoading ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, gap: 2 }}>
+              <CircularProgress size={40} sx={{ color: '#059669' }} />
+              <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 700 }}>Loading project slabs & pieces...</Typography>
+            </Box>
+          ) : !manualProjectSlabs || manualProjectSlabs.length === 0 ? (
+            <Paper elevation={0} sx={{ p: 4, textAlign: 'center', bgcolor: '#FEF3C7', borderRadius: 3, border: '1px solid #FCD34D' }}>
+              <Typography variant="body1" sx={{ fontWeight: 800, color: '#92400E' }}>No Slabs Found for this Project</Typography>
+              <Typography variant="caption" sx={{ color: '#78350F' }}>
+                Please create slabs and pieces under this project in Active Work Orders before running manual approvals.
+              </Typography>
+            </Paper>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              {manualProjectSlabs.map((slab: any) => {
+                const slabPieces = (slab.pieces || []).filter((p: any) => {
+                  if (!pieceSearchQuery.trim()) return true;
+                  const query = pieceSearchQuery.toLowerCase();
+                  return (
+                    (p.productName && p.productName.toLowerCase().includes(query)) ||
+                    (p.pieceNumber && String(p.pieceNumber).includes(query)) ||
+                    (slab.name && slab.name.toLowerCase().includes(query))
+                  );
+                });
+
+                const slabPieceIds = (slab.pieces || []).map((p: any) => p.id);
+                const isSlabAllSelected = slabPieceIds.length > 0 && slabPieceIds.every((id: string) => selectedPieceIds.includes(id));
+                const isSlabPartiallySelected = slabPieceIds.some((id: string) => selectedPieceIds.includes(id)) && !isSlabAllSelected;
+
+                return (
+                  <Paper 
+                    key={slab.id} 
+                    elevation={0} 
+                    sx={{ 
+                      borderRadius: 3.5, 
+                      border: '1px solid #E2E8F0', 
+                      overflow: 'hidden',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    {/* Slab Header Bar */}
+                    <Box sx={{ p: 2, bgcolor: '#F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Checkbox
+                          size="small"
+                          checked={isSlabAllSelected}
+                          indeterminate={isSlabPartiallySelected}
+                          onChange={() => {
+                            if (isSlabAllSelected) {
+                              setSelectedPieceIds(prev => prev.filter(id => !slabPieceIds.includes(id)));
+                            } else {
+                              setSelectedPieceIds(prev => Array.from(new Set([...prev, ...slabPieceIds])));
+                            }
+                          }}
+                          sx={{ p: 0.5, color: '#059669', '&.Mui-checked': { color: '#059669' } }}
+                        />
+                        <LayersIcon sx={{ color: '#B38B36', fontSize: 22 }} />
+                        <Box>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
+                            {slab.name || 'Unnamed Slab'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                            Size: {slab.size || 'Standard'} • Stages: {(slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch']).join(' → ')}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Chip 
+                          size="small" 
+                          label={`${slab.pieces?.length || 0} Total Pieces`} 
+                          sx={{ bgcolor: '#FFFFFF', fontWeight: 800, border: '1px solid #CBD5E1' }} 
+                        />
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            if (isSlabAllSelected) {
+                              setSelectedPieceIds(prev => prev.filter(id => !slabPieceIds.includes(id)));
+                            } else {
+                              setSelectedPieceIds(prev => Array.from(new Set([...prev, ...slabPieceIds])));
+                            }
+                          }}
+                          sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.75rem', color: '#059669' }}
+                        >
+                          {isSlabAllSelected ? 'Deselect Slab' : 'Select Slab Pieces'}
+                        </Button>
+                      </Box>
+                    </Box>
+
+                    {/* Pieces Table */}
+                    {slabPieces.length === 0 ? (
+                      <Box sx={{ p: 3, textAlign: 'center' }}>
+                        <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                          No pieces found matching filter under this slab.
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Table size="small">
+                        <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                          <TableRow>
+                            <TableCell sx={{ width: 50, py: 1 }} align="center">Select</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1 }}>Piece / Sub-Piece Name</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1 }}>Piece #</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1 }}>Dimensions / Size</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1 }}>Current Stage</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1 }}>Status</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {slabPieces.map((piece: any, pIdx: number) => {
+                            const isSelected = selectedPieceIds.includes(piece.id);
+                            return (
+                              <TableRow 
+                                key={piece.id || pIdx} 
+                                hover 
+                                onClick={() => {
+                                  setSelectedPieceIds(prev => 
+                                    prev.includes(piece.id) 
+                                      ? prev.filter(id => id !== piece.id) 
+                                      : [...prev, piece.id]
+                                  );
+                                }}
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  bgcolor: isSelected ? '#ECFDF5' : (pIdx % 2 === 0 ? '#FFFFFF' : '#FAFAFA')
+                                }}
+                              >
+                                <TableCell align="center" sx={{ py: 1 }}>
+                                  <Checkbox
+                                    size="small"
+                                    checked={isSelected}
+                                    sx={{ p: 0, color: '#059669', '&.Mui-checked': { color: '#059669' } }}
+                                  />
+                                </TableCell>
+                                <TableCell sx={{ py: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>
+                                    {piece.productName || `Piece ${piece.pieceNumber}`}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell sx={{ py: 1 }}>
+                                  <Chip size="small" label={`#${piece.pieceNumber}`} sx={{ fontWeight: 800, fontSize: '0.7rem' }} />
+                                </TableCell>
+                                <TableCell sx={{ py: 1 }}>
+                                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+                                    {piece.size || 'Standard'}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell sx={{ py: 1 }}>
+                                  <Chip 
+                                    size="small" 
+                                    label={piece.stage || 'Production'} 
+                                    sx={{ 
+                                      fontWeight: 700, 
+                                      fontSize: '0.7rem',
+                                      bgcolor: piece.stage === 'Dispatch' ? '#EFF6FF' : piece.stage === 'Packing' ? '#FDF4FF' : '#F0FDF4',
+                                      color: piece.stage === 'Dispatch' ? '#1D4ED8' : piece.stage === 'Packing' ? '#9333EA' : '#15803D'
+                                    }} 
+                                  />
+                                </TableCell>
+                                <TableCell sx={{ py: 1 }}>
+                                  <Chip 
+                                    size="small" 
+                                    label={piece.status === 'completed' ? 'Completed' : 'Pending'} 
+                                    color={piece.status === 'completed' ? 'success' : 'warning'}
+                                    variant={piece.status === 'completed' ? 'filled' : 'outlined'}
+                                    sx={{ fontWeight: 800, fontSize: '0.68rem' }} 
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </Paper>
+                );
+              })}
+            </Box>
+          )}
+
+          {/* STEP 4: REMARKS */}
+          {manualProjectId && (
+            <Box sx={{ mt: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Admin Approval Remarks (Optional)"
+                placeholder="e.g. Manually checked and approved by Admin for Production..."
+                value={manualRemarks}
+                onChange={(e) => setManualRemarks(e.target.value)}
+                sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+              />
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 3, pt: 2, borderTop: '1px solid #F1F5F9', bgcolor: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Button onClick={() => setManualApprovalOpen(false)} color="inherit" sx={{ fontWeight: 700 }}>
+            Close
+          </Button>
+
+          <Button
+            variant="contained"
+            color="success"
+            disabled={selectedPieceIds.length === 0 || isManualApproving || !manualProjectId}
+            startIcon={isManualApproving ? <CircularProgress size={18} color="inherit" /> : <DoneAllIcon />}
+            onClick={handleBulkManualApprove}
+            sx={{
+              borderRadius: 2.5,
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '0.95rem',
+              px: 3,
+              py: 1,
+              bgcolor: '#059669',
+              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.3)',
+              '&:hover': { bgcolor: '#047857' }
+            }}
+          >
+            {isManualApproving ? 'Approving...' : `Approve Selected (${selectedPieceIds.length} Pieces) → ${manualStage}`}
           </Button>
         </DialogActions>
       </Dialog>

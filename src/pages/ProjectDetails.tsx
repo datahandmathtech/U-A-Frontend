@@ -49,6 +49,7 @@ import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import SearchIcon from '@mui/icons-material/Search';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import { 
   useGetProjectByIdQuery, useUpdateProjectMutation, useCreateQuotationMutation, 
   useCreateInvoiceMutation, useUploadFilesMutation, useGetDrawingsQuery, 
@@ -545,6 +546,123 @@ const ProjectDetails: React.FC = () => {
   const [updateSlab] = useUpdateSlabMutation();
   const [deleteSlab] = useDeleteSlabMutation();
   const [syncSlabs] = useSyncSlabsMutation();
+  const [addPieces, { isLoading: isAddingPieces }] = useAddPiecesMutation();
+
+  // Master Maker State & Logic
+  const [masterMakerOpen, setMasterMakerOpen] = useState(false);
+  const [masterSourceSlabId, setMasterSourceSlabId] = useState<string>('');
+  const [masterCopiesCount, setMasterCopiesCount] = useState<number>(50);
+  const [masterBaseName, setMasterBaseName] = useState<string>('Piece');
+  const [masterLength, setMasterLength] = useState<number>(24);
+  const [masterWidth, setMasterWidth] = useState<number>(24);
+  const [masterThickness, setMasterThickness] = useState<number>(20);
+  const [masterUnit, setMasterUnit] = useState<string>('inch');
+  const [masterGeneratedMatrix, setMasterGeneratedMatrix] = useState<any[]>([]);
+
+  const generateMasterMatrixPreview = (
+    slab: any, 
+    baseName: string, 
+    count: number, 
+    len: number, 
+    wid: number, 
+    thick: number, 
+    unit: string
+  ) => {
+    const existingMax = (slab?.pieces || []).length > 0 
+      ? Math.max(...(slab.pieces || []).map((p: any) => Number(p.pieceNumber) || 0)) 
+      : 0;
+
+    const matrix = [];
+    for (let i = 1; i <= count; i++) {
+      const pieceNum = existingMax + i;
+      const cleanBase = baseName.trim() || 'Piece';
+      const pieceName = `${cleanBase}.${pieceNum}`;
+      const sizeStr = `${len} × ${wid} (${unit}) × ${thick}mm`;
+      
+      let areaSqFt = 0;
+      if (unit.toLowerCase().includes('mm')) {
+        areaSqFt = (len * wid) / 92903.04;
+      } else if (unit.toLowerCase().includes('inch') || unit.toLowerCase().includes('in')) {
+        areaSqFt = (len * wid) / 144;
+      } else {
+        areaSqFt = (len * wid);
+      }
+
+      matrix.push({
+        pieceNumber: pieceNum,
+        name: pieceName,
+        length: len,
+        width: wid,
+        thickness: thick,
+        unit: unit,
+        size: sizeStr,
+        area: parseFloat(areaSqFt.toFixed(2))
+      });
+    }
+    setMasterGeneratedMatrix(matrix);
+  };
+
+  const initMasterMakerFromSlab = (slab: any, count = masterCopiesCount) => {
+    if (!slab) return;
+    setMasterSourceSlabId(slab.id);
+    const slabName = slab.name || 'Piece';
+    const base = slabName.includes(' - ') ? slabName.split(' - ')[0] : slabName;
+    setMasterBaseName(base);
+
+    let len = 24;
+    let wid = 24;
+    let thick = 20;
+    let unit = 'inch';
+
+    if (slab.pieces && slab.pieces.length > 0) {
+      const p0 = slab.pieces[0];
+      if (p0.size) {
+        const parts = String(p0.size).split('×').map(s => s.trim());
+        if (parts.length >= 2) {
+          len = parseFloat(parts[0]) || 24;
+          wid = parseFloat(parts[1]) || 24;
+          if (parts[2]) thick = parseFloat(parts[2]) || 20;
+        }
+      }
+    } else if (slab.size) {
+      const parts = String(slab.size).split('×').map(s => s.trim());
+      if (parts.length >= 2) {
+        len = parseFloat(parts[0]) || 24;
+        wid = parseFloat(parts[1]) || 24;
+        if (parts[2]) thick = parseFloat(parts[2]) || 20;
+      }
+    }
+
+    setMasterLength(len);
+    setMasterWidth(wid);
+    setMasterThickness(thick);
+    setMasterUnit(unit);
+
+    generateMasterMatrixPreview(slab, base, count, len, wid, thick, unit);
+  };
+
+  const handleSaveMasterMakerPieces = async () => {
+    if (!masterSourceSlabId) {
+      setSnackbarMessage('Please select a target slab');
+      return;
+    }
+    if (masterGeneratedMatrix.length === 0) {
+      setSnackbarMessage('No pieces generated to save');
+      return;
+    }
+    try {
+      await addPieces({
+        id: masterSourceSlabId,
+        piecesArray: masterGeneratedMatrix
+      }).unwrap();
+
+      setSnackbarMessage(`Successfully generated and added ${masterGeneratedMatrix.length} pieces!`);
+      setMasterMakerOpen(false);
+      refetchSlabs();
+    } catch (err: any) {
+      setSnackbarMessage(err?.data?.message || err?.message || 'Failed to generate pieces with Master Maker');
+    }
+  };
 
   const user = useSelector((state: any) => state.auth.user);
   const isSuperAdmin = user?.role === 'admin' && (!user?.modulesAccess || user.modulesAccess.length === 0);
@@ -3298,6 +3416,28 @@ const ProjectDetails: React.FC = () => {
 
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                           <Button 
+                            variant="contained" 
+                            startIcon={<AutoAwesomeRoundedIcon />} 
+                            onClick={() => {
+                              if (projectSlabs && projectSlabs.length > 0) {
+                                initMasterMakerFromSlab(projectSlabs[0]);
+                              }
+                              setMasterMakerOpen(true);
+                            }}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 800,
+                              bgcolor: '#B38B36',
+                              color: '#FFFFFF',
+                              boxShadow: '0 2px 10px rgba(179, 139, 54, 0.25)',
+                              '&:hover': { bgcolor: '#967226' }
+                            }}
+                          >
+                            Master Maker
+                          </Button>
+
+                          <Button 
                             variant="outlined" 
                             startIcon={<SyncIcon />} 
                             onClick={async () => {
@@ -4779,6 +4919,283 @@ const ProjectDetails: React.FC = () => {
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', bgcolor: '#FAFAFA' }}>
           <Button variant="contained" onClick={() => setIsTermsDialogOpen(false)}>Done</Button>
         </Box>
+      </Dialog>
+
+      {/* MASTER MAKER BULK CLONER & GENERATOR DIALOG */}
+      <Dialog 
+        open={masterMakerOpen} 
+        onClose={() => setMasterMakerOpen(false)} 
+        maxWidth="lg" 
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, maxHeight: '90vh' } }}
+      >
+        <DialogTitle sx={{ p: 3, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', bgcolor: '#FDFBF7' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ p: 1, bgcolor: '#FFFDF5', color: '#B38B36', border: '1px solid #FDE68A', borderRadius: 2.5, display: 'flex' }}>
+              <AutoAwesomeRoundedIcon fontSize="medium" />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
+                Master Maker — Bulk Piece & Sub-Piece Generator
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                Mass-generate identical or sequential cut pieces and sub-pieces without repetitive manual entry.
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setMasterMakerOpen(false)} size="small" sx={{ bgcolor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: { xs: 2, md: 3 } }}>
+          {/* STEP 1: SELECT SOURCE SLAB TEMPLATE */}
+          <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px solid #E2E8F0' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LayersRoundedIcon sx={{ fontSize: 20, color: '#B38B36' }} /> Step 1: Select Target Slab Template *
+            </Typography>
+            <FormControl fullWidth size="small">
+              <Select
+                value={masterSourceSlabId}
+                onChange={(e) => {
+                  const targetId = e.target.value;
+                  const slab = (projectSlabs || []).find((s: any) => s.id === targetId);
+                  if (slab) {
+                    initMasterMakerFromSlab(slab, masterCopiesCount);
+                  }
+                }}
+                sx={{ bgcolor: '#FFFFFF', borderRadius: 2, fontWeight: 700 }}
+              >
+                {(projectSlabs || []).map((s: any) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{s.name || 'Unnamed Slab'}</Typography>
+                      <Typography variant="caption" sx={{ color: '#64748B' }}>
+                        Size: {s.size || 'Standard'} • Existing Pieces: {s.pieces?.length || 0}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Paper>
+
+          {/* STEP 2: CONFIGURATION PARAMETERS */}
+          <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#FFFFFF', borderRadius: 3, border: '1px solid #E2E8F0' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TuneRoundedIcon sx={{ fontSize: 20, color: '#0284C7' }} /> Step 2: Piece Specifications & Quantity
+            </Typography>
+
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  label="Quantity to Generate *"
+                  value={masterCopiesCount}
+                  onChange={(e) => {
+                    const count = Math.max(1, parseInt(e.target.value, 10) || 1);
+                    setMasterCopiesCount(count);
+                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(slab, masterBaseName, count, masterLength, masterWidth, masterThickness, masterUnit);
+                  }}
+                  inputProps={{ min: 1, max: 1000 }}
+                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Base Piece Name *"
+                  value={masterBaseName}
+                  onChange={(e) => {
+                    const base = e.target.value;
+                    setMasterBaseName(base);
+                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(slab, base, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit);
+                  }}
+                  placeholder="e.g. P-01 or Slab 1"
+                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                />
+              </Grid>
+
+              <Grid item xs={6} sm={4} md={1.5}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Unit</InputLabel>
+                  <Select
+                    value={masterUnit}
+                    label="Unit"
+                    onChange={(e) => {
+                      const u = e.target.value;
+                      setMasterUnit(u);
+                      const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                      generateMasterMatrixPreview(slab, masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, u);
+                    }}
+                    sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                  >
+                    <MenuItem value="inch">Inches (in)</MenuItem>
+                    <MenuItem value="mm">Millimeters (mm)</MenuItem>
+                    <MenuItem value="feet">Feet (ft)</MenuItem>
+                    <MenuItem value="sq_ft">Sq.Ft</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={6} sm={4} md={1.5}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  label="Length (L)"
+                  value={masterLength}
+                  onChange={(e) => {
+                    const l = parseFloat(e.target.value) || 0;
+                    setMasterLength(l);
+                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(slab, masterBaseName, masterCopiesCount, l, masterWidth, masterThickness, masterUnit);
+                  }}
+                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                />
+              </Grid>
+
+              <Grid item xs={6} sm={4} md={1.5}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  label="Width (W)"
+                  value={masterWidth}
+                  onChange={(e) => {
+                    const w = parseFloat(e.target.value) || 0;
+                    setMasterWidth(w);
+                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(slab, masterBaseName, masterCopiesCount, masterLength, w, masterThickness, masterUnit);
+                  }}
+                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                />
+              </Grid>
+
+              <Grid item xs={6} sm={4} md={1.5}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  label="Thickness MM"
+                  value={masterThickness}
+                  onChange={(e) => {
+                    const t = parseFloat(e.target.value) || 20;
+                    setMasterThickness(t);
+                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(slab, masterBaseName, masterCopiesCount, masterLength, masterWidth, t, masterUnit);
+                  }}
+                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* STEP 3: CUSTOM SUB-PIECES MATRIX PREVIEW */}
+          <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #FDE68A', bgcolor: '#FFFDF5' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AutoAwesomeRoundedIcon sx={{ color: '#D97706', fontSize: 20 }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#92400E' }}>
+                  Generate Custom Sub-Pieces Matrix ({masterGeneratedMatrix.length} Pieces)
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Chip 
+                  size="small" 
+                  label={`Total Calculated Area: ${masterGeneratedMatrix.reduce((sum, p) => sum + (p.area || 0), 0).toFixed(2)} Sq.Ft`}
+                  sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 800, border: '1px solid #FCD34D' }}
+                />
+              </Box>
+            </Box>
+
+            <TableContainer sx={{ maxHeight: 320, border: '1px solid #E2E8F0', borderRadius: 2.5, bgcolor: '#FFFFFF' }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '30%' }}>Piece / Sub-Piece Name</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '12%' }}>Serial #</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Unit</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Length (L)</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Width (W)</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Thickness (MM)</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Area (Sq.Ft)</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {masterGeneratedMatrix.map((p, idx) => (
+                    <TableRow key={idx} hover sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <TextField 
+                          size="small"
+                          value={p.name}
+                          onChange={(e) => {
+                            const newName = e.target.value;
+                            setMasterGeneratedMatrix(prev => prev.map((item, i) => i === idx ? { ...item, name: newName } : item));
+                          }}
+                          fullWidth
+                          slotProps={{ input: { sx: { height: 32, fontSize: '0.85rem', bgcolor: '#FFFFFF', borderRadius: 1.5 } } }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <Chip size="small" label={`#${p.pieceNumber}`} sx={{ fontWeight: 800, fontSize: '0.7rem' }} />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748B' }}>{p.unit}</Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>{p.length}</Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>{p.width}</Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748B' }}>{p.thickness}mm</Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669' }}>{p.area} Sq.Ft</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 3, pt: 2, borderTop: '1px solid #F1F5F9', bgcolor: '#FDFBF7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Button onClick={() => setMasterMakerOpen(false)} color="inherit" sx={{ fontWeight: 700 }}>
+            Cancel
+          </Button>
+
+          <Button
+            variant="contained"
+            disabled={masterGeneratedMatrix.length === 0 || isAddingPieces || !masterSourceSlabId}
+            startIcon={isAddingPieces ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeRoundedIcon />}
+            onClick={handleSaveMasterMakerPieces}
+            sx={{
+              borderRadius: 2.5,
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '0.95rem',
+              px: 3,
+              py: 1,
+              bgcolor: '#B38B36',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 14px rgba(179, 139, 54, 0.3)',
+              '&:hover': { bgcolor: '#967226' }
+            }}
+          >
+            {isAddingPieces ? 'Generating Pieces...' : `Generate & Save (${masterGeneratedMatrix.length} Pieces)`}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Snackbar

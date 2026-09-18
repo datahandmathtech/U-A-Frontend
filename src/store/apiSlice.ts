@@ -526,6 +526,14 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Project']
     }),
+    manualApprovePieces: builder.mutation<any, { projectId?: string, slabId?: string, pieceIds?: string[], stage?: string, approvals?: { pieceId: string, stage: string }[], remarks?: string }>({
+      query: (data) => ({
+        url: '/production/manual-approve-pieces',
+        method: 'POST',
+        body: data
+      }),
+      invalidatesTags: ['Production', 'Project', 'Dispatch']
+    }),
   }),
 });
 
@@ -626,5 +634,6 @@ export const {
   useEditProductionLogMutation,
   useGetPackingItemsQuery,
   useSavePackingItemsMutation,
-  useGetItemLogsQuery
+  useGetItemLogsQuery,
+  useManualApprovePiecesMutation
 } = apiSlice;
