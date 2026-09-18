@@ -538,6 +538,14 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Production', 'Project', 'Dispatch']
     }),
+    replicateSlabTemplate: builder.mutation<any, { projectId: string, sourceSlabId: string, targetSlabIds?: string[], fromSlabNumber?: number, toSlabNumber?: number }>({
+      query: (data) => ({
+        url: '/slabs/replicate-template',
+        method: 'POST',
+        body: data
+      }),
+      invalidatesTags: ['Project', 'Production']
+    }),
   }),
 });
 
@@ -589,6 +597,7 @@ export const {
   useUpdateSlabMutation,
   useDeleteSlabMutation,
   useBulkUpdateSlabStagesMutation,
+  useReplicateSlabTemplateMutation,
   useSyncSlabsMutation,
   useAddManualAttendanceMutation,
   useUpdatePieceMutation,

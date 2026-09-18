@@ -59,7 +59,7 @@ import {
   useGetInventoryQuery, useCreateInventoryMutation, useGetCategoriesQuery, useCreateCategoryMutation, useDeleteCategoryMutation,
   useGetUnitsQuery, useCreateUnitMutation, useDeleteUnitMutation,
   useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation,
-  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useAddPiecesMutation, useBulkCreateSlabsMutation, useSyncSlabsMutation,
+  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useAddPiecesMutation, useBulkCreateSlabsMutation, useSyncSlabsMutation, useReplicateSlabTemplateMutation,
   useGetQuotationTermsQuery, useAddQuotationTermMutation
 } from '../store/apiSlice';
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
@@ -95,7 +95,8 @@ const SlabRow = ({
   onDelete,
   products,
   productionLogs,
-  isPlanningMode
+  isPlanningMode,
+  activeStageColumns
 }: {
   slab: any;
   index: number;
@@ -106,6 +107,7 @@ const SlabRow = ({
   products: any[];
   productionLogs: any[];
   isPlanningMode: boolean;
+  activeStageColumns?: any[];
 }) => {
   const navigate = useNavigate();
   const { id: projectId } = useParams();
@@ -195,13 +197,14 @@ const SlabRow = ({
     return 'Pending';
   };
 
-  const STAGE_COLUMNS = [
+  const DEFAULT_STAGE_COLUMNS = [
     { key: 'Production', label: 'Production', route: 'production' },
-    { key: 'Polishing - Honed', label: 'Polishing - Honed', route: 'polishing' },
-    { key: 'Polishing - Mirror', label: 'Polishing - Mirror', route: 'polishing' },
+    { key: 'Polishing - Honed', label: 'Polishing (Honed)', route: 'polishing' },
+    { key: 'Polishing - Mirror', label: 'Polishing (Mirror)', route: 'polishing' },
     { key: 'Packing', label: 'Packing', route: 'packing' },
     { key: 'Dispatch', label: 'Dispatch', route: 'dispatch' }
   ];
+  const STAGE_COLUMNS = (activeStageColumns && activeStageColumns.length > 0) ? activeStageColumns : DEFAULT_STAGE_COLUMNS;
 
   const calculateSlabCompletedPieces = () => {
     const totalSubPieces = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
@@ -304,26 +307,7 @@ const SlabRow = ({
             }} 
           />
           </Box>
-          <Box 
-            sx={{ 
-              ml: 1, 
-              px: 1.5, 
-              py: 0.5, 
-              border: '1px solid #E2E8F0', 
-              borderRadius: 2, 
-              bgcolor: '#F8FAFC', 
-              color: '#334155', 
-              fontWeight: 800,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: 32
-            }}
-            title={`${completedPiecesVal} pieces completed (based on weighted stages)`}
-          >
-            {completedPiecesVal}
-          </Box>
+          
         </Box>
       </TableCell>
 
@@ -398,7 +382,7 @@ const SlabRow = ({
         if (!isChecked) {
           return (
             <TableCell key={col.key} sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
-              <Chip label="N/A" size="small" sx={{ bgcolor: '#F1F5F9', color: '#94A3B8', fontSize: '0.7rem', height: 20 }} />
+              <Typography variant="caption" sx={{ color: '#CBD5E1', fontWeight: 600 }}>—</Typography>
             </TableCell>
           );
         }
@@ -514,6 +498,13 @@ const SlabRow = ({
 
 const filter = createFilterOptions<any>();
 
+const getSlabAllowedStages = (slab: any): string[] => {
+  if (slab?.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0) {
+    return slab.requiredStages;
+  }
+  return ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+};
+
 const ProjectDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -529,7 +520,6 @@ const ProjectDetails: React.FC = () => {
   const [uploadFiles] = useUploadFilesMutation();
   const [addDrawing] = useAddDrawingMutation();
   const [approveDrawing] = useApproveDrawingMutation();
-
   const { data: projectMaterials, refetch: refetchMaterials } = useGetProjectMaterialsQuery(id as string, { skip: !id });
   const [reserveMaterial] = useReserveProjectMaterialMutation();
   const [deleteProjectMaterial] = useDeleteProjectMaterialMutation();
@@ -549,15 +539,21 @@ const ProjectDetails: React.FC = () => {
   const [addPieces, { isLoading: isAddingPieces }] = useAddPiecesMutation();
 
   const [bulkCreateSlabs, { isLoading: isBulkCreatingSlabs }] = useBulkCreateSlabsMutation();
+  const [replicateSlabTemplate, { isLoading: isReplicatingTemplate }] = useReplicateSlabTemplateMutation();
 
   // Master Maker State & Logic (Bulk Slabs & Pieces Generator)
   const [masterMakerOpen, setMasterMakerOpen] = useState(false);
+  const [masterMakerTab, setMasterMakerTab] = useState<'replicate' | 'create'>('replicate');
   const [masterSourceSlabId, setMasterSourceSlabId] = useState<string>('');
-  const [masterCopiesCount, setMasterCopiesCount] = useState<number>(50);
+  const [masterTargetMode, setMasterTargetMode] = useState<'range' | 'checkboxes'>('range');
+  const [masterFromSlabNum, setMasterFromSlabNum] = useState<string>('');
+  const [masterToSlabNum, setMasterToSlabNum] = useState<string>('');
+  const [masterSelectedTargetIds, setMasterSelectedTargetIds] = useState<string[]>([]);
+  const [masterCopiesCount, setMasterCopiesCount] = useState<number>(1);
   const [masterBaseName, setMasterBaseName] = useState<string>('Stone');
-  const [masterLength, setMasterLength] = useState<number>(150);
-  const [masterWidth, setMasterWidth] = useState<number>(20);
-  const [masterThickness, setMasterThickness] = useState<number>(50);
+  const [masterLength, setMasterLength] = useState<number>(1);
+  const [masterWidth, setMasterWidth] = useState<number>(1);
+  const [masterThickness, setMasterThickness] = useState<number>(20);
   const [masterUnit, setMasterUnit] = useState<string>('feet');
   const [masterRequiredStages, setMasterRequiredStages] = useState<string[]>(['Production', 'Polishing', 'Packing', 'Dispatch']);
   const [masterGeneratedMatrix, setMasterGeneratedMatrix] = useState<any[]>([]);
@@ -569,51 +565,29 @@ const ProjectDetails: React.FC = () => {
     wid: number, 
     thick: number, 
     unit: string,
-    reqStages: string[] = masterRequiredStages,
-    templatePieces: any[] = []
+    reqStages: string[] = masterRequiredStages
   ) => {
     const existingSlabCount = (projectSlabs || []).length;
     const cleanBase = baseName.trim() || 'Stone';
+
+    let areaSqFt = 0;
+    const u = (unit || 'inch').toLowerCase();
+    if (u === 'mm') {
+      areaSqFt = (len * wid) / 92903.04;
+    } else if (u === 'inch' || u === 'inches' || u === 'in') {
+      areaSqFt = (len * wid) / 144;
+    } else if (u === 'feet' || u === 'ft') {
+      areaSqFt = (len * wid);
+    } else {
+      areaSqFt = (len * wid);
+    }
+
+    const sizeStr = `${len}L x ${wid}W | ${thick}MM`;
 
     const matrix = [];
     for (let i = 1; i <= count; i++) {
       const slabNum = existingSlabCount + i;
       const slabName = `${cleanBase} ${slabNum}`;
-      
-      let areaSqFt = 0;
-      if (unit.toLowerCase().includes('mm')) {
-        areaSqFt = (len * wid) / 92903.04;
-      } else if (unit.toLowerCase().includes('inch') || unit.toLowerCase().includes('in')) {
-        areaSqFt = (len * wid) / 144;
-      } else if (unit.toLowerCase().includes('feet') || unit.toLowerCase().includes('ft')) {
-        areaSqFt = (len * wid);
-      } else {
-        areaSqFt = (len * wid);
-      }
-
-      const sizeStr = `${len}L x ${wid}W ${unit === 'feet' ? 'Feet' : unit === 'inch' ? 'Inches' : unit.toUpperCase()} | ${thick}MM (${areaSqFt.toFixed(2)} Sq.Ft)`;
-
-      // Cloned pieces inside this new slab
-      let piecesForThisSlab = [];
-      if (templatePieces && templatePieces.length > 0) {
-        piecesForThisSlab = templatePieces.map((tp: any, pIdx: number) => ({
-          pieceNumber: tp.pieceNumber || (pIdx + 1),
-          productName: tp.productName || `${slabName}.${pIdx + 1}`,
-          size: tp.size || sizeStr,
-          stage: tp.stage || 'Production',
-          status: 'pending'
-        }));
-      } else {
-        piecesForThisSlab = [
-          {
-            pieceNumber: 1,
-            productName: slabName,
-            size: sizeStr,
-            stage: 'Production',
-            status: 'pending'
-          }
-        ];
-      }
 
       matrix.push({
         slabNumber: slabNum,
@@ -621,26 +595,27 @@ const ProjectDetails: React.FC = () => {
         length: len,
         width: wid,
         thickness: thick,
-        unit: unit,
+        unit: u,
         size: sizeStr,
         area: parseFloat(areaSqFt.toFixed(2)),
         requiredStages: reqStages,
-        pieces: piecesForThisSlab
+        pieces: [] // Slabs from scratch have 0 pieces inside
       });
     }
     setMasterGeneratedMatrix(matrix);
   };
 
-  const initMasterMakerFromSlab = (slab: any, count = masterCopiesCount) => {
+  const initMasterMakerFromSlab = (slab: any, count = 1) => {
     if (!slab) return;
     setMasterSourceSlabId(slab.id);
+    setMasterCopiesCount(count);
     const slabName = slab.name || 'Stone';
     const base = slabName.includes(' - ') ? slabName.split(' - ')[0] : slabName.replace(/[0-9]+$/, '').trim() || 'Stone';
     setMasterBaseName(base);
 
-    let len = 150;
-    let wid = 20;
-    let thick = 50;
+    let len = 1;
+    let wid = 1;
+    let thick = 20;
     let unit = 'feet';
 
     if (slab.size) {
@@ -670,7 +645,45 @@ const ProjectDetails: React.FC = () => {
     setMasterUnit(unit);
     setMasterRequiredStages(reqStages);
 
-    generateMasterMatrixPreview(base, count, len, wid, thick, unit, reqStages, templatePieces);
+    generateMasterMatrixPreview(base, count, len, wid, thick, unit, reqStages);
+  };
+
+  const handleApplyTemplateToSlabs = async () => {
+    if (!masterSourceSlabId) {
+      setSnackbarMessage('Please select a source template slab.');
+      return;
+    }
+    const targetSlabsList = (projectSlabs || []).filter((s: any, idx: number) => {
+      if (s.id === masterSourceSlabId) return false;
+      if (masterTargetMode === 'checkboxes') {
+        return masterSelectedTargetIds.includes(s.id);
+      }
+      const match = s.name.match(/\d+$/);
+      const num = match ? parseInt(match[0], 10) : (idx + 1);
+      const fromN = masterFromSlabNum.trim() === '' ? 0 : (parseInt(masterFromSlabNum, 10) || 0);
+      const toN = masterToSlabNum.trim() === '' ? Infinity : (parseInt(masterToSlabNum, 10) || Infinity);
+      return num >= fromN && num <= toN;
+    });
+
+    if (targetSlabsList.length === 0) {
+      setSnackbarMessage('No target slabs found in the specified range/selection.');
+      return;
+    }
+
+    try {
+      const sourceSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+      await replicateSlabTemplate({
+        projectId: id as string,
+        sourceSlabId: masterSourceSlabId,
+        targetSlabIds: targetSlabsList.map((s: any) => s.id)
+      }).unwrap();
+
+      setSnackbarMessage(`Successfully replicated ${sourceSlab?.pieces?.length || 0} pieces and specs to ${targetSlabsList.length} Slabs!`);
+      setMasterMakerOpen(false);
+      refetchSlabs();
+    } catch (err: any) {
+      setSnackbarMessage(err?.data?.message || err?.message || 'Error replicating template to slabs');
+    }
   };
 
   const handleSaveMasterMakerPieces = async () => {
@@ -740,7 +753,7 @@ const ProjectDetails: React.FC = () => {
   const isReservingRef = useRef(false);
   const isEditingRef = useRef(false);
 
-  const isPlanningMode = projectSlabs?.some((s: any) => s.status === 'pending') || !projectSlabs || projectSlabs.length === 0;
+  const isPlanningMode = false;
 
   const [selectedSlabIds, setSelectedSlabIds] = useState<string[]>([]);
   const [bulkStages, setBulkStages] = useState<string[]>(['Production', 'Polishing - Honed']);
@@ -790,7 +803,7 @@ const ProjectDetails: React.FC = () => {
 
   const handleCreateSlab = async () => {
     try {
-      await createSlab({ projectId: id, ...slabForm, status: 'pending' }).unwrap();
+      await createSlab({ projectId: id, ...slabForm, status: 'active' }).unwrap();
       setSlabDialogOpen(false);
       setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
       refetchSlabs();
@@ -3662,76 +3675,98 @@ const ProjectDetails: React.FC = () => {
                     )}
                   </Box>
 
-                  {/* Unified Modern Slabs Table (Matches Image 1) */}
-                  <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, mb: 3.5, overflowX: 'auto' }}>
-                    <Table sx={{ minWidth: 1300 }}>
-                      <TableHead sx={{ bgcolor: '#F8FAFC' }}>
-                        <TableRow>
-                          <TableCell padding="checkbox" sx={{ pl: 2, py: 1.75 }}>
-                            <Checkbox 
-                              checked={isAllFilteredSelected}
-                              indeterminate={isSomeFilteredSelected}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedSlabIds(Array.from(new Set([...selectedSlabIds, ...filteredSlabs.map(s => s.id)])));
-                                } else {
-                                  const filteredIds = new Set(filteredSlabs.map(s => s.id));
-                                  setSelectedSlabIds(selectedSlabIds.filter(sid => !filteredIds.has(sid)));
-                                }
-                              }}
-                              sx={{ '&.Mui-checked': { color: '#1D4ED8' } }}
-                            />
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
-                            Product / Slab Name
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
-                            Original Spec
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
-                            Production
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
-                            Polishing (Honed)
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
-                            Polishing (Mirror)
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
-                            Packing
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
-                            Dispatch
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
-                            Overall Status
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }} align="center">
-                            Actions
-                          </TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {filteredSlabs.map((slab: any, idx: number) => (
-                          <SlabRow
-                            key={slab.id}
-                            slab={slab}
-                            index={idx}
-                            isSelected={selectedSlabIds.includes(slab.id)}
-                            onToggleSelect={() => {
-                              if (selectedSlabIds.includes(slab.id)) {
-                                setSelectedSlabIds(selectedSlabIds.filter(sid => sid !== slab.id));
-                              } else {
-                                setSelectedSlabIds([...selectedSlabIds, slab.id]);
-                              }
-                            }}
-                            onEdit={handleEditSlabClick}
-                            onDelete={handleDeleteSlab}
-                            products={products}
-                            productionLogs={productionLogs || []}
-                            isPlanningMode={isPlanningMode}
-                          />
-                        ))}
+                  {/* Unified Modern Slabs Table (Dynamically shows ONLY active required stages) */}
+                  {(() => {
+                    const ALL_STAGE_CONFIG = [
+                      { key: 'Production', label: 'Production', route: 'production' },
+                      { key: 'Polishing - Honed', label: 'Polishing (Honed)', route: 'polishing' },
+                      { key: 'Polishing - Mirror', label: 'Polishing (Mirror)', route: 'polishing' },
+                      { key: 'Packing', label: 'Packing', route: 'packing' },
+                      { key: 'Dispatch', label: 'Dispatch', route: 'dispatch' }
+                    ];
+
+                    // Dynamically calculate visible stage columns based on all project slabs
+                    const activeStageKeys = new Set<string>();
+                    (projectSlabs || []).forEach((s: any) => {
+                      const req = (s.requiredStages && Array.isArray(s.requiredStages) && s.requiredStages.length > 0)
+                        ? s.requiredStages
+                        : ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                      req.forEach((stg: string) => {
+                        if (stg === 'Polishing') activeStageKeys.add('Polishing - Honed');
+                        else activeStageKeys.add(stg);
+                      });
+                    });
+
+                    const visibleProjectStageColumns = isPlanningMode && activeStageKeys.size === 0
+                      ? ALL_STAGE_CONFIG
+                      : ALL_STAGE_CONFIG.filter(col => activeStageKeys.has(col.key));
+
+                    const columnsToRender = visibleProjectStageColumns.length > 0 ? visibleProjectStageColumns : ALL_STAGE_CONFIG;
+
+                    return (
+                      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, mb: 3.5, overflowX: 'auto' }}>
+                        <Table sx={{ minWidth: 1000 + columnsToRender.length * 80 }}>
+                          <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                            <TableRow>
+                              <TableCell padding="checkbox" sx={{ pl: 2, py: 1.75 }}>
+                                <Checkbox 
+                                  checked={isAllFilteredSelected}
+                                  indeterminate={isSomeFilteredSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedSlabIds(Array.from(new Set([...selectedSlabIds, ...filteredSlabs.map(s => s.id)])));
+                                    } else {
+                                      const filteredIds = new Set(filteredSlabs.map(s => s.id));
+                                      setSelectedSlabIds(selectedSlabIds.filter(sid => !filteredIds.has(sid)));
+                                    }
+                                  }}
+                                  sx={{ '&.Mui-checked': { color: '#1D4ED8' } }}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
+                                Product / Slab Name
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
+                                Original Spec
+                              </TableCell>
+                              
+                              {/* DYNAMIC STAGE HEADERS */}
+                              {columnsToRender.map(col => (
+                                <TableCell key={col.key} sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
+                                  {col.label}
+                                </TableCell>
+                              ))}
+
+                              <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }}>
+                                Overall Status
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.75, whiteSpace: 'nowrap' }} align="center">
+                                Actions
+                              </TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {filteredSlabs.map((slab: any, idx: number) => (
+                              <SlabRow
+                                key={slab.id}
+                                slab={slab}
+                                index={idx}
+                                isSelected={selectedSlabIds.includes(slab.id)}
+                                onToggleSelect={() => {
+                                  if (selectedSlabIds.includes(slab.id)) {
+                                    setSelectedSlabIds(selectedSlabIds.filter(sid => sid !== slab.id));
+                                  } else {
+                                    setSelectedSlabIds([...selectedSlabIds, slab.id]);
+                                  }
+                                }}
+                                onEdit={handleEditSlabClick}
+                                onDelete={handleDeleteSlab}
+                                products={products}
+                                productionLogs={productionLogs || []}
+                                isPlanningMode={isPlanningMode}
+                                activeStageColumns={columnsToRender}
+                              />
+                            ))}
                         {filteredSlabs.length === 0 && (
                           <TableRow>
                             <TableCell colSpan={10} align="center" sx={{ py: 6, color: '#94A3B8' }}>
@@ -3748,6 +3783,8 @@ const ProjectDetails: React.FC = () => {
                       </TableBody>
                     </Table>
                   </TableContainer>
+                    );
+                  })()}
 
                   {/* Footer Navigation */}
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
@@ -4951,7 +4988,7 @@ const ProjectDetails: React.FC = () => {
         </Box>
       </Dialog>
 
-      {/* MASTER MAKER BULK SLABS GENERATOR DIALOG */}
+            {/* MASTER MAKER BULK SLABS & REPLICATION DIALOG */}
       <Dialog 
         open={masterMakerOpen} 
         onClose={() => setMasterMakerOpen(false)} 
@@ -4966,10 +5003,10 @@ const ProjectDetails: React.FC = () => {
             </Box>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-                Master Maker — Bulk Slabs & Production Planning Generator
+                Master Maker — Slab Pieces & Specs Replicator
               </Typography>
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                Mass-generate individual Slabs (rows) directly in the planning table with replicated pieces.
+                Apply pieces and dimensional specifications from one configured slab across other project slabs in a range (e.g. Slab 12 to 15).
               </Typography>
             </Box>
           </Box>
@@ -4978,265 +5015,494 @@ const ProjectDetails: React.FC = () => {
           </IconButton>
         </DialogTitle>
 
+        {/* MODE NAVIGATION TABS */}
+        <Box sx={{ px: 3, pt: 2, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', gap: 1.5 }}>
+          <Button
+            variant={masterMakerTab === 'replicate' ? 'contained' : 'text'}
+            onClick={() => setMasterMakerTab('replicate')}
+            startIcon={<LayersRoundedIcon />}
+            sx={{
+              borderRadius: '10px 10px 0 0',
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              py: 1,
+              px: 2.5,
+              bgcolor: masterMakerTab === 'replicate' ? '#B38B36' : 'transparent',
+              color: masterMakerTab === 'replicate' ? '#FFFFFF' : '#475569',
+              boxShadow: masterMakerTab === 'replicate' ? '0 -2px 10px rgba(179, 139, 54, 0.2)' : 'none',
+              '&:hover': { bgcolor: masterMakerTab === 'replicate' ? '#967226' : '#F1F5F9' }
+            }}
+          >
+            ⚡ Replicate Template to Existing Slabs (e.g. Slab 12 to 15)
+          </Button>
+
+          <Button
+            variant={masterMakerTab === 'create' ? 'contained' : 'text'}
+            onClick={() => setMasterMakerTab('create')}
+            startIcon={<AutoAwesomeRoundedIcon />}
+            sx={{
+              borderRadius: '10px 10px 0 0',
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              py: 1,
+              px: 2.5,
+              bgcolor: masterMakerTab === 'create' ? '#0284C7' : 'transparent',
+              color: masterMakerTab === 'create' ? '#FFFFFF' : '#475569',
+              boxShadow: masterMakerTab === 'create' ? '0 -2px 10px rgba(2, 132, 199, 0.2)' : 'none',
+              '&:hover': { bgcolor: masterMakerTab === 'create' ? '#0369A1' : '#F1F5F9' }
+            }}
+          >
+            + Create New Slabs From Scratch
+          </Button>
+        </Box>
+
         <DialogContent sx={{ p: { xs: 2, md: 3 } }}>
-          {/* STEP 1: SELECT SOURCE SLAB TEMPLATE */}
-          <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px solid #E2E8F0' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LayersRoundedIcon sx={{ fontSize: 20, color: '#B38B36' }} /> Step 1: Select Target Slab Template (Copy Specs & Pieces)
-            </Typography>
-            <FormControl fullWidth size="small">
-              <Select
-                value={masterSourceSlabId}
-                displayEmpty
-                onChange={(e) => {
-                  const targetId = e.target.value;
-                  const slab = (projectSlabs || []).find((s: any) => s.id === targetId);
-                  if (slab) {
-                    initMasterMakerFromSlab(slab, masterCopiesCount);
-                  }
-                }}
-                sx={{ bgcolor: '#FFFFFF', borderRadius: 2, fontWeight: 700 }}
-              >
-                <MenuItem value="">
-                  <em>-- Choose Template Slab to copy specs & pieces --</em>
-                </MenuItem>
-                {(projectSlabs || []).map((s: any) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{s.name || 'Unnamed Slab'}</Typography>
-                      <Typography variant="caption" sx={{ color: '#64748B' }}>
-                        Spec: {s.size || 'Standard'} • Pieces inside: {s.pieces?.length || 0}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Paper>
+          {masterMakerTab === 'replicate' ? (
+            /* TAB 1: REPLICATE TO EXISTING SLABS RANGE */
+            (() => {
+              const sourceSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+              const sourcePiecesCount = sourceSlab?.pieces?.length || 0;
 
-          {/* STEP 2: CONFIGURATION PARAMETERS */}
-          <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#FFFFFF', borderRadius: 3, border: '1px solid #E2E8F0' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TuneRoundedIcon sx={{ fontSize: 20, color: '#0284C7' }} /> Step 2: Slabs Count & Dimensional Specifications
-            </Typography>
+              const targetSlabsList = (projectSlabs || []).filter((s: any, idx: number) => {
+                if (s.id === masterSourceSlabId) return false;
+                if (masterTargetMode === 'checkboxes') {
+                  return masterSelectedTargetIds.includes(s.id);
+                }
+                const match = s.name.match(/\d+$/);
+                const num = match ? parseInt(match[0], 10) : (idx + 1);
+                const fromN = masterFromSlabNum.trim() === '' ? 0 : (parseInt(masterFromSlabNum, 10) || 0);
+                const toN = masterToSlabNum.trim() === '' ? Infinity : (parseInt(masterToSlabNum, 10) || Infinity);
+                return num >= fromN && num <= toN;
+              });
 
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Quantity of Slabs to Create *"
-                  value={masterCopiesCount}
-                  onChange={(e) => {
-                    const count = Math.max(1, parseInt(e.target.value, 10) || 1);
-                    setMasterCopiesCount(count);
-                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(masterBaseName, count, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages, selSlab?.pieces || []);
-                  }}
-                  slotProps={{ htmlInput: { min: 1, max: 1000 } }}
-                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
-                />
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Base Slab Name *"
-                  value={masterBaseName}
-                  onChange={(e) => {
-                    const base = e.target.value;
-                    setMasterBaseName(base);
-                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(base, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages, selSlab?.pieces || []);
-                  }}
-                  placeholder="e.g. Stone or Slab"
-                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
-                />
-              </Grid>
-
-              <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Unit</InputLabel>
-                  <Select
-                    value={masterUnit}
-                    label="Unit"
-                    onChange={(e) => {
-                      const u = e.target.value;
-                      setMasterUnit(u);
-                      const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                      generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, u, masterRequiredStages, selSlab?.pieces || []);
-                    }}
-                    sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
-                  >
-                    <MenuItem value="feet">Feet (ft)</MenuItem>
-                    <MenuItem value="inch">Inches (in)</MenuItem>
-                    <MenuItem value="mm">Millimeters (mm)</MenuItem>
-                    <MenuItem value="sq_ft">Sq.Ft</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Length"
-                  value={masterLength}
-                  onChange={(e) => {
-                    const l = parseFloat(e.target.value) || 0;
-                    setMasterLength(l);
-                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(masterBaseName, masterCopiesCount, l, masterWidth, masterThickness, masterUnit, masterRequiredStages, selSlab?.pieces || []);
-                  }}
-                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
-                />
-              </Grid>
-
-              <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Width"
-                  value={masterWidth}
-                  onChange={(e) => {
-                    const w = parseFloat(e.target.value) || 0;
-                    setMasterWidth(w);
-                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, w, masterThickness, masterUnit, masterRequiredStages, selSlab?.pieces || []);
-                  }}
-                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
-                />
-              </Grid>
-
-              <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Thickness MM"
-                  value={masterThickness}
-                  onChange={(e) => {
-                    const t = parseFloat(e.target.value) || 20;
-                    setMasterThickness(t);
-                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, t, masterUnit, masterRequiredStages, selSlab?.pieces || []);
-                  }}
-                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
-                />
-              </Grid>
-            </Grid>
-
-            {/* Stages selection for generated slabs */}
-            <Box sx={{ mt: 2.5, pt: 2, borderTop: '1px dashed #E2E8F0', display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
-                Required Manufacturing Stages:
-              </Typography>
-              {['Production', 'Polishing', 'Packing', 'Dispatch'].map((stage) => {
-                const isChecked = masterRequiredStages.includes(stage);
-                return (
-                  <FormControlLabel
-                    key={stage}
-                    control={
-                      <Checkbox 
-                        size="small"
-                        checked={isChecked}
+              return (
+                <Box>
+                  {/* STEP 1: SELECT SOURCE SLAB */}
+                  <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px solid #E2E8F0' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <LayersRoundedIcon sx={{ fontSize: 20, color: '#B38B36' }} /> Step 1: Select Master Template Slab (Source)
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={masterSourceSlabId}
+                        displayEmpty
                         onChange={(e) => {
-                          const updated = e.target.checked 
-                            ? [...masterRequiredStages, stage]
-                            : masterRequiredStages.filter(s => s !== stage);
-                          setMasterRequiredStages(updated);
-                          const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                          generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit, updated, selSlab?.pieces || []);
+                          const targetId = e.target.value;
+                          setMasterSourceSlabId(targetId);
+                          const slab = (projectSlabs || []).find((s: any) => s.id === targetId);
+                          if (slab) {
+                            initMasterMakerFromSlab(slab, masterCopiesCount);
+                          }
                         }}
-                        sx={{ color: '#B38B36', '&.Mui-checked': { color: '#B38B36' } }}
-                      />
-                    }
-                    label={<Typography variant="body2" sx={{ fontWeight: 700, color: '#334155' }}>{stage}</Typography>}
-                  />
-                );
-              })}
-            </Box>
-          </Paper>
+                        sx={{ bgcolor: '#FFFFFF', borderRadius: 2, fontWeight: 700 }}
+                      >
+                        <MenuItem value="">
+                          <em>-- Choose Master Slab (with pieces configured) --</em>
+                        </MenuItem>
+                        {(projectSlabs || []).map((s: any, sIdx: number) => {
+                          const match = s.name.match(/\d+$/);
+                          const num = match ? match[0] : (sIdx + 1);
+                          return (
+                            <MenuItem key={s.id} value={s.id}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A' }}>
+                                  #{num} — {s.name || 'Unnamed Slab'}
+                                </Typography>
+                                <Chip 
+                                  size="small" 
+                                  label={`${s.pieces?.length || 0} Pieces Inside`} 
+                                  color={(s.pieces?.length || 0) > 1 ? 'primary' : 'default'}
+                                  sx={{ fontWeight: 700, fontSize: '0.72rem', height: 22 }}
+                                />
+                              </Box>
+                            </MenuItem>
+                          );
+                        })}
+                      </Select>
+                    </FormControl>
 
-          {/* STEP 3: SLABS MATRIX PREVIEW */}
-          <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #FDE68A', bgcolor: '#FFFDF5' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AutoAwesomeRoundedIcon sx={{ color: '#D97706', fontSize: 20 }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#92400E' }}>
-                  Preview: {masterGeneratedMatrix.length} Slabs to be Added to Planning Table (Outside)
-                </Typography>
-              </Box>
-
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Chip 
-                  size="small" 
-                  label={`Total Calculated Area: ${masterGeneratedMatrix.reduce((sum, p) => sum + (p.area || 0), 0).toFixed(2)} Sq.Ft`}
-                  sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 800, border: '1px solid #FCD34D' }}
-                />
-              </Box>
-            </Box>
-
-            <TableContainer sx={{ maxHeight: 320, border: '1px solid #E2E8F0', borderRadius: 2.5, bgcolor: '#FFFFFF' }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#F8FAFC' }}>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '30%' }}>Slab Name (Table Row)</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '10%' }}>Slab #</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Unit</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Length</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Width</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Thickness</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Area (Sq.Ft)</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Pieces Inside</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {masterGeneratedMatrix.map((p, idx) => (
-                    <TableRow key={idx} hover sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
-                      <TableCell sx={{ py: 0.75 }}>
-                        <TextField 
-                          size="small"
-                          value={p.name}
-                          onChange={(e) => {
-                            const newName = e.target.value;
-                            setMasterGeneratedMatrix(prev => prev.map((item, i) => i === idx ? { ...item, name: newName } : item));
-                          }}
-                          fullWidth
-                          slotProps={{ input: { sx: { height: 32, fontSize: '0.85rem', bgcolor: '#FFFFFF', borderRadius: 1.5 } } }}
+                    {sourceSlab && (
+                      <Box sx={{ mt: 2, p: 1.5, bgcolor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CheckCircleRoundedIcon sx={{ color: '#059669', fontSize: 20 }} />
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#065F46' }}>
+                            Source: {sourceSlab.name} ({sourcePiecesCount} Pieces configured • Spec: {sourceSlab.size || 'Standard'})
+                          </Typography>
+                        </Box>
+                        <Chip 
+                          label={`Stages: ${getSlabAllowedStages(sourceSlab).join(' → ')}`} 
+                          size="small" 
+                          sx={{ bgcolor: '#FFFFFF', color: '#065F46', fontWeight: 700, fontSize: '0.7rem' }}
                         />
-                      </TableCell>
-                      <TableCell sx={{ py: 0.75 }}>
-                        <Chip size="small" label={`#${p.slabNumber}`} sx={{ fontWeight: 800, fontSize: '0.7rem' }} />
-                      </TableCell>
-                      <TableCell sx={{ py: 0.75 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748B' }}>{p.unit}</Typography>
-                      </TableCell>
-                      <TableCell sx={{ py: 0.75 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>{p.length}</Typography>
-                      </TableCell>
-                      <TableCell sx={{ py: 0.75 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>{p.width}</Typography>
-                      </TableCell>
-                      <TableCell sx={{ py: 0.75 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748B' }}>{p.thickness}mm</Typography>
-                      </TableCell>
-                      <TableCell sx={{ py: 0.75 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669' }}>{p.area} Sq.Ft</Typography>
-                      </TableCell>
-                      <TableCell sx={{ py: 0.75 }}>
-                        <Chip size="small" label={`${(p.pieces || []).length} Piece(s)`} sx={{ fontWeight: 700, fontSize: '0.72rem', bgcolor: '#E0F2FE', color: '#0369A1' }} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+                      </Box>
+                    )}
+                  </Paper>
+
+                  {/* STEP 2: CHOOSE TARGET SLABS RANGE OR SELECTION */}
+                  <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#FFFFFF', borderRadius: 3, border: '1px solid #E2E8F0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <TuneRoundedIcon sx={{ fontSize: 20, color: '#0284C7' }} /> Step 2: Choose Target Slabs (Kahan se Kahan tak apply karna hai)
+                      </Typography>
+
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          size="small"
+                          variant={masterTargetMode === 'range' ? 'contained' : 'outlined'}
+                          onClick={() => setMasterTargetMode('range')}
+                          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, fontSize: '0.75rem' }}
+                        >
+                          Slab Number Range (e.g. 12 to 15)
+                        </Button>
+                        <Button
+                          size="small"
+                          variant={masterTargetMode === 'checkboxes' ? 'contained' : 'outlined'}
+                          onClick={() => setMasterTargetMode('checkboxes')}
+                          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, fontSize: '0.75rem' }}
+                        >
+                          Pick Specific Slabs
+                        </Button>
+                      </Box>
+                    </Box>
+
+                    {masterTargetMode === 'range' ? (
+                      <Box>
+                        <Grid container spacing={2} sx={{ alignItems: 'center' }}>
+                          <Grid size={{ xs: 12, sm: 5 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              label="From Slab Number (e.g. 12)"
+                              placeholder="e.g. 12"
+                              value={masterFromSlabNum}
+                              onChange={(e) => setMasterFromSlabNum(e.target.value.replace(/[^0-9]/g, ''))}
+                              onFocus={(e) => e.target.select()}
+                              slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+                              sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                            />
+                          </Grid>
+
+                          <Grid size={{ xs: 12, sm: 2 }} sx={{ textAlign: 'center' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#64748B' }}>
+                              TO
+                            </Typography>
+                          </Grid>
+
+                          <Grid size={{ xs: 12, sm: 5 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              label="To Slab Number (e.g. 15)"
+                              placeholder="e.g. 15"
+                              value={masterToSlabNum}
+                              onChange={(e) => setMasterToSlabNum(e.target.value.replace(/[^0-9]/g, ''))}
+                              onFocus={(e) => e.target.select()}
+                              slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+                              sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                            />
+                          </Grid>
+                        </Grid>
+
+                        <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              const match = sourceSlab?.name?.match(/\d+$/);
+                              const curr = match ? parseInt(match[0], 10) : 1;
+                              setMasterFromSlabNum(curr + 1);
+                              setMasterToSlabNum((projectSlabs || []).length);
+                            }}
+                            sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.75rem', bgcolor: '#EFF6FF', color: '#1D4ED8' }}
+                          >
+                            ⚡ Apply to All Remaining Slabs (#{Number(sourceSlab?.name?.match(/\d+$/)?.[0] || 1) + 1} to #{(projectSlabs || []).length})
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setMasterFromSlabNum(1);
+                              setMasterToSlabNum((projectSlabs || []).length);
+                            }}
+                            sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.75rem', bgcolor: '#F1F5F9', color: '#475569' }}
+                          >
+                            All Slabs (#1 to #{(projectSlabs || []).length})
+                          </Button>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{ maxHeight: 200, overflowY: 'auto', p: 1, bgcolor: '#FAFAFA', borderRadius: 2, border: '1px solid #E2E8F0' }}>
+                        <Grid container spacing={1}>
+                          {(projectSlabs || []).filter((s: any) => s.id !== masterSourceSlabId).map((s: any) => {
+                            const isSelected = masterSelectedTargetIds.includes(s.id);
+                            return (
+                              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={s.id}>
+                                <Box
+                                  onClick={() => {
+                                    if (isSelected) setMasterSelectedTargetIds(masterSelectedTargetIds.filter(id => id !== s.id));
+                                    else setMasterSelectedTargetIds([...masterSelectedTargetIds, s.id]);
+                                  }}
+                                  sx={{
+                                    p: 1,
+                                    borderRadius: 1.5,
+                                    border: '1px solid',
+                                    borderColor: isSelected ? '#3B82F6' : '#E2E8F0',
+                                    bgcolor: isSelected ? '#EFF6FF' : '#FFFFFF',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                  }}
+                                >
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Checkbox size="small" checked={isSelected} sx={{ p: 0 }} />
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{s.name}</Typography>
+                                  </Box>
+                                  <Chip size="small" label={`${s.pieces?.length || 0} pcs`} sx={{ fontSize: '0.68rem', height: 20 }} />
+                                </Box>
+                              </Grid>
+                            );
+                          })}
+                        </Grid>
+                      </Box>
+                    )}
+                  </Paper>
+
+                  {/* STEP 3: PREVIEW TARGET SLABS */}
+                  <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #BAE6FD', bgcolor: '#F0F9FF' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AutoAwesomeRoundedIcon sx={{ color: '#0284C7', fontSize: 20 }} />
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0369A1' }}>
+                          Preview: {targetSlabsList.length} Target Slabs to be Updated with {sourcePiecesCount} Pieces each
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        size="small" 
+                        label={`Total Generated Pieces: ${targetSlabsList.length * sourcePiecesCount}`} 
+                        sx={{ bgcolor: '#0284C7', color: '#FFFFFF', fontWeight: 800 }}
+                      />
+                    </Box>
+
+                    <TableContainer sx={{ maxHeight: 260, border: '1px solid #E2E8F0', borderRadius: 2.5, bgcolor: '#FFFFFF' }}>
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Target Slab Name</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Current Pieces</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>New Pieces to Apply</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Specs & Size to Copy</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Stages</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {targetSlabsList.map((ts: any) => (
+                            <TableRow key={ts.id} hover>
+                              <TableCell sx={{ py: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A' }}>{ts.name}</Typography>
+                              </TableCell>
+                              <TableCell sx={{ py: 1 }}>
+                                <Chip size="small" label={`${ts.pieces?.length || 0} pcs`} sx={{ fontSize: '0.7rem', height: 20 }} />
+                              </TableCell>
+                              <TableCell sx={{ py: 1 }}>
+                                <Chip 
+                                  size="small" 
+                                  label={`→ ${sourcePiecesCount} Sub-Pieces (${ts.name}.1 to ${ts.name}.${sourcePiecesCount})`} 
+                                  color="success" 
+                                  sx={{ fontWeight: 800, fontSize: '0.72rem', height: 22 }}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ py: 1 }}>
+                                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+                                  {sourceSlab?.size || 'Standard Spec'}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ py: 1 }}>
+                                <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
+                                  {((sourceSlab?.requiredStages && sourceSlab.requiredStages.length > 0) ? sourceSlab.requiredStages : (ts?.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'])).join(' → ')}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {targetSlabsList.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={5} align="center" sx={{ py: 4, color: '#94A3B8' }}>
+                                No target slabs match the selected range. Please adjust the "From" and "To" numbers above.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Paper>
+                </Box>
+              );
+            })()
+          ) : (
+            /* TAB 2: CREATE NEW SLABS FROM SCRATCH */
+            <Box>
+              <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#FFFFFF', borderRadius: 3, border: '1px solid #E2E8F0' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <TuneRoundedIcon sx={{ fontSize: 20, color: '#0284C7' }} /> Create New Slabs in Planning Table
+                </Typography>
+
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Quantity of Slabs to Create *"
+                      value={masterCopiesCount}
+                      onChange={(e) => {
+                        const count = Math.max(1, parseInt(e.target.value, 10) || 1);
+                        setMasterCopiesCount(count);
+                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                        generateMasterMatrixPreview(masterBaseName, count, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages);
+                      }}
+                      slotProps={{ htmlInput: { min: 1, max: 1000 } }}
+                      sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Base Slab Name *"
+                      value={masterBaseName}
+                      onChange={(e) => {
+                        const base = e.target.value;
+                        setMasterBaseName(base);
+                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                        generateMasterMatrixPreview(base, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages);
+                      }}
+                      placeholder="e.g. Stone or Slab"
+                      sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Unit</InputLabel>
+                      <Select
+                        value={masterUnit}
+                        label="Unit"
+                        onChange={(e) => {
+                          const u = e.target.value;
+                          setMasterUnit(u);
+                          const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                          generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, u, masterRequiredStages);
+                        }}
+                        sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                      >
+                        <MenuItem value="feet">Feet (ft)</MenuItem>
+                        <MenuItem value="inch">Inches (in)</MenuItem>
+                        <MenuItem value="mm">Millimeters (mm)</MenuItem>
+                        <MenuItem value="sq_ft">Sq.Ft</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Length"
+                      value={masterLength}
+                      onChange={(e) => {
+                        const l = parseFloat(e.target.value) || 0;
+                        setMasterLength(l);
+                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                        generateMasterMatrixPreview(masterBaseName, masterCopiesCount, l, masterWidth, masterThickness, masterUnit, masterRequiredStages);
+                      }}
+                      sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Width"
+                      value={masterWidth}
+                      onChange={(e) => {
+                        const w = parseFloat(e.target.value) || 0;
+                        setMasterWidth(w);
+                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                        generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, w, masterThickness, masterUnit, masterRequiredStages);
+                      }}
+                      sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Thickness MM"
+                      value={masterThickness}
+                      onChange={(e) => {
+                        const t = parseFloat(e.target.value) || 20;
+                        setMasterThickness(t);
+                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                        generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, t, masterUnit, masterRequiredStages);
+                      }}
+                      sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #FDE68A', bgcolor: '#FFFDF5' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#92400E' }}>
+                    Preview: {masterGeneratedMatrix.length} New Slabs to Create
+                  </Typography>
+                </Box>
+                <TableContainer sx={{ maxHeight: 260, border: '1px solid #E2E8F0', borderRadius: 2.5, bgcolor: '#FFFFFF' }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Slab Name</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Slab #</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Unit</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Dimensions</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Area</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Pieces Inside</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {masterGeneratedMatrix.map((p, idx) => (
+                        <TableRow key={idx} hover>
+                          <TableCell sx={{ py: 0.75 }}>
+                            <TextField 
+                              size="small"
+                              value={p.name}
+                              onChange={(e) => {
+                                const newName = e.target.value;
+                                setMasterGeneratedMatrix(prev => prev.map((item, i) => i === idx ? { ...item, name: newName } : item));
+                              }}
+                              fullWidth
+                              slotProps={{ input: { sx: { height: 32, fontSize: '0.85rem' } } }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ py: 0.75 }}>#{p.slabNumber}</TableCell>
+                          <TableCell sx={{ py: 0.75 }}>{p.unit}</TableCell>
+                          <TableCell sx={{ py: 0.75 }}>{p.length} x {p.width} | {p.thickness}mm</TableCell>
+                          <TableCell sx={{ py: 0.75 }}>{p.area} Sq.Ft</TableCell>
+                          <TableCell sx={{ py: 0.75 }}><Chip size="small" label="0 Pieces (Whole Slab)" sx={{ height: 20, fontSize: '0.68rem' }} /></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+          )}
         </DialogContent>
 
         <DialogActions sx={{ p: 3, pt: 2, borderTop: '1px solid #F1F5F9', bgcolor: '#FDFBF7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -5244,26 +5510,49 @@ const ProjectDetails: React.FC = () => {
             Cancel
           </Button>
 
-          <Button
-            variant="contained"
-            disabled={masterGeneratedMatrix.length === 0 || isBulkCreatingSlabs}
-            startIcon={isBulkCreatingSlabs ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeRoundedIcon />}
-            onClick={handleSaveMasterMakerPieces}
-            sx={{
-              borderRadius: 2.5,
-              textTransform: 'none',
-              fontWeight: 800,
-              fontSize: '0.95rem',
-              px: 3,
-              py: 1,
-              bgcolor: '#B38B36',
-              color: '#FFFFFF',
-              boxShadow: '0 4px 14px rgba(179, 139, 54, 0.3)',
-              '&:hover': { bgcolor: '#967226' }
-            }}
-          >
-            {isBulkCreatingSlabs ? 'Generating Slabs...' : `Generate & Add (${masterGeneratedMatrix.length} Slabs to Table)`}
-          </Button>
+          {masterMakerTab === 'replicate' ? (
+            <Button
+              variant="contained"
+              disabled={isReplicatingTemplate}
+              startIcon={isReplicatingTemplate ? <CircularProgress size={18} color="inherit" /> : <LayersRoundedIcon />}
+              onClick={handleApplyTemplateToSlabs}
+              sx={{
+                borderRadius: 2.5,
+                textTransform: 'none',
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                px: 3.5,
+                py: 1.1,
+                bgcolor: '#B38B36',
+                color: '#FFFFFF',
+                boxShadow: '0 4px 14px rgba(179, 139, 54, 0.3)',
+                '&:hover': { bgcolor: '#967226' }
+              }}
+            >
+              {isReplicatingTemplate ? 'Replicating Pieces to Slabs...' : '⚡ Replicate Template Pieces to Target Slabs'}
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              disabled={masterGeneratedMatrix.length === 0 || isBulkCreatingSlabs}
+              startIcon={isBulkCreatingSlabs ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeRoundedIcon />}
+              onClick={handleSaveMasterMakerPieces}
+              sx={{
+                borderRadius: 2.5,
+                textTransform: 'none',
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                px: 3.5,
+                py: 1.1,
+                bgcolor: '#0284C7',
+                color: '#FFFFFF',
+                boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)',
+                '&:hover': { bgcolor: '#0369A1' }
+              }}
+            >
+              {isBulkCreatingSlabs ? 'Creating Slabs...' : `Generate & Add (${masterGeneratedMatrix.length} Slabs to Table)`}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

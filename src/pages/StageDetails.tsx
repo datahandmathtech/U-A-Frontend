@@ -474,8 +474,7 @@ const StageDetails = () => {
                 const polishLog = pieceProductionLogs.find((l: any) => (l.stage?.startsWith('Polishing') || l.stage === 'Polishing') && (l.approvalStatus === 'approved' || l.approvalStatus === 'completed'));
                 const isVendor = !!(polishLog?.vendorName || p.vendorName || (vendorName && !pLog?.machine));
                 const vendorLabel = polishLog?.vendorName || p.vendorName || vendorName;
-                const workerLabel = polishLog?.workerName || polishLog?.worker?.name || p.workerName || (displayStatus === 'completed' ? 'Abhay 1' : '—');
-                const approvalId = polishLog?.id ? `#${polishLog.id.slice(-6).toUpperCase()}` : (displayStatus === 'completed' ? '#AP-PLSH' : null);
+                const isCompletedOrLogged = displayStatus === 'completed' || !!polishLog;
 
                 if (isVendor && vendorLabel) {
                   return (
@@ -488,13 +487,17 @@ const StageDetails = () => {
                   );
                 }
 
-                return workerLabel !== '—' ? (
-                  <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
-                      {workerLabel}
-                    </Typography>
-                  </Box>
-                ) : (
+                if (isCompletedOrLogged) {
+                  return (
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#B45309', fontSize: '0.82rem' }}>
+                        Manual
+                      </Typography>
+                    </Box>
+                  );
+                }
+
+                return (
                   <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
                 );
               })()
@@ -1352,10 +1355,18 @@ const StageDetails = () => {
                     displayLogs = [...packedDisplay, ...directLogs];
                   } else {
                     displayLogs = productionLogs?.filter((l: any) =>
-                      l.stage === stageFormatted &&
+                      (l.stage === stageFormatted || l.stage === `${stageFormatted} Work` || l.stage?.startsWith(stageFormatted)) &&
                       (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
-                      (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id)
+                      (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
                     ) || [];
+
+                    if (displayLogs.length === 0 && stageFormatted === 'Packing') {
+                      displayLogs = productionLogs?.filter((l: any) =>
+                        (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
+                        (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
+                        (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
+                      ) || [];
+                    }
                   }
 
                   if (searchQuery.trim()) {
@@ -1400,11 +1411,22 @@ const StageDetails = () => {
                         {/* Logged By */}
                         <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
                           {(() => {
-                            const logger = log.workerName || log.worker?.name || log.vendorName || 'Abhay 1';
+                            const logger = log.workerName || log.worker?.name || log.vendorName;
+                            const isVendor = !!(log.vendorName || (logger && !['Admin User', 'Admin', 'Manual'].includes(logger) && log.isVendor));
+                            if (isVendor) {
+                              return (
+                                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
+                                    {logger}
+                                  </Typography>
+                                  <Chip label="Job Work" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 800, bgcolor: '#FFF7ED', color: '#EA580C', border: '1px solid #FFEDD5' }} />
+                                </Box>
+                              );
+                            }
                             return (
-                              <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
-                                  {logger}
+                              <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 800, color: '#B45309', fontSize: '0.82rem' }}>
+                                  Manual
                                 </Typography>
                               </Box>
                             );
@@ -1530,7 +1552,7 @@ const StageDetails = () => {
                     Product / Piece Name
                   </TableCell>
                   <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
-                    {stageFormatted === 'Polishing' ? 'Logged By' : 'Used Raw Block'}
+                    {stageFormatted === 'Polishing' ? 'Machine / Workstation' : 'Used Raw Block'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
                     Actual Dimensions
