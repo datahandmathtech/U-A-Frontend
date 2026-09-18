@@ -333,6 +333,10 @@ export const apiSlice = createApi({
       query: (body) => ({ url: '/slabs', method: 'POST', body }),
       invalidatesTags: ['Production']
     }),
+    bulkCreateSlabs: builder.mutation<any, { projectId: string; slabs: any[] }>({
+      query: (body) => ({ url: '/slabs/bulk-create', method: 'POST', body }),
+      invalidatesTags: ['Production', 'Project']
+    }),
     updateSlab: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({ url: `/slabs/${id}`, method: 'PUT', body: data }),
       invalidatesTags: ['Production']
@@ -635,5 +639,6 @@ export const {
   useGetPackingItemsQuery,
   useSavePackingItemsMutation,
   useGetItemLogsQuery,
-  useManualApprovePiecesMutation
+  useManualApprovePiecesMutation,
+  useBulkCreateSlabsMutation
 } = apiSlice;

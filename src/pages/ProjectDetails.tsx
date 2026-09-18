@@ -59,7 +59,7 @@ import {
   useGetInventoryQuery, useCreateInventoryMutation, useGetCategoriesQuery, useCreateCategoryMutation, useDeleteCategoryMutation,
   useGetUnitsQuery, useCreateUnitMutation, useDeleteUnitMutation,
   useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation,
-  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useAddPiecesMutation, useSyncSlabsMutation,
+  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useAddPiecesMutation, useBulkCreateSlabsMutation, useSyncSlabsMutation,
   useGetQuotationTermsQuery, useAddQuotationTermMutation
 } from '../store/apiSlice';
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
@@ -3418,6 +3418,8 @@ const ProjectDetails: React.FC = () => {
                             onClick={() => {
                               if (projectSlabs && projectSlabs.length > 0) {
                                 initMasterMakerFromSlab(projectSlabs[0]);
+                              } else {
+                                generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages);
                               }
                               setMasterMakerOpen(true);
                             }}
