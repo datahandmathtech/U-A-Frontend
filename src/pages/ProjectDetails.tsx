@@ -548,55 +548,84 @@ const ProjectDetails: React.FC = () => {
   const [syncSlabs] = useSyncSlabsMutation();
   const [addPieces, { isLoading: isAddingPieces }] = useAddPiecesMutation();
 
-  // Master Maker State & Logic
+  const [bulkCreateSlabs, { isLoading: isBulkCreatingSlabs }] = useBulkCreateSlabsMutation();
+
+  // Master Maker State & Logic (Bulk Slabs & Pieces Generator)
   const [masterMakerOpen, setMasterMakerOpen] = useState(false);
   const [masterSourceSlabId, setMasterSourceSlabId] = useState<string>('');
   const [masterCopiesCount, setMasterCopiesCount] = useState<number>(50);
-  const [masterBaseName, setMasterBaseName] = useState<string>('Piece');
-  const [masterLength, setMasterLength] = useState<number>(24);
-  const [masterWidth, setMasterWidth] = useState<number>(24);
-  const [masterThickness, setMasterThickness] = useState<number>(20);
-  const [masterUnit, setMasterUnit] = useState<string>('inch');
+  const [masterBaseName, setMasterBaseName] = useState<string>('Stone');
+  const [masterLength, setMasterLength] = useState<number>(150);
+  const [masterWidth, setMasterWidth] = useState<number>(20);
+  const [masterThickness, setMasterThickness] = useState<number>(50);
+  const [masterUnit, setMasterUnit] = useState<string>('feet');
+  const [masterRequiredStages, setMasterRequiredStages] = useState<string[]>(['Production', 'Polishing', 'Packing', 'Dispatch']);
   const [masterGeneratedMatrix, setMasterGeneratedMatrix] = useState<any[]>([]);
 
   const generateMasterMatrixPreview = (
-    slab: any, 
     baseName: string, 
     count: number, 
     len: number, 
     wid: number, 
     thick: number, 
-    unit: string
+    unit: string,
+    reqStages: string[] = masterRequiredStages,
+    templatePieces: any[] = []
   ) => {
-    const existingMax = (slab?.pieces || []).length > 0 
-      ? Math.max(...(slab.pieces || []).map((p: any) => Number(p.pieceNumber) || 0)) 
-      : 0;
+    const existingSlabCount = (projectSlabs || []).length;
+    const cleanBase = baseName.trim() || 'Stone';
 
     const matrix = [];
     for (let i = 1; i <= count; i++) {
-      const pieceNum = existingMax + i;
-      const cleanBase = baseName.trim() || 'Piece';
-      const pieceName = `${cleanBase}.${pieceNum}`;
-      const sizeStr = `${len} × ${wid} (${unit}) × ${thick}mm`;
+      const slabNum = existingSlabCount + i;
+      const slabName = `${cleanBase} ${slabNum}`;
       
       let areaSqFt = 0;
       if (unit.toLowerCase().includes('mm')) {
         areaSqFt = (len * wid) / 92903.04;
       } else if (unit.toLowerCase().includes('inch') || unit.toLowerCase().includes('in')) {
         areaSqFt = (len * wid) / 144;
+      } else if (unit.toLowerCase().includes('feet') || unit.toLowerCase().includes('ft')) {
+        areaSqFt = (len * wid);
       } else {
         areaSqFt = (len * wid);
       }
 
+      const sizeStr = `${len}L x ${wid}W ${unit === 'feet' ? 'Feet' : unit === 'inch' ? 'Inches' : unit.toUpperCase()} | ${thick}MM (${areaSqFt.toFixed(2)} Sq.Ft)`;
+
+      // Cloned pieces inside this new slab
+      let piecesForThisSlab = [];
+      if (templatePieces && templatePieces.length > 0) {
+        piecesForThisSlab = templatePieces.map((tp: any, pIdx: number) => ({
+          pieceNumber: tp.pieceNumber || (pIdx + 1),
+          productName: tp.productName || `${slabName}.${pIdx + 1}`,
+          size: tp.size || sizeStr,
+          stage: tp.stage || 'Production',
+          status: 'pending'
+        }));
+      } else {
+        piecesForThisSlab = [
+          {
+            pieceNumber: 1,
+            productName: slabName,
+            size: sizeStr,
+            stage: 'Production',
+            status: 'pending'
+          }
+        ];
+      }
+
       matrix.push({
-        pieceNumber: pieceNum,
-        name: pieceName,
+        slabNumber: slabNum,
+        name: slabName,
         length: len,
         width: wid,
         thickness: thick,
         unit: unit,
         size: sizeStr,
-        area: parseFloat(areaSqFt.toFixed(2))
+        area: parseFloat(areaSqFt.toFixed(2)),
+        requiredStages: reqStages,
+        pieces: piecesForThisSlab
       });
     }
     setMasterGeneratedMatrix(matrix);
@@ -605,59 +634,61 @@ const ProjectDetails: React.FC = () => {
   const initMasterMakerFromSlab = (slab: any, count = masterCopiesCount) => {
     if (!slab) return;
     setMasterSourceSlabId(slab.id);
-    const slabName = slab.name || 'Piece';
-    const base = slabName.includes(' - ') ? slabName.split(' - ')[0] : slabName;
+    const slabName = slab.name || 'Stone';
+    const base = slabName.includes(' - ') ? slabName.split(' - ')[0] : slabName.replace(/[0-9]+$/, '').trim() || 'Stone';
     setMasterBaseName(base);
 
-    let len = 24;
-    let wid = 24;
-    let thick = 20;
-    let unit = 'inch';
+    let len = 150;
+    let wid = 20;
+    let thick = 50;
+    let unit = 'feet';
 
-    if (slab.pieces && slab.pieces.length > 0) {
-      const p0 = slab.pieces[0];
-      if (p0.size) {
-        const parts = String(p0.size).split('×').map(s => s.trim());
-        if (parts.length >= 2) {
-          len = parseFloat(parts[0]) || 24;
-          wid = parseFloat(parts[1]) || 24;
-          if (parts[2]) thick = parseFloat(parts[2]) || 20;
-        }
-      }
-    } else if (slab.size) {
-      const parts = String(slab.size).split('×').map(s => s.trim());
-      if (parts.length >= 2) {
-        len = parseFloat(parts[0]) || 24;
-        wid = parseFloat(parts[1]) || 24;
-        if (parts[2]) thick = parseFloat(parts[2]) || 20;
-      }
+    if (slab.size) {
+      const raw = String(slab.size);
+      if (raw.toLowerCase().includes('feet') || raw.toLowerCase().includes('ft')) unit = 'feet';
+      else if (raw.toLowerCase().includes('inch') || raw.toLowerCase().includes('in')) unit = 'inch';
+      else if (raw.toLowerCase().includes('mm')) unit = 'mm';
+
+      const matchL = raw.match(/([0-9.]+)\s*L/i);
+      const matchW = raw.match(/([0-9.]+)\s*W/i);
+      const matchT = raw.match(/([0-9.]+)\s*MM/i);
+
+      if (matchL) len = parseFloat(matchL[1]) || len;
+      if (matchW) wid = parseFloat(matchW[1]) || wid;
+      if (matchT) thick = parseFloat(matchT[1]) || thick;
     }
+
+    const reqStages = slab.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0
+      ? slab.requiredStages
+      : ['Production', 'Polishing', 'Packing', 'Dispatch'];
+
+    const templatePieces = slab.pieces || [];
 
     setMasterLength(len);
     setMasterWidth(wid);
     setMasterThickness(thick);
     setMasterUnit(unit);
+    setMasterRequiredStages(reqStages);
 
-    generateMasterMatrixPreview(slab, base, count, len, wid, thick, unit);
+    generateMasterMatrixPreview(base, count, len, wid, thick, unit, reqStages, templatePieces);
   };
 
   const handleSaveMasterMakerPieces = async () => {
-    if (!masterSourceSlabId) {
-      setSnackbarMessage('Please select a target slab');
-      return;
-    }
     if (masterGeneratedMatrix.length === 0) {
-      setSnackbarMessage('No pieces generated to save');
+      setSnackbarMessage('No slabs generated to save');
       return;
     }
     try {
-      await addPieces({ slabId: masterSourceSlabId, data: { piecesArray: masterGeneratedMatrix } }).unwrap();
+      await bulkCreateSlabs({
+        projectId: id as string,
+        slabs: masterGeneratedMatrix
+      }).unwrap();
 
-      setSnackbarMessage(`Successfully generated and added ${masterGeneratedMatrix.length} pieces!`);
+      setSnackbarMessage(`Successfully created ${masterGeneratedMatrix.length} Slabs in Slabs & Production Planning!`);
       setMasterMakerOpen(false);
       refetchSlabs();
     } catch (err: any) {
-      setSnackbarMessage(err?.data?.message || err?.message || 'Failed to generate pieces with Master Maker');
+      setSnackbarMessage(err?.data?.message || err?.message || 'Failed to generate slabs with Master Maker');
     }
   };
 
@@ -4920,13 +4951,13 @@ const ProjectDetails: React.FC = () => {
         </Box>
       </Dialog>
 
-      {/* MASTER MAKER BULK CLONER & GENERATOR DIALOG */}
+      {/* MASTER MAKER BULK SLABS GENERATOR DIALOG */}
       <Dialog 
         open={masterMakerOpen} 
         onClose={() => setMasterMakerOpen(false)} 
         maxWidth="lg" 
         fullWidth
-        slotProps={{ paper: { sx: { borderRadius: 4, maxHeight: '90vh' } } }}
+        slotProps={{ paper: { sx: { borderRadius: 4, maxHeight: '92vh' } } }}
       >
         <DialogTitle sx={{ p: 3, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', bgcolor: '#FDFBF7' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -4935,10 +4966,10 @@ const ProjectDetails: React.FC = () => {
             </Box>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-                Master Maker — Bulk Piece & Sub-Piece Generator
+                Master Maker — Bulk Slabs & Production Planning Generator
               </Typography>
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                Mass-generate identical or sequential cut pieces and sub-pieces without repetitive manual entry.
+                Mass-generate individual Slabs (rows) directly in the planning table with replicated pieces.
               </Typography>
             </Box>
           </Box>
@@ -4951,11 +4982,12 @@ const ProjectDetails: React.FC = () => {
           {/* STEP 1: SELECT SOURCE SLAB TEMPLATE */}
           <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px solid #E2E8F0' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LayersRoundedIcon sx={{ fontSize: 20, color: '#B38B36' }} /> Step 1: Select Target Slab Template *
+              <LayersRoundedIcon sx={{ fontSize: 20, color: '#B38B36' }} /> Step 1: Select Target Slab Template (Copy Specs & Pieces)
             </Typography>
             <FormControl fullWidth size="small">
               <Select
                 value={masterSourceSlabId}
+                displayEmpty
                 onChange={(e) => {
                   const targetId = e.target.value;
                   const slab = (projectSlabs || []).find((s: any) => s.id === targetId);
@@ -4965,12 +4997,15 @@ const ProjectDetails: React.FC = () => {
                 }}
                 sx={{ bgcolor: '#FFFFFF', borderRadius: 2, fontWeight: 700 }}
               >
+                <MenuItem value="">
+                  <em>-- Choose Template Slab to copy specs & pieces --</em>
+                </MenuItem>
                 {(projectSlabs || []).map((s: any) => (
                   <MenuItem key={s.id} value={s.id}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>{s.name || 'Unnamed Slab'}</Typography>
                       <Typography variant="caption" sx={{ color: '#64748B' }}>
-                        Size: {s.size || 'Standard'} • Existing Pieces: {s.pieces?.length || 0}
+                        Spec: {s.size || 'Standard'} • Pieces inside: {s.pieces?.length || 0}
                       </Typography>
                     </Box>
                   </MenuItem>
@@ -4982,7 +5017,7 @@ const ProjectDetails: React.FC = () => {
           {/* STEP 2: CONFIGURATION PARAMETERS */}
           <Paper elevation={0} sx={{ p: 2.5, mb: 3, bgcolor: '#FFFFFF', borderRadius: 3, border: '1px solid #E2E8F0' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#334155', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TuneRoundedIcon sx={{ fontSize: 20, color: '#0284C7' }} /> Step 2: Piece Specifications & Quantity
+              <TuneRoundedIcon sx={{ fontSize: 20, color: '#0284C7' }} /> Step 2: Slabs Count & Dimensional Specifications
             </Typography>
 
             <Grid container spacing={2}>
@@ -4991,13 +5026,13 @@ const ProjectDetails: React.FC = () => {
                   fullWidth
                   size="small"
                   type="number"
-                  label="Quantity to Generate *"
+                  label="Quantity of Slabs to Create *"
                   value={masterCopiesCount}
                   onChange={(e) => {
                     const count = Math.max(1, parseInt(e.target.value, 10) || 1);
                     setMasterCopiesCount(count);
-                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(slab, masterBaseName, count, masterLength, masterWidth, masterThickness, masterUnit);
+                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(masterBaseName, count, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages, selSlab?.pieces || []);
                   }}
                   slotProps={{ htmlInput: { min: 1, max: 1000 } }}
                   sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
@@ -5008,15 +5043,15 @@ const ProjectDetails: React.FC = () => {
                 <TextField
                   fullWidth
                   size="small"
-                  label="Base Piece Name *"
+                  label="Base Slab Name *"
                   value={masterBaseName}
                   onChange={(e) => {
                     const base = e.target.value;
                     setMasterBaseName(base);
-                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(slab, base, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit);
+                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(base, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages, selSlab?.pieces || []);
                   }}
-                  placeholder="e.g. P-01 or Slab 1"
+                  placeholder="e.g. Stone or Slab"
                   sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                 />
               </Grid>
@@ -5030,14 +5065,14 @@ const ProjectDetails: React.FC = () => {
                     onChange={(e) => {
                       const u = e.target.value;
                       setMasterUnit(u);
-                      const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                      generateMasterMatrixPreview(slab, masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, u);
+                      const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                      generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, u, masterRequiredStages, selSlab?.pieces || []);
                     }}
                     sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                   >
+                    <MenuItem value="feet">Feet (ft)</MenuItem>
                     <MenuItem value="inch">Inches (in)</MenuItem>
                     <MenuItem value="mm">Millimeters (mm)</MenuItem>
-                    <MenuItem value="feet">Feet (ft)</MenuItem>
                     <MenuItem value="sq_ft">Sq.Ft</MenuItem>
                   </Select>
                 </FormControl>
@@ -5048,13 +5083,13 @@ const ProjectDetails: React.FC = () => {
                   fullWidth
                   size="small"
                   type="number"
-                  label="Length (L)"
+                  label="Length"
                   value={masterLength}
                   onChange={(e) => {
                     const l = parseFloat(e.target.value) || 0;
                     setMasterLength(l);
-                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(slab, masterBaseName, masterCopiesCount, l, masterWidth, masterThickness, masterUnit);
+                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(masterBaseName, masterCopiesCount, l, masterWidth, masterThickness, masterUnit, masterRequiredStages, selSlab?.pieces || []);
                   }}
                   sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                 />
@@ -5065,13 +5100,13 @@ const ProjectDetails: React.FC = () => {
                   fullWidth
                   size="small"
                   type="number"
-                  label="Width (W)"
+                  label="Width"
                   value={masterWidth}
                   onChange={(e) => {
                     const w = parseFloat(e.target.value) || 0;
                     setMasterWidth(w);
-                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(slab, masterBaseName, masterCopiesCount, masterLength, w, masterThickness, masterUnit);
+                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, w, masterThickness, masterUnit, masterRequiredStages, selSlab?.pieces || []);
                   }}
                   sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                 />
@@ -5087,22 +5122,53 @@ const ProjectDetails: React.FC = () => {
                   onChange={(e) => {
                     const t = parseFloat(e.target.value) || 20;
                     setMasterThickness(t);
-                    const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                    generateMasterMatrixPreview(slab, masterBaseName, masterCopiesCount, masterLength, masterWidth, t, masterUnit);
+                    const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                    generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, t, masterUnit, masterRequiredStages, selSlab?.pieces || []);
                   }}
                   sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                 />
               </Grid>
             </Grid>
+
+            {/* Stages selection for generated slabs */}
+            <Box sx={{ mt: 2.5, pt: 2, borderTop: '1px dashed #E2E8F0', display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                Required Manufacturing Stages:
+              </Typography>
+              {['Production', 'Polishing', 'Packing', 'Dispatch'].map((stage) => {
+                const isChecked = masterRequiredStages.includes(stage);
+                return (
+                  <FormControlLabel
+                    key={stage}
+                    control={
+                      <Checkbox 
+                        size="small"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const updated = e.target.checked 
+                            ? [...masterRequiredStages, stage]
+                            : masterRequiredStages.filter(s => s !== stage);
+                          setMasterRequiredStages(updated);
+                          const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
+                          generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit, updated, selSlab?.pieces || []);
+                        }}
+                        sx={{ color: '#B38B36', '&.Mui-checked': { color: '#B38B36' } }}
+                      />
+                    }
+                    label={<Typography variant="body2" sx={{ fontWeight: 700, color: '#334155' }}>{stage}</Typography>}
+                  />
+                );
+              })}
+            </Box>
           </Paper>
 
-          {/* STEP 3: CUSTOM SUB-PIECES MATRIX PREVIEW */}
+          {/* STEP 3: SLABS MATRIX PREVIEW */}
           <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #FDE68A', bgcolor: '#FFFDF5' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <AutoAwesomeRoundedIcon sx={{ color: '#D97706', fontSize: 20 }} />
                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#92400E' }}>
-                  Generate Custom Sub-Pieces Matrix ({masterGeneratedMatrix.length} Pieces)
+                  Preview: {masterGeneratedMatrix.length} Slabs to be Added to Planning Table (Outside)
                 </Typography>
               </Box>
 
@@ -5119,13 +5185,14 @@ const ProjectDetails: React.FC = () => {
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow sx={{ bgcolor: '#F8FAFC' }}>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '30%' }}>Piece / Sub-Piece Name</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '12%' }}>Serial #</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '30%' }}>Slab Name (Table Row)</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '10%' }}>Slab #</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Unit</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Length (L)</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Width (W)</TableCell>
-                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Thickness (MM)</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Length</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Width</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Thickness</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Area (Sq.Ft)</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>Pieces Inside</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -5144,7 +5211,7 @@ const ProjectDetails: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell sx={{ py: 0.75 }}>
-                        <Chip size="small" label={`#${p.pieceNumber}`} sx={{ fontWeight: 800, fontSize: '0.7rem' }} />
+                        <Chip size="small" label={`#${p.slabNumber}`} sx={{ fontWeight: 800, fontSize: '0.7rem' }} />
                       </TableCell>
                       <TableCell sx={{ py: 0.75 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, color: '#64748B' }}>{p.unit}</Typography>
@@ -5161,6 +5228,9 @@ const ProjectDetails: React.FC = () => {
                       <TableCell sx={{ py: 0.75 }}>
                         <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669' }}>{p.area} Sq.Ft</Typography>
                       </TableCell>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <Chip size="small" label={`${(p.pieces || []).length} Piece(s)`} sx={{ fontWeight: 700, fontSize: '0.72rem', bgcolor: '#E0F2FE', color: '#0369A1' }} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -5176,8 +5246,8 @@ const ProjectDetails: React.FC = () => {
 
           <Button
             variant="contained"
-            disabled={masterGeneratedMatrix.length === 0 || isAddingPieces || !masterSourceSlabId}
-            startIcon={isAddingPieces ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeRoundedIcon />}
+            disabled={masterGeneratedMatrix.length === 0 || isBulkCreatingSlabs}
+            startIcon={isBulkCreatingSlabs ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeRoundedIcon />}
             onClick={handleSaveMasterMakerPieces}
             sx={{
               borderRadius: 2.5,
@@ -5192,7 +5262,7 @@ const ProjectDetails: React.FC = () => {
               '&:hover': { bgcolor: '#967226' }
             }}
           >
-            {isAddingPieces ? 'Generating Pieces...' : `Generate & Save (${masterGeneratedMatrix.length} Pieces)`}
+            {isBulkCreatingSlabs ? 'Generating Slabs...' : `Generate & Add (${masterGeneratedMatrix.length} Slabs to Table)`}
           </Button>
         </DialogActions>
       </Dialog>

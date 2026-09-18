@@ -235,7 +235,7 @@ const ManualApproval: React.FC = () => {
 
       {/* TOP CONTROLS & PROJECT SELECTOR */}
       <Paper elevation={0} sx={{ p: 3, mb: 3.5, bgcolor: '#FFFFFF', borderRadius: 4, border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-        <Grid container spacing={2.5} alignItems="center">
+        <Grid container spacing={2.5} sx={{ alignItems: 'center' }}>
           {/* Project Selector */}
           <Grid size={{ xs: 12, md: 7 }}>
             <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', mb: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
