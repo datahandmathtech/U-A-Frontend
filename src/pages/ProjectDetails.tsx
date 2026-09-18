@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel, Card, Tooltip } from '@mui/material';
+import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, CircularProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel, Card, Tooltip } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -651,10 +651,7 @@ const ProjectDetails: React.FC = () => {
       return;
     }
     try {
-      await addPieces({
-        id: masterSourceSlabId,
-        piecesArray: masterGeneratedMatrix
-      }).unwrap();
+      await addPieces({ slabId: masterSourceSlabId, data: { piecesArray: masterGeneratedMatrix } }).unwrap();
 
       setSnackbarMessage(`Successfully generated and added ${masterGeneratedMatrix.length} pieces!`);
       setMasterMakerOpen(false);
@@ -4927,7 +4924,7 @@ const ProjectDetails: React.FC = () => {
         onClose={() => setMasterMakerOpen(false)} 
         maxWidth="lg" 
         fullWidth
-        PaperProps={{ sx: { borderRadius: 4, maxHeight: '90vh' } }}
+        slotProps={{ paper: { sx: { borderRadius: 4, maxHeight: '90vh' } } }}
       >
         <DialogTitle sx={{ p: 3, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', bgcolor: '#FDFBF7' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -4987,7 +4984,7 @@ const ProjectDetails: React.FC = () => {
             </Typography>
 
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -5000,12 +4997,12 @@ const ProjectDetails: React.FC = () => {
                     const slab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
                     generateMasterMatrixPreview(slab, masterBaseName, count, masterLength, masterWidth, masterThickness, masterUnit);
                   }}
-                  inputProps={{ min: 1, max: 1000 }}
+                  slotProps={{ htmlInput: { min: 1, max: 1000 } }}
                   sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -5022,7 +5019,7 @@ const ProjectDetails: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={6} sm={4} md={1.5}>
+              <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Unit</InputLabel>
                   <Select
@@ -5044,7 +5041,7 @@ const ProjectDetails: React.FC = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={6} sm={4} md={1.5}>
+              <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -5061,7 +5058,7 @@ const ProjectDetails: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={6} sm={4} md={1.5}>
+              <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -5078,7 +5075,7 @@ const ProjectDetails: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={6} sm={4} md={1.5}>
+              <Grid size={{ xs: 6, sm: 4, md: 1.5 }}>
                 <TextField
                   fullWidth
                   size="small"

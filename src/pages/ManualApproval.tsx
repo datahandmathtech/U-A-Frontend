@@ -237,7 +237,7 @@ const ManualApproval: React.FC = () => {
       <Paper elevation={0} sx={{ p: 3, mb: 3.5, bgcolor: '#FFFFFF', borderRadius: 4, border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
         <Grid container spacing={2.5} alignItems="center">
           {/* Project Selector */}
-          <Grid item xs={12} md={7}>
+          <Grid size={{ xs: 12, md: 7 }}>
             <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', mb: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <FolderSpecialIcon sx={{ fontSize: 16, color: '#059669' }} /> Select Active Work Order Project *
             </Typography>
@@ -272,7 +272,7 @@ const ManualApproval: React.FC = () => {
           </Grid>
 
           {/* Search Box */}
-          <Grid item xs={12} md={5}>
+          <Grid size={{ xs: 12, md: 5 }}>
             <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', mb: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <SearchIcon sx={{ fontSize: 16, color: '#64748B' }} /> Filter Pieces / Serials
             </Typography>
