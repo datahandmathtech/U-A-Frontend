@@ -434,6 +434,12 @@ const StageDetails = () => {
                 <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                   <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>{vendorName}</Typography>
                 </Box>
+              ) : (displayStatus === 'completed' || p.status === 'completed') ? (
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, bgcolor: '#FFFDF5', border: '1px solid #FDE68A', borderRadius: 2, px: 1.5, py: 0.6, boxShadow: '0 1px 3px rgba(179,139,54,0.08)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#B38B36', fontSize: '0.82rem', letterSpacing: 0.2 }}>
+                    Manual
+                  </Typography>
+                </Box>
               ) : (
                 <Typography variant="caption" sx={{ color: '#94A3B8' }}>Unassigned</Typography>
               )}

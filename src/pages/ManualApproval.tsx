@@ -1,57 +1,343 @@
-import React, { useState } from 'react';
-import { 
-  Box, Typography, Paper, Grid, Button, Chip, TextField, 
-  CircularProgress, Alert, Snackbar, Checkbox, 
-  Autocomplete, Table, TableHead, TableRow, TableCell, TableBody, Divider, Tooltip, IconButton
+import React, { useState, useMemo, useCallback } from 'react';
+import {
+  Box,
+  Typography,
+  Card,
+  Button,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Checkbox,
+  Chip,
+  IconButton,
+  TextField,
+  Paper,
+  Divider,
+  Alert,
+  Snackbar,
+  CircularProgress,
+  Stack,
+  InputAdornment,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer
 } from '@mui/material';
-import { useGetProjectsQuery, useGetSlabsQuery, useManualApprovePiecesMutation, useGetApprovedLogsQuery, useGetPendingApprovalsQuery } from '../store/apiSlice';
-import FlashOnRoundedIcon from '@mui/icons-material/FlashOnRounded';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
-import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
-import SearchIcon from '@mui/icons-material/Search';
-import LayersIcon from '@mui/icons-material/Layers';
-import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import Inventory2Icon from '@mui/icons-material/Inventory2';
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import {
+  CheckCircle as CheckCircleIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon,
+  PrecisionManufacturing as PrecisionManufacturingIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  Inventory2 as Inventory2Icon,
+  LocalShipping as LocalShippingIcon,
+  Layers as LayersIcon,
+  SelectAll as SelectAllIcon,
+  Deselect as DeselectIcon,
+  AssignmentTurnedIn as AssignmentTurnedInIcon
+} from '@mui/icons-material';
+import {
+  useGetProjectsQuery,
+  useGetSlabsQuery,
+  useManualApprovePiecesMutation
+} from '../store/apiSlice';
 
-const STAGES = [
+
+const ALL_STAGES = [
   { name: 'Production', label: 'Production', icon: <PrecisionManufacturingIcon sx={{ fontSize: 16 }} />, color: '#059669', bg: '#ECFDF5' },
-  { name: 'Polishing', label: 'Polishing', icon: <AutoFixHighIcon sx={{ fontSize: 16 }} />, color: '#D97706', bg: '#FFFDF5' },
-  { name: 'Packing', label: 'Packing', icon: <Inventory2Icon sx={{ fontSize: 16 }} />, color: '#9333EA', bg: '#FDF4FF' },
-  { name: 'Dispatch', label: 'Dispatch', icon: <LocalShippingIcon sx={{ fontSize: 16 }} />, color: '#0284C7', bg: '#EFF6FF' }
+  { name: 'Polishing', label: 'Polishing', icon: <AutoAwesomeIcon sx={{ fontSize: 16 }} />, color: '#D97706', bg: '#FFFBEB' },
+  { name: 'Packing', label: 'Packing', icon: <Inventory2Icon sx={{ fontSize: 16 }} />, color: '#4F46E5', bg: '#EEF2FF' },
+  { name: 'Dispatch', label: 'Dispatch', icon: <LocalShippingIcon sx={{ fontSize: 16 }} />, color: '#2563EB', bg: '#EFF6FF' }
 ];
 
-const ManualApproval: React.FC = () => {
-  const { data: projects, isLoading: isProjectsLoading } = useGetProjectsQuery();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [remarks, setRemarks] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+interface SlabCardProps {
+  slab: any;
+  searchTerm: string;
+  selectedSet: Set<string>;
+  onToggleKey: (key: string) => void;
+  onTogglePiece: (piece: any, requiredStages: string[]) => void;
+  onToggleSlabStage: (slab: any, stage: string) => void;
+  onToggleSlabAll: (slab: any, requiredStages: string[]) => void;
+}
 
-  // Key format: "${pieceId}__${stageName}"
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-
-  const { data: projectSlabs, isLoading: isSlabsLoading, refetch: refetchSlabs } = useGetSlabsQuery(selectedProjectId, { skip: !selectedProjectId });
-  const { refetch: refetchApproved } = useGetApprovedLogsQuery();
-  const { refetch: refetchPending } = useGetPendingApprovalsQuery();
-
-  const [manualApprovePieces, { isLoading: isApproving }] = useManualApprovePiecesMutation();
-
-  // Helper to get allowed stages for a slab (defaults to all 4 if not specified)
-  const getSlabAllowedStages = (slab: any): string[] => {
-    if (slab?.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0) {
+const SlabCard: React.FC<SlabCardProps> = React.memo(({
+  slab,
+  searchTerm,
+  selectedSet,
+  onToggleKey,
+  onTogglePiece,
+  onToggleSlabStage,
+  onToggleSlabAll
+}) => {
+  const reqStages: string[] = useMemo(() => {
+    if (slab.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0) {
       return slab.requiredStages;
     }
     return ['Production', 'Polishing', 'Packing', 'Dispatch'];
+  }, [slab.requiredStages]);
+
+  const pieces = slab.pieces || [];
+
+  const filteredPieces = useMemo(() => {
+    if (!searchTerm.trim()) return pieces;
+    const s = searchTerm.toLowerCase();
+    return pieces.filter((p: any) =>
+      (p.productName && p.productName.toLowerCase().includes(s)) ||
+      (p.pieceNumber && String(p.pieceNumber).toLowerCase().includes(s)) ||
+      (p.status && p.status.toLowerCase().includes(s))
+    );
+  }, [pieces, searchTerm]);
+
+  const { totalSelectableInSlab, totalSelectedInSlab } = useMemo(() => {
+    let selectable = 0;
+    let selected = 0;
+    for (const p of filteredPieces) {
+      for (const stg of reqStages) {
+        selectable++;
+        if (selectedSet.has(p.id + '::' + stg)) {
+          selected++;
+        }
+      }
+    }
+    return { totalSelectableInSlab: selectable, totalSelectedInSlab: selected };
+  }, [filteredPieces, reqStages, selectedSet]);
+
+  const isSlabAllSelected = totalSelectableInSlab > 0 && totalSelectedInSlab === totalSelectableInSlab;
+  const isSlabIndeterminate = totalSelectedInSlab > 0 && totalSelectedInSlab < totalSelectableInSlab;
+
+  if (filteredPieces.length === 0 && searchTerm.trim()) {
+    return null;
+  }
+
+  return (
+    <Card
+      elevation={2}
+      sx={{
+        mb: 3,
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: totalSelectedInSlab > 0 ? 'primary.light' : 'divider',
+        overflow: 'hidden',
+        transition: 'border-color 0.2s'
+      }}
+    >
+      <Box
+        sx={{
+          p: 2,
+          bgcolor: totalSelectedInSlab > 0 ? 'rgba(37, 99, 235, 0.04)' : '#f8fafc',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1.5
+        }}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Checkbox
+            size="small"
+            checked={isSlabAllSelected}
+            indeterminate={isSlabIndeterminate}
+            onChange={() => onToggleSlabAll(slab, reqStages)}
+            sx={{ p: 0.5 }}
+          />
+          <Box>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                {slab.name || ('Slab ' + (slab.slabNumber || ''))}
+              </Typography>
+              {slab.stoneName && (
+                <Chip label={slab.stoneName} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: 11 }} />
+              )}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              {filteredPieces.length} Pieces &bull; {reqStages.length} Required Stages ({reqStages.join(', ')})
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={1} alignItems="center">
+          {reqStages.map((stg) => {
+            let stgSelected = 0;
+            for (const p of filteredPieces) {
+              if (selectedSet.has(p.id + '::' + stg)) stgSelected++;
+            }
+            const allStgSelected = filteredPieces.length > 0 && stgSelected === filteredPieces.length;
+            const someStgSelected = stgSelected > 0 && stgSelected < filteredPieces.length;
+
+            return (
+              <Button
+                key={stg}
+                size="small"
+                variant={allStgSelected ? 'contained' : someStgSelected ? 'outlined' : 'text'}
+                color="primary"
+                onClick={() => onToggleSlabStage(slab, stg)}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  py: 0.3,
+                  px: 1,
+                  borderRadius: 2
+                }}
+              >
+                {stg} ({stgSelected}/{filteredPieces.length})
+              </Button>
+            );
+          })}
+        </Stack>
+      </Box>
+
+      <TableContainer sx={{ maxHeight: 400 }}>
+        <Table size="small" stickyHeader>
+          <TableHead>
+            <TableRow sx={{ '& th': { bgcolor: '#f1f5f9', fontWeight: 700, fontSize: '0.8rem', py: 1 } }}>
+              <TableCell sx={{ width: 60 }}>Select</TableCell>
+              <TableCell sx={{ minWidth: 160 }}>Piece / Sub-Piece</TableCell>
+              <TableCell sx={{ width: 100 }}>Dimensions</TableCell>
+              <TableCell sx={{ width: 90 }}>Current Status</TableCell>
+              {ALL_STAGES.map((stg) => (
+                <TableCell key={stg.name} align="center" sx={{ width: 110 }}>
+                  <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                    {stg.icon}
+                    <span>{stg.label}</span>
+                  </Stack>
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredPieces.map((piece: any, idx: number) => {
+              let pieceSelectedCount = 0;
+              for (const s of reqStages) {
+                if (selectedSet.has(piece.id + '::' + s)) pieceSelectedCount++;
+              }
+              const isPieceAllSelected = reqStages.length > 0 && pieceSelectedCount === reqStages.length;
+              const isPieceIndeterminate = pieceSelectedCount > 0 && pieceSelectedCount < reqStages.length;
+
+              return (
+                <TableRow
+                  key={piece.id || idx}
+                  hover
+                  sx={{
+                    bgcolor: pieceSelectedCount > 0 ? 'rgba(37, 99, 235, 0.02)' : 'inherit',
+                    '&:last-child td, &:last-child th': { border: 0 }
+                  }}
+                >
+                  <TableCell>
+                    <Checkbox
+                      size="small"
+                      checked={isPieceAllSelected}
+                      indeterminate={isPieceIndeterminate}
+                      onChange={() => onTogglePiece(piece, reqStages)}
+                      sx={{ p: 0.5 }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={600} color="text.primary">
+                      {piece.productName || ('Piece #' + (piece.pieceNumber || idx + 1))}
+                    </Typography>
+                    {piece.description && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {piece.description}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="caption" color="text.secondary">
+                      {piece.length || piece.width ? (piece.length || 0) + ' × ' + (piece.width || 0) : '—'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={piece.status || 'pending'}
+                      size="small"
+                      color={
+                        piece.status === 'completed'
+                          ? 'success'
+                          : piece.status === 'in_progress'
+                          ? 'info'
+                          : 'default'
+                      }
+                      sx={{ textTransform: 'capitalize', fontSize: '0.7rem', height: 20 }}
+                    />
+                  </TableCell>
+                  {ALL_STAGES.map((stg) => {
+                    const isRequired = reqStages.includes(stg.name);
+                    const key = piece.id + '::' + stg.name;
+                    const isChecked = selectedSet.has(key);
+
+                    if (!isRequired) {
+                      return (
+                        <TableCell key={stg.name} align="center">
+                          <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                            — N/A —
+                          </Typography>
+                        </TableCell>
+                      );
+                    }
+
+                    return (
+                      <TableCell key={stg.name} align="center" sx={{ py: 0.5 }}>
+                        <Checkbox
+                          size="small"
+                          checked={isChecked}
+                          onChange={() => onToggleKey(key)}
+                          sx={{
+                            p: 0.5,
+                            color: isChecked ? stg.color : undefined,
+                            '&.Mui-checked': {
+                              color: stg.color
+                            }
+                          }}
+                        />
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Card>
+  );
+});
+
+export const ManualApproval: React.FC = () => {
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [approvalRemarks, setApprovalRemarks] = useState<string>('Manual Direct Approval by Admin');
+  const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set());
+
+  const { data: projects = [], isLoading: isLoadingProjects } = useGetProjectsQuery();
+
+  const {
+    data: slabs = [],
+    isLoading: isLoadingSlabs,
+    refetch: refetchSlabs
+  } = useGetSlabsQuery(selectedProjectId, {
+    skip: !selectedProjectId
+  });
+
+  const [manualApprovePieces, { isLoading: isApproving }] = useManualApprovePiecesMutation();
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setSelectedSet(new Set());
+    setSearchTerm('');
   };
 
-  // Toggle a single piece + stage
-  const toggleKey = (pieceId: string, stage: string) => {
-    const key = pieceId + '__' + stage;
-    setSelectedKeys(prev => {
+  const handleToggleKey = useCallback((key: string) => {
+    setSelectedSet((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
         next.delete(key);
@@ -60,565 +346,346 @@ const ManualApproval: React.FC = () => {
       }
       return next;
     });
-  };
+  }, []);
 
-  // Toggle all allowed stages for a single piece
-  const togglePieceAllStages = (piece: any, slab: any) => {
-    const allowed = getSlabAllowedStages(slab);
-    const pieceKeys = allowed.map(stg => piece.id + '__' + stg);
-    const isAllPieceSelected = pieceKeys.every(k => selectedKeys.has(k));
-
-    setSelectedKeys(prev => {
+  const handleTogglePiece = useCallback((piece: any, requiredStages: string[]) => {
+    setSelectedSet((prev) => {
       const next = new Set(prev);
-      if (isAllPieceSelected) {
-        pieceKeys.forEach(k => next.delete(k));
+      const pieceKeys = requiredStages.map((s) => piece.id + '::' + s);
+      const allSelected = pieceKeys.every((k) => next.has(k));
+
+      if (allSelected) {
+        pieceKeys.forEach((k) => next.delete(k));
       } else {
-        pieceKeys.forEach(k => next.add(k));
+        pieceKeys.forEach((k) => next.add(k));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleSlabStage = useCallback((slab: any, stage: string) => {
+    setSelectedSet((prev) => {
+      const next = new Set(prev);
+      const pieces = slab.pieces || [];
+      const keys = pieces.map((p: any) => p.id + '::' + stage);
+      const allSelected = keys.every((k: string) => next.has(k));
+
+      if (allSelected) {
+        keys.forEach((k: string) => next.delete(k));
+      } else {
+        keys.forEach((k: string) => next.add(k));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleSlabAll = useCallback((slab: any, requiredStages: string[]) => {
+    setSelectedSet((prev) => {
+      const next = new Set(prev);
+      const pieces = slab.pieces || [];
+      const keys: string[] = [];
+      for (const p of pieces) {
+        for (const s of requiredStages) {
+          keys.push(p.id + '::' + s);
+        }
+      }
+      const allSelected = keys.every((k) => next.has(k));
+
+      if (allSelected) {
+        keys.forEach((k) => next.delete(k));
+      } else {
+        keys.forEach((k) => next.add(k));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleGlobalStage = (stage: string) => {
+    setSelectedSet((prev) => {
+      const next = new Set(prev);
+      const keys: string[] = [];
+      for (const slab of slabs) {
+        const reqStages: string[] =
+          slab.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0
+            ? slab.requiredStages
+            : ['Production', 'Polishing', 'Packing', 'Dispatch'];
+
+        if (reqStages.includes(stage)) {
+          for (const p of slab.pieces || []) {
+            keys.push(p.id + '::' + stage);
+          }
+        }
+      }
+      const allSelected = keys.length > 0 && keys.every((k) => next.has(k));
+      if (allSelected) {
+        keys.forEach((k) => next.delete(k));
+      } else {
+        keys.forEach((k) => next.add(k));
       }
       return next;
     });
   };
 
-  // Toggle a specific stage for all pieces in a slab
-  const toggleSlabStage = (slab: any, stage: string) => {
-    const pieces = slab.pieces || [];
-    const keys = pieces.map((p: any) => p.id + '__' + stage);
-    const isAllSelected = keys.length > 0 && keys.every(k => selectedKeys.has(k));
+  const handleSelectAll = () => {
+    const next = new Set<string>();
+    for (const slab of slabs) {
+      const reqStages: string[] =
+        slab.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0
+          ? slab.requiredStages
+          : ['Production', 'Polishing', 'Packing', 'Dispatch'];
 
-    setSelectedKeys(prev => {
-      const next = new Set(prev);
-      if (isAllSelected) {
-        keys.forEach(k => next.delete(k));
-      } else {
-        keys.forEach(k => next.add(k));
+      for (const p of slab.pieces || []) {
+        for (const s of reqStages) {
+          next.add(p.id + '::' + s);
+        }
       }
-      return next;
-    });
-  };
-
-  // Toggle all allowed stages for all pieces in a slab
-  const toggleSlabAll = (slab: any) => {
-    const allowed = getSlabAllowedStages(slab);
-    const pieces = slab.pieces || [];
-    const slabKeys: string[] = [];
-    pieces.forEach((p: any) => {
-      allowed.forEach(stg => slabKeys.push(p.id + '__' + stg));
-    });
-
-    const isAllSlabSelected = slabKeys.length > 0 && slabKeys.every(k => selectedKeys.has(k));
-
-    setSelectedKeys(prev => {
-      const next = new Set(prev);
-      if (isAllSlabSelected) {
-        slabKeys.forEach(k => next.delete(k));
-      } else {
-        slabKeys.forEach(k => next.add(k));
-      }
-      return next;
-    });
-  };
-
-  // Global: Toggle all required stages across entire project
-  const selectAllProjectRequired = () => {
-    const allKeys: string[] = [];
-    (projectSlabs || []).forEach((slab: any) => {
-      const allowed = getSlabAllowedStages(slab);
-      (slab.pieces || []).forEach((p: any) => {
-        allowed.forEach(stg => allKeys.push(p.id + '__' + stg));
-      });
-    });
-
-    const isAllSelected = allKeys.length > 0 && allKeys.every(k => selectedKeys.has(k));
-    if (isAllSelected) {
-      setSelectedKeys(new Set());
-    } else {
-      setSelectedKeys(new Set(allKeys));
     }
+    setSelectedSet(next);
   };
 
-  // Global: Toggle a specific stage across all slabs where allowed
-  const selectGlobalStage = (stage: string) => {
-    const targetKeys: string[] = [];
-    (projectSlabs || []).forEach((slab: any) => {
-      const allowed = getSlabAllowedStages(slab);
-      if (allowed.includes(stage)) {
-        (slab.pieces || []).forEach((p: any) => {
-          targetKeys.push(p.id + '__' + stage);
-        });
-      }
-    });
-
-    const isAllSelected = targetKeys.length > 0 && targetKeys.every(k => selectedKeys.has(k));
-    setSelectedKeys(prev => {
-      const next = new Set(prev);
-      if (isAllSelected) {
-        targetKeys.forEach(k => next.delete(k));
-      } else {
-        targetKeys.forEach(k => next.add(k));
-      }
-      return next;
-    });
+  const handleDeselectAll = () => {
+    setSelectedSet(new Set());
   };
 
-  // Count unique pieces selected
-  const uniquePieceCount = new Set(Array.from(selectedKeys).map(k => k.split('__')[0])).size;
-
-  const handleBulkApprove = async () => {
-    if (selectedKeys.size === 0) {
-      setToast({ open: true, message: 'Please select at least one piece stage to approve', severity: 'error' });
+  const handleDirectApprove = async () => {
+    if (selectedSet.size === 0) {
+      setToast({ open: true, message: 'Please select at least one piece stage to approve', severity: 'warning' });
       return;
     }
 
-    const approvals = Array.from(selectedKeys).map(k => {
-      const [pieceId, stage] = k.split('__');
-      return { pieceId, stage };
-    });
-
     try {
-      await manualApprovePieces({
+      const approvals = Array.from(selectedSet).map((key) => {
+        const [pieceId, stage] = key.split('::');
+        return { pieceId, stage };
+      });
+
+      const res = await manualApprovePieces({
         projectId: selectedProjectId,
         approvals,
-        remarks: remarks || ('Manual Direct Approval for ' + approvals.length + ' stage items')
+        remarks: approvalRemarks || 'Manual Direct Approval by Admin'
       }).unwrap();
 
-      setToast({ open: true, message: ('Successfully approved ' + approvals.length + ' stage item(s) across ' + uniquePieceCount + ' piece(s)!'), severity: 'success' });
-      setSelectedKeys(new Set());
-      if (refetchSlabs) refetchSlabs();
-      refetchApproved();
-      refetchPending();
+      setToast({ open: true, message: res.message || ('Successfully approved ' + approvals.length + ' item(s)!'), severity: 'success' });
+      setSelectedSet(new Set());
+      refetchSlabs();
     } catch (err: any) {
-      setToast({ open: true, message: err?.data?.message || err?.message || 'Manual approval failed', severity: 'error' });
+      console.error('Direct approval failed:', err);
+      setToast({ open: true, message: err?.data?.message || 'Failed to approve pieces manually', severity: 'error' });
     }
   };
 
-  return (
-    <Box sx={{ pb: 6 }}>
-      {/* PAGE HEADER */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ p: 1.25, bgcolor: '#ECFDF5', color: '#059669', borderRadius: 3, display: 'flex', border: '1px solid #A7F3D0' }}>
-            <FlashOnRoundedIcon sx={{ fontSize: 32 }} />
-          </Box>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-              Manual Approval
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600, mt: 0.25 }}>
-              Granular & multi-stage direct approval of pieces matching Active Work Orders configuration.
-            </Typography>
-          </Box>
-        </Box>
+  const selectedCount = selectedSet.size;
 
-        {selectedProjectId && (
-          <Button
-            variant="contained"
-            color="success"
-            disabled={selectedKeys.size === 0 || isApproving}
-            startIcon={isApproving ? <CircularProgress size={18} color="inherit" /> : <DoneAllIcon />}
-            onClick={handleBulkApprove}
-            sx={{
-              borderRadius: 2.5,
-              textTransform: 'none',
-              fontWeight: 800,
-              fontSize: '0.95rem',
-              px: 3.5,
-              py: 1.25,
-              bgcolor: '#059669',
-              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.3)',
-              '&:hover': { bgcolor: '#047857' }
-            }}
-          >
-            {isApproving ? 'Approving...' : ('Approve Selected (' + selectedKeys.size + ' Approvals / ' + uniquePieceCount + ' Pcs)')}
-          </Button>
-        )}
+  return (
+    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1600, margin: '0 auto' }}>
+      <Box sx={{ mb: 3 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
+          <AssignmentTurnedInIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+          <Typography variant="h4" fontWeight={800} color="text.primary">
+            Manual Production Approval
+          </Typography>
+        </Stack>
+        <Typography variant="body2" color="text.secondary">
+          Directly approve production, polishing, packing, and dispatch stages for pieces in Active Work Orders.
+        </Typography>
       </Box>
 
-      {/* TOP CONTROLS & PROJECT SELECTOR */}
-      <Paper elevation={0} sx={{ p: 3, mb: 3.5, bgcolor: '#FFFFFF', borderRadius: 4, border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-        <Grid container spacing={2.5} sx={{ alignItems: 'center' }}>
-          {/* Project Selector */}
-          <Grid size={{ xs: 12, md: 7 }}>
-            <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', mb: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <FolderSpecialIcon sx={{ fontSize: 16, color: '#059669' }} /> Select Active Work Order Project *
-            </Typography>
-            <Autocomplete
-              options={projects || []}
-              getOptionLabel={(p: any) => ((p.name || 'Unnamed') + ' ' + (p.projectId ? ('(' + p.projectId + ')') : '') + ' - ' + (p.clientName || 'Client'))}
-              value={(projects || []).find((p: any) => p.id === selectedProjectId) || null}
-              onChange={(_, newValue: any) => {
-                setSelectedProjectId(newValue ? newValue.id : '');
-                setSelectedKeys(new Set());
-              }}
-              renderOption={(props: any, option: any) => {
-                const { key, ...restProps } = props;
-                return (
-                  <li key={key} {...restProps}>
-                    <Box sx={{ py: 0.5 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>{option.name || 'Unnamed Project'}</Typography>
-                      <Typography variant="caption" sx={{ color: '#64748B' }}>Client: {option.clientName || 'N/A'} {option.projectId ? ('• ID: ' + option.projectId) : ''}</Typography>
-                    </Box>
-                  </li>
-                );
-              }}
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  size="small" 
-                  placeholder="Click here to choose a project..."
-                  sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
-                />
-              )}
-            />
-          </Grid>
+      <Paper elevation={2} sx={{ p: 2.5, mb: 3, borderRadius: 3 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
+          <FormControl sx={{ minWidth: 320, width: { xs: '100%', md: 'auto' } }} size="small">
+            <InputLabel id="select-project-label">Select Project / Work Order</InputLabel>
+            <Select
+              labelId="select-project-label"
+              value={selectedProjectId}
+              label="Select Project / Work Order"
+              onChange={(e) => handleProjectChange(e.target.value)}
+              disabled={isLoadingProjects}
+            >
+              <MenuItem value="">
+                <em>— None (Select a Project) —</em>
+              </MenuItem>
+              {projects.map((proj: any) => (
+                <MenuItem key={proj.id} value={proj.id}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="body2" fontWeight={600}>
+                      {proj.name}
+                    </Typography>
+                    {proj.clientName && (
+                      <Typography variant="caption" color="text.secondary">
+                        ({proj.clientName})
+                      </Typography>
+                    )}
+                  </Stack>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          {/* Search Box */}
-          <Grid size={{ xs: 12, md: 5 }}>
-            <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', mb: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <SearchIcon sx={{ fontSize: 16, color: '#64748B' }} /> Filter Pieces / Serials
-            </Typography>
+          {selectedProjectId && (
             <TextField
-              fullWidth
               size="small"
-              disabled={!selectedProjectId}
-              placeholder="Filter by piece name (e.g. Stone.1, P-01)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
+              placeholder="Search slab, piece name or status..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              sx={{ width: { xs: '100%', md: 320 } }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null
+              }}
             />
-          </Grid>
-        </Grid>
-
-        {/* BATCH STAGE CONTROLS TOOLBAR (Only shown when project is selected) */}
-        {selectedProjectId && (
-          <>
-            <Divider sx={{ my: 2.5, borderColor: '#F1F5F9' }} />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', mr: 0.5 }}>
-                  QUICK SELECT:
-                </Typography>
-                <Button
-                  size="small"
-                  variant="contained"
-                  startIcon={<DoneAllIcon />}
-                  onClick={selectAllProjectRequired}
-                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 800, bgcolor: '#059669', color: '#FFF', fontSize: '0.78rem', '&:hover': { bgcolor: '#047857' } }}
-                >
-                  ⚡ All Required Stages (All Slabs)
-                </Button>
-
-                {STAGES.map(stg => (
-                  <Button
-                    key={stg.name}
-                    size="small"
-                    variant="outlined"
-                    startIcon={stg.icon}
-                    onClick={() => selectGlobalStage(stg.name)}
-                    sx={{ 
-                      borderRadius: 2, 
-                      textTransform: 'none', 
-                      fontWeight: 700, 
-                      borderColor: '#CBD5E1', 
-                      color: stg.color,
-                      fontSize: '0.78rem',
-                      '&:hover': { bgcolor: stg.bg, borderColor: stg.color }
-                    }}
-                  >
-                    + All {stg.label}
-                  </Button>
-                ))}
-
-                {selectedKeys.size > 0 && (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    startIcon={<RestartAltIcon />}
-                    onClick={() => setSelectedKeys(new Set())}
-                    sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, fontSize: '0.78rem' }}
-                  >
-                    Deselect All
-                  </Button>
-                )}
-              </Box>
-
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                <Chip 
-                  label={'Selected: ' + selectedKeys.size + ' Approvals (' + uniquePieceCount + ' Pieces)'} 
-                  color={selectedKeys.size > 0 ? 'success' : 'default'}
-                  sx={{ fontWeight: 800, borderRadius: 2 }}
-                />
-
-                <TextField
-                  size="small"
-                  placeholder="Optional approval remarks..."
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  sx={{ width: { xs: '100%', sm: 260 }, bgcolor: '#FAFAFA', borderRadius: 2 }}
-                />
-              </Box>
-            </Box>
-          </>
-        )}
+          )}
+        </Stack>
       </Paper>
 
-      {/* INITIAL SCREEN (BLANK / UNSELECTED STATE) */}
       {!selectedProjectId ? (
-        <Paper elevation={0} sx={{ p: 7, textAlign: 'center', bgcolor: '#F8FAFC', borderRadius: 4, border: '2px dashed #CBD5E1' }}>
-          <Box sx={{ p: 2, bgcolor: '#EFF6FF', color: '#0284C7', borderRadius: '50%', width: 70, height: 70, mx: 'auto', mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FolderSpecialIcon sx={{ fontSize: 40 }} />
-          </Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', mb: 1 }}>
-            Select a Project to Start Manual Approval
+        <Paper
+          elevation={0}
+          sx={{
+            p: 8,
+            textAlign: 'center',
+            borderRadius: 4,
+            border: '2px dashed #cbd5e1',
+            bgcolor: '#f8fafc'
+          }}
+        >
+          <LayersIcon sx={{ fontSize: 64, color: '#94a3b8', mb: 2 }} />
+          <Typography variant="h6" fontWeight={700} color="text.secondary" gutterBottom>
+            No Project Selected
           </Typography>
-          <Typography variant="body2" sx={{ color: '#64748B', maxWidth: 480, mx: 'auto', fontWeight: 500 }}>
-            Choose an Active Work Order project from the dropdown above to load its Slabs, custom Sub-Pieces, and configure granular stage approvals.
+          <Typography variant="body2" color="text.disabled" sx={{ maxWidth: 500, margin: '0 auto' }}>
+            Please select a project from the dropdown above to view its slabs, sub-pieces, and perform direct manual stage approvals.
           </Typography>
         </Paper>
-      ) : isProjectsLoading || isSlabsLoading ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
-          <CircularProgress size={44} sx={{ color: '#059669' }} />
-          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 700 }}>Loading project slabs & pieces...</Typography>
+      ) : isLoadingSlabs ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
+          <CircularProgress size={48} thickness={4} />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Loading slabs and pieces...
+          </Typography>
         </Box>
-      ) : !projectSlabs || projectSlabs.length === 0 ? (
-        <Paper elevation={0} sx={{ p: 5, textAlign: 'center', bgcolor: '#FEF3C7', borderRadius: 4, border: '1px solid #FCD34D' }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: '#92400E' }}>No Slabs Found for this Project</Typography>
-          <Typography variant="body2" sx={{ color: '#78350F', mt: 0.5 }}>
-            Please create slabs and pieces under this project in Active Work Orders before running manual approvals.
-          </Typography>
-        </Paper>
+      ) : slabs.length === 0 ? (
+        <Alert severity="info" sx={{ borderRadius: 3 }}>
+          No slabs or pieces found for this project. Please configure slabs in the project details page.
+        </Alert>
       ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {projectSlabs.map((slab: any) => {
-            const allowedStages = getSlabAllowedStages(slab);
+        <Box>
+          <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: 3, bgcolor: '#ffffff' }}>
+            <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
+              <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<SelectAllIcon />}
+                  onClick={handleSelectAll}
+                  sx={{ textTransform: 'none', fontWeight: 600 }}
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="inherit"
+                  startIcon={<DeselectIcon />}
+                  onClick={handleDeselectAll}
+                  disabled={selectedCount === 0}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Deselect All
+                </Button>
 
-            const slabPieces = (slab.pieces || []).filter((p: any) => {
-              if (!searchQuery.trim()) return true;
-              const query = searchQuery.toLowerCase();
-              return (
-                (p.productName && p.productName.toLowerCase().includes(query)) ||
-                (p.pieceNumber && String(p.pieceNumber).includes(query)) ||
-                (slab.name && slab.name.toLowerCase().includes(query))
-              );
-            });
+                <Divider orientation="vertical" flexItem sx={{ mx: 1, height: 24 }} />
 
-            // Calculate slab selection state
-            const allSlabKeys: string[] = [];
-            (slab.pieces || []).forEach((p: any) => {
-              allowedStages.forEach(stg => allSlabKeys.push(p.id + '__' + stg));
-            });
-            const isSlabAllSelected = allSlabKeys.length > 0 && allSlabKeys.every(k => selectedKeys.has(k));
-            const isSlabPartiallySelected = allSlabKeys.some(k => selectedKeys.has(k)) && !isSlabAllSelected;
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mr: 0.5 }}>
+                  Batch Stage Select:
+                </Typography>
 
-            return (
-              <Paper 
-                key={slab.id} 
-                elevation={0} 
-                sx={{ 
-                  borderRadius: 4, 
-                  border: '1px solid #E2E8F0', 
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 14px rgba(0,0,0,0.02)'
-                }}
-              >
-                {/* SLAB HEADER */}
-                <Box sx={{ p: 2, bgcolor: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, borderBottom: '1px solid #E2E8F0' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Checkbox
-                      checked={isSlabAllSelected}
-                      indeterminate={isSlabPartiallySelected}
-                      onChange={() => toggleSlabAll(slab)}
-                      sx={{ p: 0.5, color: '#059669', '&.Mui-checked': { color: '#059669' } }}
-                    />
-                    <LayersIcon sx={{ color: '#B38B36', fontSize: 24 }} />
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-                        {slab.name || 'Unnamed Slab'}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                        Size: {slab.size || 'Standard'} • Active Stages: {allowedStages.join(' → ')}
-                      </Typography>
-                    </Box>
-                  </Box>
+                {ALL_STAGES.map((stg) => (
+                  <Chip
+                    key={stg.name}
+                    icon={stg.icon}
+                    label={'All ' + stg.label}
+                    onClick={() => handleToggleGlobalStage(stg.name)}
+                    clickable
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      borderColor: stg.color,
+                      color: stg.color,
+                      fontWeight: 600,
+                      '&:hover': { bgcolor: stg.bg }
+                    }}
+                  />
+                ))}
+              </Stack>
 
-                  {/* Slab Stage Quick Actions */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', fontSize: '0.7rem' }}>
-                      SLAB STAGES:
-                    </Typography>
-                    {allowedStages.map(stgName => {
-                      const stgMeta = STAGES.find(s => s.name === stgName) || { name: stgName, label: stgName, color: '#475569', bg: '#F1F5F9', icon: null };
-                      const slabStgKeys = (slab.pieces || []).map((p: any) => p.id + '__' + stgName);
-                      const isStgAll = slabStgKeys.length > 0 && slabStgKeys.every(k => selectedKeys.has(k));
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ width: { xs: '100%', lg: 'auto' } }}>
+                <TextField
+                  size="small"
+                  label="Approval Remarks"
+                  value={approvalRemarks}
+                  onChange={(e) => setApprovalRemarks(e.target.value)}
+                  sx={{ minWidth: 240 }}
+                />
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="medium"
+                  disabled={selectedCount === 0 || isApproving}
+                  onClick={handleDirectApprove}
+                  startIcon={
+                    isApproving ? <CircularProgress size={18} color="inherit" /> : <CheckCircleIcon />
+                  }
+                  sx={{
+                    px: 3,
+                    py: 1,
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    borderRadius: 2,
+                    boxShadow: 3
+                  }}
+                >
+                  {isApproving ? 'Approving...' : ('Direct Approve (' + selectedCount + ')')}
+                </Button>
+              </Stack>
+            </Stack>
+          </Paper>
 
-                      return (
-                        <Chip
-                          key={stgName}
-                          size="small"
-                          label={isStgAll ? ('✓ All ' + stgMeta.label) : ('+ ' + stgMeta.label)}
-                          onClick={() => toggleSlabStage(slab, stgName)}
-                          sx={{
-                            fontWeight: 800,
-                            fontSize: '0.72rem',
-                            cursor: 'pointer',
-                            bgcolor: isStgAll ? stgMeta.color : '#FFFFFF',
-                            color: isStgAll ? '#FFFFFF' : stgMeta.color,
-                            border: '1px solid ' + stgMeta.color,
-                            '&:hover': { bgcolor: stgMeta.color, color: '#FFFFFF' }
-                          }}
-                        />
-                      );
-                    })}
-
-                    <Button
-                      size="small"
-                      onClick={() => toggleSlabAll(slab)}
-                      sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.78rem', color: '#059669', ml: 1 }}
-                    >
-                      {isSlabAllSelected ? 'Deselect Slab' : 'Select All in Slab'}
-                    </Button>
-                  </Box>
-                </Box>
-
-                {/* TABLE OF PIECES WITH STAGE MATRIX */}
-                {slabPieces.length === 0 ? (
-                  <Box sx={{ p: 3.5, textAlign: 'center' }}>
-                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>
-                      No pieces matching filter under this slab.
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Table size="small">
-                    <TableHead sx={{ bgcolor: '#FFFFFF' }}>
-                      <TableRow>
-                        <TableCell sx={{ width: 50, py: 1.25 }} align="center">All</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '22%' }}>Piece / Sub-Piece Name</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '8%' }}>Piece #</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '18%' }}>Dimensions / Size</TableCell>
-                        
-                        {/* STAGE MATRIX COLUMNS */}
-                        {STAGES.map(stg => (
-                          <TableCell key={stg.name} align="center" sx={{ fontWeight: 800, color: stg.color, fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                              {stg.icon}
-                              {stg.label}
-                            </Box>
-                          </TableCell>
-                        ))}
-
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.25, width: '10%' }} align="center">Status</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {slabPieces.map((piece: any, pIdx: number) => {
-                        const pieceAllowedStages = allowedStages;
-                        const pieceKeys = pieceAllowedStages.map(stg => piece.id + '__' + stg);
-                        const isPieceAllSelected = pieceKeys.length > 0 && pieceKeys.every(k => selectedKeys.has(k));
-                        const isPiecePartiallySelected = pieceKeys.some(k => selectedKeys.has(k)) && !isPieceAllSelected;
-
-                        return (
-                          <TableRow 
-                            key={piece.id || pIdx} 
-                            hover 
-                            sx={{ 
-                              bgcolor: (isPieceAllSelected || isPiecePartiallySelected) ? '#F0FDF4' : (pIdx % 2 === 0 ? '#FFFFFF' : '#FAFAFA')
-                            }}
-                          >
-                            {/* Piece Row Master Toggle */}
-                            <TableCell align="center" sx={{ py: 1 }}>
-                              <Checkbox
-                                size="small"
-                                checked={isPieceAllSelected}
-                                indeterminate={isPiecePartiallySelected}
-                                onChange={() => togglePieceAllStages(piece, slab)}
-                                sx={{ p: 0, color: '#059669', '&.Mui-checked': { color: '#059669' } }}
-                              />
-                            </TableCell>
-
-                            {/* Piece Name */}
-                            <TableCell sx={{ py: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A' }}>
-                                {piece.productName || ('Piece ' + piece.pieceNumber)}
-                              </Typography>
-                            </TableCell>
-
-                            {/* Serial */}
-                            <TableCell sx={{ py: 1 }}>
-                              <Chip size="small" label={piece.pieceNumber ? ('#' + piece.pieceNumber) : '#1'} sx={{ fontWeight: 800, fontSize: '0.7rem' }} />
-                            </TableCell>
-
-                            {/* Dimensions */}
-                            <TableCell sx={{ py: 1 }}>
-                              <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
-                                {piece.size || 'Standard'}
-                              </Typography>
-                            </TableCell>
-
-                            {/* STAGE COLUMNS (Production, Polishing, Packing, Dispatch) */}
-                            {STAGES.map(stg => {
-                              const isAllowed = allowedStages.includes(stg.name);
-                              const key = piece.id + '__' + stg.name;
-                              const isChecked = selectedKeys.has(key);
-                              const isAlreadyCompleted = piece.status === 'completed' && piece.stage === stg.name;
-
-                              if (!isAllowed) {
-                                return (
-                                  <TableCell key={stg.name} align="center" sx={{ py: 1 }}>
-                                    <Typography variant="caption" sx={{ color: '#CBD5E1', fontWeight: 700, fontSize: '0.7rem' }}>
-                                      — N/A —
-                                    </Typography>
-                                  </TableCell>
-                                );
-                              }
-
-                              return (
-                                <TableCell key={stg.name} align="center" sx={{ py: 1 }}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                                    <Checkbox
-                                      size="small"
-                                      checked={isChecked}
-                                      onChange={() => toggleKey(piece.id, stg.name)}
-                                      sx={{ 
-                                        p: 0.5, 
-                                        color: stg.color, 
-                                        '&.Mui-checked': { color: stg.color } 
-                                      }}
-                                    />
-                                    {isAlreadyCompleted && (
-                                      <Tooltip title="Already completed in this stage">
-                                        <CheckCircleRoundedIcon sx={{ fontSize: 16, color: '#059669' }} />
-                                      </Tooltip>
-                                    )}
-                                  </Box>
-                                </TableCell>
-                              );
-                            })}
-
-                            {/* Status */}
-                            <TableCell align="center" sx={{ py: 1 }}>
-                              <Chip 
-                                size="small" 
-                                label={piece.status === 'completed' ? (piece.stage || 'Done') : 'Pending'} 
-                                color={piece.status === 'completed' ? 'success' : 'warning'}
-                                variant={piece.status === 'completed' ? 'filled' : 'outlined'}
-                                sx={{ fontWeight: 800, fontSize: '0.68rem' }} 
-                              />
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </Paper>
-            );
-          })}
+          {slabs.map((slab: any) => (
+            <SlabCard
+              key={slab.id}
+              slab={slab}
+              searchTerm={searchTerm}
+              selectedSet={selectedSet}
+              onToggleKey={handleToggleKey}
+              onTogglePiece={handleTogglePiece}
+              onToggleSlabStage={handleToggleSlabStage}
+              onToggleSlabAll={handleToggleSlabAll}
+            />
+          ))}
         </Box>
       )}
 
-      {/* TOAST SNACKBAR */}
-      <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast({ ...toast, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert onClose={() => setToast({ ...toast, open: false })} severity={toast.severity} sx={{ width: '100%' }} variant="filled">
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setToast(prev => ({ ...prev, open: false }))} 
+          severity={toast.severity} 
+          sx={{ width: '100%', fontWeight: 700, borderRadius: 2 }}
+        >
           {toast.message}
         </Alert>
       </Snackbar>
