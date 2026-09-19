@@ -6,11 +6,24 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
-const savedToken = sessionStorage.getItem('token') || localStorage.getItem('token');
-const savedUser = sessionStorage.getItem('user') || localStorage.getItem('user');
+const savedToken = (typeof window !== 'undefined') ? (sessionStorage.getItem('token') || localStorage.getItem('token')) : null;
+const savedUser = (typeof window !== 'undefined') ? (sessionStorage.getItem('user') || localStorage.getItem('user')) : null;
+
+let parsedUser = null;
+if (savedUser) {
+  try {
+    parsedUser = JSON.parse(savedUser);
+  } catch (e) {
+    parsedUser = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('user');
+    }
+  }
+}
 
 const initialState: AuthState = {
-  user: savedUser ? JSON.parse(savedUser) : null,
+  user: parsedUser,
   token: savedToken || null,
   isAuthenticated: !!savedToken,
 };
