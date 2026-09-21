@@ -546,6 +546,38 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Project', 'Production']
     }),
+    getProjectProductionLogs: builder.query<any[], string>({
+      query: (projectId) => `/production/project/${projectId}`,
+      providesTags: ['Production']
+    }),
+    createMaterialLog: builder.mutation<any, Partial<any>>({
+      query: (body) => ({ url: '/production/material-log', method: 'POST', body }),
+      invalidatesTags: ['Production']
+    }),
+    getPendingApprovals: builder.query<any[], void>({
+      query: () => '/production/pending-approvals',
+      providesTags: ['Production']
+    }),
+    approveMaterialLog: builder.mutation<any, { id: string, data: any }>({
+      query: ({ id, data }) => ({ url: `/production/${id}/approve`, method: 'PATCH', body: data }),
+      invalidatesTags: ['Production', 'Inventory', 'Project']
+    }),
+    getApprovedLogs: builder.query<any[], void>({
+      query: () => '/production/approved-logs',
+      providesTags: ['Production']
+    }),
+    getActiveOutLogs: builder.query<any[], void>({
+      query: () => '/production/active-out-logs',
+      providesTags: ['Production']
+    }),
+    getRejectedLogs: builder.query<any[], void>({
+      query: () => '/production/rejected-logs',
+      providesTags: ['Production']
+    }),
+    updateReturnQty: builder.mutation<any, { id: string, returnedQty: number, returnDate: string }>({
+      query: ({ id, returnedQty, returnDate }) => ({ url: `/production/${id}/return`, method: 'PATCH', body: { returnedQty, returnDate } }),
+      invalidatesTags: ['Production']
+    }),
   }),
 });
 
