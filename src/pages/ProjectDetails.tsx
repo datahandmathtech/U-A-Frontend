@@ -120,7 +120,13 @@ const SlabRow = ({
       ? `${matchedProduct.length || 0}L A- ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
       : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1') : ''));
 
-  const rawUnit = matchedProduct?.unit || (slab.size?.toLowerCase().includes('mm') ? 'mm' : 'inch');
+  const sizeLower = slab?.size?.toLowerCase() || '';
+  const rawUnit = matchedProduct?.unit || (
+    sizeLower.includes('sq. ft') || sizeLower.includes('sq_ft') || sizeLower.includes('sq.ft') || sizeLower.includes('sqft') ? 'sq_ft' :
+    sizeLower.includes('inch') ? 'inch' :
+    sizeLower.includes('feet') || sizeLower.includes('ft') ? 'feet' :
+    sizeLower.includes('mm') ? 'mm' : 'inch'
+  );
   const unitLabel = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches'
     : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet'
     : rawUnit.toLowerCase() === 'sq_ft' || rawUnit.toLowerCase() === 'sqft' ? 'Sq.Ft'

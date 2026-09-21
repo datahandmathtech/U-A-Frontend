@@ -56,8 +56,24 @@ const StageDetails = () => {
   const slab = slabs?.find((s: any) => s.id === slabId);
   const stageFormatted = stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : '';
   
-  const matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => slab?.name?.startsWith(p.category));
-  const rawUnit = matchedProduct?.unit || (slab?.size?.toLowerCase().includes('mm') ? 'mm' : 'inch');
+  let matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => slab?.name?.startsWith(p.category));
+  if (!matchedProduct && projectId) {
+    try {
+      const savedProductsStr = localStorage.getItem(`quoteProducts_${projectId}`);
+      if (savedProductsStr) {
+        const localProducts = JSON.parse(savedProductsStr);
+        matchedProduct = localProducts.find((p: any) => slab?.name?.startsWith(p.category));
+      }
+    } catch (e) {}
+  }
+  
+  const sizeLower = slab?.size?.toLowerCase() || '';
+  const rawUnit = matchedProduct?.unit || (
+    sizeLower.includes('sq. ft') || sizeLower.includes('sq_ft') || sizeLower.includes('sq.ft') || sizeLower.includes('sqft') ? 'sq_ft' :
+    sizeLower.includes('inch') ? 'inch' :
+    sizeLower.includes('feet') || sizeLower.includes('ft') ? 'feet' :
+    sizeLower.includes('mm') ? 'mm' : 'inch'
+  );
   
   const unitDisplayName = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches' 
     : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet' 
