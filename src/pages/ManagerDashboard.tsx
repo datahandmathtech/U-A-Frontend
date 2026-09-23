@@ -1145,7 +1145,7 @@ const ManagerDashboard: React.FC = () => {
                     </Box>
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', fontSize: { xs: '1.05rem', sm: '1.15rem' }, lineHeight: 1.2 }}>
-                        Step 3: Material Movement & Logistics
+                        Material Movement & Logistics
                       </Typography>
                       <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500, fontSize: '0.78rem' }}>
                         Dispatch raw stone to vendors or receive processed material back
@@ -1294,7 +1294,7 @@ const ManagerDashboard: React.FC = () => {
                 {/* 3 Stage Action Cards */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   
-                  {/* STEP 4: POLISHING */}
+                  {/* Polishing */}
                   <Paper 
                     elevation={0} 
                     sx={{ 
@@ -1317,7 +1317,7 @@ const ManagerDashboard: React.FC = () => {
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.98rem' }}>
-                          Step 4: Polishing
+                          Polishing
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.78rem' }}>
                           Surface polishing work (Honed / Mirror finish)
@@ -1347,7 +1347,7 @@ const ManagerDashboard: React.FC = () => {
                     </Button>
                   </Paper>
 
-                  {/* STEP 5: PACKING */}
+                  {/* Packing */}
                   <Paper 
                     elevation={0} 
                     sx={{ 
@@ -1370,7 +1370,7 @@ const ManagerDashboard: React.FC = () => {
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.98rem' }}>
-                          Step 5: Packing
+                          Packing
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.78rem' }}>
                           Log box names, package codes &amp; dimensions
@@ -1400,7 +1400,7 @@ const ManagerDashboard: React.FC = () => {
                     </Button>
                   </Paper>
 
-                  {/* STEP 6: DISPATCH */}
+                  {/* Dispatch */}
                   <Paper 
                     elevation={0} 
                     sx={{ 
@@ -1423,7 +1423,7 @@ const ManagerDashboard: React.FC = () => {
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.98rem' }}>
-                          Step 6: Dispatch
+                          Dispatch
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.78rem' }}>
                           Log vehicle number &amp; customer delivery
@@ -2995,3 +2995,4 @@ const ManagerDashboard: React.FC = () => {
 };
 
 export default ManagerDashboard;
+
