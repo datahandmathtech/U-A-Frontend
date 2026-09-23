@@ -30,6 +30,7 @@ import {
   useDeleteProductionLogMutation, useCreateMaterialLogMutation, useGetVendorsQuery, 
   useGetStaffListQuery, useEditProductionLogMutation 
 } from '../store/apiSlice';
+import { useSearchParams } from 'react-router-dom';
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 
@@ -89,8 +90,19 @@ const InOutLedger: React.FC = () => {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
-  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
-  const [currentTab, setCurrentTab] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam !== null ? parseInt(tabParam, 10) : 0;
+  const [currentTab, setCurrentTab] = useState(isNaN(initialTab) ? 0 : initialTab);
+
+  React.useEffect(() => {
+    if (tabParam !== null) {
+      const parsed = parseInt(tabParam, 10);
+      if (!isNaN(parsed) && parsed !== currentTab) {
+        setCurrentTab(parsed);
+      }
+    }
+  }, [tabParam]);
   
   const today = new Date();
   const currentYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
@@ -492,7 +504,10 @@ const InOutLedger: React.FC = () => {
       <Paper elevation={0} sx={{ p: 0.75, borderRadius: 3, bgcolor: '#F1F5F9', mb: 3, display: 'inline-flex', border: '1px solid #E2E8F0' }}>
         <Tabs 
           value={currentTab} 
-          onChange={(e, val) => setCurrentTab(val)} 
+          onChange={(_e, val) => {
+            setCurrentTab(val);
+            setSearchParams(val === 0 ? {} : { tab: String(val) });
+          }} 
           textColor="inherit"
           slotProps={{ indicator: { style: { display: 'none' } } }}
           sx={{ minHeight: 'unset' }}

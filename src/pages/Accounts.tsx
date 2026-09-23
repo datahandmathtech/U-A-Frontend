@@ -85,7 +85,7 @@ const Accounts: React.FC = () => {
       </TableContainer>
 
       {/* Add Invoice Dialog */}
-      <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 4 } }}>
+      <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" slotProps={{ paper: { sx: { borderRadius: 4 } } }}>
         <DialogTitle sx={{ fontWeight: 'bold' }}>Generate New Invoice</DialogTitle>
         <DialogContent dividers>
           <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

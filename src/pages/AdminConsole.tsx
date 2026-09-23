@@ -163,7 +163,7 @@ const AdminConsole: React.FC = () => {
         </Table>
       </TableContainer>
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { bgcolor: '#ffffff', borderRadius: 4, color: 'text.primary' } }}>
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth slotProps={{ paper: { sx: { bgcolor: '#ffffff', borderRadius: 4, color: 'text.primary' } } }}>
         <DialogTitle sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)', pb: 2, pt: 3, px: 3 }}>
           <Typography variant="h5" fontWeight="bold">{isEditing ? 'Edit Access' : 'Create New Access'}</Typography>
           <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 1 }}>PERMISSIONS & CREDENTIALS</Typography>

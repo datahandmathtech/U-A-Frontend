@@ -1560,7 +1560,17 @@ const Approvals: React.FC = () => {
       </Dialog>
 
       {/* Fullscreen Photo Preview Dialog */}
-      <Dialog open={!!previewPhoto} onClose={() => setPreviewPhoto(null)} maxWidth="lg" fullWidth PaperProps={{ style: { backgroundColor: 'transparent', boxShadow: 'none' } } as any}>
+      <Dialog 
+        open={!!previewPhoto} 
+        onClose={() => setPreviewPhoto(null)} 
+        maxWidth="lg" 
+        fullWidth 
+        slotProps={{
+          paper: {
+            sx: { backgroundColor: 'transparent', boxShadow: 'none' }
+          }
+        }}
+      >
         <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', p: 2 }} onClick={() => setPreviewPhoto(null)}>
           {previewPhoto ? (
             <img src={getFullQualityUrl(previewPhoto)} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} />
@@ -1683,7 +1693,11 @@ const Approvals: React.FC = () => {
         onClose={() => setManualApprovalOpen(false)} 
         maxWidth="lg" 
         fullWidth
-        PaperProps={{ sx: { borderRadius: 4, maxHeight: '90vh' } }}
+        slotProps={{
+          paper: {
+            sx: { borderRadius: 4, maxHeight: '90vh' }
+          }
+        }}
       >
         <DialogTitle sx={{ p: 3, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', bgcolor: '#F8FAFC' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

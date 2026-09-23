@@ -839,13 +839,21 @@ const ManagerDashboard: React.FC = () => {
   };
 
   const handleMaterialSubmit = async () => {
-    if (materialType === 'IN' && selectedOutLogId) {
-      const outLog = activeOutLogs?.find((l: any) => l.id === selectedOutLogId);
-      if (outLog) {
-        const pending = (outLog.quantityProduced || 0) - (outLog.returnedQty || 0);
-        if (Number(materialQuantity) > pending) {
-          alert(`Error: You cannot return more than ${pending} pending pieces!`);
+    if (materialType === 'IN' && dialogOrigin === 'Material Tracking') {
+      for (const row of vendorRows) {
+        if (!row.vendorId || !row.qty) {
+          showToast('Please select a vendor and enter quantity for all return rows!', 'error');
           return;
+        }
+        if (row.parentLogId) {
+          const outLog = activeOutLogs?.find((l: any) => l.id === row.parentLogId);
+          if (outLog) {
+            const pending = (outLog.quantityProduced || 0) - (outLog.returnedQty || 0);
+            if (Number(row.qty) > pending) {
+              showToast(`Error: ${row.vendorName || 'Vendor'} cannot return more than ${pending} pending pieces!`, 'error');
+              return;
+            }
+          }
         }
       }
     }
@@ -932,21 +940,21 @@ const ManagerDashboard: React.FC = () => {
 
       await createMaterialLog({
         stage: materialStage,
-        quantityProduced: materialQuantity || 1,
+        quantityProduced: materialQuantity || vendorRows[0]?.qty || 1,
         transactionType: materialType,
         startPhotos: materialPhotos,
         workerId: isStageCompletion ? (user?.id || user?._id) : undefined,
-        vendors: !isStageCompletion && materialType === 'OUT' ? vendorRows : [],
+        vendors: !isStageCompletion ? vendorRows : [],
         vendorName: undefined,
         vehicleNumber: vehicleNumber || undefined,
         boxCode: finalBoxCode,
-        parentLogId: materialType === 'IN' && !isStageCompletion ? selectedOutLogId : undefined,
+        parentLogId: materialType === 'IN' && !isStageCompletion ? (vendorRows[0]?.parentLogId || selectedOutLogId || undefined) : undefined,
         source: 'Material Tracking',
         requiresMachine: isStageCompletion ? false : (materialType === 'OUT' ? requiresMachine : undefined),
-        projectId: materialType === 'OUT' ? (selectedProjectId || undefined) : undefined,
-        productId: materialType === 'OUT' ? (selectedProductId || selectedSlabId || undefined) : undefined,
-        productName: materialType === 'OUT' ? (finalProductName || undefined) : undefined,
-        slabId: materialType === 'OUT' ? (selectedSlabId || undefined) : undefined,
+        projectId: materialType === 'OUT' ? (selectedProjectId || undefined) : (vendorRows[0]?.projectId || undefined),
+        productId: materialType === 'OUT' ? (selectedProductId || selectedSlabId || undefined) : (vendorRows[0]?.productId || undefined),
+        productName: materialType === 'OUT' ? (finalProductName || undefined) : (vendorRows[0]?.productName || undefined),
+        slabId: materialType === 'OUT' ? (selectedSlabId || undefined) : (vendorRows[0]?.slabId || undefined),
       }).unwrap();
       
       showToast(
@@ -1145,7 +1153,7 @@ const ManagerDashboard: React.FC = () => {
                     </Box>
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', fontSize: { xs: '1.05rem', sm: '1.15rem' }, lineHeight: 1.2 }}>
-                        Material Movement & Logistics
+                        Step 3: Material Movement & Logistics
                       </Typography>
                       <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500, fontSize: '0.78rem' }}>
                         Dispatch raw stone to vendors or receive processed material back
@@ -1294,7 +1302,7 @@ const ManagerDashboard: React.FC = () => {
                 {/* 3 Stage Action Cards */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   
-                  {/* Polishing */}
+                  {/* STEP 4: POLISHING */}
                   <Paper 
                     elevation={0} 
                     sx={{ 
@@ -1317,7 +1325,7 @@ const ManagerDashboard: React.FC = () => {
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.98rem' }}>
-                          Polishing
+                          Step 4: Polishing
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.78rem' }}>
                           Surface polishing work (Honed / Mirror finish)
@@ -1347,7 +1355,7 @@ const ManagerDashboard: React.FC = () => {
                     </Button>
                   </Paper>
 
-                  {/* Packing */}
+                  {/* STEP 5: PACKING */}
                   <Paper 
                     elevation={0} 
                     sx={{ 
@@ -1370,7 +1378,7 @@ const ManagerDashboard: React.FC = () => {
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.98rem' }}>
-                          Packing
+                          Step 5: Packing
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.78rem' }}>
                           Log box names, package codes &amp; dimensions
@@ -1400,7 +1408,7 @@ const ManagerDashboard: React.FC = () => {
                     </Button>
                   </Paper>
 
-                  {/* Dispatch */}
+                  {/* STEP 6: DISPATCH */}
                   <Paper 
                     elevation={0} 
                     sx={{ 
@@ -1423,7 +1431,7 @@ const ManagerDashboard: React.FC = () => {
                       </Box>
                       <Box>
                         <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.98rem' }}>
-                          Dispatch
+                          Step 6: Dispatch
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.78rem' }}>
                           Log vehicle number &amp; customer delivery
@@ -1758,96 +1766,245 @@ const ManagerDashboard: React.FC = () => {
         <DialogContent sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#FFFFFF' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
-            {/* Inward Section: Select active out log to return using Checkboxes */}
+            {/* INWARD (RECEIVE) FLOW: Follows exact same process as Outward, with automatic work stage & quantity selection */}
             {materialType === 'IN' && (
-              <Box>
-                <Typography sx={{ color: '#1E293B', fontWeight: 800, fontSize: '0.88rem', mb: 1.2 }}>
-                  1. Select Active Assignment to Return
-                </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* Clean Header Bar */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 0.5, borderBottom: '1px solid #F1F5F9' }}>
+                  <Box>
+                    <Typography sx={{ color: '#0F172A', fontWeight: 800, fontSize: '0.92rem', letterSpacing: '-0.01em' }}>
+                      Receive Stone from Vendor(s):
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500 }}>
+                      Log returned pieces & verify completed stage
+                    </Typography>
+                  </Box>
+                  <Chip 
+                    label={`${vendorRows.length} Vendor${vendorRows.length > 1 ? 's' : ''}`} 
+                    size="small" 
+                    sx={{ fontWeight: 800, fontSize: '0.72rem', bgcolor: '#F0F9FF', color: '#0284C7', border: '1px solid #BAE6FD', height: 24 }} 
+                  />
+                </Box>
 
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
-                  {activeOutLogs?.filter((log: any) => dialogOrigin === 'Material Tracking' || log.stage === materialStage).map((log: any) => {
-                    const assigneeName = log.vendorName || log.worker?.name || log.workerName || 'External';
-                    const projName = log.project?.name && log.project?.clientName ? log.project.name : (log.project?.projectId || '');
-                    const pendingQty = (log.quantityProduced || 0) - (log.returnedQty || 0);
-                    const isChecked = selectedOutLogId === log.id;
+                {vendorRows.map((row, index) => {
+                  const DEFAULT_STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Polishing', 'Packing', 'Dispatch'];
+                  const isCustomStage = !DEFAULT_STAGES.includes(row.stage);
 
-                    return (
-                      <Paper
-                        key={log.id}
-                        onClick={() => {
-                          if (isChecked) {
-                            setSelectedOutLogId('');
-                            setMaterialQuantity('');
-                          } else {
-                            setSelectedOutLogId(log.id);
-                            setMaterialQuantity(String(pendingQty));
+                  // Check if there is an active out log matching this vendor
+                  const matchingOutLog = activeOutLogs?.find((l: any) => 
+                    (row.parentLogId && l.id === row.parentLogId) ||
+                    (row.vendorId && l.vendorId === row.vendorId) || 
+                    (row.vendorName && l.vendorName && l.vendorName.toLowerCase().trim() === row.vendorName.toLowerCase().trim())
+                  );
+                  const pendingQty = matchingOutLog ? ((matchingOutLog.quantityProduced || 0) - (matchingOutLog.returnedQty || 0)) : null;
+
+                  return (
+                    <Paper 
+                      key={index} 
+                      elevation={0} 
+                      sx={{ 
+                        p: 2.2, 
+                        border: '1.5px solid #E2E8F0', 
+                        borderRadius: 3.5, 
+                        bgcolor: '#FFFFFF', 
+                        boxShadow: '0 4px 14px rgba(15, 23, 42, 0.04)',
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: 1.8,
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          borderColor: '#BAE6FD',
+                          boxShadow: '0 6px 20px rgba(2, 132, 199, 0.08)'
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                          <Box sx={{ 
+                            width: 26, 
+                            height: 26, 
+                            borderRadius: '50%', 
+                            bgcolor: '#0284C7', 
+                            color: '#FFFFFF', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            fontSize: '0.78rem', 
+                            fontWeight: 900,
+                            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)'
+                          }}>
+                            {index + 1}
+                          </Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.88rem' }}>
+                            Return #{index + 1}
+                          </Typography>
+                        </Box>
+                        {vendorRows.length > 1 && (
+                          <IconButton 
+                            size="small" 
+                            color="error" 
+                            onClick={() => setVendorRows(prev => prev.filter((_, i) => i !== index))} 
+                            sx={{ bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' }, p: 0.6 }}
+                          >
+                            <DeleteIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        )}
+                      </Box>
+                      
+                      {/* 1. Vendor Selection */}
+                      <TextField 
+                        select
+                        label="Select Vendor *" 
+                        fullWidth 
+                        size="small"
+                        value={row.vendorId} 
+                        onChange={(e) => {
+                          const vId = e.target.value;
+                          const vObj = vendorsList?.find((v: any) => v.id === vId);
+                          const vName = vObj?.name || '';
+                          
+                          // Automatic Work Stage and Quantity Selection based on active assignment!
+                          let autoStage = row.stage || 'Production';
+                          let autoQty = row.qty || '';
+                          let autoParentLogId = '';
+                          let autoProjectId = '';
+                          let autoProductName = '';
+                          let autoSlabId = '';
+
+                          const matchLog = activeOutLogs?.find((l: any) => 
+                            (l.vendorId === vId) || 
+                            (l.vendorName && vName && l.vendorName.toLowerCase().trim() === vName.toLowerCase().trim())
+                          );
+                          if (matchLog) {
+                            autoStage = matchLog.stage || 'Production';
+                            const pending = (matchLog.quantityProduced || 0) - (matchLog.returnedQty || 0);
+                            autoQty = pending > 0 ? String(pending) : '';
+                            autoParentLogId = matchLog.id;
+                            autoProjectId = matchLog.projectId || matchLog.project?.id || '';
+                            autoProductName = matchLog.productName || '';
+                            autoSlabId = matchLog.slabId || '';
                           }
+
+                          setVendorRows(prev => { 
+                            const arr = [...prev]; 
+                            arr[index] = { 
+                              ...arr[index], 
+                              vendorId: vId, 
+                              vendorName: vName,
+                              stage: autoStage,
+                              qty: autoQty || arr[index].qty,
+                              parentLogId: autoParentLogId,
+                              projectId: autoProjectId,
+                              productName: autoProductName,
+                              slabId: autoSlabId
+                            }; 
+                            return arr; 
+                          });
                         }}
-                        elevation={0}
-                        sx={{
-                          p: 1.75,
-                          borderRadius: 3,
-                          border: '1.5px solid',
-                          borderColor: isChecked ? '#0284C7' : '#E2E8F0',
-                          bgcolor: isChecked ? '#F0F9FF' : '#F8FAFC',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          transition: 'all 0.2s ease',
-                          boxShadow: isChecked ? '0 4px 12px rgba(2, 132, 199, 0.15)' : 'none',
-                          '&:hover': { borderColor: '#0284C7', bgcolor: '#F0F9FF' }
+                        slotProps={{ 
+                          input: { 
+                            sx: { 
+                              borderRadius: 2.5, 
+                              bgcolor: '#F8FAFC',
+                              fontWeight: 600
+                            } 
+                          } 
                         }}
                       >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Checkbox 
-                            checked={isChecked} 
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              if (isChecked) {
-                                setSelectedOutLogId('');
-                                setMaterialQuantity('');
-                              } else {
-                                setSelectedOutLogId(log.id);
-                                setMaterialQuantity(String(pendingQty));
-                              }
-                            }} 
-                            color="primary"
-                            sx={{ p: 0.5 }}
-                          />
-                          <Box>
-                            <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>
-                              From: <span style={{ color: '#0284C7', fontWeight: 900 }}>{assigneeName}</span>{projName ? ` (${projName})` : ''}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, display: 'block', mt: 0.3 }}>
-                              {log.productName ? `${log.productName} • ` : ''}{log.stage}
+                        {vendorsList?.map((v: any) => {
+                          const pendingLogs = activeOutLogs?.filter((l: any) => 
+                            l.vendorId === v.id || (l.vendorName && v.name && l.vendorName.toLowerCase().trim() === v.name.toLowerCase().trim())
+                          ) || [];
+                          const totalPending = pendingLogs.reduce((acc: number, l: any) => acc + ((l.quantityProduced || 0) - (l.returnedQty || 0)), 0);
+                          const stagesText = pendingLogs.map((l: any) => l.stage).filter(Boolean).join(', ');
+
+                          return (
+                            <MenuItem key={v.id} value={v.id} sx={{ fontSize: '0.88rem', display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                              <span style={{ fontWeight: 600 }}>{v.name}</span>
+                              {totalPending > 0 && (
+                                <Chip 
+                                  label={`${totalPending} pcs (${stagesText || 'Pending'})`} 
+                                  size="small" 
+                                  sx={{ height: 20, fontSize: '0.68rem', fontWeight: 800, bgcolor: '#E0F2FE', color: '#0369A1' }} 
+                                />
+                              )}
+                            </MenuItem>
+                          );
+                        })}
+                      </TextField>
+
+                      {/* Pending Details Banner inside Card if Vendor has active assignment */}
+                      {matchingOutLog && (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between', 
+                          flexWrap: 'wrap',
+                          gap: 1,
+                          px: 1.6, 
+                          py: 1, 
+                          bgcolor: '#F0F9FF', 
+                          borderRadius: 2.5, 
+                          border: '1px solid #BAE6FD' 
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                            <InventoryIcon sx={{ fontSize: 16, color: '#0284C7', flexShrink: 0 }} />
+                            <Typography variant="caption" sx={{ color: '#0369A1', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {matchingOutLog.project?.name ? `Project: ${matchingOutLog.project.name} • ` : ''}{matchingOutLog.productName ? `${matchingOutLog.productName} • ` : ''}{matchingOutLog.stage}
                             </Typography>
                           </Box>
+                          <Chip 
+                            label={`${pendingQty} pcs pending`} 
+                            size="small" 
+                            sx={{ height: 20, fontSize: '0.68rem', fontWeight: 900, bgcolor: '#0284C7', color: '#FFFFFF', flexShrink: 0 }} 
+                          />
                         </Box>
-                        
-                        <Chip 
-                          label={`${pendingQty} pcs pending`} 
-                          size="small" 
-                          sx={{ 
-                            bgcolor: isChecked ? '#0284C7' : '#E2E8F0', 
-                            color: isChecked ? '#FFFFFF' : '#334155', 
-                            fontWeight: 800, 
-                            fontSize: '0.74rem' 
-                          }} 
-                        />
-                      </Paper>
-                    );
-                  })}
+                      )}
 
-                  {(!activeOutLogs || activeOutLogs.filter((log: any) => dialogOrigin === 'Material Tracking' || log.stage === materialStage).length === 0) && (
-                    <Box sx={{ textAlign: 'center', py: 3, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px dashed #CBD5E1' }}>
-                      <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>
-                        No pending assignments available to return.
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
+                      {/* 2. Quantity Returning (Work Stage is auto-linked in the background) */}
+                      <TextField 
+                        fullWidth 
+                        size="small" 
+                        label="Quantity Returning *" 
+                        type="number"
+                        placeholder="e.g. 5"
+                        value={row.qty}
+                        onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
+                        helperText={pendingQty !== null ? `Max: ${pendingQty} pcs pending` : undefined}
+                        slotProps={{ 
+                          input: { 
+                            endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B' }}>Pcs</Typography></InputAdornment>,
+                            sx: { borderRadius: 2.5, bgcolor: '#F8FAFC', fontWeight: 700 } 
+                          },
+                          formHelperText: {
+                            sx: { color: '#059669', fontWeight: 700, fontSize: '0.72rem', mt: 0.4 }
+                          }
+                        }}
+                      />
+                    </Paper>
+                  );
+                })}
+
+                <Button 
+                  startIcon={<AddIcon sx={{ fontSize: 18 }} />} 
+                  onClick={() => setVendorRows(prev => [...prev, { vendorId: '', vendorName: '', stage: 'Production', qty: '' }])} 
+                  sx={{ 
+                    alignSelf: 'flex-start', 
+                    textTransform: 'none', 
+                    fontWeight: 800, 
+                    fontSize: '0.82rem',
+                    color: '#0284C7',
+                    bgcolor: '#F8FAFC',
+                    border: '1.5px dashed #0284C7',
+                    borderRadius: 2.5,
+                    px: 2.5,
+                    py: 0.8,
+                    transition: 'all 0.2s ease',
+                    '&:hover': { bgcolor: '#F0F9FF', borderColor: '#0369A1' }
+                  }}
+                >
+                  + Add Another Vendor Return
+                </Button>
               </Box>
             )}
 
@@ -2475,8 +2632,7 @@ const ManagerDashboard: React.FC = () => {
                 creatingMaterial
               )
               : (
-                (materialType === 'OUT' && vendorRows.some(r => !r.vendorId || !r.qty)) ||
-                (materialType === 'IN' && !materialQuantity && !selectedOutLogId) ||
+                vendorRows.some(r => !r.vendorId || !r.qty) ||
                 !materialPhotos.machine ||
                 (materialType === 'OUT' && !requiresMachine && !materialPhotos.endPhoto) ||
                 creatingMaterial
@@ -2995,4 +3151,3 @@ const ManagerDashboard: React.FC = () => {
 };
 
 export default ManagerDashboard;
-

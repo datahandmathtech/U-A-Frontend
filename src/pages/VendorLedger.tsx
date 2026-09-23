@@ -72,7 +72,7 @@ const VendorLedger = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
         <Breadcrumbs>
-          <Link component="button" variant="body1" onClick={() => navigate('/vendors')} sx={{ display: 'flex', alignItems: 'center' }}>
+          <Link component="button" variant="body1" onClick={() => navigate('/in-out-ledger?tab=2')} sx={{ display: 'flex', alignItems: 'center' }}>
             <ArrowBackIcon sx={{ mr: 0.5, fontSize: 20 }} /> Back to Vendors
           </Link>
           <Typography color="text.primary">{vendor?.name}</Typography>
@@ -183,7 +183,17 @@ const VendorLedger = () => {
       />
 
       {/* Photo Preview Dialog */}
-      <Dialog open={!!previewPhoto} onClose={() => setPreviewPhoto(null)} maxWidth="lg" fullWidth PaperProps={{ style: { backgroundColor: 'transparent', boxShadow: 'none' } } as any}>
+      <Dialog 
+        open={!!previewPhoto} 
+        onClose={() => setPreviewPhoto(null)} 
+        maxWidth="lg" 
+        fullWidth 
+        slotProps={{
+          paper: {
+            sx: { backgroundColor: 'transparent', boxShadow: 'none' }
+          }
+        }}
+      >
         <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', p: 2 }} onClick={() => setPreviewPhoto(null)}>
           {previewPhoto && previewPhoto !== 'no-photo' ? <img src={previewPhoto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} /> : <Typography sx={{color: 'white'}}>No photo available</Typography>}
         </Box>

@@ -61,18 +61,20 @@ const VendorsList = ({ hideHeader, selectedMonth, selectedFY }: { hideHeader?: b
 
   return (
     <Box sx={{ p: hideHeader ? 0 : 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'center' }}>
-        {!hideHeader && <Typography variant="h4" fontWeight="bold">Vendor Master</Typography>}
-        <TextField 
-          placeholder="Search vendors..." 
-          size="small"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ width: 300, bgcolor: '#fff', borderRadius: 1 }}
-        />
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()} sx={{ ml: 'auto' }}>
-          + Enlist New Vendor
-        </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        {!hideHeader && <Typography variant="h5" fontWeight="bold">Vendor Master</Typography>}
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', ml: 'auto' }}>
+          <TextField 
+            placeholder="Search vendors..." 
+            size="small"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ width: 260, bgcolor: '#fff', borderRadius: 1 }}
+          />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+            + Enlist New Vendor
+          </Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 2 }}>

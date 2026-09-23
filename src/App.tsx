@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import PageLoader from './components/PageLoader';
 
@@ -110,7 +110,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'vendors',
-        element: <VendorsList />
+        element: <Navigate to="/in-out-ledger?tab=2" replace />
       },
       {
         path: 'vendors/:id',
