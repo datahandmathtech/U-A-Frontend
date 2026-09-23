@@ -1767,7 +1767,7 @@ const ManagerDashboard: React.FC = () => {
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
                   {activeOutLogs?.filter((log: any) => dialogOrigin === 'Material Tracking' || log.stage === materialStage).map((log: any) => {
-                    const clientName = log.project?.clientName || log.project?.name || log.vendorName || 'Client';
+                    const assigneeName = log.vendorName || log.worker?.name || log.workerName || 'External';
                     const projName = log.project?.name && log.project?.clientName ? log.project.name : (log.project?.projectId || '');
                     const pendingQty = (log.quantityProduced || 0) - (log.returnedQty || 0);
                     const isChecked = selectedOutLogId === log.id;
@@ -1818,10 +1818,10 @@ const ManagerDashboard: React.FC = () => {
                           />
                           <Box>
                             <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>
-                              Client: <span style={{ color: '#0284C7', fontWeight: 900 }}>{clientName}</span>{projName ? ` (${projName})` : ''}
+                              From: <span style={{ color: '#0284C7', fontWeight: 900 }}>{assigneeName}</span>{projName ? ` (${projName})` : ''}
                             </Typography>
                             <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, display: 'block', mt: 0.3 }}>
-                              {log.productName ? `${log.productName} • ` : ''}{log.stage} ({log.worker?.name || log.vendorName || 'External Vendor'})
+                              {log.productName ? `${log.productName} • ` : ''}{log.stage}
                             </Typography>
                           </Box>
                         </Box>

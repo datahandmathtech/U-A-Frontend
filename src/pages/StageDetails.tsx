@@ -1332,7 +1332,14 @@ const StageDetails = () => {
                     const matchedDispatchIds = new Set<string>();
 
                     const packedDisplay = packedLogs.map((pLog: any) => {
-                      const dLog = dispatchLogs.find((d: any) => d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode));
+                      const dLog = dispatchLogs.find((d: any) => {
+                        if (d.boxCode && pLog.boxCode && d.boxCode.includes(pLog.boxCode)) return true;
+                        if (!d.boxCode && !pLog.boxCode) {
+                          if (d.productId && pLog.productId && d.productId === pLog.productId) return true;
+                          if (d.pieceIds && pLog.pieceIds && d.pieceIds.length > 0 && d.pieceIds.some((id: string) => pLog.pieceIds.includes(id))) return true;
+                        }
+                        return false;
+                      });
                       if (dLog) matchedDispatchIds.add(dLog.id);
                       return {
                         id: pLog.id,

@@ -175,11 +175,11 @@ const SlabRow = ({
           if (l.approvalStatus !== 'approved') return false;
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
           if (lStage !== normalizedStageName && !lStage.startsWith(normalizedStageName)) return false;
-          return (l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
+          return (l.pieceIds && l.pieceIds.includes(p.id)) || l.productId === p.id || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
         });
         const isCurrentStageCompleted = pStage === normalizedStageName && p.status === 'completed';
 
-        if (hasCompletedLog || hasApprovedProdLog || isCurrentStageCompleted) {
+        if (hasCompletedLog || hasApprovedProdLog || isCurrentStageCompleted || pIdx > stageIdx) {
           piecesCompleted++;
         } else if (pIdx === stageIdx && (p.status === 'active' || p.status === 'in_progress')) {
           piecesActive++;
@@ -240,6 +240,8 @@ const SlabRow = ({
         let completedCount = 0;
         slab.pieces.forEach((p: any) => {
           const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+          const pIdx = ['Production', 'Polishing', 'Packing', 'Dispatch'].indexOf(pStage);
+          const stageIdx = ['Production', 'Polishing', 'Packing', 'Dispatch'].indexOf(stageName);
           const hasLog = p.logs && p.logs.some((l: any) => {
             const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
             return (lStage === stageName || lStage.startsWith(stageName)) && (l.status === 'completed' || l.status === 'approved');
@@ -248,9 +250,9 @@ const SlabRow = ({
             if (l.approvalStatus !== 'approved') return false;
             const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
             if (lStage !== stageName && !lStage.startsWith(stageName)) return false;
-            return (l.pieceIds && l.pieceIds.includes(p.id)) || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
+            return (l.pieceIds && l.pieceIds.includes(p.id)) || l.productId === p.id || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
           });
-          if (hasLog || hasApprovedProdLog || (pStage === stageName && p.status === 'completed')) {
+          if (hasLog || hasApprovedProdLog || (pStage === stageName && p.status === 'completed') || pIdx > stageIdx) {
             completedCount++;
           }
         });
@@ -268,8 +270,31 @@ const SlabRow = ({
     return parseFloat((fraction * totalSubPieces).toFixed(2));
   };
 
+  const calculateOverallStatus = () => {
+    if (slab.status === 'completed') return 'Completed';
+    const requiredStages = slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const cProd = getStageStatus('Production');
+    const cPoli = getStageStatus('Polishing');
+    const cPack = getStageStatus('Packing');
+    const cDisp = getStageStatus('Dispatch');
+    
+    const stages = [cProd, cPoli, cPack, cDisp];
+    
+    // If all required stages are Not Started, the slab hasn't actually started production
+    if (stages.every(s => s === 'Not Started' || s === 'N/A')) {
+      return 'Not Started';
+    }
+
+    if (stages.some(s => s === 'In Progress' || s === 'Completed')) {
+       const finalStage = requiredStages.includes('Dispatch') ? 'Dispatch' : (requiredStages.includes('Packing') ? 'Packing' : (requiredStages.includes('Polishing') ? 'Polishing' : 'Production'));
+       if (getStageStatus(finalStage) === 'Completed') return 'Completed';
+       return 'In Production';
+    }
+    return 'Not Started';
+  };
+
   const completedPiecesVal = calculateSlabCompletedPieces();
-  const overallStatus = slab.status === 'completed' ? 'Completed' : (slab.status === 'active' ? 'In Production' : 'Not Started');
+  const overallStatus = calculateOverallStatus();
 
   return (
     <TableRow 

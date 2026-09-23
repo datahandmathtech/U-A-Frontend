@@ -46,15 +46,22 @@ export const calculateOrderProgress = (project: any) => {
       if (pieces.length === 0) {
          return slab.status === 'completed' ? 1.0 : 0;
       }
+      
+      const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const stageIdx = BASE_STAGES.indexOf(stageName);
+
       let completedCount = 0;
       pieces.forEach((p: any) => {
         const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+        const pIdx = BASE_STAGES.indexOf(pStage);
+        
         const hasLog = p.logs && p.logs.some((l: any) => {
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
           return (lStage === stageName || lStage.startsWith(stageName)) && 
                  (l.status === 'completed' || l.status === 'approved');
         });
-        if (hasLog || (pStage === stageName && p.status === 'completed')) {
+        
+        if (hasLog || (pStage === stageName && p.status === 'completed') || pIdx > stageIdx) {
           completedCount++;
         }
       });
