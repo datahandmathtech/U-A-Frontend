@@ -90,6 +90,7 @@ const InOutLedger: React.FC = () => {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success'|'error' });
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const initialTab = tabParam !== null ? parseInt(tabParam, 10) : 0;
