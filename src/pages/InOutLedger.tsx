@@ -266,19 +266,54 @@ const InOutLedger: React.FC = () => {
                 </TableCell>
                 
                 <TableCell sx={{ py: 2 }}>
-                  <Chip 
-                    label={`${log.quantityProduced} pcs`} 
-                    size="small" 
-                    sx={{ 
-                      fontWeight: 800, 
-                      fontSize: '0.75rem', 
-                      bgcolor: isOut ? '#FFF7ED' : '#EFF6FF',
-                      color: isOut ? '#C2410C' : '#1D4ED8',
-                      border: '1px solid',
-                      borderColor: isOut ? '#FFEDD5' : '#DBEAFE',
-                      borderRadius: 1.5 
-                    }} 
-                  />
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                    <Chip 
+                      label={`${log.quantityProduced} pcs`} 
+                      size="small" 
+                      sx={{ 
+                        fontWeight: 800, 
+                        fontSize: '0.75rem', 
+                        bgcolor: isOut ? '#FFF7ED' : '#EFF6FF',
+                        color: isOut ? '#C2410C' : '#1D4ED8',
+                        border: '1px solid',
+                        borderColor: isOut ? '#FFEDD5' : '#DBEAFE',
+                        borderRadius: 1.5 
+                      }} 
+                    />
+                    {isOut && (() => {
+                      const ret = Number(log.returnedQty) || 0;
+                      const total = Number(log.quantityProduced) || 0;
+                      const remaining = Math.max(0, total - ret);
+                      if (log.isReturned || remaining === 0) {
+                        return (
+                          <Typography sx={{ fontSize: '0.7rem', color: '#16A34A', fontWeight: 700, mt: 0.2 }}>
+                            ✓ All Returned ({ret || total} pcs)
+                          </Typography>
+                        );
+                      }
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', mt: 0.2 }}>
+                          <Chip
+                            label={`Pending: ${remaining} pcs`}
+                            size="small"
+                            sx={{
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              bgcolor: '#FEF2F2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA',
+                              height: 20
+                            }}
+                          />
+                          {ret > 0 && (
+                            <Typography sx={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 600 }}>
+                              ({ret} In)
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    })()}
+                  </Box>
                 </TableCell>
                 
                 <TableCell sx={{ py: 2 }}>

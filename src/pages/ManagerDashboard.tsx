@@ -1796,7 +1796,7 @@ const ManagerDashboard: React.FC = () => {
                     (row.vendorId && l.vendorId === row.vendorId) || 
                     (row.vendorName && l.vendorName && l.vendorName.toLowerCase().trim() === row.vendorName.toLowerCase().trim())
                   );
-                  const pendingQty = matchingOutLog ? ((matchingOutLog.quantityProduced || 0) - (matchingOutLog.returnedQty || 0)) : null;
+                  const pendingQty = matchingOutLog ? (matchingOutLog.pendingQty !== undefined ? matchingOutLog.pendingQty : ((matchingOutLog.quantityProduced || 0) - (matchingOutLog.returnedQty || 0))) : null;
 
                   return (
                     <Paper 
@@ -1877,7 +1877,7 @@ const ManagerDashboard: React.FC = () => {
                           );
                           if (matchLog) {
                             autoStage = matchLog.stage || 'Production';
-                            const pending = (matchLog.quantityProduced || 0) - (matchLog.returnedQty || 0);
+                            const pending = matchLog.pendingQty !== undefined ? matchLog.pendingQty : ((matchLog.quantityProduced || 0) - (matchLog.returnedQty || 0));
                             autoQty = pending > 0 ? String(pending) : '';
                             autoParentLogId = matchLog.id;
                             autoProjectId = matchLog.projectId || matchLog.project?.id || '';
@@ -1915,7 +1915,7 @@ const ManagerDashboard: React.FC = () => {
                           const pendingLogs = activeOutLogs?.filter((l: any) => 
                             l.vendorId === v.id || (l.vendorName && v.name && l.vendorName.toLowerCase().trim() === v.name.toLowerCase().trim())
                           ) || [];
-                          const totalPending = pendingLogs.reduce((acc: number, l: any) => acc + ((l.quantityProduced || 0) - (l.returnedQty || 0)), 0);
+                          const totalPending = pendingLogs.reduce((acc: number, l: any) => acc + (l.pendingQty !== undefined ? l.pendingQty : ((l.quantityProduced || 0) - (l.returnedQty || 0))), 0);
                           const stagesText = pendingLogs.map((l: any) => l.stage).filter(Boolean).join(', ');
 
                           return (
@@ -1923,9 +1923,9 @@ const ManagerDashboard: React.FC = () => {
                               <span style={{ fontWeight: 600 }}>{v.name}</span>
                               {totalPending > 0 && (
                                 <Chip 
-                                  label={`${totalPending} pcs (${stagesText || 'Pending'})`} 
+                                  label={`Pending: ${totalPending} pcs (${stagesText || 'Pending'})`} 
                                   size="small" 
-                                  sx={{ height: 20, fontSize: '0.68rem', fontWeight: 800, bgcolor: '#E0F2FE', color: '#0369A1' }} 
+                                  sx={{ height: 20, fontSize: '0.68rem', fontWeight: 800, bgcolor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }} 
                                 />
                               )}
                             </MenuItem>
@@ -1949,14 +1949,19 @@ const ManagerDashboard: React.FC = () => {
                         }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                             <InventoryIcon sx={{ fontSize: 16, color: '#0284C7', flexShrink: 0 }} />
-                            <Typography variant="caption" sx={{ color: '#0369A1', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {matchingOutLog.project?.name ? `Project: ${matchingOutLog.project.name} • ` : ''}{matchingOutLog.productName ? `${matchingOutLog.productName} • ` : ''}{matchingOutLog.stage}
-                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                              <Typography variant="caption" sx={{ color: '#0369A1', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {matchingOutLog.project?.name ? `Project: ${matchingOutLog.project.name} • ` : ''}{matchingOutLog.productName ? `${matchingOutLog.productName} • ` : ''}{matchingOutLog.stage}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.72rem' }}>
+                                Out: {matchingOutLog.quantityProduced} pcs | Returned: {matchingOutLog.returnedQty || 0} pcs | Pending: {pendingQty} pcs
+                              </Typography>
+                            </Box>
                           </Box>
                           <Chip 
-                            label={`${pendingQty} pcs pending`} 
+                            label={`Pending: ${pendingQty} pcs`} 
                             size="small" 
-                            sx={{ height: 20, fontSize: '0.68rem', fontWeight: 900, bgcolor: '#0284C7', color: '#FFFFFF', flexShrink: 0 }} 
+                            sx={{ height: 22, fontSize: '0.72rem', fontWeight: 900, bgcolor: '#DC2626', color: '#FFFFFF', flexShrink: 0 }} 
                           />
                         </Box>
                       )}
@@ -1970,14 +1975,14 @@ const ManagerDashboard: React.FC = () => {
                         placeholder="e.g. 5"
                         value={row.qty}
                         onChange={(e) => setVendorRows(prev => { const arr = [...prev]; arr[index] = { ...arr[index], qty: e.target.value }; return arr; })}
-                        helperText={pendingQty !== null ? `Max: ${pendingQty} pcs pending` : undefined}
+                        helperText={matchingOutLog ? `Out: ${matchingOutLog.quantityProduced} pcs | Returned: ${matchingOutLog.returnedQty || 0} pcs | Pending: ${pendingQty} pcs` : (pendingQty !== null ? `Max: ${pendingQty} pcs pending` : undefined)}
                         slotProps={{ 
                           input: { 
                             endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B' }}>Pcs</Typography></InputAdornment>,
                             sx: { borderRadius: 2.5, bgcolor: '#F8FAFC', fontWeight: 700 } 
                           },
                           formHelperText: {
-                            sx: { color: '#059669', fontWeight: 700, fontSize: '0.72rem', mt: 0.4 }
+                            sx: { color: '#0369A1', fontWeight: 700, fontSize: '0.72rem', mt: 0.4 }
                           }
                         }}
                       />
