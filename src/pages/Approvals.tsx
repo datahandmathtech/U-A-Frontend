@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel, Autocomplete, Tooltip, Table, TableHead, TableRow, TableCell, TableBody, Divider, Accordion, AccordionSummary, AccordionDetails, RadioGroup, Radio } from '@mui/material';
+import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel, Autocomplete, Tooltip, Table, TableHead, TableRow, TableCell, TableBody, Divider, Accordion, AccordionSummary, AccordionDetails, RadioGroup, Radio, Skeleton } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
-import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetApprovedLogsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useGetActiveOutLogsQuery, useManualApprovePiecesMutation } from '../store/apiSlice';
+import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useManualApprovePiecesMutation } from '../store/apiSlice';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
@@ -21,25 +21,20 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import LayersIcon from '@mui/icons-material/Layers';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import SearchIcon from '@mui/icons-material/Search';
+import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
+import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
+import ZoomInRoundedIcon from '@mui/icons-material/ZoomInRounded';
+import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
+import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 
 const Approvals: React.FC = () => {
   const { data: pendingLogs, isLoading, refetch: refetchPending } = useGetPendingApprovalsQuery(undefined, {
     pollingInterval: 15000,
     skipPollingIfUnfocused: true
   });
-  const { data: approvedLogs, refetch: refetchApproved } = useGetApprovedLogsQuery(undefined, {
-    pollingInterval: 30000,
-    skipPollingIfUnfocused: true
-  });
   const { data: projects } = useGetProjectsQuery();
-  const { data: machineLogs } = useGetMachineLogsQuery(undefined, {
-    pollingInterval: 30000,
-    skipPollingIfUnfocused: true
-  });
-  const { data: activeOutLogs } = useGetActiveOutLogsQuery(undefined, {
-    pollingInterval: 30000,
-    skipPollingIfUnfocused: true
-  });
+  const { data: machineLogs } = useGetMachineLogsQuery();
   const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
   
 
@@ -368,8 +363,6 @@ const Approvals: React.FC = () => {
     }
   };
 
-  if (isLoading && !pendingLogs) return <Box sx={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
-
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
@@ -377,38 +370,28 @@ const Approvals: React.FC = () => {
           <PendingActionsIcon fontSize="large" color="warning" />
           Pending Approvals
         </Typography>
-
-        <Button
-          variant="contained"
-          startIcon={<FlashOnIcon />}
-          onClick={() => {
-            setManualApprovalOpen(true);
-            if (!manualProjectId && projects && projects.length > 0) {
-              setManualProjectId(projects[0].id);
-            }
-          }}
-          sx={{
-            borderRadius: 2.5,
-            textTransform: 'none',
-            fontWeight: 800,
-            fontSize: '0.95rem',
-            px: 2.5,
-            py: 1,
-            bgcolor: '#059669',
-            color: '#FFFFFF',
-            boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
-            '&:hover': { bgcolor: '#047857' }
-          }}
-        >
-          ⚡ Manual Approval
-        </Button>
       </Box>
 
       {(!pendingLogs) ? (
-        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4 }}>
-          <CheckCircleIcon sx={{ fontSize: 60, color: 'success.main', mb: 2 }} />
-          <Typography variant="h6" color="textSecondary">Loading approvals...</Typography>
-        </Paper>
+        <Grid container spacing={2.5}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Grid size={{ xs: 12, md: 6, lg: 4 }} key={i}>
+              <Card sx={{ borderRadius: 3.5, p: 2, border: '1px solid #E2E8F0', bgcolor: '#FFF' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                  <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1.5 }} />
+                  <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1.5 }} />
+                </Box>
+                <Skeleton variant="rectangular" width="100%" height={120} sx={{ borderRadius: 2, mb: 2 }} />
+                <Skeleton variant="text" width="60%" height={24} />
+                <Skeleton variant="text" width="40%" height={20} />
+                <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                  <Skeleton variant="rectangular" width="50%" height={36} sx={{ borderRadius: 2 }} />
+                  <Skeleton variant="rectangular" width="50%" height={36} sx={{ borderRadius: 2 }} />
+                </Box>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
       ) : (
         <Box>
           {(() => {
@@ -431,129 +414,280 @@ const Approvals: React.FC = () => {
               { name: 'Dispatch', shortName: 'Dispatch', matchStages: ['Dispatch'], color: '#FFEBEE', iconColor: 'error', borderColor: '#FFCDD2' },
             ];
 
+            const getLogPhotos = (log: any) => {
+              const list: { url: string; label: string }[] = [];
+              if (log.startPhotos?.machine) list.push({ url: log.startPhotos.machine, label: 'Machine' });
+              if (log.startPhotos?.unit) list.push({ url: log.startPhotos.unit, label: 'Unit / Material' });
+              if (log.startPhotos?.software) list.push({ url: log.startPhotos.software, label: 'Meter Reading' });
+              if (log.endPhotos?.machine) list.push({ url: log.endPhotos.machine, label: 'End Machine' });
+              if (log.endPhotos?.unit) list.push({ url: log.endPhotos.unit, label: 'End Unit' });
+              if (log.endPhotos?.software) list.push({ url: log.endPhotos.software, label: 'End Meter' });
+              if (log.photo && !list.some(p => p.url === log.photo)) list.push({ url: log.photo, label: 'Photo' });
+              if (log.rejectionPhoto) list.push({ url: log.rejectionPhoto, label: 'Rejection' });
+              return list;
+            };
+
             const renderLogGrid = (logsToRender: any[]) => (
-              <Grid container spacing={3}>
-                {logsToRender.map((log: any) => (
-                  <Grid size={{ xs: 12, md: 6, lg: 4 }} key={log.id}>
-                    <Card sx={{ borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', position: 'relative', bgcolor: 'white' }}>
-                      <Box sx={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: 0.75, alignItems: 'center' }}>
-                        {log.id && (
-                          <Chip 
-                            label={`#${log.id.slice(-6).toUpperCase()}`}
-                            size="small"
-                            sx={{ fontWeight: 'bold', fontSize: '0.7rem', bgcolor: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}
-                          />
-                        )}
-                        {log.stage !== 'Packing' && log.stage !== 'Dispatch' && (
-                          <Chip 
-                            label={log.transactionType === 'OUT' ? 'MATERIAL OUT' : 'MATERIAL IN'} 
-                            color={log.transactionType === 'OUT' ? 'warning' : 'info'} 
-                            size="small" 
-                            sx={{ fontWeight: 'bold', fontSize: '0.7rem' }} 
-                            icon={log.transactionType === 'OUT' ? <OutputIcon /> : <InputIcon />}
-                          />
-                        )}
-                      </Box>
-                      <CardContent sx={{ pt: 4 }}>
-                        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Stage: {log.stage}</span>
-                          <span style={{ color: '#666' }}>Item(s): {log.quantityProduced}</span>
-                        </Typography>
-                        {log.vehicleNumber && (
-                          <Typography variant="body2" sx={{ mb: 1, color: '#1976d2', fontWeight: 'bold' }}>
-                            Vehicle No: {log.vehicleNumber}
-                          </Typography>
-                        )}
-                        {(log.project || log.projectId) && (
-                          <Box sx={{ mt: 2, mb: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Project:</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                              {log.project ? `${log.project.projectId || log.project.name} ${log.project.clientName ? `(${log.project.clientName})` : ''}` : 'Unknown Project'}
+              <Grid container spacing={2.5}>
+                {logsToRender.map((log: any) => {
+                  const photos = getLogPhotos(log);
+                  const isOut = log.transactionType === 'OUT';
+                  const formattedDate = log.createdAt 
+                    ? new Date(log.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })
+                    : '';
+
+                  return (
+                    <Grid size={{ xs: 12, md: 6, lg: 4 }} key={log.id}>
+                      <Card sx={{ 
+                        borderRadius: 3.5, 
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.06)', 
+                        border: '1px solid #E2E8F0',
+                        bgcolor: '#FFFFFF',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.09)'
+                        }
+                      }}>
+                        {/* PROMINENT PHOTOS SECTION (MAIN VERIFICATION INFO) */}
+                        <Box sx={{ p: 2, pb: 1.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', display: 'flex', alignItems: 'center', gap: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              <PhotoCameraIcon sx={{ fontSize: 14, color: '#0284C7' }} />
+                              Verification Photos ({photos.length})
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                              {isOut && (
+                                <Chip 
+                                  label="OUT" 
+                                  size="small" 
+                                  sx={{ fontWeight: 800, fontSize: '0.68rem', bgcolor: '#F97316', color: '#FFF', height: 20 }}
+                                />
+                              )}
+                              <Chip 
+                                label={`${log.quantityProduced || 1} Item${(log.quantityProduced || 1) > 1 ? 's' : ''}`}
+                                size="small"
+                                sx={{ 
+                                  fontWeight: 800, 
+                                  fontSize: '0.72rem', 
+                                  bgcolor: '#FFFFFF', 
+                                  color: '#0369A1',
+                                  border: '1px solid #BAE6FD',
+                                  height: 22
+                                }}
+                              />
+                            </Box>
+                          </Box>
+
+                          {photos.length > 0 ? (
+                            <Grid container spacing={1}>
+                              {photos.map((p, pIdx) => (
+                                <Grid size={{ xs: photos.length === 1 ? 12 : photos.length === 2 ? 6 : 4 }} key={pIdx}>
+                                  <Box 
+                                    onClick={() => setPreviewPhoto(p.url)}
+                                    sx={{ 
+                                      position: 'relative', 
+                                      height: photos.length === 1 ? 150 : 120, 
+                                      borderRadius: 2, 
+                                      overflow: 'hidden', 
+                                      border: '1px solid #CBD5E1',
+                                      bgcolor: '#000',
+                                      cursor: 'pointer',
+                                      '&:hover .zoom-overlay': { opacity: 1 },
+                                      '&:hover img': { transform: 'scale(1.05)' }
+                                    }}
+                                  >
+                                    <CardMedia 
+                                      component="img" 
+                                      image={p.url} 
+                                      alt={p.label}
+                                      sx={{ 
+                                        width: '100%', 
+                                        height: '100%', 
+                                        objectFit: 'cover',
+                                        transition: 'transform 0.25s ease'
+                                      }} 
+                                    />
+                                    {/* Photo Label Chip */}
+                                    <Box sx={{ 
+                                      position: 'absolute', 
+                                      bottom: 4, 
+                                      left: 4, 
+                                      bgcolor: 'rgba(15, 23, 42, 0.82)', 
+                                      color: '#FFF', 
+                                      px: 1, 
+                                      py: 0.2, 
+                                      borderRadius: 1, 
+                                      fontSize: '0.68rem', 
+                                      fontWeight: 700,
+                                      backdropFilter: 'blur(4px)'
+                                    }}>
+                                      {p.label}
+                                    </Box>
+                                    {/* Zoom Hint Overlay */}
+                                    <Box className="zoom-overlay" sx={{ 
+                                      position: 'absolute', 
+                                      inset: 0, 
+                                      bgcolor: 'rgba(0, 0, 0, 0.35)', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      opacity: 0,
+                                      transition: 'opacity 0.2s ease',
+                                      color: '#FFF'
+                                    }}>
+                                      <ZoomInRoundedIcon sx={{ fontSize: 28 }} />
+                                    </Box>
+                                  </Box>
+                                </Grid>
+                              ))}
+                            </Grid>
+                          ) : (
+                            <Box sx={{ p: 2, textAlign: 'center', bgcolor: '#F1F5F9', borderRadius: 2, border: '1px dashed #CBD5E1' }}>
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                                No photos uploaded with this log
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+
+                        {/* KEY DATA SECTION */}
+                        <CardContent sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                          {/* Machine & Operator Info Bar */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, pb: 1, borderBottom: '1px solid #F1F5F9' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                              <PrecisionManufacturingRoundedIcon sx={{ fontSize: 18, color: '#0284C7' }} />
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A' }}>
+                                Machine: <span style={{ color: '#0284C7' }}>{log.machine?.name || 'N/A'}</span>
+                              </Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                              <PersonRoundedIcon sx={{ fontSize: 18, color: '#64748B' }} />
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155' }}>
+                                {log.vendorName ? `${log.vendorName} (Vendor)` : (log.worker?.name || 'Unknown')}
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          {/* Project & Item Details (If present) */}
+                          {(log.project || log.productName || log.vehicleNumber) && (
+                            <Box sx={{ bgcolor: '#F8FAFC', p: 1.2, borderRadius: 2, border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                              {log.project && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                                  <FolderSpecialIcon sx={{ fontSize: 16, color: '#B38B36' }} />
+                                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                                    {log.project.name || log.project.projectId} {log.project.clientName ? `• ${log.project.clientName}` : ''}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {log.productName && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                                  <CategoryRoundedIcon sx={{ fontSize: 16, color: '#EA580C' }} />
+                                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#C2410C' }}>
+                                    Item: {log.productName}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {log.vehicleNumber && (
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#0284C7' }}>
+                                  Vehicle: {log.vehicleNumber}
+                                </Typography>
+                              )}
+                            </Box>
+                          )}
+
+                          {/* Remarks / Carry Forward Note */}
+                          {log.remarks && (
+                            <Box sx={{ 
+                              bgcolor: '#FFFBEB', 
+                              p: 1.2, 
+                              borderRadius: 2, 
+                              border: '1px solid #FEF3C7',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 0.8
+                            }}>
+                              <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 16, color: '#D97706', mt: 0.2, flexShrink: 0 }} />
+                              <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 700, wordBreak: 'break-word' }}>
+                                {log.remarks}
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {/* Timestamp */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, mt: 'auto', pt: 0.5 }}>
+                            <AccessTimeRoundedIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
+                            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600 }}>
+                              Submitted: {formattedDate}
                             </Typography>
                           </Box>
-                        )}
-                        
-                        {(log.productName || log.machine) && (
-                          <Box sx={{ mb: 1 }}>
-                            {log.productName && (
-                              <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 'bold', mb: 0.5 }}>
-                                Item: <span style={{ color: '#ed6c02' }}>{log.productName}</span>
-                              </Typography>
-                            )}
-                            {log.machine && (
-                              <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 'bold' }}>
-                                Machine: <span style={{ color: '#0288d1' }}>{log.machine.name}</span>
-                              </Typography>
-                            )}
-                          </Box>
-                        )}
 
-                        <Box sx={{ mt: 2, mb: 2 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Worker/Vendor:</Typography>
-                          {log.vendorName ? (
-                            <Typography variant="body1" sx={{ color: 'secondary.main', fontWeight: 'bold' }}>{log.vendorName} (Vendor)</Typography>
-                          ) : (
-                            <Typography variant="body1">{log.worker?.name || 'Unknown'}</Typography>
-                          )}
-                        </Box>
-                        {log.remarks && (
-                          <Box sx={{ mb: 2, bgcolor: '#FFFBEB', p: 1, borderRadius: 1, border: '1px solid #FEF3C7' }}>
-                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#B45309' }}>Remarks:</Typography>
-                            <Typography variant="body2" sx={{ color: '#92400E', whiteSpace: 'pre-wrap' }}>{log.remarks}</Typography>
-                          </Box>
-                        )}
-                        <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 2 }}>
-                          Submitted: {new Date(log.createdAt).toLocaleString()}
-                        </Typography>
-
-                        <Box sx={{ display: 'flex', gap: 1, mb: 3, overflowX: 'auto', pb: 1 }}>
-                          {log.startPhotos?.machine && (
-                            <CardMedia 
-                              component="img" 
-                              image={log.startPhotos.machine} 
-                              sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
-                              onClick={() => setPreviewPhoto(log.startPhotos.machine)}
-                            />
-                          )}
-                          {log.startPhotos?.unit && (
-                            <CardMedia 
-                              component="img" 
-                              image={log.startPhotos.unit} 
-                              sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
-                              onClick={() => setPreviewPhoto(log.startPhotos.unit)}
-                            />
-                          )}
-                          {log.startPhotos?.software && (
-                            <CardMedia 
-                              component="img" 
-                              image={log.startPhotos.software} 
-                              sx={{ width: 80, height: 80, borderRadius: 2, cursor: 'pointer', flexShrink: 0 }} 
-                              onClick={() => setPreviewPhoto(log.startPhotos.software)}
-                            />
-                          )}
-                        </Box>
-
-                        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                          <Button variant="contained" color="success" sx={{ flex: 1, fontWeight: 'bold' }} onClick={() => handleApproveClick(log)} startIcon={<CheckCircleIcon />}>
-                            Approve
-                          </Button>
-                          <Button variant="outlined" color="error" sx={{ flex: 1, fontWeight: 'bold' }} onClick={() => handleRejectClick(log.id)} startIcon={<CancelIcon />}>
-                            Reject
-                          </Button>
-                          <Tooltip title="Delete Permanently">
-                            <IconButton 
-                              color="error" 
-                              sx={{ border: '1px solid #FFCDD2', bgcolor: '#FFEBEE', borderRadius: 2, '&:hover': { bgcolor: '#FFCDD2' } }} 
-                              onClick={() => handleDeletePendingLog(log.id)}
+                          {/* Actions Footer */}
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', pt: 1, borderTop: '1px solid #F1F5F9' }}>
+                            <Button 
+                              variant="contained" 
+                              color="success" 
+                              fullWidth 
+                              size="small"
+                              onClick={() => handleApproveClick(log)} 
+                              startIcon={<CheckCircleIcon />}
+                              sx={{ 
+                                fontWeight: 800, 
+                                borderRadius: 2, 
+                                textTransform: 'none', 
+                                py: 0.8,
+                                bgcolor: '#059669',
+                                boxShadow: 'none',
+                                '&:hover': { bgcolor: '#047857', boxShadow: 'none' }
+                              }}
                             >
-                              <DeleteIcon sx={{ fontSize: 20 }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
+                              Approve
+                            </Button>
+                            <Button 
+                              variant="outlined" 
+                              color="error" 
+                              fullWidth 
+                              size="small"
+                              onClick={() => handleRejectClick(log.id)} 
+                              startIcon={<CancelIcon />}
+                              sx={{ 
+                                fontWeight: 800, 
+                                borderRadius: 2, 
+                                textTransform: 'none', 
+                                py: 0.8,
+                                borderColor: '#FCA5A5',
+                                color: '#DC2626',
+                                '&:hover': { bgcolor: '#FEF2F2', borderColor: '#EF4444' }
+                              }}
+                            >
+                              Reject
+                            </Button>
+                            <Tooltip title="Delete Permanently">
+                              <IconButton 
+                                size="small"
+                                color="error" 
+                                sx={{ 
+                                  border: '1px solid #FECACA', 
+                                  bgcolor: '#FEF2F2', 
+                                  borderRadius: 2, 
+                                  p: 0.8,
+                                  '&:hover': { bgcolor: '#FEE2E2', borderColor: '#FCA5A5' } 
+                                }} 
+                                onClick={() => handleDeletePendingLog(log.id)}
+                              >
+                                <DeleteIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  );
+                })}
               </Grid>
             );
 
@@ -630,7 +764,9 @@ const Approvals: React.FC = () => {
                   )}
                   {stageLogs.filter((l: any) => l.transactionType === 'IN').length > 0 && (
                     <Box sx={{ mb: 4 }}>
-                       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#0288d1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}><InputIcon fontSize="small"/> Material IN</Typography>
+                       {stageLogs.some((l: any) => l.transactionType === 'OUT') && (
+                         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#0288d1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}><InputIcon fontSize="small"/> Material IN</Typography>
+                       )}
                        {renderLogGrid(stageLogs.filter((l: any) => l.transactionType === 'IN'))}
                     </Box>
                   )}
@@ -668,7 +804,9 @@ const Approvals: React.FC = () => {
                     )}
                     {otherStageLogs.filter((l: any) => l.transactionType === 'IN').length > 0 && (
                       <Box sx={{ mb: 4 }}>
-                         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#0288d1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}><InputIcon fontSize="small"/> Material IN</Typography>
+                         {otherStageLogs.some((l: any) => l.transactionType === 'OUT') && (
+                           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#0288d1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}><InputIcon fontSize="small"/> Material IN</Typography>
+                         )}
                          {renderLogGrid(otherStageLogs.filter((l: any) => l.transactionType === 'IN'))}
                       </Box>
                     )}

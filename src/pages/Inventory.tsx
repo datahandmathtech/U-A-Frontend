@@ -80,7 +80,7 @@ const Inventory: React.FC = () => {
 
   const supplierRows = useMemo(() => {
     const map = filteredMaterials.reduce((acc: any, item: any) => {
-      // Resolve client name for both tabs
+      // Resolve client and project relation
       const pRel = item.projectMaterials?.[0]?.project || item.slabs?.[0]?.project;
       let matchedClient = pRel?.clientName;
       if (!matchedClient && projects && item.supplier) {
@@ -94,10 +94,35 @@ const Inventory: React.FC = () => {
         }
       }
 
-      const clientName = matchedClient || item.supplier || (activeTab === 0 ? 'Unnati Arts' : 'Unknown Client');
-      const key = clientName.trim().toLowerCase();
-      const displayName = clientName;
-      const ledgerIdentifier = clientName;
+      let key = '';
+      let displayName = '';
+      let ledgerIdentifier = '';
+
+      if (activeTab === 0) {
+        // Tab 0: Unnati Material Stock
+        if (pRel) {
+          const client = pRel.clientName?.trim();
+          const pName = pRel.name?.trim();
+          displayName = client && pName && client.toLowerCase() !== pName.toLowerCase()
+            ? `${client} (${pName})`
+            : (client || pName || 'Assigned Project');
+          ledgerIdentifier = client || pName || 'Assigned Project';
+          key = `unnati_${client || ''}_${pName || ''}`.toLowerCase();
+        } else {
+          displayName = 'Unnati Arts (Raw Stock)';
+          ledgerIdentifier = 'Unnati Arts (Raw Stock)';
+          key = 'unnati_arts_raw_stock';
+        }
+      } else {
+        // Tab 1: Client Material (Job Work)
+        const clientName = matchedClient || item.supplier || 'Unknown Client';
+        const pName = pRel?.name?.trim();
+        displayName = pName && clientName && pName.toLowerCase() !== clientName.toLowerCase()
+          ? `${clientName} (${pName})`
+          : clientName;
+        ledgerIdentifier = clientName;
+        key = `client_${displayName}`.trim().toLowerCase();
+      }
 
       if (!acc[key]) {
         acc[key] = {

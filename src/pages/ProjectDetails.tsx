@@ -171,36 +171,50 @@ const SlabRow = ({
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
           return (lStage === normalizedStageName || lStage.startsWith(normalizedStageName)) && (l.status === 'completed' || l.status === 'approved');
         });
-        const hasApprovedProdLog = productionLogs && productionLogs.some((l: any) => {
+        const hasApprovedPieceLog = productionLogs && productionLogs.some((l: any) => {
           if (l.approvalStatus !== 'approved') return false;
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
           if (lStage !== normalizedStageName && !lStage.startsWith(normalizedStageName)) return false;
-          return (l.pieceIds && l.pieceIds.includes(p.id)) || l.productId === p.id || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
+          return l.pieceIds && l.pieceIds.includes(p.id);
         });
-        const isCurrentStageCompleted = pStage === normalizedStageName && p.status === 'completed';
+        const isCurrentStageCompleted = pStage === normalizedStageName && (p.status === 'completed' || p.status === 'approved');
 
-        if (hasCompletedLog || hasApprovedProdLog || isCurrentStageCompleted || pIdx > stageIdx) {
+        if (hasCompletedLog || hasApprovedPieceLog || isCurrentStageCompleted || pIdx > stageIdx) {
           piecesCompleted++;
         } else if (pIdx === stageIdx && (p.status === 'active' || p.status === 'in_progress')) {
           piecesActive++;
         }
       }
+
+      // Also account for slab-level production logs that don't have explicit pieceIds
+      if (piecesCompleted < slab.pieces.length && productionLogs) {
+        const slabLevelLogs = productionLogs.filter((l: any) => {
+          if (l.approvalStatus !== 'approved') return false;
+          const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+          if (lStage !== normalizedStageName && !lStage.startsWith(normalizedStageName)) return false;
+          return l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0);
+        });
+        const slabLevelQty = slabLevelLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
+        piecesCompleted = Math.max(piecesCompleted, Math.min(slab.pieces.length, slabLevelQty));
+      }
+
       if (piecesCompleted >= slab.pieces.length) return 'Completed';
       if (piecesCompleted > 0 || piecesActive > 0) return 'In Progress';
+      return 'Not Started';
     }
 
     if (targetQty > 0 && productionLogs) {
       const stageLogs = productionLogs.filter((l: any) => 
         l.approvalStatus === 'approved' &&
         (l.stage === normalizedStageName || l.stage === `${normalizedStageName} Work` || l.stage.startsWith(normalizedStageName)) &&
-        (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id || (l.pieceIds && l.pieceIds.some((pid: string) => slab.pieces?.some((p: any) => p.id === pid))))
+        (l.productName === slab.name || l.productId === slab.id || l.slabId === slab.id)
       );
       const sumQty = stageLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
       if (sumQty >= targetQty) return 'Completed';
       if (sumQty > 0) return 'In Progress';
     }
 
-    return 'Pending';
+    return 'Not Started';
   };
 
   const DEFAULT_STAGE_COLUMNS = [
@@ -246,16 +260,29 @@ const SlabRow = ({
             const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
             return (lStage === stageName || lStage.startsWith(stageName)) && (l.status === 'completed' || l.status === 'approved');
           });
-          const hasApprovedProdLog = productionLogs && productionLogs.some((l: any) => {
+          const hasApprovedPieceLog = productionLogs && productionLogs.some((l: any) => {
             if (l.approvalStatus !== 'approved') return false;
             const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
             if (lStage !== stageName && !lStage.startsWith(stageName)) return false;
-            return (l.pieceIds && l.pieceIds.includes(p.id)) || l.productId === p.id || (l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0));
+            return l.pieceIds && l.pieceIds.includes(p.id);
           });
-          if (hasLog || hasApprovedProdLog || (pStage === stageName && p.status === 'completed') || pIdx > stageIdx) {
+          if (hasLog || hasApprovedPieceLog || (pStage === stageName && p.status === 'completed') || pIdx > stageIdx) {
             completedCount++;
           }
         });
+
+        // Also credit slab-level quantity if any
+        if (completedCount < totalSubPieces && productionLogs) {
+          const slabLevelLogs = productionLogs.filter((l: any) => {
+            if (l.approvalStatus !== 'approved') return false;
+            const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+            if (lStage !== stageName && !lStage.startsWith(stageName)) return false;
+            return l.slabId === slab.id && (!l.pieceIds || l.pieceIds.length === 0);
+          });
+          const slabLevelQty = slabLevelLogs.reduce((acc: number, l: any) => acc + (l.quantityProduced || 0), 0);
+          completedCount = Math.max(completedCount, Math.min(totalSubPieces, slabLevelQty));
+        }
+
         return Math.min(1.0, completedCount / totalSubPieces);
       }
       return slab.status === 'completed' ? 1.0 : 0;
@@ -272,24 +299,25 @@ const SlabRow = ({
 
   const calculateOverallStatus = () => {
     if (slab.status === 'completed') return 'Completed';
-    const requiredStages = slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
-    const cProd = getStageStatus('Production');
-    const cPoli = getStageStatus('Polishing');
-    const cPack = getStageStatus('Packing');
-    const cDisp = getStageStatus('Dispatch');
-    
-    const stages = [cProd, cPoli, cPack, cDisp];
-    
-    // If all required stages are Not Started, the slab hasn't actually started production
-    if (stages.every(s => s === 'Not Started' || s === 'N/A')) {
-      return 'Not Started';
+    const reqStages = slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const activeReqStages = reqStages.filter((st: string) => st !== 'N/A');
+    if (activeReqStages.length === 0) return 'Not Started';
+
+    const stageStatuses = activeReqStages.map((st: string) => ({
+      stage: st,
+      status: getStageStatus(st)
+    }));
+
+    // If ALL required active stages are Completed, the slab is Completed!
+    if (stageStatuses.every(s => s.status === 'Completed' || s.status === 'N/A')) {
+      return 'Completed';
     }
 
-    if (stages.some(s => s === 'In Progress' || s === 'Completed')) {
-       const finalStage = requiredStages.includes('Dispatch') ? 'Dispatch' : (requiredStages.includes('Packing') ? 'Packing' : (requiredStages.includes('Polishing') ? 'Polishing' : 'Production'));
-       if (getStageStatus(finalStage) === 'Completed') return 'Completed';
-       return 'In Production';
+    // If ANY required stage has started (In Progress or Completed), the slab is In Production
+    if (stageStatuses.some(s => s.status === 'In Progress' || s.status === 'Completed')) {
+      return 'In Production';
     }
+
     return 'Not Started';
   };
 
@@ -895,6 +923,7 @@ const ProjectDetails: React.FC = () => {
   const [editingDrawing, setEditingDrawing] = useState<any>(null);
   const [editDrawingTitle, setEditDrawingTitle] = useState('');
   const [editDrawingComments, setEditDrawingComments] = useState('');
+  const [editDrawingFileUrl, setEditDrawingFileUrl] = useState('');
 
   const [deleteDrawing] = useDeleteDrawingMutation();
   const [updateDrawing] = useUpdateDrawingMutation();
@@ -1065,8 +1094,8 @@ const ProjectDetails: React.FC = () => {
     if (status === 'quotation') return 2;
     if (status === 'advance_payment') return 3;
     if (status === 'shop_drawing') return 4;
-    if (status === 'production' || status === 'material_planning') return 5;
-    if (status === 'work_order' || status === 'completed') return 6;
+    if (status === 'production' || status === 'material_planning' || status === 'work_order') return 5;
+    if (status === 'completed') return 6;
     return 0;
   };
 
@@ -1479,15 +1508,21 @@ const ProjectDetails: React.FC = () => {
     setEditingDrawing(drawing);
     setEditDrawingTitle(drawing.title || '');
     setEditDrawingComments(drawing.comments || '');
+    setEditDrawingFileUrl(drawing.fileUrl || '');
     setIsEditDrawingOpen(true);
   };
 
   const handleSaveDrawingEdit = async () => {
     try {
+      setIsUploading(true);
       await updateDrawing({
         id: editingDrawing.id,
         projectId: id as string,
-        body: { title: editDrawingTitle, comments: editDrawingComments }
+        body: { 
+          title: editDrawingTitle, 
+          comments: editDrawingComments,
+          fileUrl: editDrawingFileUrl || editingDrawing.fileUrl
+        }
       }).unwrap();
       setIsEditDrawingOpen(false);
       refetchDrawings();
@@ -1495,6 +1530,8 @@ const ProjectDetails: React.FC = () => {
     } catch (err) {
       console.error(err);
       setSnackbarMessage('Failed to update drawing');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -1508,6 +1545,25 @@ const ProjectDetails: React.FC = () => {
         console.error(err);
         setSnackbarMessage('Failed to delete drawing');
       }
+    }
+  };
+
+  const handleDownloadFile = async (url: string, filename?: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      const ext = url.split('.').pop()?.split('?')[0] || 'jpg';
+      const safeName = filename ? `${filename.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}` : (url.split('/').pop()?.split('?')[0] || `download.${ext}`);
+      link.download = safeName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, '_blank');
     }
   };
 
@@ -2240,12 +2296,21 @@ const ProjectDetails: React.FC = () => {
                                 View Preview
                               </Button>
                               <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                <IconButton size="small" onClick={() => handleEditDrawingClick(drawing)} sx={{ color: '#64748B' }}>
-                                  <EditIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                                <IconButton size="small" onClick={() => handleDeleteDrawingClick(drawing.id)} sx={{ color: '#DC2626' }}>
-                                  <DeleteIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
+                                <Tooltip title="Download File">
+                                  <IconButton size="small" onClick={() => handleDownloadFile(drawing.fileUrl, drawing.title)} sx={{ color: '#0284C7' }}>
+                                    <DownloadIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Edit Details">
+                                  <IconButton size="small" onClick={() => handleEditDrawingClick(drawing)} sx={{ color: '#64748B' }}>
+                                    <EditIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete Drawing">
+                                  <IconButton size="small" onClick={() => handleDeleteDrawingClick(drawing.id)} sx={{ color: '#DC2626' }}>
+                                    <DeleteIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
                               </Box>
                             </Box>
                           </Paper>
@@ -3341,6 +3406,11 @@ const ProjectDetails: React.FC = () => {
                                 View Preview
                               </Button>
                               <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Tooltip title="Download File">
+                                  <IconButton size="small" onClick={() => handleDownloadFile(drawing.fileUrl, drawing.title)} sx={{ color: '#0284C7' }}>
+                                    <DownloadIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
                                 <Tooltip title="Edit Details">
                                   <IconButton size="small" onClick={() => handleEditDrawingClick(drawing)} sx={{ color: '#64748B' }}>
                                     <EditIcon sx={{ fontSize: 16 }} />
@@ -3422,7 +3492,7 @@ const ProjectDetails: React.FC = () => {
             )}
 
             {/* STEP 5: PRODUCTION MANAGEMENT (SLABS & PRODUCTS TRACKING) */}
-            {stepToRender === 5 && (() => {
+            {(stepToRender === 5 || (stepToRender === 6 && project?.status !== 'completed')) && (() => {
               const categories = Array.from(new Set(projectSlabs?.map((s: any) => {
                 const prod = products?.find(p => s.name.startsWith(p.category));
                 return prod?.category || s.name.split(' ')[0];
@@ -3843,8 +3913,8 @@ const ProjectDetails: React.FC = () => {
                         size="large" 
                         endIcon={<ArrowForwardRoundedIcon />}
                         onClick={async () => {
-                          await updateProject({ id: id as string, data: { status: 'work_order' } }).unwrap();
-                          setActiveStep(7);
+                          await updateProject({ id: id as string, data: { status: 'completed' } }).unwrap();
+                          setActiveStep(6);
                           setViewingStepOverride(null);
                           refetch();
                         }} 
@@ -3869,27 +3939,149 @@ const ProjectDetails: React.FC = () => {
               );
             })()}
 
-            {/* STEP 6: WORK ORDER ACTIVE */}
-            {stepToRender >= 7 && (
-              <Paper elevation={0} sx={{ 
-                p: 6, textAlign: 'center', 
-                border: '1px solid', borderColor: '#C8E6C9', 
-                borderRadius: 4, bgcolor: '#F4FBF5' 
-              }}>
-                <CheckCircleIcon sx={{ fontSize: 80, color: '#4CAF50', mb: 2 }} />
-                <Typography variant="h4" fontWeight="bold" color="success.main" mb={2}>Project Pipeline Complete!</Typography>
-                <Typography variant="body1" color="text.secondary" mb={4} sx={{ maxWidth: 500, mx: 'auto' }}>
-                  This project has successfully completed the enquiry pipeline and is now an <strong>Active Work Order</strong> in the factory.
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                  <Button variant="outlined" color="primary" size="large" onClick={handleDownloadWorkOrder} sx={{ borderRadius: 2, px: 4 }}>
-                    Download Work Order PDF
-                  </Button>
-                  <Button variant="contained" color="success" size="large" onClick={() => navigate('/projects')} sx={{ borderRadius: 2, px: 4 }}>
-                    Go to Active Work Orders
-                  </Button>
-                </Box>
-              </Paper>
+            {/* STEP 6: WORK ORDER / PROJECT COMPLETED */}
+            {(stepToRender >= 6 && project?.status === 'completed') && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5 }}>
+                <Paper elevation={0} sx={{ 
+                  p: 6, textAlign: 'center', 
+                  border: '1px solid', borderColor: '#C8E6C9', 
+                  borderRadius: 4, bgcolor: '#F4FBF5' 
+                }}>
+                  <CheckCircleIcon sx={{ fontSize: 80, color: '#4CAF50', mb: 2 }} />
+                  <Typography variant="h4" fontWeight="bold" color="success.main" mb={2}>Project Pipeline Complete!</Typography>
+                  <Typography variant="body1" color="text.secondary" mb={4} sx={{ maxWidth: 500, mx: 'auto' }}>
+                    This project has successfully completed production and is finalized.
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                    <Button variant="outlined" color="primary" size="large" onClick={handleDownloadWorkOrder} sx={{ borderRadius: 2, px: 4 }}>
+                      Download Work Order PDF
+                    </Button>
+                    <Button variant="contained" color="success" size="large" onClick={() => navigate('/projects')} sx={{ borderRadius: 2, px: 4 }}>
+                      Go to Active Work Orders
+                    </Button>
+                  </Box>
+                </Paper>
+
+                {/* Completed Project Reference Designs Gallery */}
+                <Paper elevation={0} sx={{ p: 3.5, borderRadius: 4, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CollectionsRoundedIcon sx={{ fontSize: 22, color: '#B38B36' }} />
+                    Reference Designs & Material Photos ({drawings ? drawings.filter((d: any) => d.type === 'Reference Design').length : 0})
+                  </Typography>
+                  {drawings && drawings.filter((d: any) => d.type === 'Reference Design').length > 0 ? (
+                    <Grid container spacing={2}>
+                      {drawings.filter((d: any) => d.type === 'Reference Design').map((drawing: any) => (
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={drawing.id}>
+                          <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            <Box
+                              onClick={() => setPreviewFileUrl(drawing.fileUrl)}
+                              sx={{ width: '100%', height: 140, borderRadius: 2, overflow: 'hidden', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                            >
+                              {drawing.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                  <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: '#DC2626' }} />
+                                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>PDF Document</Typography>
+                                </Box>
+                              ) : (
+                                <img src={drawing.fileUrl} alt={drawing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              )}
+                            </Box>
+                            <Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B' }}>{drawing.title}</Typography>
+                                <Chip label={`v${drawing.version}`} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#FFF4E5', color: '#B38B36' }} />
+                              </Box>
+                              {drawing.comments && (
+                                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.5 }}>
+                                  Note: {drawing.comments}
+                                </Typography>
+                              )}
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>
+                                {new Date(drawing.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid #E2E8F0' }}>
+                              <Button size="small" onClick={() => setPreviewFileUrl(drawing.fileUrl)} sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}>
+                                View Preview
+                              </Button>
+                              <Button
+                                size="small"
+                                startIcon={<DownloadIcon />}
+                                onClick={() => handleDownloadFile(drawing.fileUrl, drawing.title)}
+                                sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}
+                              >
+                                Download
+                              </Button>
+                            </Box>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">No reference designs uploaded for this project.</Typography>
+                  )}
+                </Paper>
+
+                {/* Completed Project Shop Drawings Gallery */}
+                <Paper elevation={0} sx={{ p: 3.5, borderRadius: 4, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <DescriptionRoundedIcon sx={{ fontSize: 22, color: '#B38B36' }} />
+                    Shop Drawings & Technical Blueprints ({drawings ? drawings.filter((d: any) => d.type === 'Shop Drawing').length : 0})
+                  </Typography>
+                  {drawings && drawings.filter((d: any) => d.type === 'Shop Drawing').length > 0 ? (
+                    <Grid container spacing={2}>
+                      {drawings.filter((d: any) => d.type === 'Shop Drawing').map((drawing: any) => (
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={drawing.id}>
+                          <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            <Box
+                              onClick={() => setPreviewFileUrl(drawing.fileUrl)}
+                              sx={{ width: '100%', height: 140, borderRadius: 2, overflow: 'hidden', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                            >
+                              {drawing.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                  <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: '#DC2626' }} />
+                                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>PDF Blueprint</Typography>
+                                </Box>
+                              ) : (
+                                <img src={drawing.fileUrl} alt={drawing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              )}
+                            </Box>
+                            <Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B' }}>{drawing.title}</Typography>
+                                <Chip label={`v${drawing.version}`} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#FFF4E5', color: '#B38B36' }} />
+                              </Box>
+                              {drawing.comments && (
+                                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.5 }}>
+                                  Note: {drawing.comments}
+                                </Typography>
+                              )}
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>
+                                {new Date(drawing.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid #E2E8F0' }}>
+                              <Button size="small" onClick={() => setPreviewFileUrl(drawing.fileUrl)} sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}>
+                                View Preview
+                              </Button>
+                              <Button
+                                size="small"
+                                startIcon={<DownloadIcon />}
+                                onClick={() => handleDownloadFile(drawing.fileUrl, drawing.title)}
+                                sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}
+                              >
+                                Download
+                              </Button>
+                            </Box>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">No shop drawings uploaded for this project.</Typography>
+                  )}
+                </Paper>
+              </Box>
             )}
 
           </Box>
@@ -4200,8 +4392,21 @@ const ProjectDetails: React.FC = () => {
       {/* FILE PREVIEW DIALOG */}
       <Dialog open={!!previewFileUrl} onClose={() => setPreviewFileUrl(null)} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 'bold' }}>
-          File Preview
-          <IconButton onClick={() => setPreviewFileUrl(null)}><CloseIcon /></IconButton>
+          <span>File Preview</span>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {previewFileUrl && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<DownloadIcon />}
+                onClick={() => handleDownloadFile(previewFileUrl)}
+                sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}
+              >
+                Download
+              </Button>
+            )}
+            <IconButton onClick={() => setPreviewFileUrl(null)}><CloseIcon /></IconButton>
+          </Box>
         </DialogTitle>
         <DialogContent dividers sx={{ height: '80vh', p: 0, bgcolor: '#F5F5F5', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           {previewFileUrl && (
@@ -4939,15 +5144,94 @@ const ProjectDetails: React.FC = () => {
       </Dialog>
 
       {/* EDIT DRAWING DIALOG */}
+      {/* EDIT DRAWING DIALOG */}
       <Dialog 
         open={isEditDrawingOpen} 
-        onClose={() => setIsEditDrawingOpen(false)} 
-        maxWidth="xs" 
+        onClose={() => !isUploading && setIsEditDrawingOpen(false)} 
+        maxWidth="sm" 
         fullWidth
         slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
       >
-        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B' }}>Edit Drawing Info</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Edit Drawing / Image</span>
+          {editDrawingFileUrl && (
+            <Button
+              size="small"
+              startIcon={<DownloadIcon />}
+              onClick={() => handleDownloadFile(editDrawingFileUrl, editDrawingTitle)}
+              sx={{ textTransform: 'none', fontWeight: 700 }}
+            >
+              Download
+            </Button>
+          )}
+        </DialogTitle>
         <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2.5 }}>
+          {/* Current File Preview */}
+          {editDrawingFileUrl && (
+            <Box sx={{ 
+              width: '100%', 
+              height: 180, 
+              borderRadius: 2.5, 
+              overflow: 'hidden', 
+              bgcolor: '#F8FAFC', 
+              border: '1px solid #E2E8F0', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              position: 'relative'
+            }}>
+              {editDrawingFileUrl.toLowerCase().endsWith('.pdf') ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <PictureAsPdfRoundedIcon sx={{ fontSize: 48, color: '#DC2626' }} />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>PDF Document</Typography>
+                </Box>
+              ) : (
+                <img src={editDrawingFileUrl} alt="Drawing Preview" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              )}
+            </Box>
+          )}
+
+          {/* Replace file action */}
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+            <Button
+              variant="outlined"
+              component="label"
+              size="small"
+              disabled={isUploading}
+              startIcon={<CloudUploadIcon />}
+              sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}
+            >
+              {isUploading ? 'Uploading...' : 'Replace File / Image'}
+              <input
+                type="file"
+                hidden
+                accept="image/*,.pdf,.dwg"
+                onChange={async (e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    setIsUploading(true);
+                    const formData = new FormData();
+                    formData.append('files', e.target.files[0]);
+                    try {
+                      const res = await uploadFiles(formData).unwrap();
+                      if (res.success && res.urls.length > 0) {
+                        setEditDrawingFileUrl(res.urls[0]);
+                        setSnackbarMessage('New image selected! Click "Save Changes" to update.');
+                      }
+                    } catch {
+                      setSnackbarMessage('Failed to upload replacement file');
+                    } finally {
+                      setIsUploading(false);
+                      e.target.value = '';
+                    }
+                  }
+                }}
+              />
+            </Button>
+            <Typography variant="caption" sx={{ color: '#64748B' }}>
+              Select a new file to replace the existing design.
+            </Typography>
+          </Box>
+
           <TextField 
             label="Drawing Title" 
             fullWidth 
@@ -4966,10 +5250,11 @@ const ProjectDetails: React.FC = () => {
           />
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button onClick={() => setIsEditDrawingOpen(false)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={() => setIsEditDrawingOpen(false)} disabled={isUploading} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
           <Button 
             variant="contained" 
             onClick={handleSaveDrawingEdit}
+            disabled={isUploading}
             sx={{ 
               borderRadius: 2, 
               bgcolor: '#1E293B', 
@@ -4980,7 +5265,7 @@ const ProjectDetails: React.FC = () => {
               '&:hover': { bgcolor: '#0F172A' }
             }}
           >
-            Save Changes
+            {isUploading ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>

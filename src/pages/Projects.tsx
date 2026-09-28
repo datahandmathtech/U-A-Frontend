@@ -783,36 +783,44 @@ const Projects: React.FC = () => {
                               {project.name}
                             </Typography>
                           </Box>
-                          {project.description && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: '#64748B',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 1,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                                maxWidth: 220,
-                                mt: 0.25
-                              }}
-                            >
-                              {project.description}
-                            </Typography>
+                          {(project.clientName || project.description) && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.3, flexWrap: 'wrap' }}>
+                              {project.clientName && (
+                                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, fontSize: '0.75rem' }}>
+                                  Client: {project.clientName}
+                                </Typography>
+                              )}
+                              {project.description && (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: '#94A3B8',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 1,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                    maxWidth: 220
+                                  }}
+                                >
+                                  {project.clientName ? `• ${project.description}` : project.description}
+                                </Typography>
+                              )}
+                            </Box>
                           )}
                         </Box>
                       </Box>
                     </TableCell>
 
-                    {/* Work Order Code & Manager */}
+                    {/* Work Order Code & Client / Manager */}
                     <TableCell sx={{ py: 2 }}>
                       <Typography variant="body2" sx={{ fontWeight: 700, color: '#B38B36' }}>
                         {project.projectId || 'WO'}
                       </Typography>
-                      {project.clientHandle && (
+                      {(project.clientName || project.clientHandle) && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
                           <PersonIcon sx={{ fontSize: 13, color: '#94A3B8' }} />
-                          <Typography variant="caption" sx={{ color: '#64748B' }}>
-                            {project.clientHandle}
+                          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                            {project.clientName || project.clientHandle}
                           </Typography>
                         </Box>
                       )}

@@ -2,13 +2,19 @@ import React, { useState } from 'react';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, 
   TableRow, TableFooter, Button, IconButton, Dialog, DialogTitle, DialogContent, 
-  DialogActions, TextField, Autocomplete, Alert, Chip, Select, MenuItem, FormControl, InputLabel 
+  DialogActions, TextField, Autocomplete, Alert, Chip, Select, MenuItem, FormControl, InputLabel,
+  Avatar
 } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
+import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
+import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import DeleteSweepRoundedIcon from '@mui/icons-material/DeleteSweepRounded';
 import { useDeductInventoryMutation, useUpdateInventoryLogMutation, useDeleteInventoryLogMutation, useGetAllSlabNamesQuery, useGetItemLogsQuery, useGetProjectHierarchyQuery } from '../store/apiSlice';
 
 const ItemLedger = () => {
@@ -29,41 +35,66 @@ const ItemLedger = () => {
   const parsePieceDimensions = (sizeStr: string, unitHint?: string) => {
     if (!sizeStr) return { l: 0, w: 0, t: 0, sqft: 0, lFeet: 0, wFeet: 0, lInch: 0, wInch: 0, lMM: 0, wMM: 0, isFt: false, isMM: false, unit: 'inch' };
     
-    const normalizedUnitHint = (unitHint || '').toLowerCase().trim();
-    const isFtHint = normalizedUnitHint === 'sq_ft' || normalizedUnitHint === 'sqft' || normalizedUnitHint === 'sq. ft' || normalizedUnitHint === 'feet' || normalizedUnitHint === 'ft' || normalizedUnitHint.includes('ft') || normalizedUnitHint.includes('sq');
-    const isMMHint = normalizedUnitHint === 'mm';
-    const isInchHint = normalizedUnitHint === 'inch' || normalizedUnitHint === 'inches' || normalizedUnitHint === 'in';
-
-    const isFt = isFtHint || /\b(?:ft|feet)\b/i.test(sizeStr);
-    const isMM = isMMHint || /\b(?:mm)\b/i.test(sizeStr.replace(/\|\s*\d+\s*MM/i, '')) || sizeStr.toLowerCase().includes('(mm)');
-    
-    // Extract thickness (e.g. | 12MM)
-    const tMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*MM/i);
+    // Thickness (e.g. | 60MM or | 20MM)
+    const tMatch = sizeStr.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
     const t = tMatch ? parseFloat(tMatch[1]) : 0;
     
     const sizePart = sizeStr.split('|')[0].trim();
-    const parts = sizePart.split(/\s*[xX×]\s*/);
+    // Remove parentheses like (inch), (mm), (sq_ft) before extracting numbers
+    const cleanSize = sizePart.replace(/\([^)]+\)/g, '').trim();
+
     let l = 0, w = 0;
+    const parts = cleanSize.split(/\s*[xX×]\s*/);
     if (parts.length >= 2) {
       const lMatch = parts[0].match(/(\d+(?:\.\d+)?)/);
       const wMatch = parts[1].match(/(\d+(?:\.\d+)?)/);
       l = lMatch ? parseFloat(lMatch[1]) : 0;
       w = wMatch ? parseFloat(wMatch[1]) : 0;
     } else {
-      const lMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*L/i);
-      const wMatch = sizeStr.match(/(\d+(?:\.\d+)?)\s*W/i);
+      const lMatch = cleanSize.match(/(\d+(?:\.\d+)?)\s*L/i);
+      const wMatch = cleanSize.match(/(\d+(?:\.\d+)?)\s*W/i);
       l = lMatch ? parseFloat(lMatch[1]) : 0;
       w = wMatch ? parseFloat(wMatch[1]) : 0;
     }
 
-    // If dimensions are large (> 500), they are MM (e.g. 7898 x 6589)
-    const effectiveIsMM = isMM || (l > 500 && w > 500);
-    const effectiveIsFt = !effectiveIsMM && (isFt || (!isInchHint && isFtHint));
+    const sizeLower = sizeStr.toLowerCase();
+    
+    // Explicit indicators in sizeStr:
+    const hasExplicitInch = sizeLower.includes('(inch)') || sizeLower.includes('inch') || sizeLower.includes('inches') || sizeStr.includes('"');
+    const hasExplicitFt = sizeLower.includes('(ft)') || sizeLower.includes('(sq_ft)') || sizeLower.includes('(sq.ft)') || sizeLower.includes('feet') || /\bft\b/i.test(sizeStr) || sizeStr.includes("'");
+    const hasExplicitMM = sizeLower.includes('(mm)') || sizeLower.includes('mm') || /\bmm\b/i.test(sizeStr);
 
-    let lFeet = 0, wFeet = 0, lInch = 0, wInch = 0, lMM = 0, wMM = 0, sqft = 0, unit = 'inch';
+    let effectiveUnit: 'inch' | 'mm' | 'feet' = 'inch';
 
-    if (effectiveIsMM) {
-      unit = 'mm';
+    // 1. Explicit unit in sizeStr takes HIGHEST PRIORITY
+    if (hasExplicitInch) {
+      effectiveUnit = 'inch';
+    } else if (hasExplicitFt) {
+      effectiveUnit = 'feet';
+    } else if (hasExplicitMM) {
+      effectiveUnit = 'mm';
+    } else {
+      // 2. Fall back to unitHint
+      const hint = (unitHint || '').toLowerCase().trim();
+      if (hint === 'mm') {
+        effectiveUnit = 'mm';
+      } else if (hint === 'feet' || hint === 'ft' || hint === 'sq_ft' || hint === 'sqft') {
+        effectiveUnit = 'feet';
+      } else if (hint === 'inch' || hint === 'inches') {
+        effectiveUnit = 'inch';
+      } else {
+        // Heuristic: large numbers (> 120) are mm
+        if (l > 120 || w > 120 || (l > 100 && w > 100)) {
+          effectiveUnit = 'mm';
+        } else {
+          effectiveUnit = 'inch';
+        }
+      }
+    }
+
+    let lFeet = 0, wFeet = 0, lInch = 0, wInch = 0, lMM = 0, wMM = 0, sqft = 0;
+
+    if (effectiveUnit === 'mm') {
       lMM = l;
       wMM = w;
       lInch = l / 25.4;
@@ -71,8 +102,7 @@ const ItemLedger = () => {
       lFeet = l / 304.8;
       wFeet = w / 304.8;
       sqft = (l * w) / 92903.04;
-    } else if (effectiveIsFt) {
-      unit = 'feet';
+    } else if (effectiveUnit === 'feet') {
       lFeet = l;
       wFeet = w;
       lInch = l * 12;
@@ -81,7 +111,7 @@ const ItemLedger = () => {
       wMM = w * 304.8;
       sqft = l * w;
     } else {
-      unit = 'inch';
+      // inch
       lInch = l;
       wInch = w;
       lFeet = l / 12;
@@ -91,7 +121,14 @@ const ItemLedger = () => {
       sqft = (l * w) / 144;
     }
 
-    return { l, w, t, sqft, lFeet, wFeet, lInch, wInch, lMM, wMM, isFt: effectiveIsFt, isMM: effectiveIsMM, unit };
+    return { 
+      l, w, t, 
+      sqft, 
+      lFeet, wFeet, lInch, wInch, lMM, wMM, 
+      isFt: effectiveUnit === 'feet', 
+      isMM: effectiveUnit === 'mm', 
+      unit: effectiveUnit 
+    };
   };
 
   const [openDeduct, setOpenDeduct] = useState(false);
@@ -102,7 +139,7 @@ const ItemLedger = () => {
   const { data: allSlabNames = [] } = useGetAllSlabNamesQuery();
   const uniqueSlabNames = React.useMemo(() => Array.from(new Set(allSlabNames || [])), [allSlabNames]);
   const { data: projectHierarchy = [] } = useGetProjectHierarchyQuery();
-  const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [selectedProject, setSelectedProject] = useState<any>(undefined);
   const [selectedSlab, setSelectedSlab] = useState<any>(null);
   const [selectedPiece, setSelectedPiece] = useState<any>(null);
 
@@ -147,7 +184,8 @@ const ItemLedger = () => {
     return null;
   }, [inventory, projectHierarchy]);
 
-  const activeProject = selectedProject || autoProject;
+  const isCompanyStock = inventory?.jobWorkType === 'company' || (inventory?.supplier || '').toLowerCase().includes('unnati');
+  const activeProject = selectedProject !== undefined ? selectedProject : autoProject;
 
   // Auto-select slab if matching or only 1 slab in production
   React.useEffect(() => {
@@ -261,7 +299,7 @@ const ItemLedger = () => {
         date: deductForm.date
       }).unwrap();
       setOpenDeduct(false);
-      setSelectedProject(null);
+      setSelectedProject(undefined);
       setSelectedSlab(null);
       setSelectedPiece(null);
       setDeductForm({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0,10), productName: '', unit: 'inch' });
@@ -465,127 +503,334 @@ const ItemLedger = () => {
   const wastePct = totalIn > 0 ? ((totalWaste / totalIn) * 100).toFixed(1) : '0.0';
   const balancePct = totalIn > 0 ? ((remBalance / totalIn) * 100).toFixed(1) : '0.0';
 
+  const renderRemarksCell = (remarks: string) => {
+    if (!remarks) return <Typography variant="body2" sx={{ color: '#94A3B8' }}>-</Typography>;
+
+    // 1. Strip internal piece IDs like [Piece:...]
+    const clean = remarks.replace(/\[Piece:[a-f0-9]+\]\s*/gi, '').trim();
+
+    // 2. Initial inward stock
+    if (clean.toLowerCase().includes('initial stock')) {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip label="Initial Inward" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 700, fontSize: '0.72rem', borderRadius: 1 }} />
+          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Opening / Base Stock</Typography>
+        </Box>
+      );
+    }
+
+    // 3. Wastage
+    if (clean.toLowerCase() === 'waste' || clean.toLowerCase().includes('wastage') || clean.toLowerCase().includes('stock marked as waste')) {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip label="Wastage / Scrap" size="small" sx={{ bgcolor: '#FEF2F2', color: '#DC2626', fontWeight: 700, fontSize: '0.72rem', borderRadius: 1 }} />
+          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>{clean}</Typography>
+        </Box>
+      );
+    }
+
+    // 4. Try parsing Project Name, Piece Name, and Dimension blocks
+    const firstParenIdx = clean.indexOf('(');
+    if (firstParenIdx > 0) {
+      const projectName = clean.substring(0, firstParenIdx).trim();
+      const rest = clean.substring(firstParenIdx).trim();
+
+      const rawSegments: string[] = [];
+      let depth = 0;
+      let currentSeg = '';
+      for (let i = 0; i < rest.length; i++) {
+        const ch = rest[i];
+        if (ch === '(') {
+          if (depth > 0) currentSeg += ch;
+          depth++;
+        } else if (ch === ')') {
+          depth--;
+          if (depth === 0) {
+            if (currentSeg.trim()) rawSegments.push(currentSeg.trim());
+            currentSeg = '';
+          } else {
+            currentSeg += ch;
+          }
+        } else {
+          if (depth > 0) currentSeg += ch;
+        }
+      }
+
+      const uniqueSegments: string[] = [];
+      for (const seg of rawSegments) {
+        const isDim = seg.toLowerCase().includes('sq.ft') || seg.toLowerCase().includes('sqft') || seg.includes('x') || seg.includes('×');
+        if (isDim && uniqueSegments.some(s => s.toLowerCase().includes('sq.ft') || s.toLowerCase().includes('sqft'))) {
+          continue;
+        }
+        if (!uniqueSegments.includes(seg)) {
+          uniqueSegments.push(seg);
+        }
+      }
+
+      const pieceName = uniqueSegments[0] || '';
+      const dimensions = uniqueSegments.slice(1).join(' • ');
+
+      return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {projectName && (
+            <Typography variant="body2" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.2px' }}>
+              {projectName}
+            </Typography>
+          )}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.8 }}>
+            {pieceName && (
+              <Chip 
+                label={pieceName} 
+                size="small" 
+                sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.72rem', height: 22, borderRadius: 1 }} 
+              />
+            )}
+            {dimensions && (
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                {dimensions}
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      );
+    }
+
+    return (
+      <Typography variant="body2" sx={{ color: '#334155', fontWeight: 500 }}>
+        {clean}
+      </Typography>
+    );
+  };
+
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, margin: '0 auto' }}>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 2, color: '#b8860b' }}>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1250, margin: '0 auto' }}>
+      <Button 
+        startIcon={<ArrowBackIcon />} 
+        onClick={() => navigate(-1)} 
+        sx={{ mb: 2.5, color: '#475569', fontWeight: 700, textTransform: 'none', '&:hover': { bgcolor: '#F1F5F9' } }}
+      >
         Back to Ledger
       </Button>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      {/* Modern Page Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, mb: 3.5 }}>
         <Box>
-          <Typography variant="h4" sx={{ color: '#333', mb: 1 }}>{inventory?.itemName} (Block {inventory?.blockNumber})</Typography>
-          <Typography variant="subtitle1" color="text.secondary">Item Ledger Details</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5, flexWrap: 'wrap' }}>
+            <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.5px' }}>
+              {inventory?.itemName || 'Material Item'}
+            </Typography>
+            {inventory?.blockNumber && inventory.blockNumber.trim() !== '' && (
+              <Chip 
+                label={`Block ${inventory.blockNumber}`} 
+                size="small" 
+                sx={{ 
+                  bgcolor: '#FFFDF5', 
+                  color: '#B38B36', 
+                  border: '1px solid #C89F5A', 
+                  fontWeight: 800, 
+                  fontSize: '0.8rem', 
+                  borderRadius: 1.5 
+                }} 
+              />
+            )}
+            {inventory?.supplier && (
+              <Chip 
+                label={`Supplier: ${inventory.supplier}`} 
+                size="small" 
+                variant="outlined"
+                sx={{ color: '#64748B', borderColor: '#CBD5E1', fontWeight: 600, fontSize: '0.75rem', borderRadius: 1.5 }} 
+              />
+            )}
+          </Box>
+          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>
+            Comprehensive Stock Ledger & Consumption History
+          </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
           <Button 
             variant="contained" 
-            sx={{ fontWeight: 'bold', bgcolor: '#ed6c02', '&:hover': { bgcolor: '#e65100' } }}
+            sx={{ 
+              fontWeight: 800, 
+              bgcolor: '#F97316', 
+              boxShadow: 'none',
+              borderRadius: 2,
+              px: 2.5,
+              textTransform: 'none',
+              '&:hover': { bgcolor: '#EA580C', boxShadow: 'none' } 
+            }}
             onClick={() => setOpenWastage(true)}
             disabled={(inventory?.quantity || 0) <= 0}
           >
-            Wastage
+            Mark Wastage
           </Button>
-          <Button variant="contained" color="error" onClick={() => setOpenDeduct(true)} sx={{ fontWeight: 'bold' }}>
+          <Button 
+            variant="contained" 
+            color="error" 
+            onClick={() => setOpenDeduct(true)} 
+            sx={{ 
+              fontWeight: 800, 
+              boxShadow: 'none',
+              borderRadius: 2,
+              px: 2.5,
+              textTransform: 'none',
+              '&:hover': { boxShadow: 'none' } 
+            }}
+          >
             - Deduct Stock
           </Button>
         </Box>
       </Box>
 
-      {/* Item Ledger Details / Grand Total Cards (3 Cards) */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 4 }}>
-        <Paper elevation={1} sx={{ p: 2.5, borderRadius: 2, borderLeft: '4px solid #2e7d32' }}>
-          <Typography variant="caption" color="text.secondary" fontWeight="bold">Available / IN (+) First</Typography>
-          <Typography variant="h5" fontWeight="bold" color="success.main" sx={{ my: 0.5 }}>
-            {totalIn.toFixed(2)} Sq.Ft
-          </Typography>
-          <Typography variant="caption" color="text.secondary">100% (Base)</Typography>
+      {/* Modern 4 KPI Cards */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2.5, mb: 4 }}>
+        {/* Card 1: Total Inward */}
+        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <Avatar sx={{ bgcolor: '#ECFDF5', color: '#059669', width: 48, height: 48, borderRadius: 2.5 }}>
+            <Inventory2RoundedIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Total Inward
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', my: 0.2 }}>
+              {totalIn.toFixed(2)} <Typography component="span" variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>Sq.Ft</Typography>
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700, bgcolor: '#ECFDF5', px: 1, py: 0.2, borderRadius: 1 }}>
+              100% Base Stock
+            </Typography>
+          </Box>
         </Paper>
 
-        <Paper elevation={1} sx={{ p: 2.5, borderRadius: 2, borderLeft: '4px solid #1976d2' }}>
-          <Typography variant="caption" color="text.secondary" fontWeight="bold">Total Used (Production)</Typography>
-          <Typography variant="h5" fontWeight="bold" color="primary.main" sx={{ my: 0.5 }}>
-            {totalUsed.toFixed(2)} Sq.Ft
-          </Typography>
-          <Typography variant="caption" fontWeight="bold" color="primary.main">{usedPct}%</Typography>
+        {/* Card 2: Production Used */}
+        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <Avatar sx={{ bgcolor: '#EFF6FF', color: '#2563EB', width: 48, height: 48, borderRadius: 2.5 }}>
+            <LayersRoundedIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Production Used
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', my: 0.2 }}>
+              {totalUsed.toFixed(2)} <Typography component="span" variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>Sq.Ft</Typography>
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#2563EB', fontWeight: 700, bgcolor: '#EFF6FF', px: 1, py: 0.2, borderRadius: 1 }}>
+              {usedPct}% Utilized
+            </Typography>
+          </Box>
         </Paper>
 
-        <Paper elevation={1} sx={{ p: 2.5, borderRadius: 2, borderLeft: '4px solid #ed6c02' }}>
-          <Typography variant="caption" color="text.secondary" fontWeight="bold">Total Wastage</Typography>
-          <Typography variant="h5" fontWeight="bold" sx={{ color: '#ed6c02', my: 0.5 }}>
-            {wastePct}%
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {totalWaste.toFixed(2)} Sq.Ft
-          </Typography>
+        {/* Card 3: Wastage */}
+        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <Avatar sx={{ bgcolor: '#FFF7ED', color: '#EA580C', width: 48, height: 48, borderRadius: 2.5 }}>
+            <DeleteSweepRoundedIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Wastage / Scrap
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', my: 0.2 }}>
+              {totalWaste.toFixed(2)} <Typography component="span" variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>Sq.Ft</Typography>
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#EA580C', fontWeight: 700, bgcolor: '#FFF7ED', px: 1, py: 0.2, borderRadius: 1 }}>
+              {wastePct}% Waste
+            </Typography>
+          </Box>
+        </Paper>
+
+        {/* Card 4: Remaining Balance */}
+        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <Avatar sx={{ bgcolor: remBalance > 0 ? '#F0FDF4' : '#FEF2F2', color: remBalance > 0 ? '#16A34A' : '#DC2626', width: 48, height: 48, borderRadius: 2.5 }}>
+            <CheckCircleRoundedIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Current Balance
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: remBalance > 0 ? '#16A34A' : '#DC2626', my: 0.2 }}>
+              {remBalance.toFixed(2)} <Typography component="span" variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>Sq.Ft</Typography>
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+              {balancePct}% Remaining
+            </Typography>
+          </Box>
         </Paper>
       </Box>
 
-      <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      {/* Modern Table */}
+      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <Table>
           <TableHead>
-            <TableRow sx={{ bgcolor: '#f8f9fa' }}>
-              <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Project / Remarks</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: 'green' }}>Available / IN (+)</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: 'error.main' }}>OUT (-)</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>Balance</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', align: 'center' }}>Actions</TableCell>
+            <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+              <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.8 }}>Date</TableCell>
+              <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.8 }}>Project / Remarks</TableCell>
+              <TableCell sx={{ fontWeight: 800, color: '#16A34A', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.8 }}>Inward (+)</TableCell>
+              <TableCell sx={{ fontWeight: 800, color: '#DC2626', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.8 }}>Outward (-)</TableCell>
+              <TableCell sx={{ fontWeight: 800, color: '#2563EB', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.8 }}>Balance</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 1.8 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {ledgerRows.length === 0 ? (
-              <TableRow><TableCell colSpan={6} align="center">No logs found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} align="center" sx={{ py: 6, color: '#94A3B8' }}>No logs found for this item.</TableCell></TableRow>
             ) : (
               ledgerRows.map((log: any) => (
-                <TableRow key={log.id} hover>
-                  <TableCell>{new Date(log.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell sx={{ color: 'text.secondary' }}>{log.remarks || '-'}</TableCell>
-                  <TableCell sx={{ color: 'green', fontWeight: log.type === 'IN' ? 'bold' : 'normal' }}>
+                <TableRow key={log.id} hover sx={{ '&:hover': { bgcolor: '#F8FAFC' } }}>
+                  <TableCell sx={{ whiteSpace: 'nowrap', py: 1.8 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CalendarMonthRoundedIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                        {new Date(log.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell sx={{ py: 1.8 }}>
+                    {renderRemarksCell(log.remarks)}
+                  </TableCell>
+                  <TableCell sx={{ color: '#16A34A', fontWeight: log.type === 'IN' ? 800 : 500, py: 1.8 }}>
                     {log.type === 'IN' ? `+ ${log.quantity.toFixed(2)} Sq.Ft` : '-'}
                   </TableCell>
-                  <TableCell sx={{ color: 'error.main', fontWeight: log.type === 'OUT' ? 'bold' : 'normal' }}>
+                  <TableCell sx={{ color: '#DC2626', fontWeight: log.type === 'OUT' ? 800 : 500, py: 1.8 }}>
                     {log.type === 'OUT' ? `- ${log.quantity.toFixed(2)} Sq.Ft` : '-'}
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                  <TableCell sx={{ fontWeight: 800, color: '#0F172A', py: 1.8 }}>
                     {log.balance.toFixed(2)} Sq.Ft
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ py: 1.8 }}>
                     {log.remarks === 'Initial stock addition' ? (
-                      <Typography variant="caption" color="text.secondary">Initial</Typography>
+                      <Chip label="Initial" size="small" sx={{ bgcolor: '#F1F5F9', color: '#64748B', fontWeight: 600, fontSize: '0.7rem' }} />
                     ) : (
-                      <>
-                        <IconButton size="small" color="primary" onClick={() => handleEditClick(log)}>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+                        <IconButton size="small" onClick={() => handleEditClick(log)} sx={{ color: '#2563EB', '&:hover': { bgcolor: '#EFF6FF' } }}>
                           <EditIcon fontSize="small" />
                         </IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleDelete(log.id)}>
+                        <IconButton size="small" onClick={() => handleDelete(log.id)} sx={{ color: '#DC2626', '&:hover': { bgcolor: '#FEF2F2' } }}>
                           <DeleteIcon fontSize="small" />
                         </IconButton>
-                      </>
+                      </Box>
                     )}
                   </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
-          <TableFooter sx={{ bgcolor: '#f8f9fa' }}>
+          <TableFooter sx={{ bgcolor: '#F8FAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Grand Total</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#555' }}>
-                Used: {usedPct}% | Waste: {wastePct}%
+              <TableCell sx={{ fontWeight: 900, color: '#0F172A', py: 2 }}>Grand Total</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#64748B', py: 2 }}>
+                Used: <Typography component="span" sx={{ color: '#2563EB', fontWeight: 800 }}>{usedPct}%</Typography> | Waste: <Typography component="span" sx={{ color: '#EA580C', fontWeight: 800 }}>{wastePct}%</Typography>
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: 'green' }}>
+              <TableCell sx={{ fontWeight: 900, color: '#16A34A', py: 2 }}>
                 + {totalIn.toFixed(2)} Sq.Ft
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: 'error.main' }}>
+              <TableCell sx={{ fontWeight: 900, color: '#DC2626', py: 2 }}>
                 - {(totalUsed + totalWaste).toFixed(2)} Sq.Ft
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+              <TableCell sx={{ fontWeight: 900, color: remBalance > 0 ? '#16A34A' : '#DC2626', py: 2 }}>
                 {remBalance.toFixed(2)} Sq.Ft
               </TableCell>
-              <TableCell align="center">
-                <Typography variant="caption" fontWeight="bold" sx={{ color: '#ed6c02' }}>
-                  Waste: {wastePct}%
-                </Typography>
+              <TableCell align="center" sx={{ py: 2 }}>
+                <Chip label={`Waste: ${wastePct}%`} size="small" sx={{ bgcolor: '#FFF7ED', color: '#EA580C', fontWeight: 800, fontSize: '0.75rem' }} />
               </TableCell>
             </TableRow>
           </TableFooter>
@@ -631,7 +876,9 @@ const ItemLedger = () => {
         fullWidth
         slotProps={{ paper: { sx: { borderRadius: 3.5 } } }}
       >
-        <DialogTitle sx={{ fontWeight: 'bold', bgcolor: '#f8f9fa' }}>Deduct Stock for Block {inventory?.blockNumber}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#0F172A', borderBottom: '1px solid #E2E8F0', py: 2 }}>
+          {inventory?.blockNumber && inventory.blockNumber.trim() !== '' ? `Deduct Stock — Block ${inventory.blockNumber}` : `Deduct Stock — ${inventory?.itemName || 'Material'}`}
+        </DialogTitle>
         <DialogContent sx={{ p: 3 }}>
           <Alert severity="info" sx={{ mb: 2, fontWeight: 600 }}>
             Available Balance: <strong>{(inventory?.quantity || 0).toFixed(2)} Sq.Ft</strong>
@@ -640,7 +887,11 @@ const ItemLedger = () => {
           {(() => {
             const l = Number(deductForm.length) || 0;
             const w = Number(deductForm.width) || 0;
-            const calcArea = deductForm.unit === 'feet' ? (l * w) : (l * w) / 144;
+            const calcArea = deductForm.unit === 'feet' 
+              ? (l * w) 
+              : deductForm.unit === 'mm' 
+                ? ((l * w) / 92903.04) 
+                : ((l * w) / 144);
             if (l > 0 && w > 0 && calcArea > (inventory?.quantity || 0)) {
               return (
                 <Alert severity="warning" sx={{ mb: 2 }}>
@@ -660,8 +911,33 @@ const ItemLedger = () => {
               onChange={(e) => setDeductForm({ ...deductForm, date: e.target.value })}
             />
 
-            {/* Project Indicator (Auto-detected from current ledger) */}
-            {activeProject ? (
+            {/* Project Selection / Indicator */}
+            {isCompanyStock ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <Autocomplete
+                  options={projectHierarchy || []}
+                  getOptionLabel={(option: any) => {
+                    if (typeof option === 'string') return option;
+                    return `${option.name}${option.clientName ? ` (${option.clientName})` : ''}`;
+                  }}
+                  value={activeProject || null}
+                  onChange={(_, val: any) => {
+                    setSelectedProject(val || null);
+                    setSelectedSlab(null);
+                    setSelectedPiece(null);
+                    setDeductForm(prev => ({ ...prev, productName: val?.name || '' }));
+                  }}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label="Select Target Project (Unnati Stock)" 
+                      placeholder="Choose project..." 
+                      helperText={activeProject ? `Selected Project: ${activeProject.name}` : 'Select which project this Unnati stock is being deducted for'}
+                    />
+                  )}
+                />
+              </Box>
+            ) : activeProject ? (
               <Box sx={{ p: 1.5, px: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography variant="body2" color="#166534" fontWeight="bold">
                   Project: <span style={{ fontSize: '1rem', color: '#15803D' }}>{activeProject.name}</span>
@@ -675,9 +951,9 @@ const ItemLedger = () => {
               </Box>
             ) : (
               <Autocomplete
-                options={projectHierarchy}
+                options={projectHierarchy || []}
                 getOptionLabel={(option: any) => typeof option === 'string' ? option : option.name}
-                value={selectedProject}
+                value={selectedProject || null}
                 onChange={(_, val: any) => {
                   setSelectedProject(val);
                   setSelectedSlab(null);
@@ -744,7 +1020,7 @@ const ItemLedger = () => {
                         length: parsed.l ? String(parsed.l) : prev.length,
                         width: parsed.w ? String(parsed.w) : prev.width,
                         thickness: parsed.t ? String(parsed.t) : prev.thickness,
-                        unit: parsed.unit || 'feet'
+                        unit: parsed.unit || (parsed.isMM ? 'mm' : (parsed.isFt ? 'feet' : 'inch'))
                       }));
                     }
                   }}

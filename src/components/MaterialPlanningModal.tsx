@@ -137,10 +137,52 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
         </Typography>
         <Autocomplete
           options={projects || []}
-          getOptionLabel={(o: any) => `${o.projectId || o.name} ${o.clientName ? `(${o.clientName})` : ''}`}
+          getOptionLabel={(o: any) => {
+            const code = o.projectId ? `${o.projectId}` : '';
+            const name = o.name || '';
+            const client = o.clientName ? `(${o.clientName})` : '';
+            if (code && name && name.toLowerCase() !== code.toLowerCase()) {
+              return `${code} - ${name} ${client}`.trim();
+            }
+            return `${code || name} ${client}`.trim();
+          }}
+          renderOption={(props, o: any) => {
+            const { key, ...restProps } = props as any;
+            return (
+              <li key={key} {...restProps}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2, py: 0.4 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    {o.projectId && (
+                      <Chip
+                        label={o.projectId}
+                        size="small"
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: '0.72rem',
+                          height: 20,
+                          bgcolor: '#FFF7ED',
+                          color: '#C2410C',
+                          border: '1px solid #FFEDD5',
+                          borderRadius: 1
+                        }}
+                      />
+                    )}
+                    <Typography sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>
+                      {o.name || 'Unnamed Project'}
+                    </Typography>
+                  </Box>
+                  {o.clientName && (
+                    <Typography sx={{ fontSize: '0.76rem', color: '#64748B', fontWeight: 500, pl: o.projectId ? 0.5 : 0 }}>
+                      Client: {o.clientName}
+                    </Typography>
+                  )}
+                </Box>
+              </li>
+            );
+          }}
           value={selectedProject || null}
           onChange={(_, val) => setSelectedProjectId(val ? val.id : null)}
-          renderInput={(params) => <TextField {...params} variant="outlined" placeholder="Search project name or client..." />}
+          renderInput={(params) => <TextField {...params} variant="outlined" placeholder="Search project name, ID, or client..." />}
           sx={{ mb: 3.5, maxWidth: 520, bgcolor: '#FFF', borderRadius: 2 }}
         />
 

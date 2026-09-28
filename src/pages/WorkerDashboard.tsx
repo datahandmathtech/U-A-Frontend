@@ -197,6 +197,19 @@ const WorkerDashboard: React.FC = () => {
   const [startMachineDialogOpen, setStartMachineDialogOpen] = useState(false);
   
   const [selectedEndMachine, setSelectedEndMachine] = useState('');
+  const activeLogsByMachine = React.useMemo(() => {
+    if (!activeMachineLogs) return [];
+    const map = new Map<string, any>();
+    for (const log of activeMachineLogs) {
+      if (log.status === 'active') {
+        const mId = log.machineId || log.machine?.id || log.id;
+        if (!map.has(mId) || new Date(log.startTime).getTime() > new Date(map.get(mId).startTime).getTime()) {
+          map.set(mId, log);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [activeMachineLogs]);
   const [endPhotos, setEndPhotos] = useState({ machine: '', unit: '', software: '' });
   const [endRemarks, setEndRemarks] = useState('');
   const [endQuantity, setEndQuantity] = useState('');
@@ -914,11 +927,15 @@ const WorkerDashboard: React.FC = () => {
                     } 
                   }}
                 >
-                  {activeMachineLogs?.filter((l: any) => l.status === 'active').map((log: any) => (
-                    <MenuItem key={log.id} value={log.id} sx={{ py: 0.8, fontWeight: 500, fontSize: '0.88rem' }}>
-                      {log.machine?.name}
-                    </MenuItem>
-                  ))}
+                  {activeLogsByMachine.length > 0 ? (
+                    activeLogsByMachine.map((log: any) => (
+                      <MenuItem key={log.id} value={log.id} sx={{ py: 0.8, fontWeight: 500, fontSize: '0.88rem' }}>
+                        {log.machine?.name} {log.operator?.name ? `(${log.operator.name})` : ''}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem value="" disabled>No active machines</MenuItem>
+                  )}
                 </TextField>
               </Box>
 

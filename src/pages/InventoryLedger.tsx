@@ -19,32 +19,63 @@ const InventoryLedger = () => {
 
   // Filter inventory by supplier or project
   const supplierInventory = (allInventory || []).filter((item: any) => {
-    if (item.supplier && item.supplier.toLowerCase() === decodedSupplier.toLowerCase()) return true;
-    const proj1 = item.projectMaterials?.[0]?.project;
-    const proj2 = item.slabs?.[0]?.project;
-    const p = proj1 || proj2;
-    if (p) {
+    const dec = decodedSupplier.toLowerCase().trim();
+    const isRawStockRequest = dec.includes('raw stock') || dec === 'unnati arts (raw stock)';
+
+    const matchProjectObj = (p: any) => {
+      if (!p) return false;
       const projDisplay = `${p.projectId ? p.projectId + ' – ' : ''}${p.name}`.toLowerCase();
       const projDisplayDash = `${p.projectId ? p.projectId + ' - ' : ''}${p.name}`.toLowerCase();
-      const dec = decodedSupplier.toLowerCase();
-      if (
+      const pName = (p.name || '').toLowerCase().trim();
+      const pClient = (p.clientName || '').toLowerCase().trim();
+      const pCode = (p.projectId || '').toLowerCase().trim();
+      return (
         projDisplay === dec ||
         projDisplayDash === dec ||
-        (p.name && p.name.toLowerCase() === dec) ||
-        (p.projectId && p.projectId.toLowerCase() === dec) ||
+        pName === dec ||
+        pCode === dec ||
         p.id === decodedSupplier ||
-        (p.clientName && p.clientName.toLowerCase() === dec)
-      ) {
-        return true;
-      }
+        pClient === dec ||
+        (pClient && dec.includes(pClient)) ||
+        (pName && dec.includes(pName))
+      );
+    };
+
+    const hasAnyProject = (item.projectMaterials && item.projectMaterials.length > 0) || (item.slabs && item.slabs.length > 0);
+
+    if (isRawStockRequest) {
+      // For raw stock: company stock that has NOT been reserved for any project
+      return (item.jobWorkType === 'company' || (item.supplier || '').toLowerCase().includes('unnati')) && !hasAnyProject;
     }
+
+    // Direct supplier match for unlinked items
+    if (item.supplier && item.supplier.toLowerCase().trim() === dec && !hasAnyProject) return true;
+
+    // Check project relation via projectMaterials
+    if (item.projectMaterials && item.projectMaterials.length > 0) {
+      if (item.projectMaterials.some((pm: any) => matchProjectObj(pm.project))) return true;
+    }
+
+    // Check project relation via slabs
+    if (item.slabs && item.slabs.length > 0) {
+      if (item.slabs.some((s: any) => matchProjectObj(s.project))) return true;
+    }
+
     return false;
   });
 
-  const projectInfo = supplierInventory[0]?.projectMaterials?.[0]?.project || supplierInventory[0]?.slabs?.[0]?.project;
-  const pageTitle = projectInfo 
-    ? (projectInfo.projectId ? `${projectInfo.projectId} – ${projectInfo.name}` : projectInfo.name)
-    : decodedSupplier;
+  const isRawStock = decodedSupplier.toLowerCase().includes('raw stock') || decodedSupplier.toLowerCase() === 'unnati arts (raw stock)';
+  const firstMatchedProject = !isRawStock
+    ? (supplierInventory[0]?.projectMaterials?.[0]?.project || supplierInventory[0]?.slabs?.[0]?.project)
+    : null;
+
+  const pageTitle = isRawStock
+    ? 'Unnati Arts (Raw Stock)'
+    : firstMatchedProject
+      ? (firstMatchedProject.clientName && firstMatchedProject.name && firstMatchedProject.clientName.toLowerCase() !== firstMatchedProject.name.toLowerCase()
+          ? `${firstMatchedProject.clientName} - ${firstMatchedProject.name}`
+          : (firstMatchedProject.projectId ? `${firstMatchedProject.projectId} – ${firstMatchedProject.name}` : (firstMatchedProject.clientName || firstMatchedProject.name)))
+      : decodedSupplier;
 
   // Calculate used quantity for each inventory item
   const inventoryStats = supplierInventory.map((item: any) => {

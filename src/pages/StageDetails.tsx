@@ -52,23 +52,32 @@ const StageDetails = () => {
   const [updatePiece] = useUpdatePieceMutation();
   const [deletePiece] = useDeletePieceMutation();
   const [deleteProductionLog] = useDeleteProductionLogMutation();
+  const [selectedDimUnit, setSelectedDimUnit] = useState<string>('');
 
   const slab = slabs?.find((s: any) => s.id === slabId);
   const stageFormatted = stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : '';
   
-  let matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => slab?.name?.startsWith(p.category));
+  let matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => 
+    p.category === slab?.name || 
+    (p.category && slab?.name?.startsWith(p.category)) || 
+    p.productName === slab?.name
+  );
   if (!matchedProduct && projectId) {
     try {
       const savedProductsStr = localStorage.getItem(`quoteProducts_${projectId}`);
       if (savedProductsStr) {
         const localProducts = JSON.parse(savedProductsStr);
-        matchedProduct = localProducts.find((p: any) => slab?.name?.startsWith(p.category));
+        matchedProduct = localProducts.find((p: any) => 
+          p.category === slab?.name || 
+          (p.category && slab?.name?.startsWith(p.category)) || 
+          p.productName === slab?.name
+        );
       }
     } catch (e) {}
   }
   
   const sizeLower = slab?.size?.toLowerCase() || '';
-  const rawUnit = matchedProduct?.unit || (
+  const rawUnit = (matchedProduct?.unit || '').trim() || (
     sizeLower.includes('sq. ft') || sizeLower.includes('sq_ft') || sizeLower.includes('sq.ft') || sizeLower.includes('sqft') ? 'sq_ft' :
     sizeLower.includes('inch') ? 'inch' :
     sizeLower.includes('feet') || sizeLower.includes('ft') ? 'feet' :
@@ -81,17 +90,28 @@ const StageDetails = () => {
     : rawUnit.toLowerCase() === 'mm' ? 'MM' 
     : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
 
-  let dimU = rawUnit;
-  if (rawUnit.toLowerCase().startsWith('piece') || rawUnit.toLowerCase() === 'pcs') {
-    dimU = matchedProduct?.dimensionUnit || 'inch';
+  // Determine dimension unit for pieces
+  let detectedDimUnit = (matchedProduct?.dimensionUnit || '').toLowerCase().trim();
+  if (!detectedDimUnit) {
+    if (sizeLower.includes('mm') || (matchedProduct?.length && Number(matchedProduct.length) >= 100) || (matchedProduct?.width && Number(matchedProduct.width) >= 100)) {
+      detectedDimUnit = 'mm';
+    } else if (sizeLower.includes('ft') || sizeLower.includes('feet')) {
+      detectedDimUnit = 'feet';
+    } else {
+      detectedDimUnit = 'inch';
+    }
   }
-  const dimensionUnitName = dimU.toLowerCase() === 'inch' || dimU.toLowerCase() === 'inches' ? 'Inches' 
-    : dimU.toLowerCase() === 'feet' || dimU.toLowerCase() === 'ft' ? 'Feet' 
-    : dimU.toLowerCase() === 'sq_ft' || dimU.toLowerCase() === 'sqft' ? 'Sq.Ft' 
-    : dimU.toLowerCase() === 'mm' ? 'MM' 
-    : (dimU.charAt(0).toUpperCase() + dimU.slice(1));
 
-  const combinedUnitDisplay = rawUnit.toLowerCase().startsWith('piece') || rawUnit.toLowerCase() === 'pcs' 
+  const effectiveDimUnit = (selectedDimUnit || detectedDimUnit || 'mm').toLowerCase();
+  const isPiecesUnit = rawUnit.toLowerCase().startsWith('piece') || rawUnit.toLowerCase() === 'pcs';
+
+  const dimensionUnitName = effectiveDimUnit === 'inch' || effectiveDimUnit === 'inches' ? 'Inches' 
+    : effectiveDimUnit === 'feet' || effectiveDimUnit === 'ft' ? 'Feet' 
+    : effectiveDimUnit === 'sq_ft' || effectiveDimUnit === 'sqft' ? 'Sq.Ft' 
+    : effectiveDimUnit === 'mm' ? 'MM' 
+    : (effectiveDimUnit.charAt(0).toUpperCase() + effectiveDimUnit.slice(1));
+
+  const combinedUnitDisplay = isPiecesUnit 
     ? `Pieces -> ${dimensionUnitName}` 
     : unitDisplayName;
 
@@ -100,10 +120,16 @@ const StageDetails = () => {
     
     // Override unit if explicit in size string (e.g. "10L x 10W (inch)")
     let overrideUnit = unitStr;
-    const sizeLower = sizeStr.toLowerCase();
-    if (sizeLower.includes('(inch)')) overrideUnit = 'inch';
-    else if (sizeLower.includes('(mm)')) overrideUnit = 'mm';
-    else if (sizeLower.includes('(sq.ft)') || sizeLower.includes('(sq_ft)')) overrideUnit = 'sq_ft';
+    const sLower = sizeStr.toLowerCase();
+    if (sLower.includes('(inch)') || sLower.includes('(inches)') || sLower.includes('inch') || sLower.includes('"')) {
+      overrideUnit = 'inch';
+    } else if (sLower.includes('(mm)')) {
+      overrideUnit = 'mm';
+    } else if (sLower.includes('(sq.ft)') || sLower.includes('(sq_ft)')) {
+      overrideUnit = 'sq_ft';
+    } else if (sLower.includes('(ft)') || sLower.includes('(feet)') || sLower.includes("'")) {
+      overrideUnit = 'feet';
+    }
     
     // Explicit Area override?
     const explicitSqFtMatch = sizeStr.match(/([\d\.]+)\s*Sq\.?Ft/i);
@@ -126,13 +152,15 @@ const StageDetails = () => {
     const u = (overrideUnit || '').toLowerCase().trim();
     let sqft = 0;
     if (u === 'pieces' || u === 'piece' || u === 'pcs') {
-      const dimU = (productContext?.dimensionUnit || 'inch').toLowerCase();
-      if (dimU === 'inch') sqft = ((l * w) / 144);
-      else if (dimU === 'mm') sqft = ((l * w) / 92903.04);
-      else if (dimU === 'sq_ft') sqft = l * w;
+      const activeDimUnit = (productContext?.dimensionUnit || effectiveDimUnit || 'mm').toLowerCase();
+      if (activeDimUnit === 'inch' || activeDimUnit === 'inches') sqft = ((l * w) / 144);
+      else if (activeDimUnit === 'mm') sqft = ((l * w) / 92903.04);
+      else if (activeDimUnit === 'sq_ft' || activeDimUnit === 'feet' || activeDimUnit === 'ft') sqft = l * w;
       else sqft = 1;
     } else if (u === 'mm') {
       sqft = ((l * w) / 92903.04);
+    } else if (u === 'feet' || u === 'ft' || u === 'sq_ft') {
+      sqft = (l * w);
     } else {
       sqft = u.includes('inch') ? ((l * w) / 144) : (l * w);
     }
@@ -191,19 +219,19 @@ const StageDetails = () => {
     setIsSaving(true);
     
     // --- SIZE VALIDATION ---
-    let slabArea = calculateAreaFromSize(slab.size, rawUnit, matchedProduct);
+    let slabArea = calculateAreaFromSize(slab.size, rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
 
     if (slabArea > 0) {
       let existingArea = 0;
       (slab.pieces || []).forEach((p: any) => {
         if (p.size) {
-           existingArea += calculateAreaFromSize(p.size, (p as any).unit || rawUnit, matchedProduct);
+           existingArea += calculateAreaFromSize(p.size, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
         } else if (p.length && p.width) {
-           existingArea += calculateAreaFromSize(`${p.length}L x ${p.width}W`, (p as any).unit || rawUnit, matchedProduct);
+           existingArea += calculateAreaFromSize(`${p.length}L x ${p.width}W`, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
         }
       });
 
-      const newArea = piecesData.reduce((sum, p) => sum + calculateAreaFromSize(`${p.l}L x ${p.w}W`, p.unit || rawUnit, matchedProduct), 0);
+      const newArea = piecesData.reduce((sum, p) => sum + calculateAreaFromSize(`${p.l}L x ${p.w}W`, p.unit || effectiveDimUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit }), 0);
       
       // Round to 2 decimal places to avoid floating point precision issues
       const totalArea = Math.round((existingArea + newArea) * 100) / 100;
@@ -222,7 +250,7 @@ const StageDetails = () => {
         const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
         const finalName = p.pieceNumber ? `${base}.${p.pieceNumber}` : (p.name || base);
         
-        const pieceUnit = p.unit || rawUnit;
+        const pieceUnit = p.unit || effectiveDimUnit;
         let suffix = '';
         if (pieceUnit === 'inch') suffix = ' (inch)';
         if (pieceUnit === 'mm') suffix = ' (mm)';
@@ -234,7 +262,8 @@ const StageDetails = () => {
           size: p.t ? `${p.l}L x ${p.w}W | ${p.t}MM${suffix}` : `${p.l}L x ${p.w}W${suffix}`,
           length: p.l,
           width: p.w,
-          thickness: p.t
+          thickness: p.t,
+          unit: pieceUnit
         };
       });
       await addPieces({ 
@@ -438,53 +467,47 @@ const StageDetails = () => {
       if (pieceIdx > viewIdx) displayStatus = 'completed';
       else if (pieceIdx === viewIdx) displayStatus = p.status;
 
+      const cleanPieceName = String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim();
+
       return (
-        <TableRow key={p.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FBFBFB', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
+        <TableRow key={p.id} sx={{ bgcolor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background-color 0.15s ease' }}>
           {stageFormatted === 'Production' && (
-            <TableCell sx={{ py: 1.5, whiteSpace: 'nowrap' }}>
+            <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
               {mName ? (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>{mName}</Typography>
-                </Box>
+                <Chip label={mName} size="small" sx={{ bgcolor: '#F1F5F9', color: '#1E293B', fontWeight: 700, fontSize: '0.72rem', borderRadius: 1 }} />
               ) : vendorName ? (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>{vendorName}</Typography>
-                </Box>
+                <Chip label={vendorName} size="small" sx={{ bgcolor: '#F8FAFC', color: '#334155', fontWeight: 700, fontSize: '0.72rem', borderRadius: 1 }} />
               ) : (displayStatus === 'completed' || p.status === 'completed') ? (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, bgcolor: '#FFFDF5', border: '1px solid #FDE68A', borderRadius: 2, px: 1.5, py: 0.6, boxShadow: '0 1px 3px rgba(179,139,54,0.08)' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#B38B36', fontSize: '0.82rem', letterSpacing: 0.2 }}>
-                    Manual
-                  </Typography>
-                </Box>
+                <Chip label="Manual" size="small" sx={{ bgcolor: '#FFFBEB', color: '#B45309', border: '1px solid #FDE68A', fontWeight: 700, fontSize: '0.72rem', height: 22, borderRadius: 1 }} />
               ) : (
                 <Typography variant="caption" sx={{ color: '#94A3B8' }}>Unassigned</Typography>
               )}
             </TableCell>
           )}
-          <TableCell sx={{ py: 1.5, minWidth: 160 }}>
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.9rem' }}>
-                {String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim()}
+
+          <TableCell sx={{ py: 1.25, minWidth: 140 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.85rem' }}>
+                {cleanPieceName}
               </Typography>
               {p.pieceNumber && !p.isVirtualPiece && (
                 <Chip 
-                  label={`Piece #${p.pieceNumber}`} 
+                  label={`#${p.pieceNumber}`} 
                   size="small" 
                   sx={{ 
-                    mt: 0.5, 
                     bgcolor: '#EFF6FF', 
                     color: '#1D4ED8', 
-                    fontWeight: 700, 
-                    fontSize: '0.7rem', 
-                    height: 20, 
-                    borderRadius: 1, 
-                    border: '1px solid #DBEAFE' 
+                    fontWeight: 800, 
+                    fontSize: '0.68rem', 
+                    height: 18, 
+                    borderRadius: 1 
                   }} 
                 />
               )}
             </Box>
           </TableCell>
-          <TableCell sx={{ py: 1.5, whiteSpace: 'nowrap' }}>
+
+          <TableCell sx={{ py: 1.25 }}>
             {stageFormatted === 'Polishing' ? (
               (() => {
                 const polishLog = pieceProductionLogs.find((l: any) => (l.stage?.startsWith('Polishing') || l.stage === 'Polishing') && (l.approvalStatus === 'approved' || l.approvalStatus === 'completed'));
@@ -494,7 +517,7 @@ const StageDetails = () => {
 
                 if (isVendor && vendorLabel) {
                   return (
-                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.5, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                       <Typography variant="body2" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.85rem' }}>
                         {vendorLabel}
                       </Typography>
@@ -505,34 +528,26 @@ const StageDetails = () => {
 
                 if (isCompletedOrLogged) {
                   return (
-                    <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#B45309', fontSize: '0.82rem' }}>
-                        Manual
-                      </Typography>
-                    </Box>
+                    <Chip label="Manual" size="small" sx={{ bgcolor: '#FFFBEB', color: '#B45309', border: '1px solid #FDE68A', fontWeight: 700, fontSize: '0.72rem', height: 22, borderRadius: 1 }} />
                   );
                 }
 
-                return (
-                  <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
-                );
+                return <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>;
               })()
             ) : (
               (() => {
                 const hasAllocatedMaterial = Boolean(
-                  (p.sourceMaterialId && p.sourceMaterial && ((p.sourceMaterial.usedQuantity !== undefined && p.sourceMaterial.usedQuantity > 0) || (p.sourceMaterial.quantity && p.sourceMaterial.quantity > 0))) ||
-                  (p.sourceMaterialId && p.sourceMaterial?.inventory)
+                  p.vendorName ||
+                  p.sourceMaterialId ||
+                  (p.sourceMaterial && ((p.sourceMaterial.usedQuantity !== undefined && p.sourceMaterial.usedQuantity > 0) || (p.sourceMaterial.quantity && p.sourceMaterial.quantity > 0))) ||
+                  (p.sourceMaterial?.inventory) ||
+                  (slab?.inventory)
                 );
                 
                 if (!hasAllocatedMaterial) {
-                  if (vendorName) {
-                    return (
-                      <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem' }}>Job Work</Typography>
-                      </Box>
-                    );
-                  }
-                  return (
+                  return vendorName ? (
+                    <Chip label="Job Work" size="small" sx={{ bgcolor: '#F8FAFC', color: '#475569', fontWeight: 700, fontSize: '0.72rem' }} />
+                  ) : (
                     <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
                   );
                 }
@@ -546,20 +561,28 @@ const StageDetails = () => {
                 let thickStr = '';
 
                 if (rawDimStr) {
-                  const sqftMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*Sq\.Ft/i);
+                  if (rawDimStr.includes('|')) {
+                    const afterPipe = rawDimStr.split('|')[1]?.trim();
+                    const tMatch = afterPipe?.match(/(\d+(?:\.\d+)?)\s*MM/i);
+                    if (tMatch) thickStr = `${tMatch[1]}MM`;
+                  }
+                  if (!thickStr && p.sourceMaterial?.inventory?.thickness) {
+                    thickStr = `${p.sourceMaterial.inventory.thickness}MM`;
+                  }
+                  if (!thickStr && p.size && p.size.includes('|')) {
+                    const tMatch = p.size.split('|')[1]?.match(/(\d+(?:\.\d+)?)\s*MM/i);
+                    if (tMatch) thickStr = `${tMatch[1]}MM`;
+                  }
+
+                  const sqftMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*Sq\.?Ft/i);
                   if (sqftMatch) {
                     rawSqFt = parseFloat(sqftMatch[1]);
                   }
-
-                  const tMatch = rawDimStr.match(/(\d+(?:\.\d+)?)\s*MM/i) || p.size?.match(/(\d+(?:\.\d+)?)\s*MM/i) || (p.sourceMaterial?.inventory?.thickness ? [`${p.sourceMaterial.inventory.thickness}MM`, `${p.sourceMaterial.inventory.thickness}`] : null);
-                  if (tMatch) thickStr = `${tMatch[1]}MM`;
 
                   const cleanMain = rawDimStr.split('|')[0].replace(/\([^)]+\)/g, '').trim();
                   primaryDim = cleanMain;
 
                   if (rawSqFt === 0) {
-                    const isFt = /\b(?:ft|feet)\b/i.test(cleanMain);
-                    const isMM = /\b(?:mm)\b/i.test(cleanMain);
                     const parts = cleanMain.split(/\s*[xX×]\s*/);
                     let l = 0, w = 0;
                     if (parts.length >= 2) {
@@ -569,7 +592,10 @@ const StageDetails = () => {
                       w = wMatch ? parseFloat(wMatch[1]) : 0;
                     }
                     if (l > 0 && w > 0) {
-                      if (isMM || (l > 500 && w > 500)) {
+                      const isMM = cleanMain.toLowerCase().includes('mm') || rawDimStr.toLowerCase().includes('mm') || (l > 120 || w > 120) || (l > 100 && w > 100);
+                      const isFt = /\b(?:ft|feet)\b/i.test(cleanMain) || cleanMain.toLowerCase().includes('(ft)');
+
+                      if (isMM) {
                         rawSqFt = (l * w) / 92903.04;
                       } else if (isFt) {
                         rawSqFt = l * w;
@@ -580,36 +606,32 @@ const StageDetails = () => {
                   }
                 }
 
-                if (rawSqFt === 0 && p.sourceMaterial?.quantity) {
-                  rawSqFt = Number(p.sourceMaterial.quantity);
-                }
-
                 const displayDim = primaryDim ? `${primaryDim}${thickStr && !primaryDim.includes(thickStr) ? ` | ${thickStr}` : ''}` : '';
 
                 return (
-                  <Box sx={{ display: 'inline-flex', flexDirection: 'column', gap: 0.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2, px: 1.5, py: 0.75, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.85rem' }}>
-                        {displayDim || rawDimStr}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.84rem' }}>
+                        {displayDim || rawDimStr || 'Standard'}
                       </Typography>
                       {rawSqFt > 0 && (
                         <Chip 
                           label={`${rawSqFt.toFixed(2)} Sq.Ft`} 
                           size="small" 
                           sx={{ 
-                            height: 20, 
-                            fontSize: '0.72rem', 
-                            fontWeight: 900, 
+                            height: 18, 
+                            fontSize: '0.68rem', 
+                            fontWeight: 800, 
                             bgcolor: '#EFF6FF', 
-                            color: '#1D4ED8', 
-                            border: '1px solid #DBEAFE' 
+                            color: '#1D4ED8',
+                            borderRadius: 1
                           }} 
                         />
                       )}
                     </Box>
                     {matName && (
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', fontSize: '0.75rem' }}>
-                        {matName}{blockNum ? ` (Block ${blockNum})` : ''}
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.72rem' }}>
+                        {matName}{blockNum ? ` • Block ${blockNum}` : ''}
                       </Typography>
                     )}
                   </Box>
@@ -617,120 +639,149 @@ const StageDetails = () => {
               })()
             )}
           </TableCell>
-          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+
+          <TableCell sx={{ py: 1.25 }}>
             {p.size ? (
-              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 1.5, px: 1.25, py: 0.5 }}>
-                  <StraightenRoundedIcon sx={{ fontSize: 15, color: '#64748B' }} />
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                    {String(p.size).replace(/ x (\d+MM)/i, ' | $1').replace(/ Ã— (\d+MM)/i, ' | $1')}
-                  </Typography>
-                </Box>
-                <Chip 
-                  label={dimensionUnitName} 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: '#F1F5F9', 
-                    color: '#475569', 
-                    fontWeight: 700, 
-                    fontSize: '0.7rem', 
-                    height: 20, 
-                    borderRadius: 1, 
-                    border: '1px solid #CBD5E1' 
-                  }} 
-                />
-                {matchedProduct && (
-                  <Chip 
-                    label={`${calculateAreaFromSize(p.size as string, (p as any).unit || rawUnit, matchedProduct)} Sq.Ft`}
-                    size="small" 
-                    sx={{ 
-                      bgcolor: '#EFF6FF', 
-                      color: '#1D4ED8', 
-                      fontWeight: 700, 
-                      fontSize: '0.7rem',
-                      height: 20,
-                      borderRadius: 1,
-                      border: '1px solid #BFDBFE'
-                    }} 
-                  />
-                )}
-              </Box>
+              (() => {
+                const cleanSizeStr = String(p.size)
+                  .replace(/\s*\((?:mm|inch|inches|sq_ft|ft)\)/gi, '')
+                  .replace(/ x (\d+MM)/i, ' | $1')
+                  .replace(/ × (\d+MM)/i, ' | $1')
+                  .trim();
+                const sizeLower = (p.size || '').toLowerCase();
+                let pUnit = dimensionUnitName;
+                if (sizeLower.includes('(inch)') || sizeLower.includes('(inches)') || sizeLower.includes('"')) {
+                  pUnit = 'Inches';
+                } else if (sizeLower.includes('(ft)') || sizeLower.includes('(feet)') || sizeLower.includes("'")) {
+                  pUnit = 'Feet';
+                } else if (sizeLower.includes('(mm)')) {
+                  pUnit = 'MM';
+                } else if ((p as any).unit) {
+                  const u = String((p as any).unit).toLowerCase();
+                  pUnit = u === 'mm' ? 'MM' : u === 'inch' ? 'Inches' : u === 'feet' || u === 'ft' ? 'Feet' : dimensionUnitName;
+                }
+                const pArea = calculateAreaFromSize(p.size as string, pUnit.toLowerCase(), { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+
+                return (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.84rem' }}>
+                      {cleanSizeStr}
+                    </Typography>
+                    <Chip 
+                      label={pUnit} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: '#F1F5F9', 
+                        color: '#475569', 
+                        fontWeight: 700, 
+                        fontSize: '0.68rem', 
+                        height: 18, 
+                        borderRadius: 1 
+                      }} 
+                    />
+                    {pArea > 0 && (
+                      <Chip 
+                        label={`${pArea} Sq.Ft`} 
+                        size="small" 
+                        sx={{ 
+                          bgcolor: '#EFF6FF', 
+                          color: '#1D4ED8', 
+                          fontWeight: 800, 
+                          fontSize: '0.68rem', 
+                          height: 18, 
+                          borderRadius: 1 
+                        }} 
+                      />
+                    )}
+                  </Box>
+                );
+              })()
             ) : (
               <Typography variant="caption" sx={{ color: '#94A3B8' }}>Standard</Typography>
             )}
           </TableCell>
+
           {stageFormatted === 'Production' && (
-            <>
-              <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
-                <Typography variant="body2" sx={{ fontSize: '0.82rem', color: startDate !== '-' ? '#334155' : '#94A3B8', fontWeight: startDate !== '-' ? 600 : 400 }}>
-                  {startDate}
-                </Typography>
-              </TableCell>
-              <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
-                <Typography variant="body2" sx={{ fontSize: '0.82rem', color: endDate !== '-' ? '#334155' : '#94A3B8', fontWeight: endDate !== '-' ? 600 : 400 }}>
-                  {endDate}
-                </Typography>
-              </TableCell>
-            </>
+            <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
+              {startDate === '-' && endDate === '-' ? (
+                <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  {startDate !== '-' && (
+                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.72rem' }}>
+                      Start: {startDate}
+                    </Typography>
+                  )}
+                  {endDate !== '-' && (
+                    <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 700, fontSize: '0.72rem' }}>
+                      End: {endDate}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </TableCell>
           )}
+
           {['Polishing', 'Packing'].includes(stageFormatted) && (
-            <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
-              <Typography variant="body2" sx={{ fontSize: '0.82rem', color: inDate !== '-' ? '#059669' : '#94A3B8', fontWeight: inDate !== '-' ? 700 : 400 }}>
+            <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
+              <Typography variant="body2" sx={{ fontSize: '0.8rem', color: inDate !== '-' ? '#059669' : '#94A3B8', fontWeight: inDate !== '-' ? 700 : 400 }}>
                 {inDate}
               </Typography>
             </TableCell>
           )}
+
           {stageFormatted === 'Dispatch' && (
-            <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
-              <Typography variant="body2" sx={{ fontSize: '0.82rem', color: outDate !== '-' ? '#DC2626' : '#94A3B8', fontWeight: outDate !== '-' ? 700 : 400 }}>
+            <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
+              <Typography variant="body2" sx={{ fontSize: '0.8rem', color: outDate !== '-' ? '#DC2626' : '#94A3B8', fontWeight: outDate !== '-' ? 700 : 400 }}>
                 {outDate}
               </Typography>
             </TableCell>
           )}
-          <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
+
+          <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
             <Chip 
-              icon={displayStatus === 'completed' ? <CheckCircleRoundedIcon sx={{ fontSize: '14px !important', color: '#059669 !important' }} /> : displayStatus === 'pending' ? <CircleIcon sx={{ fontSize: '8px !important', color: '#94A3B8 !important' }} /> : <CircleIcon sx={{ fontSize: '10px !important', color: '#D97706 !important' }} />}
-              label={displayStatus === 'completed' ? 'Completed' : displayStatus === 'pending' ? 'Not Started' : 'Under Process'} 
+              icon={displayStatus === 'completed' ? <CheckCircleRoundedIcon sx={{ fontSize: '13px !important', color: '#059669 !important' }} /> : <CircleIcon sx={{ fontSize: '7px !important', color: displayStatus === 'pending' ? '#94A3B8 !important' : '#D97706 !important' }} />}
+              label={displayStatus === 'completed' ? 'Completed' : displayStatus === 'pending' ? 'Not Started' : 'In Progress'} 
               size="small" 
               sx={{ 
                 fontWeight: 800, 
                 fontSize: '0.72rem',
-                height: 24,
-                px: 0.5,
+                height: 22,
                 borderRadius: 1.5,
-                ...(displayStatus === 'completed' ? { bgcolor: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' } : 
-                    displayStatus === 'pending' ? { bgcolor: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' } : 
-                    { bgcolor: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A' })
-              }}
+                ...(displayStatus === 'completed' ? { bgcolor: '#ECFDF5', color: '#059669' } : 
+                    displayStatus === 'pending' ? { bgcolor: '#F1F5F9', color: '#64748B' } : 
+                    { bgcolor: '#FFFBEB', color: '#D97706' })
+              }} 
             />
           </TableCell>
-          <TableCell align="right" sx={{ py: 2, whiteSpace: 'nowrap' }}>
-            <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
-              <Tooltip title="View Timeline & Photos">
+
+          <TableCell align="right" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
+            <Box sx={{ display: 'inline-flex', gap: 0.5, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <Tooltip title="View Details">
                 <IconButton 
                   size="small" 
                   onClick={() => setViewPiece(p)}
-                  sx={{ color: '#0284C7', bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', '&:hover': { bgcolor: '#E0F2FE' } }}
+                  sx={{ color: '#0284C7', '&:hover': { bgcolor: '#F0F9FF' } }}
                 >
-                  <VisibilityIcon sx={{ fontSize: 16 }} />
+                  <VisibilityIcon sx={{ fontSize: 17 }} />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Edit Piece Spec">
+              <Tooltip title="Edit Piece">
                 <IconButton 
                   size="small" 
                   onClick={() => setEditingPiece(p)}
-                  sx={{ color: '#475569', bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', '&:hover': { bgcolor: '#F1F5F9' } }}
+                  sx={{ color: '#475569', '&:hover': { bgcolor: '#F1F5F9' } }}
                 >
-                  <EditIcon sx={{ fontSize: 16 }} />
+                  <EditIcon sx={{ fontSize: 17 }} />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Delete Piece">
                 <IconButton 
                   size="small" 
                   onClick={() => handleDeletePiece(p.id)}
-                  sx={{ color: '#DC2626', bgcolor: '#FEF2F2', border: '1px solid #FECACA', '&:hover': { bgcolor: '#FEE2E2' } }}
+                  sx={{ color: '#DC2626', '&:hover': { bgcolor: '#FEF2F2' } }}
                 >
-                  <DeleteIcon sx={{ fontSize: 16 }} />
+                  <DeleteIcon sx={{ fontSize: 17 }} />
                 </IconButton>
               </Tooltip>
             </Box>
@@ -849,9 +900,35 @@ const StageDetails = () => {
                       Spec: {slab.size}
                     </Typography>
                   </Box>
-                  <Chip label={combinedUnitDisplay} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
+                  {isPiecesUnit ? (
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#F1F5F9', borderRadius: 1.5, px: 1.25, py: 0.35, border: '1px solid #CBD5E1' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mr: 0.75, fontSize: '0.75rem' }}>
+                        Pieces &rarr;
+                      </Typography>
+                      <Select
+                        size="small"
+                        variant="standard"
+                        disableUnderline
+                        value={effectiveDimUnit}
+                        onChange={(e) => setSelectedDimUnit(e.target.value)}
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: '0.75rem',
+                          color: '#0F172A',
+                          '& .MuiSelect-select': { py: 0, pr: '18px !important' },
+                          '& .MuiSvgIcon-root': { fontSize: 16, right: 0 }
+                        }}
+                      >
+                        <MenuItem value="mm" sx={{ fontSize: '0.78rem', fontWeight: 700 }}>MM</MenuItem>
+                        <MenuItem value="inch" sx={{ fontSize: '0.78rem', fontWeight: 700 }}>Inches</MenuItem>
+                        <MenuItem value="feet" sx={{ fontSize: '0.78rem', fontWeight: 700 }}>Feet</MenuItem>
+                      </Select>
+                    </Box>
+                  ) : (
+                    <Chip label={combinedUnitDisplay} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
+                  )}
                   {matchedProduct && (
-                    <Chip label={`${calculateAreaFromSize(slab?.size as string, rawUnit, matchedProduct)} Sq.Ft`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #BFDBFE', borderRadius: 1.5 }} />
+                    <Chip label={`${calculateAreaFromSize(slab?.size as string, rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit })} Sq.Ft`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #BFDBFE', borderRadius: 1.5 }} />
                   )}
                 </Box>
             )}
@@ -1072,7 +1149,7 @@ const StageDetails = () => {
                     <TableCell sx={{ py: 1.25 }}>
                       <Select
                         size="small"
-                        value={p.unit || rawUnit}
+                        value={p.unit || effectiveDimUnit}
                         onChange={(e) => handlePieceChange(idx, 'unit', e.target.value)}
                         sx={{ bgcolor: '#FFF', height: 36, minWidth: 80, '& .MuiSelect-select': { py: 0.5, fontSize: '0.8rem', fontWeight: 700 } }}
                       >
@@ -1107,7 +1184,7 @@ const StageDetails = () => {
                     </TableCell>
                     <TableCell sx={{ py: 1.25 }}>
                       <Chip 
-                        label={`${calculateAreaFromSize(`${p.l}L x ${p.w}W`, p.unit || rawUnit, matchedProduct)} Sq.Ft`} 
+                        label={`${calculateAreaFromSize(`${p.l}L x ${p.w}W`, p.unit || effectiveDimUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit })} Sq.Ft`} 
                         size="small" 
                         sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 800, fontSize: '0.72rem' }} 
                       />
@@ -1139,7 +1216,7 @@ const StageDetails = () => {
                   if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
                   
                   const nextNum = lastPieceNum + 1;
-                  const lastUnit = piecesData.length > 0 ? piecesData[piecesData.length - 1].unit : undefined;
+                  const lastUnit = piecesData.length > 0 ? piecesData[piecesData.length - 1].unit : effectiveDimUnit;
                   setPiecesData([...piecesData, { 
                     pieceNumber: nextNum,
                     baseName: slab.name,
@@ -1176,7 +1253,7 @@ const StageDetails = () => {
                       let lastPieceNum = parseInt(piecesData[piecesData.length - 1]?.pieceNumber as any);
                       if (isNaN(lastPieceNum)) lastPieceNum = maxNum;
                       
-                      const lastUnit = piecesData.length > 0 ? piecesData[piecesData.length - 1].unit : undefined;
+                      const lastUnit = piecesData.length > 0 ? piecesData[piecesData.length - 1].unit : effectiveDimUnit;
                       const newPieces = Array.from({ length: count }).map((_, idx) => {
                         const nextNum = lastPieceNum + idx + 1;
                         return {
@@ -1563,42 +1640,37 @@ const StageDetails = () => {
         ) : (
           /* Production & Polishing: Piece-based table */
           <TableContainer sx={{ maxHeight: 600 }}>
-            <Table stickyHeader sx={{ minWidth: 950 }}>
+            <Table stickyHeader sx={{ width: '100%' }}>
               <TableHead>
                 <TableRow>
                   {stageFormatted === 'Production' && (
-                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
-                      Machine / Workstation
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
+                      Workstation
                     </TableCell>
                   )}
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
-                    Product / Piece Name
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
+                    Piece Name
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
-                    {stageFormatted === 'Polishing' ? 'Machine / Workstation' : 'Used Raw Block'}
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
+                    {stageFormatted === 'Polishing' ? 'Workstation' : 'Used Raw Block'}
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
                     Actual Dimensions
                   </TableCell>
                   {stageFormatted === 'Production' && (
-                    <>
-                      <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
-                        Start Time
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
-                        End Time
-                      </TableCell>
-                    </>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
+                      Timing
+                    </TableCell>
                   )}
                   {stageFormatted === 'Polishing' && (
-                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
+                    <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
                       Completed Date
                     </TableCell>
                   )}
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }}>
-                    Live Status
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
+                    Status
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.75, whiteSpace: 'nowrap' }} align="right">
+                  <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }} align="right">
                     Actions
                   </TableCell>
                 </TableRow>
