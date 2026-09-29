@@ -540,14 +540,11 @@ const StageDetails = () => {
                   p.vendorName ||
                   p.sourceMaterialId ||
                   (p.sourceMaterial && ((p.sourceMaterial.usedQuantity !== undefined && p.sourceMaterial.usedQuantity > 0) || (p.sourceMaterial.quantity && p.sourceMaterial.quantity > 0))) ||
-                  (p.sourceMaterial?.inventory) ||
-                  (slab?.inventory)
+                  (p.sourceMaterial?.inventory)
                 );
                 
                 if (!hasAllocatedMaterial) {
-                  return vendorName ? (
-                    <Chip label="Job Work" size="small" sx={{ bgcolor: '#F8FAFC', color: '#475569', fontWeight: 700, fontSize: '0.72rem' }} />
-                  ) : (
+                  return (
                     <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
                   );
                 }
@@ -555,6 +552,12 @@ const StageDetails = () => {
                 const rawDimStr = p.vendorName || (p.sourceMaterial?.inventory ? `${p.sourceMaterial.inventory.length}ft x ${p.sourceMaterial.inventory.width}ft${p.sourceMaterial.inventory.thickness ? ` | ${p.sourceMaterial.inventory.thickness}MM` : ''}` : '');
                 const matName = p.sourceMaterial?.inventory?.itemName || slab?.inventory?.itemName || '';
                 const blockNum = p.sourceMaterial?.inventory?.blockNumber || slab?.inventory?.blockNumber || '';
+
+                if (!rawDimStr && !matName) {
+                  return (
+                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+                  );
+                }
 
                 let rawSqFt = 0;
                 let primaryDim = '';
@@ -608,11 +611,17 @@ const StageDetails = () => {
 
                 const displayDim = primaryDim ? `${primaryDim}${thickStr && !primaryDim.includes(thickStr) ? ` | ${thickStr}` : ''}` : '';
 
+                if (!displayDim && !rawDimStr && rawSqFt === 0) {
+                  return (
+                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>—</Typography>
+                  );
+                }
+
                 return (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
                       <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.84rem' }}>
-                        {displayDim || rawDimStr || 'Standard'}
+                        {displayDim || rawDimStr}
                       </Typography>
                       {rawSqFt > 0 && (
                         <Chip 
