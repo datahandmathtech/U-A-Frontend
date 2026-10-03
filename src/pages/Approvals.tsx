@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel, Autocomplete, Tooltip, Table, TableHead, TableRow, TableCell, TableBody, Divider, Accordion, AccordionSummary, AccordionDetails, RadioGroup, Radio, Skeleton } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
@@ -29,6 +30,7 @@ import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineR
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 
 const Approvals: React.FC = () => {
+  const navigate = useNavigate();
   const { data: pendingLogs, isLoading, refetch: refetchPending } = useGetPendingApprovalsQuery(undefined, {
     pollingInterval: 15000,
     skipPollingIfUnfocused: true
@@ -371,6 +373,31 @@ const Approvals: React.FC = () => {
           <PendingActionsIcon fontSize="large" color="warning" />
           Pending Approvals
         </Typography>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<FlashOnIcon />}
+            onClick={() => setManualApprovalOpen(true)}
+            sx={{
+              borderRadius: 2.5,
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '0.92rem',
+              px: 2.5,
+              py: 1,
+              bgcolor: '#059669',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+              '&:hover': { bgcolor: '#047857' }
+            }}
+          >
+            ⚡ Manual Direct Approval
+          </Button>
+
+          
+        </Box>
       </Box>
 
       {(!pendingLogs) ? (
