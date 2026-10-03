@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Typography, Paper, Grid, Card, CardContent, CardMedia, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, CircularProgress, Alert, Snackbar, IconButton, Checkbox, ListItemText, FormControl, InputLabel, Select, OutlinedInput, FormControlLabel, Autocomplete, Tooltip, Table, TableHead, TableRow, TableCell, TableBody, Divider, Accordion, AccordionSummary, AccordionDetails, RadioGroup, Radio, Skeleton } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
-import { useGetPendingApprovalsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useManualApprovePiecesMutation } from '../store/apiSlice';
+import { useGetPendingApprovalsQuery, useGetApprovedLogsQuery, useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, useDeleteProductionLogMutation, useEditProductionLogMutation, useGetMachineLogsQuery, useDeleteMachineLogMutation, useEditMachineLogMutation, useApproveMachineLogMutation, useRejectMachineLogMutation, useManualApprovePiecesMutation } from '../store/apiSlice';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
@@ -33,6 +33,7 @@ const Approvals: React.FC = () => {
     pollingInterval: 15000,
     skipPollingIfUnfocused: true
   });
+  const { refetch: refetchApproved } = useGetApprovedLogsQuery();
   const { data: projects } = useGetProjectsQuery();
   const { data: machineLogs } = useGetMachineLogsQuery();
   const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
@@ -99,8 +100,8 @@ const Approvals: React.FC = () => {
       setToast({ open: true, message: `Successfully approved ${selectedPieceIds.length} piece(s) for ${manualStage}!`, severity: 'success' });
       setSelectedPieceIds([]);
       if (refetchManualSlabs) refetchManualSlabs();
-      refetchApproved();
-      refetchPending();
+      if (typeof refetchApproved === 'function') refetchApproved();
+      if (typeof refetchPending === 'function') refetchPending();
     } catch (err: any) {
       setToast({ open: true, message: err?.data?.message || err?.message || 'Manual approval failed', severity: 'error' });
     }
@@ -291,7 +292,7 @@ const Approvals: React.FC = () => {
         data: payload 
       }).unwrap();
       
-      refetchApproved();
+      if (typeof refetchApproved === 'function') refetchApproved();
       setApprovalDialogOpen(false);
       setProjectSplits([{projectId: '', qty: 0}]);
       setRejectRemaining(false);
@@ -304,7 +305,7 @@ const Approvals: React.FC = () => {
           : 'Approval saved successfully', 
         severity: 'success' 
       });
-      refetchPending();
+      if (typeof refetchPending === 'function') refetchPending();
     } catch (err: any) {
       console.error("Approval submit error:", err);
       setToast({ open: true, message: err?.data?.message || err?.message || 'Approval failed', severity: 'error' });
@@ -322,7 +323,7 @@ const Approvals: React.FC = () => {
           await deleteProductionLog(id).unwrap();
         }
         setToast({ open: true, message: 'Log deleted successfully', severity: 'success' });
-        refetchApproved();
+        if (typeof refetchApproved === 'function') refetchApproved();
       } catch (err) {
         setToast({ open: true, message: 'Failed to delete log', severity: 'error' });
       }
@@ -357,7 +358,7 @@ const Approvals: React.FC = () => {
       }
       setEditHistoryDialogOpen(false);
       setToast({ open: true, message: 'Log updated successfully', severity: 'success' });
-      refetchApproved();
+      if (typeof refetchApproved === 'function') refetchApproved();
     } catch (err) {
       setToast({ open: true, message: 'Failed to update log', severity: 'error' });
     }
