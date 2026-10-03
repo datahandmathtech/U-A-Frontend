@@ -395,8 +395,6 @@ const Approvals: React.FC = () => {
           >
             ⚡ Manual Direct Approval
           </Button>
-
-          
         </Box>
       </Box>
 
