@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, CircularProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel, Card, Tooltip } from '@mui/material';
@@ -590,7 +590,21 @@ const ProjectDetails: React.FC = () => {
   const { data: allMachineLogs, isLoading: machineLogsLoading } = useGetMachineLogsQuery();
   const projectMachineLogs = allMachineLogs?.filter((log: any) => log.projectId === id) || [];
 
-  const { data: projectSlabs, refetch: refetchSlabs } = useGetSlabsQuery(id as string, { skip: !id });
+  const { data: rawProjectSlabs, refetch: refetchSlabs } = useGetSlabsQuery(id as string, { skip: !id });
+  const projectSlabs = useMemo(() => {
+    if (!rawProjectSlabs || !Array.isArray(rawProjectSlabs)) return [];
+    const seen = new Set<string>();
+    const deduplicated: any[] = [];
+    for (const slab of rawProjectSlabs) {
+      const norm = (slab.name || '').trim().toLowerCase();
+      if (norm && seen.has(norm)) {
+        continue;
+      }
+      if (norm) seen.add(norm);
+      deduplicated.push(slab);
+    }
+    return deduplicated;
+  }, [rawProjectSlabs]);
   const [createSlab] = useCreateSlabMutation();
   const [updateSlab] = useUpdateSlabMutation();
   const [deleteSlab] = useDeleteSlabMutation();
