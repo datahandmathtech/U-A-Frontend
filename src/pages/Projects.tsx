@@ -194,13 +194,62 @@ const Projects: React.FC = () => {
   const handleOpen = (project?: any) => {
     if (project && project.id) {
       setEditingProjectId(project.id);
+
+      // Load existing products from project.products (quotation) OR project.slabs
+      let loadedProducts: any[] = [];
+      if (Array.isArray(project.products) && project.products.length > 0) {
+        loadedProducts = project.products.map((p: any) => {
+          const u = (p.unit || 'pieces').toLowerCase().trim();
+          const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
+          return {
+            id: p.id,
+            name: p.productName || p.category || p.name || '',
+            length: p.length ? String(p.length) : '',
+            width: p.width ? String(p.width) : '',
+            thickness: p.breadth ? String(p.breadth) : (p.thickness ? String(p.thickness) : ''),
+            unit: p.unit || 'pieces',
+            dimensionUnit: p.dimensionUnit || (isPieces ? 'inch' : u)
+          };
+        });
+      } else if (Array.isArray(project.slabs) && project.slabs.length > 0) {
+        loadedProducts = project.slabs.map((s: any) => {
+          let length = '';
+          let width = '';
+          let thickness = '';
+          let dimensionUnit = 'inch';
+          if (s.size) {
+            const lMatch = s.size.match(/(\d+(?:\.\d+)?)L/i);
+            const wMatch = s.size.match(/(\d+(?:\.\d+)?)W/i);
+            const tMatch = s.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
+            if (lMatch) length = lMatch[1];
+            if (wMatch) width = wMatch[1];
+            if (tMatch) thickness = tMatch[1];
+            if (/mm/i.test(s.size)) dimensionUnit = 'mm';
+            else if (/ft|feet/i.test(s.size)) dimensionUnit = 'feet';
+          }
+          return {
+            id: s.id,
+            name: s.name || '',
+            length,
+            width,
+            thickness,
+            unit: 'pieces',
+            dimensionUnit
+          };
+        });
+      }
+
+      if (loadedProducts.length === 0) {
+        loadedProducts = [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }];
+      }
+
       setFormData({
         name: project.name || '',
         clientName: project.clientName || '',
         description: project.description || '',
-        status: project.status || 'work_order',
-        totalPieces: project.totalPieces || 0,
-        products: [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }],
+        status: project.status || 'production',
+        totalPieces: project.totalPieces || loadedProducts.length,
+        products: loadedProducts,
         deliveryDate: project.deliveryDate ? new Date(project.deliveryDate).toISOString().split('T')[0] : '',
         startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
         deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
@@ -212,7 +261,7 @@ const Projects: React.FC = () => {
         name: '',
         clientName: '',
         description: '',
-        status: 'work_order',
+        status: 'production',
         totalPieces: 0,
         products: [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }],
         deliveryDate: '',
@@ -237,16 +286,19 @@ const Projects: React.FC = () => {
     try {
       const existingProject = projectsData?.find((p: any) => p.id === editingProjectId);
       if (editingProjectId && existingProject) {
-        const { products, ...updatePayload } = formData;
         await updateProject({
           id: editingProjectId,
           data: {
-            ...updatePayload,
+            name: formData.name,
+            clientName: formData.clientName,
+            clientHandle: formData.clientHandle,
+            description: formData.description,
             status: formData.status || existingProject.status || 'production',
-            totalPieces: parseInt(formData.totalPieces) || 0,
+            totalPieces: parseInt(formData.totalPieces) || formData.products?.length || 0,
             deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : null,
             startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
-            deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
+            deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+            products: formData.products
           }
         }).unwrap();
         refetch();
@@ -1226,16 +1278,33 @@ const Projects: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, deadline: e.target.value, deliveryDate: e.target.value })}
                   />
                 </Grid>
+                {editingProjectId && (
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Status / Stage</InputLabel>
+                      <Select
+                        label="Status / Stage"
+                        value={formData.status || 'production'}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      >
+                        <MenuItem value="production">Production</MenuItem>
+                        <MenuItem value="material_planning">Material Planning</MenuItem>
+                        <MenuItem value="shop_drawing">Shop Drawing</MenuItem>
+                        <MenuItem value="work_order">Work Order</MenuItem>
+                        <MenuItem value="completed">Completed</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                )}
               </Grid>
             </Box>
 
             {/* Section 2: Products & Slabs */}
-            {!editingProjectId && (
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#B38B36', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.75rem' }}>
-                    2. Product Slabs & Dimensions
-                  </Typography>
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#B38B36', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.75rem' }}>
+                  2. Product Slabs & Dimensions
+                </Typography>
                   <Button
                     size="small"
                     startIcon={<AddIcon />}
@@ -1489,39 +1558,6 @@ const Projects: React.FC = () => {
                   })}
                 </Box>
               </Box>
-            )}
-
-            {/* Editing: Total Pieces & Status */}
-            {editingProjectId && (
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    label="Total Pieces"
-                    type="number"
-                    fullWidth
-                    size="small"
-                    value={formData.totalPieces}
-                    onChange={(e) => setFormData({ ...formData, totalPieces: parseInt(e.target.value) || 0 })}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Status / Stage</InputLabel>
-                    <Select
-                      label="Status / Stage"
-                      value={formData.status || 'production'}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    >
-                      <MenuItem value="production">Production</MenuItem>
-                      <MenuItem value="material_planning">Material Planning</MenuItem>
-                      <MenuItem value="shop_drawing">Shop Drawing</MenuItem>
-                      <MenuItem value="work_order">Work Order</MenuItem>
-                      <MenuItem value="completed">Completed</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            )}
           </Box>
         </DialogContent>
 
