@@ -333,7 +333,6 @@ const StageDetails = () => {
 
   const [editingPiece, setEditingPiece] = useState<any>(null);
   const [viewPiece, setViewPiece] = useState<any>(null);
-  const [pieceTab, setPieceTab] = useState<'active' | 'completed'>('active');
   const [editPieceDims, setEditPieceDims] = useState({
     length: '',
     width: '',
@@ -385,86 +384,16 @@ const StageDetails = () => {
     }
   };
 
-  const handleExportPiecesExcel = () => {
-    const piecesList = slab?.pieces || [];
-    const completedList = piecesList.filter((p: any) => isPieceCompleted(p));
-    if (completedList.length === 0) {
-      alert('No completed pieces to export.');
-      return;
-    }
 
-    const dataToExport = completedList.map((p: any, idx: number) => {
-      let pLog = logs.find((log: any) => log.pieceIds?.includes(p.id) || (!log.pieceIds?.length && (log.slabId === p.id || log.productId === p.id)));
-      const mLog = pLog?.parentLogId ? machineLogs?.find((m: any) => m.id === pLog.parentLogId) : null;
-      const mName = mLog?.machine?.name || pLog?.machine?.name || p.vendorName || '-';
-
-      let sqft = '-';
-      if (p.size) {
-        const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
-        const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
-        if (lMatch && wMatch) {
-          const l = parseFloat(lMatch[1]);
-          const w = parseFloat(wMatch[1]);
-          const isFt = /ft|feet/i.test(p.size);
-          const isMM = /mm/i.test(p.size);
-          const area = isFt ? l * w : isMM ? (l * w) / 92903.04 : (l * w) / 144;
-          sqft = `${area.toFixed(2)} Sq.Ft`;
-        }
-      }
-
-      return {
-        'S.No': idx + 1,
-        'Piece Name': p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '-'),
-        'Piece Serial #': p.pieceNumber ? `#${p.pieceNumber}` : '-',
-        'Slab Name': slab?.name || '-',
-        'Workstation / Vendor': mName,
-        'Actual Dimensions': p.size || '-',
-        'Calculated Area': sqft,
-        'Current Stage': p.stage || stageFormatted,
-        'Status': 'Completed'
-      };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    worksheet['!cols'] = [
-      { wch: 6 },
-      { wch: 25 },
-      { wch: 15 },
-      { wch: 22 },
-      { wch: 22 },
-      { wch: 25 },
-      { wch: 18 },
-      { wch: 16 },
-      { wch: 14 }
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Completed Pieces');
-    const todayStr = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(workbook, `Completed_Pieces_${(slab?.name || 'Slab').replace(/[^a-zA-Z0-9]/g, '_')}_${todayStr}.xlsx`);
-  };
 
   if (!slab) return <Typography sx={{ p: 3 }}>Loading...</Typography>;
 
   const matchedProductForUI = project?.quotations?.[0]?.products?.find((p: any) => p.category === slab?.name);
   const qtyToProcess = matchedProductForUI?.qty ? Number(matchedProductForUI.qty) : 1;
 
-  const isPieceCompleted = (p: any) => {
-    const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-    const pieceIdx = stages.indexOf(p.stage || 'Production');
-    const viewIdx = stages.indexOf(stageFormatted);
-    if (pieceIdx > viewIdx) return true;
-    if (pieceIdx === viewIdx) return p.status === 'completed';
-    return false;
-  };
-
   const renderTableRows = () => {
     const piecesList = slab.pieces || [];
-    const tabPieces = piecesList.filter((p: any) => {
-      return pieceTab === 'completed' ? isPieceCompleted(p) : !isPieceCompleted(p);
-    });
-
-    const filteredPieces = tabPieces.filter((p: any) => {
+    const filteredPieces = piecesList.filter((p: any) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       const pName = String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).toLowerCase();
@@ -1411,117 +1340,36 @@ const StageDetails = () => {
       {/* MAIN TRACKING TABLE PAPER */}
       <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)' }}>
         {/* Table Header Bar */}
-        {(() => {
-          const piecesList = slab.pieces || [];
-          const activePiecesCount = piecesList.filter((p: any) => !isPieceCompleted(p)).length;
-          const completedPiecesCount = piecesList.filter((p: any) => isPieceCompleted(p)).length;
-          return (
-            <Box sx={{ p: 2, px: 3, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.05rem' }}>
-                  {stageFormatted} Tracking Table
-                </Typography>
+        <Box sx={{ p: 2.5, px: 3, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.1rem' }}>
+              {stageFormatted} Tracking Table
+            </Typography>
+            <Chip 
+              label={`${totalPieces} Tracked Items`} 
+              size="small" 
+              sx={{ bgcolor: '#FFFFFF', border: '1px solid #CBD5E1', color: '#475569', fontWeight: 700, fontSize: '0.72rem' }} 
+            />
+          </Box>
 
-                <Tabs
-                  value={pieceTab}
-                  onChange={(_e, val) => setPieceTab(val)}
-                  sx={{
-                    minHeight: 'auto',
-                    '& .MuiTabs-indicator': {
-                      backgroundColor: pieceTab === 'active' ? '#B38B36' : '#10B981',
-                      height: 3,
-                      borderRadius: '3px 3px 0 0'
-                    }
-                  }}
-                >
-                  <Tab
-                    value="active"
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <span>In Production / Active</span>
-                        <Chip
-                          label={activePiecesCount}
-                          size="small"
-                          sx={{
-                            height: 20,
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            bgcolor: pieceTab === 'active' ? '#FFF4E5' : '#F1F5F9',
-                            color: pieceTab === 'active' ? '#B38B36' : '#64748B'
-                          }}
-                        />
-                      </Box>
-                    }
-                    sx={{ textTransform: 'none', fontWeight: 800, fontSize: '0.85rem' }}
-                  />
-                  <Tab
-                    value="completed"
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <span>Completed Pieces</span>
-                        <Chip
-                          label={completedPiecesCount}
-                          size="small"
-                          sx={{
-                            height: 20,
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            bgcolor: pieceTab === 'completed' ? '#ECFDF5' : '#F1F5F9',
-                            color: pieceTab === 'completed' ? '#059669' : '#64748B'
-                          }}
-                        />
-                      </Box>
-                    }
-                    sx={{ textTransform: 'none', fontWeight: 800, fontSize: '0.85rem' }}
-                  />
-                </Tabs>
-              </Box>
-
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                {pieceTab === 'completed' && (
-                  <Button
-                    variant="contained"
-                    startIcon={<FileDownloadIcon />}
-                    onClick={handleExportPiecesExcel}
-                    disabled={completedPiecesCount === 0}
-                    sx={{
-                      bgcolor: '#059669',
-                      color: '#FFFFFF',
-                      fontWeight: 700,
-                      fontSize: '0.82rem',
-                      px: 2,
-                      py: 0.7,
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
-                      '&:hover': { bgcolor: '#047857' }
-                    }}
-                  >
-                    Export Excel (.xlsx)
-                  </Button>
-                )}
-
-                <TextField 
-                  size="small" 
-                  placeholder={pieceTab === 'active' ? "Search active pieces..." : "Search completed pieces..."} 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon sx={{ color: '#94A3B8', fontSize: 18 }} />
-                        </InputAdornment>
-                      ),
-                      sx: { borderRadius: 2, bgcolor: '#FFFFFF', fontSize: '0.85rem' }
-                    }
-                  }}
-                  sx={{ width: { xs: '100%', sm: 240 } }}
-                />
-              </Box>
-            </Box>
-          );
-        })()}
+          <TextField 
+            size="small" 
+            placeholder="Search piece, machine, or size..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: '#94A3B8', fontSize: 18 }} />
+                  </InputAdornment>
+                ),
+                sx: { borderRadius: 2, bgcolor: '#FFFFFF', fontSize: '0.85rem' }
+              }
+            }}
+            sx={{ width: { xs: '100%', sm: 280 } }}
+          />
+        </Box>
 
         {/* Packing & Dispatch: Log-based table */}
         {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') ? (

@@ -819,7 +819,6 @@ const ProjectDetails: React.FC = () => {
   const [slabDialogOpen, setSlabDialogOpen] = useState(false);
   const [editSlabDialogOpen, setEditSlabDialogOpen] = useState(false);
   const [editingSlabId, setEditingSlabId] = useState<string | null>(null);
-  const [slabActiveTab, setSlabActiveTab] = useState<'active' | 'completed'>('active');
   const [editSlabDims, setEditSlabDims] = useState({
     length: '',
     width: '',
@@ -962,50 +961,7 @@ const ProjectDetails: React.FC = () => {
     }
   };
 
-  const isSlabDone = (s: any) => {
-    if (s.status === 'completed') return true;
-    const pcs = s.pieces || [];
-    return pcs.length > 0 && pcs.every((p: any) => p.status === 'completed' || p.stage === 'Dispatch');
-  };
 
-  const handleExportSlabsExcel = () => {
-    const completedList = (projectSlabs || []).filter((s: any) => isSlabDone(s));
-    if (completedList.length === 0) {
-      alert('No completed slabs to export.');
-      return;
-    }
-
-    const dataToExport = completedList.map((s: any, idx: number) => {
-      const pcs = s.pieces || [];
-      const completedPcs = pcs.filter((p: any) => p.status === 'completed' || p.stage === 'Dispatch').length;
-
-      return {
-        'S.No': idx + 1,
-        'Slab / Product Name': s.name || '-',
-        'Original Specification': s.size || '-',
-        'Total Pieces': pcs.length,
-        'Completed Pieces': completedPcs,
-        'Required Stages': (s.requiredStages || []).join(', '),
-        'Overall Status': 'Completed'
-      };
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    worksheet['!cols'] = [
-      { wch: 6 },
-      { wch: 25 },
-      { wch: 32 },
-      { wch: 14 },
-      { wch: 18 },
-      { wch: 35 },
-      { wch: 14 }
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Completed Slabs');
-    const todayStr = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(workbook, `Completed_Slabs_${(project?.name || 'Project').replace(/[^a-zA-Z0-9]/g, '_')}_${todayStr}.xlsx`);
-  };
 
   const handleDeleteSlab = async (slabId: string) => {
     if (window.confirm("Delete this slab?")) {
@@ -3594,18 +3550,14 @@ const ProjectDetails: React.FC = () => {
                 return prod?.category || s.name.split(' ')[0];
               }).filter(Boolean))) as string[];
 
-              const baseSlabsList = (projectSlabs || []).filter((s: any) => {
-                return slabActiveTab === 'completed' ? isSlabDone(s) : !isSlabDone(s);
-              });
-
-              const filteredSlabs = baseSlabsList.filter((s: any) => {
+              const filteredSlabs = projectSlabs?.filter((s: any) => {
                 const matchesSearch = !slabSearchQuery || 
                   s.name.toLowerCase().includes(slabSearchQuery.toLowerCase()) || 
                   (s.size && s.size.toLowerCase().includes(slabSearchQuery.toLowerCase()));
                 const slabCategory = products?.find(p => s.name.startsWith(p.category))?.category || s.name.split(' ')[0];
                 const matchesCategory = slabCategoryFilter === 'All' || slabCategory === slabCategoryFilter;
                 return matchesSearch && matchesCategory;
-              });
+              }) || [];
 
               const selectedInFilterCount = selectedSlabIds.filter(id => filteredSlabs.some(s => s.id === id)).length;
               const isAllFilteredSelected = filteredSlabs.length > 0 && selectedInFilterCount === filteredSlabs.length;
@@ -3826,92 +3778,6 @@ const ProjectDetails: React.FC = () => {
                       </Box>
                     </Box>
                   )}
-
-                  {/* Tabs & Excel Export Ribbon for Slabs */}
-                  {(() => {
-                    const activeCount = (projectSlabs || []).filter((s: any) => !isSlabDone(s)).length;
-                    const completedCount = (projectSlabs || []).filter((s: any) => isSlabDone(s)).length;
-                    return (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-                        <Tabs
-                          value={slabActiveTab}
-                          onChange={(_e, val) => setSlabActiveTab(val)}
-                          sx={{
-                            minHeight: 'auto',
-                            '& .MuiTabs-indicator': {
-                              backgroundColor: slabActiveTab === 'active' ? '#B38B36' : '#10B981',
-                              height: 3,
-                              borderRadius: '3px 3px 0 0'
-                            }
-                          }}
-                        >
-                          <Tab
-                            value="active"
-                            label={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <span>Active Slabs</span>
-                                <Chip
-                                  label={activeCount}
-                                  size="small"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: '0.72rem',
-                                    fontWeight: 700,
-                                    bgcolor: slabActiveTab === 'active' ? '#FFF4E5' : '#F1F5F9',
-                                    color: slabActiveTab === 'active' ? '#B38B36' : '#64748B'
-                                  }}
-                                />
-                              </Box>
-                            }
-                            sx={{ textTransform: 'none', fontWeight: 800, fontSize: '0.88rem' }}
-                          />
-                          <Tab
-                            value="completed"
-                            label={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <span>Completed Slabs</span>
-                                <Chip
-                                  label={completedCount}
-                                  size="small"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: '0.72rem',
-                                    fontWeight: 700,
-                                    bgcolor: slabActiveTab === 'completed' ? '#ECFDF5' : '#F1F5F9',
-                                    color: slabActiveTab === 'completed' ? '#059669' : '#64748B'
-                                  }}
-                                />
-                              </Box>
-                            }
-                            sx={{ textTransform: 'none', fontWeight: 800, fontSize: '0.88rem' }}
-                          />
-                        </Tabs>
-
-                        {slabActiveTab === 'completed' && (
-                          <Button
-                            variant="contained"
-                            startIcon={<FileDownloadIcon />}
-                            onClick={handleExportSlabsExcel}
-                            disabled={completedCount === 0}
-                            sx={{
-                              bgcolor: '#059669',
-                              color: '#FFFFFF',
-                              fontWeight: 700,
-                              fontSize: '0.82rem',
-                              px: 2.2,
-                              py: 0.7,
-                              borderRadius: 2,
-                              textTransform: 'none',
-                              boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
-                              '&:hover': { bgcolor: '#047857' }
-                            }}
-                          >
-                            Export to Excel (.xlsx)
-                          </Button>
-                        )}
-                      </Box>
-                    );
-                  })()}
 
                   {/* Filter & Search Bar */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 2 }}>
