@@ -50,6 +50,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import * as XLSX from 'xlsx';
 import { 
   useGetProjectByIdQuery, useUpdateProjectMutation, useCreateQuotationMutation, 
   useCreateInvoiceMutation, useUploadFilesMutation, useGetDrawingsQuery, 
@@ -817,6 +819,13 @@ const ProjectDetails: React.FC = () => {
   const [slabDialogOpen, setSlabDialogOpen] = useState(false);
   const [editSlabDialogOpen, setEditSlabDialogOpen] = useState(false);
   const [editingSlabId, setEditingSlabId] = useState<string | null>(null);
+  const [slabActiveTab, setSlabActiveTab] = useState<'active' | 'completed'>('active');
+  const [editSlabDims, setEditSlabDims] = useState({
+    length: '',
+    width: '',
+    thickness: '',
+    unit: 'inch'
+  });
   const [slabForm, setSlabForm] = useState({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
   const [materialSource, setMaterialSource] = useState('unnati');
   const [clientSlabs, setClientSlabs] = useState([{ isUnnati: true, unnatiId: '', unnatiQty: '', materialName: '', blockNo: '', unit: 'inch', length: '', width: '', thickness: '' }]);
@@ -889,6 +898,22 @@ const ProjectDetails: React.FC = () => {
 
   const handleEditSlabClick = (slab: any) => {
     setEditingSlabId(slab.id);
+    let length = '';
+    let width = '';
+    let thickness = '';
+    let unit = 'inch';
+    if (slab.size) {
+      const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/i);
+      const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/i);
+      const tMatch = slab.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
+      if (lMatch) length = lMatch[1];
+      if (wMatch) width = wMatch[1];
+      if (tMatch) thickness = tMatch[1];
+      if (/mm/i.test(slab.size)) unit = 'mm';
+      else if (/feet|ft/i.test(slab.size)) unit = 'feet';
+      else if (/sq_ft/i.test(slab.size)) unit = 'sq_ft';
+    }
+    setEditSlabDims({ length, width, thickness, unit });
     setSlabForm({ 
       name: slab.name, 
       size: slab.size || '', 
@@ -903,9 +928,21 @@ const ProjectDetails: React.FC = () => {
 
   const handleUpdateSlab = async () => {
     try {
+      const l = parseFloat(editSlabDims.length) || 0;
+      const w = parseFloat(editSlabDims.width) || 0;
+      const t = parseFloat(editSlabDims.thickness) || 0;
+      const u = editSlabDims.unit || 'inch';
+      const isFt = u === 'feet' || u === 'sq_ft';
+      const isMM = u === 'mm';
+      const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
+      const area = isFt ? l * w : isMM ? (l * w) / 92903.04 : (l * w) / 144;
+      const sizeFormatted = (l > 0 && w > 0)
+        ? `${l}L x ${w}W ${unitLabel}${t ? ` | ${t}MM` : ''} (${area.toFixed(2)} Sq.Ft)`
+        : (slabForm.size || '');
+
       const payload: any = {
         name: slabForm.name,
-        size: slabForm.size || '',
+        size: sizeFormatted,
         cost: Number(slabForm.cost) || 0,
         requiredStages: slabForm.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch']
       };
@@ -923,6 +960,51 @@ const ProjectDetails: React.FC = () => {
       const msg = error?.data?.message || error?.error || 'Failed to update slab.';
       setSnackbarMessage(`Failed to update slab: ${msg}`);
     }
+  };
+
+  const isSlabDone = (s: any) => {
+    if (s.status === 'completed') return true;
+    const pcs = s.pieces || [];
+    return pcs.length > 0 && pcs.every((p: any) => p.status === 'completed' || p.stage === 'Dispatch');
+  };
+
+  const handleExportSlabsExcel = () => {
+    const completedList = (projectSlabs || []).filter((s: any) => isSlabDone(s));
+    if (completedList.length === 0) {
+      alert('No completed slabs to export.');
+      return;
+    }
+
+    const dataToExport = completedList.map((s: any, idx: number) => {
+      const pcs = s.pieces || [];
+      const completedPcs = pcs.filter((p: any) => p.status === 'completed' || p.stage === 'Dispatch').length;
+
+      return {
+        'S.No': idx + 1,
+        'Slab / Product Name': s.name || '-',
+        'Original Specification': s.size || '-',
+        'Total Pieces': pcs.length,
+        'Completed Pieces': completedPcs,
+        'Required Stages': (s.requiredStages || []).join(', '),
+        'Overall Status': 'Completed'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    worksheet['!cols'] = [
+      { wch: 6 },
+      { wch: 25 },
+      { wch: 32 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 35 },
+      { wch: 14 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Completed Slabs');
+    const todayStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `Completed_Slabs_${(project?.name || 'Project').replace(/[^a-zA-Z0-9]/g, '_')}_${todayStr}.xlsx`);
   };
 
   const handleDeleteSlab = async (slabId: string) => {
@@ -3512,14 +3594,18 @@ const ProjectDetails: React.FC = () => {
                 return prod?.category || s.name.split(' ')[0];
               }).filter(Boolean))) as string[];
 
-              const filteredSlabs = projectSlabs?.filter((s: any) => {
+              const baseSlabsList = (projectSlabs || []).filter((s: any) => {
+                return slabActiveTab === 'completed' ? isSlabDone(s) : !isSlabDone(s);
+              });
+
+              const filteredSlabs = baseSlabsList.filter((s: any) => {
                 const matchesSearch = !slabSearchQuery || 
                   s.name.toLowerCase().includes(slabSearchQuery.toLowerCase()) || 
                   (s.size && s.size.toLowerCase().includes(slabSearchQuery.toLowerCase()));
                 const slabCategory = products?.find(p => s.name.startsWith(p.category))?.category || s.name.split(' ')[0];
                 const matchesCategory = slabCategoryFilter === 'All' || slabCategory === slabCategoryFilter;
                 return matchesSearch && matchesCategory;
-              }) || [];
+              });
 
               const selectedInFilterCount = selectedSlabIds.filter(id => filteredSlabs.some(s => s.id === id)).length;
               const isAllFilteredSelected = filteredSlabs.length > 0 && selectedInFilterCount === filteredSlabs.length;
@@ -3740,6 +3826,92 @@ const ProjectDetails: React.FC = () => {
                       </Box>
                     </Box>
                   )}
+
+                  {/* Tabs & Excel Export Ribbon for Slabs */}
+                  {(() => {
+                    const activeCount = (projectSlabs || []).filter((s: any) => !isSlabDone(s)).length;
+                    const completedCount = (projectSlabs || []).filter((s: any) => isSlabDone(s)).length;
+                    return (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                        <Tabs
+                          value={slabActiveTab}
+                          onChange={(_e, val) => setSlabActiveTab(val)}
+                          sx={{
+                            minHeight: 'auto',
+                            '& .MuiTabs-indicator': {
+                              backgroundColor: slabActiveTab === 'active' ? '#B38B36' : '#10B981',
+                              height: 3,
+                              borderRadius: '3px 3px 0 0'
+                            }
+                          }}
+                        >
+                          <Tab
+                            value="active"
+                            label={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <span>Active Slabs</span>
+                                <Chip
+                                  label={activeCount}
+                                  size="small"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    bgcolor: slabActiveTab === 'active' ? '#FFF4E5' : '#F1F5F9',
+                                    color: slabActiveTab === 'active' ? '#B38B36' : '#64748B'
+                                  }}
+                                />
+                              </Box>
+                            }
+                            sx={{ textTransform: 'none', fontWeight: 800, fontSize: '0.88rem' }}
+                          />
+                          <Tab
+                            value="completed"
+                            label={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <span>Completed Slabs</span>
+                                <Chip
+                                  label={completedCount}
+                                  size="small"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    bgcolor: slabActiveTab === 'completed' ? '#ECFDF5' : '#F1F5F9',
+                                    color: slabActiveTab === 'completed' ? '#059669' : '#64748B'
+                                  }}
+                                />
+                              </Box>
+                            }
+                            sx={{ textTransform: 'none', fontWeight: 800, fontSize: '0.88rem' }}
+                          />
+                        </Tabs>
+
+                        {slabActiveTab === 'completed' && (
+                          <Button
+                            variant="contained"
+                            startIcon={<FileDownloadIcon />}
+                            onClick={handleExportSlabsExcel}
+                            disabled={completedCount === 0}
+                            sx={{
+                              bgcolor: '#059669',
+                              color: '#FFFFFF',
+                              fontWeight: 700,
+                              fontSize: '0.82rem',
+                              px: 2.2,
+                              py: 0.7,
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                              '&:hover': { bgcolor: '#047857' }
+                            }}
+                          >
+                            Export to Excel (.xlsx)
+                          </Button>
+                        )}
+                      </Box>
+                    );
+                  })()}
 
                   {/* Filter & Search Bar */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 2 }}>
@@ -5016,17 +5188,73 @@ const ProjectDetails: React.FC = () => {
                 label="Slab Name / Category" 
                 placeholder="Type or select slab category"
                 fullWidth 
-                slotProps={{ input: { ...params.InputProps, sx: { borderRadius: 2 } } }}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
               />
             )}
           />
-          <TextField 
-            label="Grid Layout / Size Spec (e.g. 5x2)" 
-            value={slabForm.size} 
-            onChange={(e) => setSlabForm({ ...slabForm, size: e.target.value })} 
-            fullWidth 
-            slotProps={{ input: { sx: { borderRadius: 2 } } }}
-          />
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Unit</InputLabel>
+                <Select
+                  label="Unit"
+                  value={editSlabDims.unit || 'inch'}
+                  onChange={(e) => setEditSlabDims({ ...editSlabDims, unit: e.target.value })}
+                  sx={{ borderRadius: 2 }}
+                >
+                  <MenuItem value="inch">Inches (in)</MenuItem>
+                  <MenuItem value="feet">Feet (ft)</MenuItem>
+                  <MenuItem value="mm">MM</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <TextField 
+                label="Length (L)" 
+                size="small"
+                value={editSlabDims.length} 
+                onChange={(e) => setEditSlabDims({ ...editSlabDims, length: e.target.value })} 
+                fullWidth 
+                slotProps={{ input: { sx: { borderRadius: 2 } } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <TextField 
+                label="Width (W)" 
+                size="small"
+                value={editSlabDims.width} 
+                onChange={(e) => setEditSlabDims({ ...editSlabDims, width: e.target.value })} 
+                fullWidth 
+                slotProps={{ input: { sx: { borderRadius: 2 } } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <TextField 
+                label="Thickness (MM)" 
+                size="small"
+                value={editSlabDims.thickness} 
+                onChange={(e) => setEditSlabDims({ ...editSlabDims, thickness: e.target.value })} 
+                fullWidth 
+                slotProps={{ input: { sx: { borderRadius: 2 } } }}
+              />
+            </Grid>
+          </Grid>
+
+          {parseFloat(editSlabDims.length) > 0 && parseFloat(editSlabDims.width) > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Chip
+                size="small"
+                label={`Calculated Area: ${(
+                  editSlabDims.unit === 'feet'
+                    ? parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)
+                    : editSlabDims.unit === 'mm'
+                    ? (parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)) / 92903.04
+                    : (parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)) / 144
+                ).toFixed(2)} Sq.Ft`}
+                sx={{ bgcolor: '#FFF4E5', color: '#B38B36', fontWeight: 700 }}
+              />
+            </Box>
+          )}
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1.5, color: '#1E293B', fontWeight: 800 }}>Required Manufacturing Stages:</Typography>
             <Grid container spacing={1.5}>

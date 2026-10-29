@@ -4,7 +4,8 @@ import {
   Box, Typography, Button, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, IconButton, TextField, 
   Switch, FormControlLabel, Breadcrumbs, Link, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, Select, MenuItem, Grid, LinearProgress, InputAdornment, Avatar, Divider
+  ToggleButton, ToggleButtonGroup, Tooltip, FormControl, InputLabel, Select, MenuItem, Grid, LinearProgress, InputAdornment, Avatar, Divider,
+  Tabs, Tab
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -26,6 +27,8 @@ import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManu
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
 import AddIcon from '@mui/icons-material/Add';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import * as XLSX from 'xlsx';
 import { 
   useGetProjectByIdQuery, 
   useGetSlabsQuery,
@@ -330,6 +333,14 @@ const StageDetails = () => {
 
   const [editingPiece, setEditingPiece] = useState<any>(null);
   const [viewPiece, setViewPiece] = useState<any>(null);
+  const [pieceTab, setPieceTab] = useState<'active' | 'completed'>('active');
+  const [editPieceDims, setEditPieceDims] = useState({
+    length: '',
+    width: '',
+    thickness: '',
+    unit: 'inch',
+    status: 'pending'
+  });
 
   const handleDeletePiece = async (pieceId: string) => {
     if (window.confirm('Are you sure you want to delete this tracked item?')) {
@@ -345,52 +356,25 @@ const StageDetails = () => {
 
   const handleEditPieceSave = async () => {
     if (!editingPiece) return;
-    
-    // --- SIZE VALIDATION ---
-    let slabArea = 0;
-    if (slab.size) {
-      const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/i);
-      const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/i);
-      if (lMatch && wMatch) slabArea = parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
-    }
-    
-    // Only strictly validate total area if slab is broken into multiple pieces (>1)
-    if (slabArea > 0 && slab.pieces && slab.pieces.length > 1) {
-      let otherPiecesArea = 0;
-      (slab.pieces || []).forEach((p: any) => {
-        if (p.id !== editingPiece.id && p.size) {
-           const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
-           const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
-           if (lMatch && wMatch) {
-             otherPiecesArea += parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
-           }
-        }
-      });
-      
-      let newArea = 0;
-      if (editingPiece.size) {
-         const lMatch = editingPiece.size.match(/(\d+(?:\.\d+)?)L/i);
-         const wMatch = editingPiece.size.match(/(\d+(?:\.\d+)?)W/i);
-         if (lMatch && wMatch) newArea = parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
-      }
-      
-      const totalArea = Math.round((otherPiecesArea + newArea) * 100) / 100;
-      const roundedSlabArea = Math.round(slabArea * 100) / 100;
 
-      // Allow 0.5 sq. in tolerance for rounding
-      if ((totalArea - roundedSlabArea) > 0.5) {
-         alert(`Cannot update piece. Total size exceeds original slab size.\nSlab Size: ${roundedSlabArea.toFixed(2)}\nOther Pieces Size: ${otherPiecesArea.toFixed(2)}\nThis Piece Size: ${newArea.toFixed(2)}\nRemaining: ${(roundedSlabArea - otherPiecesArea).toFixed(2)}`);
-         return;
-      }
-    }
-    // --- END VALIDATION ---
+    const l = parseFloat(editPieceDims.length) || 0;
+    const w = parseFloat(editPieceDims.width) || 0;
+    const t = parseFloat(editPieceDims.thickness) || 0;
+    const u = editPieceDims.unit;
+    const isFt = u === 'feet';
+    const isMM = u === 'mm';
+    const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
+    const sizeFormatted = (l > 0 && w > 0)
+      ? `${l}L x ${w}W ${unitLabel}${t ? ` | ${t}MM` : ''}`
+      : (editingPiece.size || '');
 
     try {
       await updatePiece({
         id: editingPiece.id,
         data: {
           productName: editingPiece.productName || '',
-          size: editingPiece.size || ''
+          size: sizeFormatted,
+          status: editPieceDims.status || 'pending'
         }
       }).unwrap();
       refetchSlabs();
@@ -401,14 +385,86 @@ const StageDetails = () => {
     }
   };
 
+  const handleExportPiecesExcel = () => {
+    const piecesList = slab?.pieces || [];
+    const completedList = piecesList.filter((p: any) => isPieceCompleted(p));
+    if (completedList.length === 0) {
+      alert('No completed pieces to export.');
+      return;
+    }
+
+    const dataToExport = completedList.map((p: any, idx: number) => {
+      let pLog = logs.find((log: any) => log.pieceIds?.includes(p.id) || (!log.pieceIds?.length && (log.slabId === p.id || log.productId === p.id)));
+      const mLog = pLog?.parentLogId ? machineLogs?.find((m: any) => m.id === pLog.parentLogId) : null;
+      const mName = mLog?.machine?.name || pLog?.machine?.name || p.vendorName || '-';
+
+      let sqft = '-';
+      if (p.size) {
+        const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
+        const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
+        if (lMatch && wMatch) {
+          const l = parseFloat(lMatch[1]);
+          const w = parseFloat(wMatch[1]);
+          const isFt = /ft|feet/i.test(p.size);
+          const isMM = /mm/i.test(p.size);
+          const area = isFt ? l * w : isMM ? (l * w) / 92903.04 : (l * w) / 144;
+          sqft = `${area.toFixed(2)} Sq.Ft`;
+        }
+      }
+
+      return {
+        'S.No': idx + 1,
+        'Piece Name': p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '-'),
+        'Piece Serial #': p.pieceNumber ? `#${p.pieceNumber}` : '-',
+        'Slab Name': slab?.name || '-',
+        'Workstation / Vendor': mName,
+        'Actual Dimensions': p.size || '-',
+        'Calculated Area': sqft,
+        'Current Stage': p.stage || stageFormatted,
+        'Status': 'Completed'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    worksheet['!cols'] = [
+      { wch: 6 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 25 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 14 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Completed Pieces');
+    const todayStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `Completed_Pieces_${(slab?.name || 'Slab').replace(/[^a-zA-Z0-9]/g, '_')}_${todayStr}.xlsx`);
+  };
+
   if (!slab) return <Typography sx={{ p: 3 }}>Loading...</Typography>;
 
   const matchedProductForUI = project?.quotations?.[0]?.products?.find((p: any) => p.category === slab?.name);
   const qtyToProcess = matchedProductForUI?.qty ? Number(matchedProductForUI.qty) : 1;
 
+  const isPieceCompleted = (p: any) => {
+    const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const pieceIdx = stages.indexOf(p.stage || 'Production');
+    const viewIdx = stages.indexOf(stageFormatted);
+    if (pieceIdx > viewIdx) return true;
+    if (pieceIdx === viewIdx) return p.status === 'completed';
+    return false;
+  };
+
   const renderTableRows = () => {
     const piecesList = slab.pieces || [];
-    const filteredPieces = piecesList.filter((p: any) => {
+    const tabPieces = piecesList.filter((p: any) => {
+      return pieceTab === 'completed' ? isPieceCompleted(p) : !isPieceCompleted(p);
+    });
+
+    const filteredPieces = tabPieces.filter((p: any) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       const pName = String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).toLowerCase();
@@ -785,7 +841,30 @@ const StageDetails = () => {
               <Tooltip title="Edit Piece">
                 <IconButton 
                   size="small" 
-                  onClick={() => setEditingPiece(p)}
+                  onClick={() => {
+                    let length = '';
+                    let width = '';
+                    let thickness = '';
+                    let unit = 'inch';
+                    if (p.size) {
+                      const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
+                      const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
+                      const tMatch = p.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
+                      if (lMatch) length = lMatch[1];
+                      if (wMatch) width = wMatch[1];
+                      if (tMatch) thickness = tMatch[1];
+                      if (/mm/i.test(p.size)) unit = 'mm';
+                      else if (/feet|ft/i.test(p.size)) unit = 'feet';
+                    }
+                    setEditPieceDims({
+                      length,
+                      width,
+                      thickness,
+                      unit,
+                      status: p.status || 'pending'
+                    });
+                    setEditingPiece(p);
+                  }}
                   sx={{ color: '#475569', '&:hover': { bgcolor: '#F1F5F9' } }}
                 >
                   <EditIcon sx={{ fontSize: 17 }} />
@@ -1332,36 +1411,117 @@ const StageDetails = () => {
       {/* MAIN TRACKING TABLE PAPER */}
       <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)' }}>
         {/* Table Header Bar */}
-        <Box sx={{ p: 2.5, px: 3, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.1rem' }}>
-              {stageFormatted} Tracking Table
-            </Typography>
-            <Chip 
-              label={`${totalPieces} Tracked Items`} 
-              size="small" 
-              sx={{ bgcolor: '#FFFFFF', border: '1px solid #CBD5E1', color: '#475569', fontWeight: 700, fontSize: '0.72rem' }} 
-            />
-          </Box>
+        {(() => {
+          const piecesList = slab.pieces || [];
+          const activePiecesCount = piecesList.filter((p: any) => !isPieceCompleted(p)).length;
+          const completedPiecesCount = piecesList.filter((p: any) => isPieceCompleted(p)).length;
+          return (
+            <Box sx={{ p: 2, px: 3, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.05rem' }}>
+                  {stageFormatted} Tracking Table
+                </Typography>
 
-          <TextField 
-            size="small" 
-            placeholder="Search piece, machine, or size..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon sx={{ color: '#94A3B8', fontSize: 18 }} />
-                  </InputAdornment>
-                ),
-                sx: { borderRadius: 2, bgcolor: '#FFFFFF', fontSize: '0.85rem' }
-              }
-            }}
-            sx={{ width: { xs: '100%', sm: 280 } }}
-          />
-        </Box>
+                <Tabs
+                  value={pieceTab}
+                  onChange={(_e, val) => setPieceTab(val)}
+                  sx={{
+                    minHeight: 'auto',
+                    '& .MuiTabs-indicator': {
+                      backgroundColor: pieceTab === 'active' ? '#B38B36' : '#10B981',
+                      height: 3,
+                      borderRadius: '3px 3px 0 0'
+                    }
+                  }}
+                >
+                  <Tab
+                    value="active"
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <span>In Production / Active</span>
+                        <Chip
+                          label={activePiecesCount}
+                          size="small"
+                          sx={{
+                            height: 20,
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            bgcolor: pieceTab === 'active' ? '#FFF4E5' : '#F1F5F9',
+                            color: pieceTab === 'active' ? '#B38B36' : '#64748B'
+                          }}
+                        />
+                      </Box>
+                    }
+                    sx={{ textTransform: 'none', fontWeight: 800, fontSize: '0.85rem' }}
+                  />
+                  <Tab
+                    value="completed"
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <span>Completed Pieces</span>
+                        <Chip
+                          label={completedPiecesCount}
+                          size="small"
+                          sx={{
+                            height: 20,
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            bgcolor: pieceTab === 'completed' ? '#ECFDF5' : '#F1F5F9',
+                            color: pieceTab === 'completed' ? '#059669' : '#64748B'
+                          }}
+                        />
+                      </Box>
+                    }
+                    sx={{ textTransform: 'none', fontWeight: 800, fontSize: '0.85rem' }}
+                  />
+                </Tabs>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                {pieceTab === 'completed' && (
+                  <Button
+                    variant="contained"
+                    startIcon={<FileDownloadIcon />}
+                    onClick={handleExportPiecesExcel}
+                    disabled={completedPiecesCount === 0}
+                    sx={{
+                      bgcolor: '#059669',
+                      color: '#FFFFFF',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      px: 2,
+                      py: 0.7,
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                      '&:hover': { bgcolor: '#047857' }
+                    }}
+                  >
+                    Export Excel (.xlsx)
+                  </Button>
+                )}
+
+                <TextField 
+                  size="small" 
+                  placeholder={pieceTab === 'active' ? "Search active pieces..." : "Search completed pieces..."} 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon sx={{ color: '#94A3B8', fontSize: 18 }} />
+                        </InputAdornment>
+                      ),
+                      sx: { borderRadius: 2, bgcolor: '#FFFFFF', fontSize: '0.85rem' }
+                    }
+                  }}
+                  sx={{ width: { xs: '100%', sm: 240 } }}
+                />
+              </Box>
+            </Box>
+          );
+        })()}
 
         {/* Packing & Dispatch: Log-based table */}
         {(stageFormatted === 'Packing' || stageFormatted === 'Dispatch') ? (
@@ -1711,18 +1871,89 @@ const StageDetails = () => {
         <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2.5 }}>
           <TextField 
             label="Product / Piece Name" 
-            value={editingPiece?.productName || editingPiece?.pieceNumber || ''} 
+            value={editingPiece?.productName || ''} 
             onChange={e => setEditingPiece({ ...editingPiece, productName: e.target.value })} 
             fullWidth 
             slotProps={{ input: { sx: { borderRadius: 2 } } }}
           />
-          <TextField 
-            label="Size Spec (e.g. 20L x 10W | 18MM)" 
-            value={editingPiece?.size || ''} 
-            onChange={e => setEditingPiece({ ...editingPiece, size: e.target.value })} 
-            fullWidth 
-            slotProps={{ input: { sx: { borderRadius: 2 } } }}
-          />
+
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Unit</InputLabel>
+                <Select
+                  label="Unit"
+                  value={editPieceDims.unit || 'inch'}
+                  onChange={(e) => setEditPieceDims({ ...editPieceDims, unit: e.target.value })}
+                  sx={{ borderRadius: 2 }}
+                >
+                  <MenuItem value="inch">Inch</MenuItem>
+                  <MenuItem value="feet">Feet</MenuItem>
+                  <MenuItem value="mm">MM</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <TextField 
+                label="Length (L)" 
+                size="small"
+                value={editPieceDims.length} 
+                onChange={e => setEditPieceDims({ ...editPieceDims, length: e.target.value })} 
+                fullWidth 
+                slotProps={{ input: { sx: { borderRadius: 2 } } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <TextField 
+                label="Width (W)" 
+                size="small"
+                value={editPieceDims.width} 
+                onChange={e => setEditPieceDims({ ...editPieceDims, width: e.target.value })} 
+                fullWidth 
+                slotProps={{ input: { sx: { borderRadius: 2 } } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <TextField 
+                label="Thickness (MM)" 
+                size="small"
+                value={editPieceDims.thickness} 
+                onChange={e => setEditPieceDims({ ...editPieceDims, thickness: e.target.value })} 
+                fullWidth 
+                slotProps={{ input: { sx: { borderRadius: 2 } } }}
+              />
+            </Grid>
+          </Grid>
+
+          <FormControl fullWidth size="small">
+            <InputLabel>Status</InputLabel>
+            <Select
+              label="Status"
+              value={editPieceDims.status || 'pending'}
+              onChange={(e) => setEditPieceDims({ ...editPieceDims, status: e.target.value })}
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="active">Active / In Progress</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+            </Select>
+          </FormControl>
+
+          {parseFloat(editPieceDims.length) > 0 && parseFloat(editPieceDims.width) > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Chip
+                size="small"
+                label={`Calculated Area: ${(
+                  editPieceDims.unit === 'feet'
+                    ? parseFloat(editPieceDims.length) * parseFloat(editPieceDims.width)
+                    : editPieceDims.unit === 'mm'
+                    ? (parseFloat(editPieceDims.length) * parseFloat(editPieceDims.width)) / 92903.04
+                    : (parseFloat(editPieceDims.length) * parseFloat(editPieceDims.width)) / 144
+                ).toFixed(2)} Sq.Ft`}
+                sx={{ bgcolor: '#FFF4E5', color: '#B38B36', fontWeight: 700 }}
+              />
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button onClick={() => setEditingPiece(null)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
