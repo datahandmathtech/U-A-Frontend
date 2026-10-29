@@ -4997,22 +4997,29 @@ const ProjectDetails: React.FC = () => {
       >
         <DialogTitle sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.25rem' }}>Edit Slab Specification</DialogTitle>
         <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2.5 }}>
-          <TextField 
-            select
-            label="Select Slab Category (From Quotation)" 
-            fullWidth 
-            value={slabForm.name} 
-            onChange={(e) => setSlabForm({ ...slabForm, name: e.target.value })} 
-            slotProps={{ input: { sx: { borderRadius: 2 } } }}
-          >
-            {products?.filter(p => p.category === slabForm.name || !projectSlabs?.some((s: any) => s.name === p.category)).length > 0 ? (
-              products.filter(p => p.category === slabForm.name || !projectSlabs?.some((s: any) => s.name === p.category)).map((p: any) => (
-                <MenuItem key={p.id} value={p.category}>{p.category}</MenuItem>
-              ))
-            ) : (
-              <MenuItem value="" disabled>All Categories Added / None Found</MenuItem>
+          <Autocomplete
+            freeSolo
+            options={Array.from(new Set([
+              ...(products?.map((p: any) => p.category).filter(Boolean) || []),
+              ...(projectSlabs?.map((s: any) => s.name).filter(Boolean) || [])
+            ]))}
+            value={slabForm.name || ''}
+            onInputChange={(_e, newInputValue) => {
+              setSlabForm({ ...slabForm, name: newInputValue });
+            }}
+            onChange={(_e, newValue) => {
+              setSlabForm({ ...slabForm, name: newValue || '' });
+            }}
+            renderInput={(params) => (
+              <TextField 
+                {...params}
+                label="Slab Name / Category" 
+                placeholder="Type or select slab category"
+                fullWidth 
+                slotProps={{ input: { ...params.InputProps, sx: { borderRadius: 2 } } }}
+              />
             )}
-          </TextField>
+          />
           <TextField 
             label="Grid Layout / Size Spec (e.g. 5x2)" 
             value={slabForm.size} 

@@ -31,7 +31,9 @@ import {
   Card,
   Skeleton,
   Autocomplete,
-  createFilterOptions
+  createFilterOptions,
+  Tabs,
+  Tab
 } from '@mui/material';
 
 // Icons
@@ -50,6 +52,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import PersonIcon from '@mui/icons-material/Person';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { calculateOrderProgress } from '../utils/progressCalculator';
+import * as XLSX from 'xlsx';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
 export const calculateProjectWorkSize = (project: any): string => {
   if (!project) return '-';
@@ -238,12 +242,16 @@ const Projects: React.FC = () => {
           id: editingProjectId,
           data: {
             ...updatePayload,
+            status: formData.status || existingProject.status || 'production',
             totalPieces: parseInt(formData.totalPieces) || 0,
-            deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : undefined,
-            startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
-            deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined
+            deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : null,
+            startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
+            deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
           }
         }).unwrap();
+        refetch();
+        handleClose();
+        return;
       } else {
         const createdProject = await createProject({
           ...formData,
@@ -362,11 +370,21 @@ const Projects: React.FC = () => {
     }
   };
 
+  // Active vs Completed tab state
+  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+
   // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Only show active or completed work orders
+  // Helper to determine if an order is completed
+  const isOrderCompleted = (wo: any) => {
+    if (wo.status === 'completed') return true;
+    const prog = calculateOrderProgress(wo);
+    return prog.percent >= 100 && prog.totalProductRows > 0;
+  };
+
+  // All work orders from projects
   const workOrders = useMemo(() => {
     return (
       projects?.filter((p: any) =>
@@ -375,15 +393,29 @@ const Projects: React.FC = () => {
     );
   }, [projects]);
 
-  // Metric Computations
+  // Split into Active and Completed
+  const activeWorkOrders = useMemo(() => {
+    return workOrders.filter((wo: any) => !isOrderCompleted(wo));
+  }, [workOrders]);
+
+  const completedWorkOrders = useMemo(() => {
+    return workOrders.filter((wo: any) => isOrderCompleted(wo));
+  }, [workOrders]);
+
+  // Current list for the active tab
+  const currentTabOrders = useMemo(() => {
+    return activeTab === 'active' ? activeWorkOrders : completedWorkOrders;
+  }, [activeTab, activeWorkOrders, completedWorkOrders]);
+
+  // Metric Computations (computed on Active Work Orders)
   const stats = useMemo(() => {
-    const totalOrders = workOrders.length;
+    const totalOrders = activeWorkOrders.length;
     let totalMainStones = 0;
     let completedMainStones = 0;
     let overdueCount = 0;
     const today = new Date();
 
-    workOrders.forEach((wo: any) => {
+    activeWorkOrders.forEach((wo: any) => {
       const prog = calculateOrderProgress(wo);
       totalMainStones += prog.totalProductRows;
       completedMainStones += prog.productionEquivalentCompleted;
@@ -403,13 +435,13 @@ const Projects: React.FC = () => {
       overdueCount, 
       completionRate 
     };
-  }, [workOrders]);
+  }, [activeWorkOrders]);
 
   // Filter by Search Query
   const filteredWorkOrders = useMemo(() => {
-    if (!searchQuery.trim()) return workOrders;
+    if (!searchQuery.trim()) return currentTabOrders;
     const q = searchQuery.toLowerCase().trim();
-    return workOrders.filter((p: any) => {
+    return currentTabOrders.filter((p: any) => {
       return (
         p.projectId?.toLowerCase().includes(q) ||
         p.clientName?.toLowerCase().includes(q) ||
@@ -418,7 +450,58 @@ const Projects: React.FC = () => {
         p.description?.toLowerCase().includes(q)
       );
     });
-  }, [workOrders, searchQuery]);
+  }, [currentTabOrders, searchQuery]);
+
+  // Export Completed Orders to Excel
+  const handleExportExcel = () => {
+    if (completedWorkOrders.length === 0) {
+      alert('No completed work orders to export.');
+      return;
+    }
+
+    const dataToExport = completedWorkOrders.map((p: any, idx: number) => {
+      const prog = calculateOrderProgress(p);
+      const targetDate = p.deadline || p.deliveryDate;
+      const targetFormatted = targetDate ? new Date(targetDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+      const startFormatted = p.startDate ? new Date(p.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+
+      return {
+        'S.No': idx + 1,
+        'Work Order ID': p.projectId || p.id,
+        'Project Name': p.name || 'Untitled Project',
+        'Client Name': p.clientName || '-',
+        'Client Manager': p.clientHandle || '-',
+        'Work Size': calculateProjectWorkSize(p),
+        'Total Pieces / Main Stones': p.totalPieces || prog.totalProductRows || 0,
+        'Completed Pieces': prog.completedPiecesCount || p.completedPieces || 0,
+        'Progress': `${prog.percent}%`,
+        'Start Date': startFormatted,
+        'Deadline / Delivery': targetFormatted,
+        'Status': 'Completed'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    worksheet['!cols'] = [
+      { wch: 6 },
+      { wch: 16 },
+      { wch: 32 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 26 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 14 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Completed Orders');
+    const todayStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `Completed_Work_Orders_${todayStr}.xlsx`);
+  };
 
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -606,7 +689,106 @@ const Projects: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* 3. Search Bar Control */}
+      {/* 3. Navigation Tabs & Excel Export Ribbon */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_e, val) => {
+            setActiveTab(val);
+            setPage(0);
+          }}
+          sx={{
+            minHeight: 'auto',
+            '& .MuiTabs-indicator': {
+              backgroundColor: activeTab === 'active' ? '#B38B36' : '#10B981',
+              height: 3,
+              borderRadius: '3px 3px 0 0'
+            }
+          }}
+        >
+          <Tab
+            value="active"
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>Active Work Orders</span>
+                <Chip
+                  label={activeWorkOrders.length}
+                  size="small"
+                  sx={{
+                    height: 22,
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    bgcolor: activeTab === 'active' ? '#FFF4E5' : '#F1F5F9',
+                    color: activeTab === 'active' ? '#B38B36' : '#64748B',
+                    border: '1px solid',
+                    borderColor: activeTab === 'active' ? '#FFE0B2' : 'transparent'
+                  }}
+                />
+              </Box>
+            }
+            sx={{
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '0.96rem',
+              color: '#64748B',
+              '&.Mui-selected': { color: '#B38B36' }
+            }}
+          />
+          <Tab
+            value="completed"
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>Completed Work Orders</span>
+                <Chip
+                  label={completedWorkOrders.length}
+                  size="small"
+                  sx={{
+                    height: 22,
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    bgcolor: activeTab === 'completed' ? '#ECFDF5' : '#F1F5F9',
+                    color: activeTab === 'completed' ? '#059669' : '#64748B',
+                    border: '1px solid',
+                    borderColor: activeTab === 'completed' ? '#A7F3D0' : 'transparent'
+                  }}
+                />
+              </Box>
+            }
+            sx={{
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '0.96rem',
+              color: '#64748B',
+              '&.Mui-selected': { color: '#059669' }
+            }}
+          />
+        </Tabs>
+
+        {activeTab === 'completed' && (
+          <Button
+            variant="contained"
+            startIcon={<FileDownloadIcon />}
+            onClick={handleExportExcel}
+            disabled={completedWorkOrders.length === 0}
+            sx={{
+              bgcolor: '#059669',
+              color: '#FFFFFF',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              px: 2.5,
+              py: 0.9,
+              borderRadius: 2.5,
+              textTransform: 'none',
+              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+              '&:hover': { bgcolor: '#047857' }
+            }}
+          >
+            Export to Excel (.xlsx)
+          </Button>
+        )}
+      </Box>
+
+      {/* 4. Search Bar Control */}
       <Paper
         elevation={0}
         sx={{
@@ -623,7 +805,7 @@ const Projects: React.FC = () => {
       >
         <TextField
           size="small"
-          placeholder="Search by Work Order ID, project name, manager..."
+          placeholder={activeTab === 'active' ? "Search active work orders by ID, project, client..." : "Search completed orders by ID, project, client..."}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           sx={{
@@ -653,7 +835,7 @@ const Projects: React.FC = () => {
           }}
         />
         <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: { xs: 'none', sm: 'block' } }}>
-          Showing <strong>{filteredWorkOrders.length}</strong> of {workOrders.length} orders
+          Showing <strong>{filteredWorkOrders.length}</strong> of {currentTabOrders.length} orders
         </Typography>
       </Paper>
 
@@ -1309,18 +1491,36 @@ const Projects: React.FC = () => {
               </Box>
             )}
 
-            {/* Editing: Total Pieces */}
+            {/* Editing: Total Pieces & Status */}
             {editingProjectId && (
-              <Box>
-                <TextField
-                  label="Total Pieces"
-                  type="number"
-                  fullWidth
-                  size="small"
-                  value={formData.totalPieces}
-                  onChange={(e) => setFormData({ ...formData, totalPieces: parseInt(e.target.value) || 0 })}
-                />
-              </Box>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label="Total Pieces"
+                    type="number"
+                    fullWidth
+                    size="small"
+                    value={formData.totalPieces}
+                    onChange={(e) => setFormData({ ...formData, totalPieces: parseInt(e.target.value) || 0 })}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Status / Stage</InputLabel>
+                    <Select
+                      label="Status / Stage"
+                      value={formData.status || 'production'}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    >
+                      <MenuItem value="production">Production</MenuItem>
+                      <MenuItem value="material_planning">Material Planning</MenuItem>
+                      <MenuItem value="shop_drawing">Shop Drawing</MenuItem>
+                      <MenuItem value="work_order">Work Order</MenuItem>
+                      <MenuItem value="completed">Completed</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
             )}
           </Box>
         </DialogContent>

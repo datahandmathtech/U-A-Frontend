@@ -354,7 +354,8 @@ const StageDetails = () => {
       if (lMatch && wMatch) slabArea = parseFloat(lMatch[1]) * parseFloat(wMatch[1]);
     }
     
-    if (slabArea > 0) {
+    // Only strictly validate total area if slab is broken into multiple pieces (>1)
+    if (slabArea > 0 && slab.pieces && slab.pieces.length > 1) {
       let otherPiecesArea = 0;
       (slab.pieces || []).forEach((p: any) => {
         if (p.id !== editingPiece.id && p.size) {
@@ -376,7 +377,8 @@ const StageDetails = () => {
       const totalArea = Math.round((otherPiecesArea + newArea) * 100) / 100;
       const roundedSlabArea = Math.round(slabArea * 100) / 100;
 
-      if (totalArea > roundedSlabArea) {
+      // Allow 0.5 sq. in tolerance for rounding
+      if ((totalArea - roundedSlabArea) > 0.5) {
          alert(`Cannot update piece. Total size exceeds original slab size.\nSlab Size: ${roundedSlabArea.toFixed(2)}\nOther Pieces Size: ${otherPiecesArea.toFixed(2)}\nThis Piece Size: ${newArea.toFixed(2)}\nRemaining: ${(roundedSlabArea - otherPiecesArea).toFixed(2)}`);
          return;
       }
@@ -384,13 +386,18 @@ const StageDetails = () => {
     // --- END VALIDATION ---
 
     try {
-      const { id, ...data } = editingPiece;
-      await updatePiece({ id, data }).unwrap();
+      await updatePiece({
+        id: editingPiece.id,
+        data: {
+          productName: editingPiece.productName || '',
+          size: editingPiece.size || ''
+        }
+      }).unwrap();
       refetchSlabs();
       setEditingPiece(null);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to update item');
+    } catch (err: any) {
+      console.error('Failed to update piece:', err);
+      alert(`Failed to update item: ${err?.data?.message || err?.message || 'Server error'}`);
     }
   };
 
