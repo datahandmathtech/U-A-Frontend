@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, CircularProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel, Card, Tooltip } from '@mui/material';
+import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, CircularProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel, Card, Tooltip, Menu, ListItemIcon, ListItemText } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -62,8 +62,15 @@ import {
   useGetUnitsQuery, useCreateUnitMutation, useDeleteUnitMutation,
   useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation,
   useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useAddPiecesMutation, useBulkCreateSlabsMutation, useSyncSlabsMutation, useReplicateSlabTemplateMutation,
-  useGetQuotationTermsQuery, useAddQuotationTermMutation
+  useGetQuotationTermsQuery, useAddQuotationTermMutation, useQuickRevertPieceMutation
 } from '../store/apiSlice';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
+import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
+import RemoveCircleOutlineRoundedIcon from '@mui/icons-material/RemoveCircleOutlineRounded';
+import QuickPieceActionDialog from '../components/Production/QuickPieceActionDialog';
+import RevertPieceDialog from '../components/Production/RevertPieceDialog';
+import ProductChatDrawer from '../components/Production/ProductChatDrawer';
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
 
 const crmSteps = ['Enquiry Details', 'Reference Image', 'Quotation & Costing', 'Advance Payment'];
@@ -98,7 +105,10 @@ const SlabRow = ({
   products,
   productionLogs,
   isPlanningMode,
-  activeStageColumns
+  activeStageColumns,
+  onOpenQuickAction,
+  onOpenChat,
+  onQuickRevert
 }: {
   slab: any;
   index: number;
@@ -110,10 +120,25 @@ const SlabRow = ({
   productionLogs: any[];
   isPlanningMode: boolean;
   activeStageColumns?: any[];
+  onOpenQuickAction: (slab: any, mode: 'add' | 'edit') => void;
+  onOpenChat: (slab: any) => void;
+  onQuickRevert: (slab: any) => void;
 }) => {
   const navigate = useNavigate();
   const { id: projectId } = useParams();
   const [updateSlab] = useUpdateSlabMutation();
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const isMenuOpen = Boolean(menuAnchor);
+
+  const handleOpenMenu = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setMenuAnchor(e.currentTarget);
+  };
+
+  const handleCloseMenu = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setMenuAnchor(null);
+  };
 
   const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
   const dimensionStr = slab.size
@@ -517,6 +542,24 @@ const SlabRow = ({
       {/* Actions */}
       <TableCell align="center" sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+          {/* Chat Icon */}
+          <Tooltip title="Product Chat & Staff Updates">
+            <IconButton
+              size="small"
+              onClick={(e) => { e.stopPropagation(); onOpenChat(slab); }}
+              sx={{
+                color: '#C89F5A',
+                p: 0.6,
+                bgcolor: '#FFFDF9',
+                border: '1px solid #FDE68A',
+                '&:hover': { bgcolor: '#FFF4E5', borderColor: '#C89F5A' }
+              }}
+            >
+              <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+
+          {/* Details Link */}
           <Button
             size="small"
             variant="text"
@@ -533,24 +576,116 @@ const SlabRow = ({
           >
             Details
           </Button>
-          <Tooltip title="Edit Slab">
-            <IconButton 
-              size="small" 
-              onClick={(e) => { e.stopPropagation(); onEdit(slab); }}
-              sx={{ color: '#64748B', p: 0.5, '&:hover': { color: '#0284C7', bgcolor: '#F0F9FF' } }}
+
+          {/* Three-Dot Menu (⋮) for + / - / Edit / Delete */}
+          <Tooltip title="Quick Actions (+ / - / Edit / Delete)">
+            <IconButton
+              size="small"
+              onClick={handleOpenMenu}
+              sx={{
+                color: '#334155',
+                p: 0.6,
+                border: '1px solid #E2E8F0',
+                bgcolor: '#F8FAFC',
+                '&:hover': { bgcolor: '#F1F5F9', borderColor: '#CBD5E1' }
+              }}
             >
-              <EditIcon sx={{ fontSize: 16 }} />
+              <MoreVertIcon sx={{ fontSize: 17 }} />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Delete Slab">
-            <IconButton 
-              size="small" 
-              onClick={(e) => { e.stopPropagation(); onDelete(slab.id); }}
-              sx={{ color: '#64748B', p: 0.5, '&:hover': { color: '#DC2626', bgcolor: '#FEF2F2' } }}
+
+          <Menu
+            anchorEl={menuAnchor}
+            open={isMenuOpen}
+            onClose={handleCloseMenu}
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: 2.5,
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                  minWidth: 195,
+                  p: 0.5
+                }
+              }
+            }}
+          >
+            <MenuItem
+              onClick={(e) => {
+                handleCloseMenu(e);
+                onOpenQuickAction(slab, 'add');
+              }}
+              sx={{ py: 1, gap: 1.5, color: '#059669' }}
             >
-              <DeleteIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
+              <ListItemIcon sx={{ minWidth: 'auto', color: '#059669' }}>
+                <AddCircleOutlineRoundedIcon sx={{ fontSize: 19 }} />
+              </ListItemIcon>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                + Quick Complete Piece
+              </Typography>
+            </MenuItem>
+
+            <MenuItem
+              onClick={(e) => {
+                handleCloseMenu(e);
+                onQuickRevert(slab);
+              }}
+              sx={{ py: 1, gap: 1.5, color: '#D97706' }}
+            >
+              <ListItemIcon sx={{ minWidth: 'auto', color: '#D97706' }}>
+                <RemoveCircleOutlineRoundedIcon sx={{ fontSize: 19 }} />
+              </ListItemIcon>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                - Revert Piece
+              </Typography>
+            </MenuItem>
+
+            <MenuItem
+              onClick={(e) => {
+                handleCloseMenu(e);
+                onOpenQuickAction(slab, 'edit');
+              }}
+              sx={{ py: 1, gap: 1.5, color: '#0284C7' }}
+            >
+              <ListItemIcon sx={{ minWidth: 'auto', color: '#0284C7' }}>
+                <EditIcon sx={{ fontSize: 18 }} />
+              </ListItemIcon>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.84rem' }}>
+                Edit Piece Details
+              </Typography>
+            </MenuItem>
+
+            <Divider sx={{ my: 0.5 }} />
+
+            <MenuItem
+              onClick={(e) => {
+                handleCloseMenu(e);
+                onEdit(slab);
+              }}
+              sx={{ py: 1, gap: 1.5, color: '#475569' }}
+            >
+              <ListItemIcon sx={{ minWidth: 'auto', color: '#64748B' }}>
+                <EditIcon sx={{ fontSize: 17 }} />
+              </ListItemIcon>
+              <Typography sx={{ fontWeight: 600, fontSize: '0.82rem' }}>
+                Edit Slab Spec
+              </Typography>
+            </MenuItem>
+
+            <MenuItem
+              onClick={(e) => {
+                handleCloseMenu(e);
+                onDelete(slab.id);
+              }}
+              sx={{ py: 1, gap: 1.5, color: '#DC2626' }}
+            >
+              <ListItemIcon sx={{ minWidth: 'auto', color: '#DC2626' }}>
+                <DeleteIcon sx={{ fontSize: 18 }} />
+              </ListItemIcon>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                Delete Slab
+              </Typography>
+            </MenuItem>
+          </Menu>
         </Box>
       </TableCell>
     </TableRow>
@@ -567,9 +702,34 @@ const getSlabAllowedStages = (slab: any): string[] => {
 };
 
 const ProjectDetails: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+    const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Quick Action, Revert & Chat State
+  const [quickActionSlab, setQuickActionSlab] = useState<any>(null);
+  const [quickActionMode, setQuickActionMode] = useState<'add' | 'edit'>('add');
+  const [isQuickActionOpen, setIsQuickActionOpen] = useState<boolean>(false);
+  const [revertSlab, setRevertSlab] = useState<any>(null);
+  const [isRevertOpen, setIsRevertOpen] = useState<boolean>(false);
+  const [chatSlab, setChatSlab] = useState<any>(null);
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+
+  const handleOpenQuickAction = (slab: any, mode: 'add' | 'edit') => {
+    setQuickActionSlab(slab);
+    setQuickActionMode(mode);
+    setIsQuickActionOpen(true);
+  };
+
+  const handleOpenRevert = (slab: any) => {
+    setRevertSlab(slab);
+    setIsRevertOpen(true);
+  };
+
+  const handleOpenChat = (slab: any) => {
+    setChatSlab(slab);
+    setIsChatOpen(true);
+  };
   const { data: project, isLoading, refetch } = useGetProjectByIdQuery(id as string);
   const { data: drawings, refetch: refetchDrawings } = useGetDrawingsQuery(id as string);
   const [updateProject] = useUpdateProjectMutation();
@@ -812,6 +972,22 @@ const ProjectDetails: React.FC = () => {
       setViewingStepOverride(null);
     }
   }, [viewParam, isCrmView, id, navigate]);
+
+  // Open chat if navigated with chatSlabId param from Admin Dashboard alerts
+  React.useEffect(() => {
+    const chatSlabId = queryParams.get('chatSlabId');
+    if (chatSlabId && projectSlabs && projectSlabs.length > 0) {
+      const target = projectSlabs.find((s: any) => s.id === chatSlabId);
+      if (target) {
+        setChatSlab(target);
+        setIsChatOpen(true);
+        // Clear param to prevent re-opening on future state updates
+        const p = new URLSearchParams(location.search);
+        p.delete('chatSlabId');
+        navigate({ search: p.toString() }, { replace: true });
+      }
+    }
+  }, [location.search, projectSlabs]);
   const [designFinalizedDate, setDesignFinalizedDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -3918,6 +4094,9 @@ const ProjectDetails: React.FC = () => {
                                 productionLogs={productionLogs || []}
                                 isPlanningMode={isPlanningMode}
                                 activeStageColumns={columnsToRender}
+                                onOpenQuickAction={handleOpenQuickAction}
+                                onOpenChat={handleOpenChat}
+                                onQuickRevert={handleOpenRevert}
                               />
                             ))}
                         {filteredSlabs.length === 0 && (
@@ -5987,8 +6166,46 @@ const ProjectDetails: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+            {/* Quick Action Dialog (+ / Edit Piece) */}
+      <QuickPieceActionDialog
+        key={`quick_${quickActionSlab?.id}_${quickActionMode}_${isQuickActionOpen}`}
+        open={isQuickActionOpen}
+        onClose={() => setIsQuickActionOpen(false)}
+        slab={quickActionSlab}
+        mode={quickActionMode}
+        onSuccess={(msg) => {
+          setSnackbarMessage(msg);
+          refetchSlabs();
+        }}
+        onError={(err) => setSnackbarMessage(err)}
+      />
+
+      {/* Revert Piece Dialog (- Action) */}
+      <RevertPieceDialog
+        key={`revert_${revertSlab?.id}_${isRevertOpen}`}
+        open={isRevertOpen}
+        onClose={() => {
+          setIsRevertOpen(false);
+          setRevertSlab(null);
+        }}
+        slab={revertSlab}
+        onSuccess={(msg) => {
+          setSnackbarMessage(msg);
+          refetchSlabs();
+        }}
+        onError={(err) => setSnackbarMessage(err)}
+      />
+
+      {/* Product Chat Drawer */}
+      <ProductChatDrawer
+        open={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        slab={chatSlab}
+        projectId={id}
+        projectName={project?.name}
+      />
+
       <Snackbar
-        open={!!snackbarMessage}
         autoHideDuration={4000}
         onClose={() => setSnackbarMessage('')}
         message={snackbarMessage}

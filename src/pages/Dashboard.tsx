@@ -28,6 +28,7 @@ import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceW
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
 import { useGetDashboardSummaryQuery } from '../store/apiSlice';
+import ProductChatAlerts from '../components/Dashboard/ProductChatAlerts';
 
 interface DashboardCardProps {
   icon: any;
@@ -221,6 +222,9 @@ const Dashboard: React.FC = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Product Chat Alerts for Admin */}
+      <ProductChatAlerts />
 
       {/* 2. Primary KPI Metric Cards - Static Analytical Display without navigation */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>

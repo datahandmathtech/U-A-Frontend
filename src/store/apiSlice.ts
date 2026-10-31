@@ -29,7 +29,7 @@ export const apiSlice = createApi({
   refetchOnFocus: false,
   refetchOnReconnect: false,
   keepUnusedDataFor: 600,
-  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste', 'Machine'],
+  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste', 'Machine', 'ProductChat'],
   endpoints: (builder) => ({
     // VENDOR ENDPOINTS
     getVendors: builder.query<any[], { month?: string, fy?: string } | void>({
@@ -578,6 +578,41 @@ export const apiSlice = createApi({
       query: ({ id, returnedQty, returnDate }) => ({ url: `/production/${id}/return`, method: 'PATCH', body: { returnedQty, returnDate } }),
       invalidatesTags: ['Production']
     }),
+    // QUICK PRODUCT DIRECT ACTIONS
+    quickCompletePiece: builder.mutation<any, { slabId: string; pieceId?: string; machineId?: string; driverName?: string; photoUrl?: string; stage?: string; remarks?: string }>({
+      query: (body) => ({ url: '/production/quick-complete-piece', method: 'POST', body }),
+      invalidatesTags: ['Production', 'Project']
+    }),
+    quickRevertPiece: builder.mutation<any, { slabId: string; pieceId?: string; stage?: string; revertAll?: boolean }>({
+      query: (body) => ({ url: '/production/quick-revert-piece', method: 'POST', body }),
+      invalidatesTags: ['Production', 'Project']
+    }),
+    quickEditPieceLog: builder.mutation<any, { slabId: string; pieceId?: string; machineId?: string; driverName?: string; photoUrl?: string; remarks?: string }>({
+      query: (body) => ({ url: '/production/quick-edit-piece-log', method: 'PATCH', body }),
+      invalidatesTags: ['Production', 'Project']
+    }),
+    getQuickPieceDetails: builder.query<any, string>({
+      query: (slabId) => `/production/quick-piece-details/${slabId}`,
+      providesTags: ['Production']
+    }),
+
+    // PRODUCT CHAT ENDPOINTS
+    getProductChat: builder.query<{ messages: any[]; unreadCount: number }, string>({
+      query: (slabId) => `/product-chat/${slabId}`,
+      providesTags: ['ProductChat']
+    }),
+    sendProductChatMessage: builder.mutation<any, { slabId: string; projectId?: string; message: string; attachments?: string[] }>({
+      query: ({ slabId, ...body }) => ({ url: `/product-chat/${slabId}`, method: 'POST', body }),
+      invalidatesTags: ['ProductChat']
+    }),
+    markProductChatRead: builder.mutation<any, string>({
+      query: (slabId) => ({ url: `/product-chat/read/${slabId}`, method: 'PATCH' }),
+      invalidatesTags: ['ProductChat']
+    }),
+    getAdminChatAlerts: builder.query<{ totalUnread: number; alertsCount: number; alerts: any[] }, void>({
+      query: () => '/product-chat/unread/admin-alerts',
+      providesTags: ['ProductChat']
+    }),
   }),
 });
 
@@ -681,5 +716,14 @@ export const {
   useSavePackingItemsMutation,
   useGetItemLogsQuery,
   useManualApprovePiecesMutation,
-  useBulkCreateSlabsMutation
+  useBulkCreateSlabsMutation,
+  useQuickCompletePieceMutation,
+  useQuickRevertPieceMutation,
+  useQuickEditPieceLogMutation,
+  useGetQuickPieceDetailsQuery,
+  useLazyGetQuickPieceDetailsQuery,
+  useGetProductChatQuery,
+  useSendProductChatMessageMutation,
+  useMarkProductChatReadMutation,
+  useGetAdminChatAlertsQuery
 } = apiSlice;
