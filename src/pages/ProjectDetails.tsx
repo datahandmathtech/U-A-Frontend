@@ -62,7 +62,8 @@ import {
   useGetUnitsQuery, useCreateUnitMutation, useDeleteUnitMutation,
   useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation,
   useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useAddPiecesMutation, useBulkCreateSlabsMutation, useSyncSlabsMutation, useReplicateSlabTemplateMutation,
-  useGetQuotationTermsQuery, useAddQuotationTermMutation, useQuickRevertPieceMutation
+  useGetQuotationTermsQuery, useAddQuotationTermMutation, useQuickRevertPieceMutation,
+  useGetMachinesQuery
 } from '../store/apiSlice';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
@@ -72,9 +73,11 @@ import QuickPieceActionDialog from '../components/Production/QuickPieceActionDia
 import RevertPieceDialog from '../components/Production/RevertPieceDialog';
 import ProductChatDrawer from '../components/Production/ProductChatDrawer';
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
+import { exportProjectProductionExcel } from '../utils/productionExcelExport';
+import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded';
 
 const crmSteps = ['Enquiry Details', 'Reference Image', 'Quotation & Costing', 'Advance Payment'];
-const projectSteps = ['Shop Drawing & Approval', 'Production', 'Work Order Active'];
+const projectSteps = ['Shop Drawing & Approval', 'Production Tracking'];
 const steps = [...crmSteps, ...projectSteps];
 
 const STANDARD_TERMS = [
@@ -750,6 +753,7 @@ const ProjectDetails: React.FC = () => {
   const { data: inventoryItems } = useGetInventoryQuery();
   const [createInventoryItem] = useCreateInventoryMutation();
   const { data: allMachineLogs, isLoading: machineLogsLoading } = useGetMachineLogsQuery();
+  const { data: machines = [] } = useGetMachinesQuery();
   const projectMachineLogs = allMachineLogs?.filter((log: any) => log.projectId === id) || [];
 
   const { data: rawProjectSlabs, refetch: refetchSlabs } = useGetSlabsQuery(id as string, { skip: !id });
@@ -1322,8 +1326,7 @@ const ProjectDetails: React.FC = () => {
     if (status === 'quotation') return 2;
     if (status === 'advance_payment') return 3;
     if (status === 'shop_drawing') return 4;
-    if (status === 'production' || status === 'material_planning' || status === 'work_order') return 5;
-    if (status === 'completed') return 6;
+    if (status === 'production' || status === 'material_planning' || status === 'work_order' || status === 'completed') return 5;
     return 0;
   };
 
@@ -3719,8 +3722,159 @@ const ProjectDetails: React.FC = () => {
               </Paper>
             )}
 
-            {/* STEP 5: PRODUCTION MANAGEMENT (SLABS & PRODUCTS TRACKING) */}
-            {(stepToRender === 5 || (stepToRender === 6 && project?.status !== 'completed')) && (() => {
+            {/* STEP 5: PRODUCTION TRACKING (OR COMPLETED EXPORT VIEW) */}
+            {stepToRender >= 5 && (
+              project?.status === 'completed' ? (
+                /* WHEN COMPLETED: ELEGANT, WORLD-CLASS COMPLETION CARD WITH EXCEL DOWNLOAD ONLY */
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: { xs: 4, sm: 5, md: 6 },
+                    textAlign: 'center',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    borderRadius: 5,
+                    background: 'radial-gradient(100% 70% at 50% 0%, #F0FDF4 0%, #FFFFFF 100%)',
+                    boxShadow: '0 20px 45px -10px rgba(16, 185, 129, 0.12), 0 4px 16px rgba(0, 0, 0, 0.04)',
+                    maxWidth: 660,
+                    mx: 'auto',
+                    my: { xs: 3, md: 5 },
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {/* Top Decorative Emerald Glow Pill */}
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, px: 2, py: 0.6, bgcolor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 99, mb: 3 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#059669' }} />
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#047857', letterSpacing: 1, textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                      Work Order Finalized
+                    </Typography>
+                  </Box>
+
+                  {/* Icon with Glowing Layered Rings */}
+                  <Box
+                    sx={{
+                      width: 92,
+                      height: 92,
+                      borderRadius: '50%',
+                      bgcolor: '#DCFCE7',
+                      border: '4px solid #F0FDF4',
+                      boxShadow: '0 0 0 8px rgba(16, 185, 129, 0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mx: 'auto',
+                      mb: 3
+                    }}
+                  >
+                    <CheckCircleRoundedIcon sx={{ fontSize: 56, color: '#059669' }} />
+                  </Box>
+
+                  {/* Title & Description */}
+                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', mb: 1.5, fontSize: { xs: '1.6rem', sm: '2.1rem' }, letterSpacing: '-0.5px' }}>
+                    Production Completed!
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: '#64748B', maxWidth: 480, mx: 'auto', fontSize: '0.96rem', lineHeight: 1.6, mb: 3.5 }}>
+                    All manufacturing stages, machine cutting, polishing, and packing have been completed. The full execution audit ledger is ready for export.
+                  </Typography>
+
+                  {/* Quick Project Summary Stats Pill */}
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: 2,
+                      p: 2,
+                      mb: 4,
+                      bgcolor: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: 3
+                    }}
+                  >
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block', mb: 0.5 }}>
+                        Project
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {project?.projectCode || project?.title || '-'}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ textAlign: 'center', borderLeft: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }}>
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block', mb: 0.5 }}>
+                        Total Slabs
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#059669' }}>
+                        {projectSlabs?.length || 0} Slabs
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block', mb: 0.5 }}>
+                        Total Pieces
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#059669' }}>
+                        {projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} Pieces
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Primary Action Button: DOWNLOAD EXCEL ONLY */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      startIcon={<TableChartRoundedIcon sx={{ fontSize: 26 }} />}
+                      onClick={() => exportProjectProductionExcel({ project, slabs: projectSlabs, machines, productionLogs })}
+                      sx={{
+                        width: { xs: '100%', sm: 'auto' },
+                        minWidth: 320,
+                        py: 1.8,
+                        px: 4.5,
+                        borderRadius: 3,
+                        fontWeight: 900,
+                        fontSize: '1.05rem',
+                        textTransform: 'none',
+                        letterSpacing: '0.2px',
+                        background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                        boxShadow: '0 8px 24px rgba(5, 150, 105, 0.35)',
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #047857 0%, #065F46 100%)',
+                          boxShadow: '0 12px 30px rgba(5, 150, 105, 0.45)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      Download Production Excel Report (.xlsx)
+                    </Button>
+
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.78rem', mt: 1.5 }}>
+                      Includes slab specs, piece tracking, machines used, driver/operator & completion dates
+                    </Typography>
+
+                    {/* Secondary Navigation */}
+                    <Button
+                      variant="text"
+                      size="medium"
+                      startIcon={<ArrowBackIcon sx={{ fontSize: 18 }} />}
+                      onClick={() => navigate('/projects')}
+                      sx={{
+                        mt: 3.5,
+                        borderRadius: 2,
+                        px: 3,
+                        py: 0.8,
+                        fontWeight: 700,
+                        color: '#64748B',
+                        textTransform: 'none',
+                        fontSize: '0.88rem',
+                        '&:hover': { bgcolor: '#F1F5F9', color: '#1E293B' }
+                      }}
+                    >
+                      Exit to All Work Orders
+                    </Button>
+                  </Box>
+                </Paper>
+              ) : (() => {
               const categories = Array.from(new Set(projectSlabs?.map((s: any) => {
                 const prod = products?.find(p => s.name.startsWith(p.category));
                 return prod?.category || s.name.split(' ')[0];
@@ -3832,6 +3986,23 @@ const ProjectDetails: React.FC = () => {
                             }}
                           >
                             Sync with Quotation
+                          </Button>
+
+                          <Button 
+                            variant="outlined" 
+                            startIcon={<TableChartRoundedIcon />} 
+                            onClick={() => exportProjectProductionExcel({ project, slabs: projectSlabs, machines, productionLogs })}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 700,
+                              borderColor: '#10B981',
+                              color: '#059669',
+                              bgcolor: '#FFFFFF',
+                              '&:hover': { borderColor: '#059669', bgcolor: '#ECFDF5' }
+                            }}
+                          >
+                            Export Production Excel
                           </Button>
 
                           {isPlanningMode && (
@@ -4145,7 +4316,7 @@ const ProjectDetails: React.FC = () => {
                         endIcon={<ArrowForwardRoundedIcon />}
                         onClick={async () => {
                           await updateProject({ id: id as string, data: { status: 'completed' } }).unwrap();
-                          setActiveStep(6);
+                          setActiveStep(5);
                           setViewingStepOverride(null);
                           refetch();
                         }} 
@@ -4168,152 +4339,8 @@ const ProjectDetails: React.FC = () => {
                   </Box>
                 </Paper>
               );
-            })()}
-
-            {/* STEP 6: WORK ORDER / PROJECT COMPLETED */}
-            {(stepToRender >= 6 && project?.status === 'completed') && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5 }}>
-                <Paper elevation={0} sx={{ 
-                  p: 6, textAlign: 'center', 
-                  border: '1px solid', borderColor: '#C8E6C9', 
-                  borderRadius: 4, bgcolor: '#F4FBF5' 
-                }}>
-                  <CheckCircleIcon sx={{ fontSize: 80, color: '#4CAF50', mb: 2 }} />
-                  <Typography variant="h4" fontWeight="bold" color="success.main" mb={2}>Project Pipeline Complete!</Typography>
-                  <Typography variant="body1" color="text.secondary" mb={4} sx={{ maxWidth: 500, mx: 'auto' }}>
-                    This project has successfully completed production and is finalized.
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                    <Button variant="outlined" color="primary" size="large" onClick={handleDownloadWorkOrder} sx={{ borderRadius: 2, px: 4 }}>
-                      Download Work Order PDF
-                    </Button>
-                    <Button variant="contained" color="success" size="large" onClick={() => navigate('/projects')} sx={{ borderRadius: 2, px: 4 }}>
-                      Go to Active Work Orders
-                    </Button>
-                  </Box>
-                </Paper>
-
-                {/* Completed Project Reference Designs Gallery */}
-                <Paper elevation={0} sx={{ p: 3.5, borderRadius: 4, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CollectionsRoundedIcon sx={{ fontSize: 22, color: '#B38B36' }} />
-                    Reference Designs & Material Photos ({drawings ? drawings.filter((d: any) => d.type === 'Reference Design').length : 0})
-                  </Typography>
-                  {drawings && drawings.filter((d: any) => d.type === 'Reference Design').length > 0 ? (
-                    <Grid container spacing={2}>
-                      {drawings.filter((d: any) => d.type === 'Reference Design').map((drawing: any) => (
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={drawing.id}>
-                          <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                            <Box
-                              onClick={() => setPreviewFileUrl(drawing.fileUrl)}
-                              sx={{ width: '100%', height: 140, borderRadius: 2, overflow: 'hidden', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                            >
-                              {drawing.fileUrl.toLowerCase().endsWith('.pdf') ? (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                  <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: '#DC2626' }} />
-                                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>PDF Document</Typography>
-                                </Box>
-                              ) : (
-                                <img src={drawing.fileUrl} alt={drawing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              )}
-                            </Box>
-                            <Box>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B' }}>{drawing.title}</Typography>
-                                <Chip label={`v${drawing.version}`} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#FFF4E5', color: '#B38B36' }} />
-                              </Box>
-                              {drawing.comments && (
-                                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.5 }}>
-                                  Note: {drawing.comments}
-                                </Typography>
-                              )}
-                              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>
-                                {new Date(drawing.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid #E2E8F0' }}>
-                              <Button size="small" onClick={() => setPreviewFileUrl(drawing.fileUrl)} sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}>
-                                View Preview
-                              </Button>
-                              <Button
-                                size="small"
-                                startIcon={<DownloadIcon />}
-                                onClick={() => handleDownloadFile(drawing.fileUrl, drawing.title)}
-                                sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}
-                              >
-                                Download
-                              </Button>
-                            </Box>
-                          </Paper>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">No reference designs uploaded for this project.</Typography>
-                  )}
-                </Paper>
-
-                {/* Completed Project Shop Drawings Gallery */}
-                <Paper elevation={0} sx={{ p: 3.5, borderRadius: 4, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <DescriptionRoundedIcon sx={{ fontSize: 22, color: '#B38B36' }} />
-                    Shop Drawings & Technical Blueprints ({drawings ? drawings.filter((d: any) => d.type === 'Shop Drawing').length : 0})
-                  </Typography>
-                  {drawings && drawings.filter((d: any) => d.type === 'Shop Drawing').length > 0 ? (
-                    <Grid container spacing={2}>
-                      {drawings.filter((d: any) => d.type === 'Shop Drawing').map((drawing: any) => (
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={drawing.id}>
-                          <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                            <Box
-                              onClick={() => setPreviewFileUrl(drawing.fileUrl)}
-                              sx={{ width: '100%', height: 140, borderRadius: 2, overflow: 'hidden', bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                            >
-                              {drawing.fileUrl.toLowerCase().endsWith('.pdf') ? (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                  <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: '#DC2626' }} />
-                                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>PDF Blueprint</Typography>
-                                </Box>
-                              ) : (
-                                <img src={drawing.fileUrl} alt={drawing.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              )}
-                            </Box>
-                            <Box>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B' }}>{drawing.title}</Typography>
-                                <Chip label={`v${drawing.version}`} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700, bgcolor: '#FFF4E5', color: '#B38B36' }} />
-                              </Box>
-                              {drawing.comments && (
-                                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.5 }}>
-                                  Note: {drawing.comments}
-                                </Typography>
-                              )}
-                              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>
-                                {new Date(drawing.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid #E2E8F0' }}>
-                              <Button size="small" onClick={() => setPreviewFileUrl(drawing.fileUrl)} sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}>
-                                View Preview
-                              </Button>
-                              <Button
-                                size="small"
-                                startIcon={<DownloadIcon />}
-                                onClick={() => handleDownloadFile(drawing.fileUrl, drawing.title)}
-                                sx={{ textTransform: 'none', fontWeight: 700, color: '#0284C7', p: 0 }}
-                              >
-                                Download
-                              </Button>
-                            </Box>
-                          </Paper>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">No shop drawings uploaded for this project.</Typography>
-                  )}
-                </Paper>
-              </Box>
-            )}
+            })()
+          )}
 
           </Box>
         </Box> {/* End of LEFT MAIN COLUMN */}

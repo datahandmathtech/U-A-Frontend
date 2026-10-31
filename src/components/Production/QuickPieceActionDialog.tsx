@@ -62,7 +62,9 @@ const STAGE_CONFIG: { [key: string]: { label: string; icon: any; color: string; 
 
 const dropdownMenuProps = {
   autoFocus: false,
+  disableAutoFocus: true,
   disableAutoFocusItem: true,
+  disableEnforceFocus: true,
   anchorOrigin: {
     vertical: 'bottom' as const,
     horizontal: 'left' as const,
@@ -71,14 +73,12 @@ const dropdownMenuProps = {
     vertical: 'top' as const,
     horizontal: 'left' as const,
   },
-  slotProps: {
-    paper: {
-      sx: {
-        maxHeight: 280,
-        borderRadius: 2.5,
-        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-        mt: 0.5
-      }
+  PaperProps: {
+    sx: {
+      maxHeight: 280,
+      borderRadius: 2.5,
+      boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+      mt: 1
     }
   }
 };
@@ -213,11 +213,13 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
   }, [slab]);
 
   const [selectedPieceId, setSelectedPieceId] = useState<string>('');
-  const [selectedStage, setSelectedStage] = useState<string>('Production');
+  const [selectedStage, setSelectedStage] = useState<string>('');
   const [machineId, setMachineId] = useState<string>('');
   const [driverName, setDriverName] = useState<string>('');
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('');
+
+  const getPieceId = (p: any): string => String(p?.id || p?._id || '');
 
   // Helper to check if a stage is done for a piece
   const checkStageDone = (piece: any, stageKey: string): boolean => {
@@ -225,22 +227,24 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
     const norm = stageKey.split(' - ')[0].replace(' Work', '').trim().toLowerCase();
 
     // Check piece.logs
-    if (piece.logs && Array.isArray(piece.logs)) {
+    if (piece.logs && Array.isArray(piece.logs) && piece.logs.length > 0) {
       const hasLog = piece.logs.some((l: any) => {
         const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim().toLowerCase();
-        return (lStage === norm || lStage.startsWith(norm) || norm.startsWith(lStage)) && (l.status === 'completed' || l.status === 'approved');
+        const matchesStage = lStage === norm || lStage.startsWith(norm) || norm.startsWith(lStage);
+        const isApprovedOrDone = !l.status || ['completed', 'approved', 'done'].includes(String(l.status).toLowerCase());
+        return matchesStage && isApprovedOrDone;
       });
       if (hasLog) return true;
     }
 
     // Check piece stage progress
     const BASE_STAGES = ['production', 'polishing', 'packing', 'dispatch'];
-    const pStage = (piece.stage || 'production').split(' - ')[0].replace(' Work', '').trim().toLowerCase();
+    const pStage = (piece.stage || '').split(' - ')[0].replace(' Work', '').trim().toLowerCase();
     const pIdx = BASE_STAGES.indexOf(pStage);
     const targetIdx = BASE_STAGES.indexOf(norm);
 
     if (pIdx > targetIdx) return true;
-    if (pIdx === targetIdx && (piece.status === 'completed' || piece.status === 'approved')) {
+    if (pIdx === targetIdx && (['completed', 'approved', 'done'].includes(String(piece.status || '').toLowerCase()))) {
       return true;
     }
 
@@ -251,7 +255,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
   const currentPiece = useMemo(() => {
     if (!slab?.pieces || !selectedPieceId) return null;
     if (selectedPieceId === 'new') return null;
-    return slab.pieces.find((p: any) => p.id === selectedPieceId) || null;
+    return slab.pieces.find((p: any) => getPieceId(p) === selectedPieceId) || null;
   }, [slab, selectedPieceId]);
 
   // Filter out stages that are already completed for the selected piece
@@ -273,7 +277,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
   const handlePieceSelect = (pId: string) => {
     setSelectedPieceId(pId);
     if (pId && pId !== 'new') {
-      const p = slab?.pieces?.find((x: any) => x.id === pId);
+      const p = slab?.pieces?.find((x: any) => getPieceId(x) === pId);
       if (p) {
         const rem = availableStages.filter(stg => !checkStageDone(p, stg));
         if (rem.length > 0) {
@@ -301,7 +305,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
   useEffect(() => {
     if (open) {
       setSelectedPieceId('');
-      setSelectedStage(availableStages[0] || 'Production');
+      setSelectedStage('');
       setMachineId('');
       setDriverName('');
       setPhotoUrl('');
@@ -442,23 +446,24 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
                 <MenuItem value="">
                   <em>-- Select Piece --</em>
                 </MenuItem>
-                {slab?.pieces?.map((p: any) => {
+                {availablePieces.map((p: any) => {
+                  const pId = getPieceId(p);
                   const logs = p.logs && Array.isArray(p.logs) ? p.logs : [];
                   const doneStages = logs
-                    .filter((l: any) => l.status === 'completed' || l.status === 'approved')
+                    .filter((l: any) => !l.status || ['completed', 'approved', 'done'].includes(String(l.status).toLowerCase()))
                     .map((l: any) => l.stage?.split(' - ')[0])
                     .filter(Boolean);
                   const isDone = doneStages.length > 0;
 
                   return (
-                    <MenuItem key={p.id} value={p.id}>
+                    <MenuItem key={pId} value={pId}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
                         <Typography sx={{ fontWeight: 700, fontSize: '0.86rem' }}>
                           Piece #{p.pieceNumber} {p.productName ? `(${p.productName})` : ''}
                         </Typography>
                         {isDone ? (
                           <Chip
-                            label={`Done: ${doneStages.join(', ')}`}
+                            label={`Done: ${Array.from(new Set(doneStages)).join(', ')}`}
                             size="small"
                             sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700, bgcolor: '#DCFCE7', color: '#166534' }}
                           />

@@ -69,8 +69,7 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
     if (status === 'quotation') return 2;
     if (status === 'advance_payment') return 3;
     if (status === 'shop_drawing') return 4;
-    if (status === 'production') return 5;
-    if (status === 'work_order' || status === 'completed') return 6;
+    if (status === 'production' || status === 'work_order' || status === 'completed') return 5;
     return 0;
   };
 
@@ -497,7 +496,7 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                       }}
                     >
                       <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        Production Execution (Steps 5–7)
+                        Production Execution (Steps 5–6)
                       </Typography>
                       {projectOpen ? <ExpandLess sx={{ fontSize: 18, color: '#94A3B8' }} /> : <ExpandMore sx={{ fontSize: 18, color: '#94A3B8' }} />}
                     </Box>
@@ -526,7 +525,6 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
                         </MenuItem>
                         {renderMenuItem('5. Shop Drawing & Approval', 5, 4, 4)}
                         {renderMenuItem('6. Production Tracking', 6, 5, 5)}
-                        {renderMenuItem('7. Work Order Active', 7, 6, 6)}
                       </Box>
                     </Collapse>
                   </Box>
