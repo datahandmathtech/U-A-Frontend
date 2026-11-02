@@ -61,7 +61,7 @@ import {
   useGetInventoryQuery, useCreateInventoryMutation, useGetCategoriesQuery, useCreateCategoryMutation, useDeleteCategoryMutation,
   useGetUnitsQuery, useCreateUnitMutation, useDeleteUnitMutation,
   useDeleteDrawingMutation, useUpdateDrawingMutation, useGetMachineLogsQuery, useUpdateQuotationMutation,
-  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useAddPiecesMutation, useBulkCreateSlabsMutation, useSyncSlabsMutation, useReplicateSlabTemplateMutation,
+  useGetSlabsQuery, useCreateSlabMutation, useUpdateSlabMutation, useDeleteSlabMutation, useBulkUpdateSlabStagesMutation, useBulkDeleteSlabsMutation, useAddPiecesMutation, useBulkCreateSlabsMutation, useSyncSlabsMutation, useReplicateSlabTemplateMutation,
   useGetQuotationTermsQuery, useAddQuotationTermMutation, useQuickRevertPieceMutation,
   useGetMachinesQuery
 } from '../store/apiSlice';
@@ -144,20 +144,47 @@ const SlabRow = ({
   };
 
   const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
+
+  // Smart dimension parser and normalizer so all copied/generated slabs match original spec format
+  const parseDimensions = (sizeRaw: string) => {
+    if (!sizeRaw) return '';
+    const cleanSize = sizeRaw.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1');
+    if (/sq\.?ft/i.test(cleanSize)) {
+      return cleanSize;
+    }
+    const lMatch = cleanSize.match(/(\d+(?:\.\d+)?)\s*L/i);
+    const wMatch = cleanSize.match(/(\d+(?:\.\d+)?)\s*W/i);
+    const tMatch = cleanSize.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || cleanSize.match(/(\d+(?:\.\d+)?)\s*MM/i);
+    if (lMatch && wMatch) {
+      const l = parseFloat(lMatch[1]);
+      const w = parseFloat(wMatch[1]);
+      const t = tMatch ? tMatch[1] : '10';
+      const dimsPart = cleanSize.split('|')[0].toLowerCase();
+      let u = 'inch';
+      if (dimsPart.includes('feet') || dimsPart.includes('ft')) u = 'feet';
+      else if (dimsPart.includes('mm')) u = 'mm';
+
+      const area = u === 'feet' ? l * w : u === 'mm' ? (l * w) / 92903.04 : (l * w) / 144;
+      const uLabel = u === 'feet' ? 'Feet' : u === 'mm' ? 'MM' : 'Inch';
+      return `${l}L x ${w}W ${uLabel} | ${t}MM (${area.toFixed(2)} Sq.Ft)`;
+    }
+    return cleanSize;
+  };
+
   const dimensionStr = slab.size
-    ? slab.size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1')
+    ? parseDimensions(slab.size)
     : (matchedProduct 
       ? `${matchedProduct.length || 0}L A- ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
-      : (slab.pieces?.[0]?.size ? slab.pieces[0].size.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1') : ''));
+      : (slab.pieces?.[0]?.size ? parseDimensions(slab.pieces[0].size) : ''));
 
-  const sizeLower = slab?.size?.toLowerCase() || '';
+  const sizeLower = (dimensionStr || slab?.size || '').toLowerCase();
   const rawUnit = matchedProduct?.unit || (
     sizeLower.includes('sq. ft') || sizeLower.includes('sq_ft') || sizeLower.includes('sq.ft') || sizeLower.includes('sqft') ? 'sq_ft' :
-    sizeLower.includes('inch') ? 'inch' :
     sizeLower.includes('feet') || sizeLower.includes('ft') ? 'feet' :
-    sizeLower.includes('mm') ? 'mm' : 'inch'
+    sizeLower.includes('mm') ? 'mm' :
+    'inch'
   );
-  const unitLabel = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches'
+  const unitLabel = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inch'
     : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet'
     : rawUnit.toLowerCase() === 'sq_ft' || rawUnit.toLowerCase() === 'sqft' ? 'Sq.Ft'
     : rawUnit.toLowerCase() === 'mm' ? 'MM'
@@ -642,21 +669,6 @@ const SlabRow = ({
               </Typography>
             </MenuItem>
 
-            <MenuItem
-              onClick={(e) => {
-                handleCloseMenu(e);
-                onOpenQuickAction(slab, 'edit');
-              }}
-              sx={{ py: 1, gap: 1.5, color: '#0284C7' }}
-            >
-              <ListItemIcon sx={{ minWidth: 'auto', color: '#0284C7' }}>
-                <EditIcon sx={{ fontSize: 18 }} />
-              </ListItemIcon>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.84rem' }}>
-                Edit Piece Details
-              </Typography>
-            </MenuItem>
-
             <Divider sx={{ my: 0.5 }} />
 
             <MenuItem
@@ -780,111 +792,155 @@ const ProjectDetails: React.FC = () => {
   const [bulkCreateSlabs, { isLoading: isBulkCreatingSlabs }] = useBulkCreateSlabsMutation();
   const [replicateSlabTemplate, { isLoading: isReplicatingTemplate }] = useReplicateSlabTemplateMutation();
 
+  // Project Default Unit (Persisted per project so unit chosen first time is retained everywhere)
+  const [defaultProjectUnit, setDefaultProjectUnitState] = useState<string>(() => {
+    return localStorage.getItem(`project_unit_${id}`) || 'inch';
+  });
+  const setDefaultProjectUnit = (u: string) => {
+    setDefaultProjectUnitState(u);
+    if (id) {
+      localStorage.setItem(`project_unit_${id}`, u);
+    }
+  };
+
   // Master Maker State & Logic (Bulk Slabs & Pieces Generator)
   const [masterMakerOpen, setMasterMakerOpen] = useState(false);
   const [masterMakerTab, setMasterMakerTab] = useState<'replicate' | 'create'>('replicate');
   const [masterSourceSlabId, setMasterSourceSlabId] = useState<string>('');
+  const [masterSourceSlab, setMasterSourceSlab] = useState<any>(null);
   const [masterTargetMode, setMasterTargetMode] = useState<'range' | 'checkboxes'>('range');
   const [masterFromSlabNum, setMasterFromSlabNum] = useState<string>('');
   const [masterToSlabNum, setMasterToSlabNum] = useState<string>('');
   const [masterSelectedTargetIds, setMasterSelectedTargetIds] = useState<string[]>([]);
-  const [masterCopiesCount, setMasterCopiesCount] = useState<number>(1);
+  const [masterCopiesCount, setMasterCopiesCount] = useState<string>('1');
   const [masterBaseName, setMasterBaseName] = useState<string>('Stone');
-  const [masterLength, setMasterLength] = useState<number>(1);
-  const [masterWidth, setMasterWidth] = useState<number>(1);
-  const [masterThickness, setMasterThickness] = useState<number>(20);
-  const [masterUnit, setMasterUnit] = useState<string>('feet');
-  const [masterRequiredStages, setMasterRequiredStages] = useState<string[]>(['Production', 'Polishing', 'Packing', 'Dispatch']);
+  const [masterLength, setMasterLength] = useState<string>('20');
+  const [masterWidth, setMasterWidth] = useState<string>('30');
+  const [masterThickness, setMasterThickness] = useState<string>('10');
+  const [masterUnit, setMasterUnit] = useState<string>('inch');
+  const [masterRequiredStages, setMasterRequiredStages] = useState<string[]>(['Production', 'Packing', 'Dispatch']);
   const [masterGeneratedMatrix, setMasterGeneratedMatrix] = useState<any[]>([]);
 
   const generateMasterMatrixPreview = (
     baseName: string, 
-    count: number, 
-    len: number, 
-    wid: number, 
-    thick: number, 
+    count: string | number, 
+    len: string | number, 
+    wid: string | number, 
+    thick: string | number, 
     unit: string,
-    reqStages: string[] = masterRequiredStages
+    reqStages: string[] = masterRequiredStages,
+    sourceSlab: any = masterSourceSlab
   ) => {
-    const existingSlabCount = (projectSlabs || []).length;
+    const countNum = parseInt(String(count), 10) || 0;
+    const lenNum = parseFloat(String(len)) || 0;
+    const widNum = parseFloat(String(wid)) || 0;
+    const thickNum = parseFloat(String(thick)) || 0;
     const cleanBase = baseName.trim() || 'Stone';
 
-    let areaSqFt = 0;
-    const u = (unit || 'inch').toLowerCase();
-    if (u === 'mm') {
-      areaSqFt = (len * wid) / 92903.04;
-    } else if (u === 'inch' || u === 'inches' || u === 'in') {
-      areaSqFt = (len * wid) / 144;
-    } else if (u === 'feet' || u === 'ft') {
-      areaSqFt = (len * wid);
-    } else {
-      areaSqFt = (len * wid);
+    if (countNum <= 0) {
+      setMasterGeneratedMatrix([]);
+      return;
     }
 
-    const sizeStr = `${len}L x ${wid}W | ${thick}MM`;
+    let areaSqFt = 0;
+    const u = (unit || defaultProjectUnit || 'inch').toLowerCase();
+    if (u === 'mm') {
+      areaSqFt = (lenNum * widNum) / 92903.04;
+    } else if (u === 'feet' || u === 'ft') {
+      areaSqFt = (lenNum * widNum);
+    } else {
+      areaSqFt = (lenNum * widNum) / 144;
+    }
 
+    const isFt = u === 'feet' || u === 'ft';
+    const isMM = u === 'mm';
+    const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
+    const sizeStr = `${lenNum}L x ${widNum}W ${unitLabel} | ${thickNum}MM (${areaSqFt.toFixed(2)} Sq.Ft)`;
+
+    const existingSlabCount = (projectSlabs || []).length;
     const matrix = [];
-    for (let i = 1; i <= count; i++) {
+
+    const templatePieces = (sourceSlab?.pieces && sourceSlab.pieces.length > 0)
+      ? sourceSlab.pieces
+      : [];
+
+    for (let i = 1; i <= countNum; i++) {
       const slabNum = existingSlabCount + i;
       const slabName = `${cleanBase} ${slabNum}`;
+
+      const clonedPieces = templatePieces.length > 0
+        ? templatePieces.map((tp: any, pIdx: number) => {
+            const pNum = tp.pieceNumber ? Number(tp.pieceNumber) : (pIdx + 1);
+            return {
+              pieceNumber: pNum,
+              productName: `${slabName}.${pNum}`,
+              size: tp.size || sizeStr,
+              stage: tp.stage || 'Production',
+              status: 'pending'
+            };
+          })
+        : [];
 
       matrix.push({
         slabNumber: slabNum,
         name: slabName,
-        length: len,
-        width: wid,
-        thickness: thick,
+        length: lenNum,
+        width: widNum,
+        thickness: thickNum,
         unit: u,
         size: sizeStr,
         area: parseFloat(areaSqFt.toFixed(2)),
         requiredStages: reqStages,
-        pieces: [] // Slabs from scratch have 0 pieces inside
+        pieces: clonedPieces
       });
     }
     setMasterGeneratedMatrix(matrix);
   };
 
-  const initMasterMakerFromSlab = (slab: any, count = 1) => {
+  const initMasterMakerFromSlab = (slab: any, count: string | number = '1') => {
     if (!slab) return;
     setMasterSourceSlabId(slab.id);
-    setMasterCopiesCount(count);
+    setMasterSourceSlab(slab);
+    const countStr = String(count || '1');
+    setMasterCopiesCount(countStr);
     const slabName = slab.name || 'Stone';
     const base = slabName.includes(' - ') ? slabName.split(' - ')[0] : slabName.replace(/[0-9]+$/, '').trim() || 'Stone';
     setMasterBaseName(base);
 
-    let len = 1;
-    let wid = 1;
-    let thick = 20;
-    let unit = 'feet';
+    let len = '20';
+    let wid = '30';
+    let thick = '10';
+    let unit = defaultProjectUnit || 'inch';
 
     if (slab.size) {
       const raw = String(slab.size);
-      if (raw.toLowerCase().includes('feet') || raw.toLowerCase().includes('ft')) unit = 'feet';
-      else if (raw.toLowerCase().includes('inch') || raw.toLowerCase().includes('in')) unit = 'inch';
-      else if (raw.toLowerCase().includes('mm')) unit = 'mm';
+      const dimsPart = (raw.split('|')[0] || '').toLowerCase();
+      if (dimsPart.includes('feet') || dimsPart.includes('ft')) unit = 'feet';
+      else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) unit = 'sq_ft';
+      else if (dimsPart.includes('mm')) unit = 'mm';
+      else unit = 'inch';
 
       const matchL = raw.match(/([0-9.]+)\s*L/i);
       const matchW = raw.match(/([0-9.]+)\s*W/i);
-      const matchT = raw.match(/([0-9.]+)\s*MM/i);
+      const matchT = raw.match(/\|\s*([0-9.]+)\s*MM/i) || raw.match(/([0-9.]+)\s*MM/i);
 
-      if (matchL) len = parseFloat(matchL[1]) || len;
-      if (matchW) wid = parseFloat(matchW[1]) || wid;
-      if (matchT) thick = parseFloat(matchT[1]) || thick;
+      if (matchL) len = matchL[1];
+      if (matchW) wid = matchW[1];
+      if (matchT) thick = matchT[1];
     }
 
     const reqStages = slab.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0
       ? slab.requiredStages
-      : ['Production', 'Polishing', 'Packing', 'Dispatch'];
-
-    const templatePieces = slab.pieces || [];
+      : ['Production', 'Packing', 'Dispatch'];
 
     setMasterLength(len);
     setMasterWidth(wid);
     setMasterThickness(thick);
     setMasterUnit(unit);
+    setDefaultProjectUnit(unit);
     setMasterRequiredStages(reqStages);
 
-    generateMasterMatrixPreview(base, count, len, wid, thick, unit, reqStages);
+    generateMasterMatrixPreview(base, countStr, len, wid, thick, unit, reqStages, slab);
   };
 
   const handleApplyTemplateToSlabs = async () => {
@@ -1021,6 +1077,7 @@ const ProjectDetails: React.FC = () => {
   const [slabSearchQuery, setSlabSearchQuery] = useState<string>('');
   const [slabCategoryFilter, setSlabCategoryFilter] = useState<string>('All');
   const [bulkUpdateSlabStages, { isLoading: isBulkUpdating }] = useBulkUpdateSlabStagesMutation();
+  const [bulkDeleteSlabs, { isLoading: isBulkDeleting }] = useBulkDeleteSlabsMutation();
 
   const ALL_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
   const activeColumns = ALL_STAGES;
@@ -1041,6 +1098,27 @@ const ProjectDetails: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setSnackbarMessage('Error updating stages in bulk.');
+    }
+  };
+
+  const handleBulkDeleteSlabs = async () => {
+    if (selectedSlabIds.length === 0) {
+      setSnackbarMessage('Please select at least one slab to delete.');
+      return;
+    }
+    const confirmed = window.confirm(`Are you sure you want to delete ${selectedSlabIds.length} selected slab(s) and all their pieces? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      await bulkDeleteSlabs({ ids: selectedSlabIds }).unwrap();
+      refetchSlabs();
+      refetch();
+      setSelectedSlabIds([]);
+      setSnackbarMessage(`Successfully deleted ${selectedSlabIds.length} slab(s).`);
+    } catch (err: any) {
+      console.error('Failed to bulk delete slabs:', err);
+      const msg = err?.data?.message || err?.message || 'Error deleting slabs.';
+      setSnackbarMessage(`Failed to delete slabs: ${msg}`);
     }
   };
 
@@ -1080,19 +1158,22 @@ const ProjectDetails: React.FC = () => {
     let length = '';
     let width = '';
     let thickness = '';
-    let unit = 'inch';
+    let unit = defaultProjectUnit || 'inch';
     if (slab.size) {
+      const dimsPart = (slab.size.split('|')[0] || '').toLowerCase();
       const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/i);
       const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/i);
-      const tMatch = slab.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
+      const tMatch = slab.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || slab.size.match(/(\d+(?:\.\d+)?)\s*MM/i);
       if (lMatch) length = lMatch[1];
       if (wMatch) width = wMatch[1];
       if (tMatch) thickness = tMatch[1];
-      if (/mm/i.test(slab.size)) unit = 'mm';
-      else if (/feet|ft/i.test(slab.size)) unit = 'feet';
-      else if (/sq_ft/i.test(slab.size)) unit = 'sq_ft';
+      if (/feet|ft/i.test(dimsPart)) unit = 'feet';
+      else if (/sq_ft|sqft/i.test(dimsPart)) unit = 'sq_ft';
+      else if (/mm/i.test(dimsPart)) unit = 'mm';
+      else unit = 'inch';
     }
     setEditSlabDims({ length, width, thickness, unit });
+    setDefaultProjectUnit(unit);
     setSlabForm({ 
       name: slab.name, 
       size: slab.size || '', 
@@ -1110,7 +1191,8 @@ const ProjectDetails: React.FC = () => {
       const l = parseFloat(editSlabDims.length) || 0;
       const w = parseFloat(editSlabDims.width) || 0;
       const t = parseFloat(editSlabDims.thickness) || 0;
-      const u = editSlabDims.unit || 'inch';
+      const u = editSlabDims.unit || defaultProjectUnit || 'inch';
+      setDefaultProjectUnit(u);
       const isFt = u === 'feet' || u === 'sq_ft';
       const isMM = u === 'mm';
       const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
@@ -4122,6 +4204,30 @@ const ProjectDetails: React.FC = () => {
                         >
                           {isBulkUpdating ? 'Applying...' : 'Apply'}
                         </Button>
+
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          color="error"
+                          startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
+                          onClick={handleBulkDeleteSlabs}
+                          disabled={isBulkDeleting}
+                          sx={{ 
+                            borderRadius: 1.5, 
+                            textTransform: 'none', 
+                            fontWeight: 800, 
+                            bgcolor: '#FEF2F2', 
+                            color: '#DC2626',
+                            borderColor: '#FCA5A5',
+                            borderWidth: 1.5,
+                            ml: 1,
+                            px: 2,
+                            boxShadow: 'none',
+                            '&:hover': { bgcolor: '#FEE2E2', borderColor: '#EF4444' }
+                          }}
+                        >
+                          {isBulkDeleting ? 'Deleting...' : `Delete Selected (${selectedSlabIds.length})`}
+                        </Button>
                       </Box>
                     </Box>
                   )}
@@ -5270,13 +5376,18 @@ const ProjectDetails: React.FC = () => {
                 <InputLabel>Unit</InputLabel>
                 <Select
                   label="Unit"
-                  value={editSlabDims.unit || 'inch'}
-                  onChange={(e) => setEditSlabDims({ ...editSlabDims, unit: e.target.value })}
+                  value={editSlabDims.unit || defaultProjectUnit || 'inch'}
+                  onChange={(e) => {
+                    const u = e.target.value;
+                    setEditSlabDims({ ...editSlabDims, unit: u });
+                    setDefaultProjectUnit(u);
+                  }}
                   sx={{ borderRadius: 2 }}
                 >
                   <MenuItem value="inch">Inches (in)</MenuItem>
                   <MenuItem value="feet">Feet (ft)</MenuItem>
-                  <MenuItem value="mm">MM</MenuItem>
+                  <MenuItem value="mm">Millimeters (mm)</MenuItem>
+                  <MenuItem value="sq_ft">Sq.Ft</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -5285,7 +5396,12 @@ const ProjectDetails: React.FC = () => {
                 label="Length (L)" 
                 size="small"
                 value={editSlabDims.length} 
-                onChange={(e) => setEditSlabDims({ ...editSlabDims, length: e.target.value })} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (/^\d*\.?\d*$/.test(val)) {
+                    setEditSlabDims({ ...editSlabDims, length: val });
+                  }
+                }} 
                 fullWidth 
                 slotProps={{ input: { sx: { borderRadius: 2 } } }}
               />
@@ -5295,7 +5411,12 @@ const ProjectDetails: React.FC = () => {
                 label="Width (W)" 
                 size="small"
                 value={editSlabDims.width} 
-                onChange={(e) => setEditSlabDims({ ...editSlabDims, width: e.target.value })} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (/^\d*\.?\d*$/.test(val)) {
+                    setEditSlabDims({ ...editSlabDims, width: val });
+                  }
+                }} 
                 fullWidth 
                 slotProps={{ input: { sx: { borderRadius: 2 } } }}
               />
@@ -5305,7 +5426,12 @@ const ProjectDetails: React.FC = () => {
                 label="Thickness (MM)" 
                 size="small"
                 value={editSlabDims.thickness} 
-                onChange={(e) => setEditSlabDims({ ...editSlabDims, thickness: e.target.value })} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (/^\d*\.?\d*$/.test(val)) {
+                    setEditSlabDims({ ...editSlabDims, thickness: val });
+                  }
+                }} 
                 fullWidth 
                 slotProps={{ input: { sx: { borderRadius: 2 } } }}
               />
@@ -5988,16 +6114,17 @@ const ProjectDetails: React.FC = () => {
                     <TextField
                       fullWidth
                       size="small"
-                      type="number"
+                      type="text"
                       label="Quantity of Slabs to Create *"
                       value={masterCopiesCount}
                       onChange={(e) => {
-                        const count = Math.max(1, parseInt(e.target.value, 10) || 1);
-                        setMasterCopiesCount(count);
-                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                        generateMasterMatrixPreview(masterBaseName, count, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages);
+                        const val = e.target.value;
+                        if (/^\d*$/.test(val)) {
+                          setMasterCopiesCount(val);
+                          generateMasterMatrixPreview(masterBaseName, val, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages, masterSourceSlab);
+                        }
                       }}
-                      slotProps={{ htmlInput: { min: 1, max: 1000 } }}
+                      slotProps={{ htmlInput: { inputMode: 'numeric' } }}
                       sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                     />
                   </Grid>
@@ -6011,8 +6138,7 @@ const ProjectDetails: React.FC = () => {
                       onChange={(e) => {
                         const base = e.target.value;
                         setMasterBaseName(base);
-                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                        generateMasterMatrixPreview(base, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages);
+                        generateMasterMatrixPreview(base, masterCopiesCount, masterLength, masterWidth, masterThickness, masterUnit, masterRequiredStages, masterSourceSlab);
                       }}
                       placeholder="e.g. Stone or Slab"
                       sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
@@ -6023,18 +6149,18 @@ const ProjectDetails: React.FC = () => {
                     <FormControl fullWidth size="small">
                       <InputLabel>Unit</InputLabel>
                       <Select
-                        value={masterUnit}
+                        value={masterUnit || defaultProjectUnit || 'inch'}
                         label="Unit"
                         onChange={(e) => {
                           const u = e.target.value;
                           setMasterUnit(u);
-                          const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                          generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, u, masterRequiredStages);
+                          setDefaultProjectUnit(u);
+                          generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, masterThickness, u, masterRequiredStages, masterSourceSlab);
                         }}
                         sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                       >
-                        <MenuItem value="feet">Feet (ft)</MenuItem>
                         <MenuItem value="inch">Inches (in)</MenuItem>
+                        <MenuItem value="feet">Feet (ft)</MenuItem>
                         <MenuItem value="mm">Millimeters (mm)</MenuItem>
                         <MenuItem value="sq_ft">Sq.Ft</MenuItem>
                       </Select>
@@ -6045,15 +6171,17 @@ const ProjectDetails: React.FC = () => {
                     <TextField
                       fullWidth
                       size="small"
-                      type="number"
+                      type="text"
                       label="Length"
                       value={masterLength}
                       onChange={(e) => {
-                        const l = parseFloat(e.target.value) || 0;
-                        setMasterLength(l);
-                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                        generateMasterMatrixPreview(masterBaseName, masterCopiesCount, l, masterWidth, masterThickness, masterUnit, masterRequiredStages);
+                        const val = e.target.value;
+                        if (/^\d*\.?\d*$/.test(val)) {
+                          setMasterLength(val);
+                          generateMasterMatrixPreview(masterBaseName, masterCopiesCount, val, masterWidth, masterThickness, masterUnit, masterRequiredStages, masterSourceSlab);
+                        }
                       }}
+                      slotProps={{ htmlInput: { inputMode: 'decimal' } }}
                       sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                     />
                   </Grid>
@@ -6062,15 +6190,17 @@ const ProjectDetails: React.FC = () => {
                     <TextField
                       fullWidth
                       size="small"
-                      type="number"
+                      type="text"
                       label="Width"
                       value={masterWidth}
                       onChange={(e) => {
-                        const w = parseFloat(e.target.value) || 0;
-                        setMasterWidth(w);
-                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                        generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, w, masterThickness, masterUnit, masterRequiredStages);
+                        const val = e.target.value;
+                        if (/^\d*\.?\d*$/.test(val)) {
+                          setMasterWidth(val);
+                          generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, val, masterThickness, masterUnit, masterRequiredStages, masterSourceSlab);
+                        }
                       }}
+                      slotProps={{ htmlInput: { inputMode: 'decimal' } }}
                       sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                     />
                   </Grid>
@@ -6079,15 +6209,17 @@ const ProjectDetails: React.FC = () => {
                     <TextField
                       fullWidth
                       size="small"
-                      type="number"
+                      type="text"
                       label="Thickness MM"
                       value={masterThickness}
                       onChange={(e) => {
-                        const t = parseFloat(e.target.value) || 20;
-                        setMasterThickness(t);
-                        const selSlab = (projectSlabs || []).find((s: any) => s.id === masterSourceSlabId);
-                        generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, t, masterUnit, masterRequiredStages);
+                        const val = e.target.value;
+                        if (/^\d*\.?\d*$/.test(val)) {
+                          setMasterThickness(val);
+                          generateMasterMatrixPreview(masterBaseName, masterCopiesCount, masterLength, masterWidth, val, masterUnit, masterRequiredStages, masterSourceSlab);
+                        }
                       }}
+                      slotProps={{ htmlInput: { inputMode: 'decimal' } }}
                       sx={{ bgcolor: '#FAFAFA', borderRadius: 2 }}
                     />
                   </Grid>
@@ -6131,7 +6263,17 @@ const ProjectDetails: React.FC = () => {
                           <TableCell sx={{ py: 0.75 }}>{p.unit}</TableCell>
                           <TableCell sx={{ py: 0.75 }}>{p.length} x {p.width} | {p.thickness}mm</TableCell>
                           <TableCell sx={{ py: 0.75 }}>{p.area} Sq.Ft</TableCell>
-                          <TableCell sx={{ py: 0.75 }}><Chip size="small" label="0 Pieces (Whole Slab)" sx={{ height: 20, fontSize: '0.68rem' }} /></TableCell>
+                          <TableCell sx={{ py: 0.75 }}>
+                            {p.pieces && p.pieces.length > 0 ? (
+                              <Chip 
+                                size="small" 
+                                label={`${p.pieces.length} Pieces (Cloned)`} 
+                                sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700, bgcolor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #DBEAFE' }} 
+                              />
+                            ) : (
+                              <Chip size="small" label="1 Piece (Whole Slab)" sx={{ height: 20, fontSize: '0.68rem' }} />
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

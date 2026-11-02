@@ -528,7 +528,15 @@ export const apiSlice = createApi({
         method: 'PATCH',
         body: data
       }),
-      invalidatesTags: ['Project']
+      invalidatesTags: ['Project', 'Production']
+    }),
+    bulkDeleteSlabs: builder.mutation<any, { ids: string[] }>({
+      query: (data) => ({
+        url: '/slabs/bulk-delete',
+        method: 'POST',
+        body: data
+      }),
+      invalidatesTags: ['Project', 'Production']
     }),
     manualApprovePieces: builder.mutation<any, { projectId?: string, slabId?: string, pieceIds?: string[], stage?: string, approvals?: { pieceId: string, stage: string }[], remarks?: string }>({
       query: (data) => ({
@@ -664,6 +672,7 @@ export const {
   useUpdateSlabMutation,
   useDeleteSlabMutation,
   useBulkUpdateSlabStagesMutation,
+  useBulkDeleteSlabsMutation,
   useReplicateSlabTemplateMutation,
   useSyncSlabsMutation,
   useAddManualAttendanceMutation,

@@ -54,6 +54,8 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { calculateOrderProgress } from '../utils/progressCalculator';
 import * as XLSX from 'xlsx';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
+import { ProductChatDrawer } from '../components/Production/ProductChatDrawer';
 
 export const calculateProjectWorkSize = (project: any): string => {
   if (!project) return '-';
@@ -176,6 +178,22 @@ const Projects: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatSlab, setChatSlab] = useState<any>(null);
+  const [chatProjectId, setChatProjectId] = useState<string>('');
+  const [chatProjectName, setChatProjectName] = useState<string>('');
+
+  const handleOpenChat = (e: React.MouseEvent, project: any) => {
+    e.stopPropagation();
+    if (project.slabs && project.slabs.length > 0) {
+      setChatSlab(project.slabs[0]);
+      setChatProjectId(project.id);
+      setChatProjectName(project.name || project.projectId || 'Work Order');
+      setChatOpen(true);
+    } else {
+      navigate(`/projects/${project.id}`);
+    }
+  };
   const [formData, setFormData] = useState<any>({
     name: '',
     clientName: '',
@@ -489,6 +507,49 @@ const Projects: React.FC = () => {
     };
   }, [activeWorkOrders]);
 
+  // Metric Computations for Completed Work Orders
+  const completedStats = useMemo(() => {
+    const totalCompletedOrders = completedWorkOrders.length;
+    let totalPieces = 0;
+    let totalSqFt = 0;
+    let onTimeCount = 0;
+    let delayedCount = 0;
+
+    completedWorkOrders.forEach((wo: any) => {
+      const prog = calculateOrderProgress(wo);
+      totalPieces += prog.totalProductRows || wo.totalPieces || wo.completedPieces || 0;
+
+      const sizeStr = calculateProjectWorkSize(wo);
+      const match = sizeStr.match(/([\d,.]+)/);
+      if (match) {
+        totalSqFt += parseFloat(match[1].replace(/,/g, '')) || 0;
+      }
+
+      const targetDate = wo.deadline || wo.deliveryDate;
+      const actualDate = wo.completedAt || wo.projectClosure?.completedAt || wo.updatedAt;
+      if (targetDate && actualDate) {
+        const tD = new Date(targetDate);
+        const aD = new Date(actualDate);
+        tD.setHours(23, 59, 59, 999);
+        if (aD.getTime() > tD.getTime()) {
+          delayedCount++;
+        } else {
+          onTimeCount++;
+        }
+      } else {
+        onTimeCount++;
+      }
+    });
+
+    return {
+      totalCompletedOrders,
+      totalPieces,
+      totalSqFt: Number(totalSqFt.toFixed(2)),
+      onTimeCount,
+      delayedCount
+    };
+  }, [completedWorkOrders]);
+
   // Filter by Search Query
   const filteredWorkOrders = useMemo(() => {
     if (!searchQuery.trim()) return currentTabOrders;
@@ -598,147 +659,241 @@ const Projects: React.FC = () => {
             Track machine production progress, piece completions, and delivery deadlines in real time.
           </Typography>
         </Box>
-
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpen()}
-          sx={{
-            bgcolor: '#C89F5A',
-            color: '#FFFFFF',
-            fontWeight: 700,
-            fontSize: '0.9rem',
-            px: 2.5,
-            py: 1,
-            borderRadius: 3,
-            boxShadow: '0 4px 14px rgba(200, 159, 90, 0.35)',
-            textTransform: 'none',
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              bgcolor: '#B38B36',
-              transform: 'translateY(-1px)',
-              boxShadow: '0 6px 18px rgba(200, 159, 90, 0.45)'
-            }
-          }}
-        >
-          Direct Work Order
-        </Button>
       </Box>
 
       {/* 2. Executive KPI Cards Ribbon */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {/* Total Active Orders */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            sx={{
-              p: 2,
-              borderRadius: 3.5,
-              bgcolor: '#FFFFFF',
-              border: '1px solid #EAE0D5',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Active Work Orders
-              </Typography>
-              <Avatar sx={{ bgcolor: '#FFF4E5', color: '#B38B36', width: 34, height: 34 }}>
-                <WorkIcon sx={{ fontSize: 18 }} />
-              </Avatar>
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
-              {stats.totalOrders}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
-              Live production lines
-            </Typography>
-          </Card>
-        </Grid>
+        {activeTab === 'completed' ? (
+          <>
+            {/* Completed Box 0: Total Completed Orders */}
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card
+                sx={{
+                  p: 2,
+                  borderRadius: 3.5,
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #A7F3D0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Completed Work Orders
+                  </Typography>
+                  <Avatar sx={{ bgcolor: '#ECFDF5', color: '#059669', width: 34, height: 34 }}>
+                    <CheckCircleIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#065F46', lineHeight: 1.1 }}>
+                  {completedStats.totalCompletedOrders}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
+                  Fully executed & closed
+                </Typography>
+              </Card>
+            </Grid>
 
-        {/* Box 1: Total Main Stones */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            sx={{
-              p: 2,
-              borderRadius: 3.5,
-              bgcolor: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#0284C7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Total Main Stones
-              </Typography>
-              <Avatar sx={{ bgcolor: '#F0F9FF', color: '#0284C7', width: 34, height: 34 }}>
-                <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />
-              </Avatar>
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
-              {stats.totalMainStones}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
-              Main stone items scheduled
-            </Typography>
-          </Card>
-        </Grid>
+            {/* Completed Box 1: Total Completed Pieces */}
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card
+                sx={{
+                  p: 2,
+                  borderRadius: 3.5,
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#0284C7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Total Completed Pieces
+                  </Typography>
+                  <Avatar sx={{ bgcolor: '#F0F9FF', color: '#0284C7', width: 34, height: 34 }}>
+                    <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
+                  {completedStats.totalPieces}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
+                  Finished pieces produced
+                </Typography>
+              </Card>
+            </Grid>
 
-        {/* Box 2: Completed Main Stones */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            sx={{
-              p: 2,
-              borderRadius: 3.5,
-              bgcolor: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Completed Main Stones
-              </Typography>
-              <Avatar sx={{ bgcolor: '#ECFDF5', color: '#059669', width: 34, height: 34 }}>
-                <CheckCircleIcon sx={{ fontSize: 18 }} />
-              </Avatar>
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
-              {stats.completedMainStones}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#059669', mt: 0.5, display: 'block', fontWeight: 600 }}>
-              {stats.completionRate}% Overall Completion Rate
-            </Typography>
-          </Card>
-        </Grid>
+            {/* Completed Box 2: Total Work Size */}
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card
+                sx={{
+                  p: 2,
+                  borderRadius: 3.5,
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#B38B36', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Total Work Size
+                  </Typography>
+                  <Avatar sx={{ bgcolor: '#FFF4E5', color: '#B38B36', width: 34, height: 34 }}>
+                    <WorkIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
+                  {completedStats.totalSqFt > 0 ? `${completedStats.totalSqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Sq.Ft` : '—'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
+                  Total area manufactured
+                </Typography>
+              </Card>
+            </Grid>
 
-        {/* Box 3: Attention / Overdue */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            sx={{
-              p: 2,
-              borderRadius: 3.5,
-              bgcolor: stats.overdueCount > 0 ? '#FEF2F2' : '#FFFFFF',
-              border: '1px solid',
-              borderColor: stats.overdueCount > 0 ? '#FCA5A5' : '#E2E8F0',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: stats.overdueCount > 0 ? '#DC2626' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Attention / Overdue
-              </Typography>
-              <Avatar sx={{ bgcolor: stats.overdueCount > 0 ? '#FEE2E2' : '#F1F5F9', color: stats.overdueCount > 0 ? '#DC2626' : '#94A3B8', width: 34, height: 34 }}>
-                <WarningAmberIcon sx={{ fontSize: 18 }} />
-              </Avatar>
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: stats.overdueCount > 0 ? '#DC2626' : '#1E293B', lineHeight: 1.1 }}>
-              {stats.overdueCount}
-            </Typography>
-            <Typography variant="caption" sx={{ color: stats.overdueCount > 0 ? '#DC2626' : '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
-              {stats.overdueCount > 0 ? `${stats.overdueCount} orders past deadline` : 'All orders on schedule'}
-            </Typography>
-          </Card>
-        </Grid>
+            {/* Completed Box 3: Delivery Performance */}
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card
+                sx={{
+                  p: 2,
+                  borderRadius: 3.5,
+                  bgcolor: completedStats.delayedCount > 0 ? '#FEF2F2' : '#F0FDF4',
+                  border: '1px solid',
+                  borderColor: completedStats.delayedCount > 0 ? '#FCA5A5' : '#86EFAC',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: completedStats.delayedCount > 0 ? '#DC2626' : '#059669', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Delivery Performance
+                  </Typography>
+                  <Avatar sx={{ bgcolor: completedStats.delayedCount > 0 ? '#FEE2E2' : '#DCFCE7', color: completedStats.delayedCount > 0 ? '#DC2626' : '#059669', width: 34, height: 34 }}>
+                    {completedStats.delayedCount > 0 ? <WarningAmberIcon sx={{ fontSize: 18 }} /> : <CheckCircleIcon sx={{ fontSize: 18 }} />}
+                  </Avatar>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: completedStats.delayedCount > 0 ? '#DC2626' : '#065F46', lineHeight: 1.1 }}>
+                  {completedStats.onTimeCount} On-Time
+                </Typography>
+                <Typography variant="caption" sx={{ color: completedStats.delayedCount > 0 ? '#DC2626' : '#059669', mt: 0.5, display: 'block', fontWeight: 600 }}>
+                  {completedStats.delayedCount > 0 ? `${completedStats.delayedCount} completed past deadline` : '100% On-Time Delivery'}
+                </Typography>
+              </Card>
+            </Grid>
+          </>
+        ) : (
+          <>
+            {/* Total Active Orders */}
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card
+                sx={{
+                  p: 2,
+                  borderRadius: 3.5,
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #EAE0D5',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Active Work Orders
+                  </Typography>
+                  <Avatar sx={{ bgcolor: '#FFF4E5', color: '#B38B36', width: 34, height: 34 }}>
+                    <WorkIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
+                  {stats.totalOrders}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
+                  Live production lines
+                </Typography>
+              </Card>
+            </Grid>
+
+            {/* Box 1: Total Main Stones */}
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card
+                sx={{
+                  p: 2,
+                  borderRadius: 3.5,
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#0284C7', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Total Main Stones
+                  </Typography>
+                  <Avatar sx={{ bgcolor: '#F0F9FF', color: '#0284C7', width: 34, height: 34 }}>
+                    <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
+                  {stats.totalMainStones}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
+                  Main stone items scheduled
+                </Typography>
+              </Card>
+            </Grid>
+
+            {/* Box 2: Completed Main Stones */}
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card
+                sx={{
+                  p: 2,
+                  borderRadius: 3.5,
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Completed Main Stones
+                  </Typography>
+                  <Avatar sx={{ bgcolor: '#ECFDF5', color: '#059669', width: 34, height: 34 }}>
+                    <CheckCircleIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
+                  {stats.completedMainStones}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#059669', mt: 0.5, display: 'block', fontWeight: 600 }}>
+                  {stats.completionRate}% Overall Completion Rate
+                </Typography>
+              </Card>
+            </Grid>
+
+            {/* Box 3: Attention / Overdue */}
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card
+                sx={{
+                  p: 2,
+                  borderRadius: 3.5,
+                  bgcolor: stats.overdueCount > 0 ? '#FEF2F2' : '#FFFFFF',
+                  border: '1px solid',
+                  borderColor: stats.overdueCount > 0 ? '#FCA5A5' : '#E2E8F0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: stats.overdueCount > 0 ? '#DC2626' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Attention / Overdue
+                  </Typography>
+                  <Avatar sx={{ bgcolor: stats.overdueCount > 0 ? '#FEE2E2' : '#F1F5F9', color: stats.overdueCount > 0 ? '#DC2626' : '#94A3B8', width: 34, height: 34 }}>
+                    <WarningAmberIcon sx={{ fontSize: 18 }} />
+                  </Avatar>
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: stats.overdueCount > 0 ? '#DC2626' : '#1E293B', lineHeight: 1.1 }}>
+                  {stats.overdueCount}
+                </Typography>
+                <Typography variant="caption" sx={{ color: stats.overdueCount > 0 ? '#DC2626' : '#64748B', mt: 0.5, display: 'block', fontWeight: 500 }}>
+                  {stats.overdueCount > 0 ? `${stats.overdueCount} orders past deadline` : 'All orders on schedule'}
+                </Typography>
+              </Card>
+            </Grid>
+          </>
+        )}
       </Grid>
 
       {/* 3. Navigation Tabs & Excel Export Ribbon */}
@@ -815,29 +970,6 @@ const Projects: React.FC = () => {
             }}
           />
         </Tabs>
-
-        {activeTab === 'completed' && (
-          <Button
-            variant="contained"
-            startIcon={<FileDownloadIcon />}
-            onClick={handleExportExcel}
-            disabled={completedWorkOrders.length === 0}
-            sx={{
-              bgcolor: '#059669',
-              color: '#FFFFFF',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              px: 2.5,
-              py: 0.9,
-              borderRadius: 2.5,
-              textTransform: 'none',
-              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
-              '&:hover': { bgcolor: '#047857' }
-            }}
-          >
-            Export to Excel (.xlsx)
-          </Button>
-        )}
       </Box>
 
       {/* 4. Search Bar Control */}
@@ -969,6 +1101,20 @@ const Projects: React.FC = () => {
                     statusChip = { label: `Overdue by ${Math.abs(diffDays)}d`, color: '#DC2626', bg: '#FEF2F2', border: '#FCA5A5' };
                   } else if (diffDays <= 3 && project.status !== 'completed') {
                     statusChip = { label: `Due in ${diffDays}d`, color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
+                  }
+                }
+
+                // Completion comparison for completed work orders
+                const completedDate = project.completedAt || project.projectClosure?.completedAt || project.updatedAt;
+                let isLateCompletion = false;
+                let completionDiffDays = 0;
+                if (finalEndDate && completedDate) {
+                  const targetD = new Date(finalEndDate);
+                  targetD.setHours(23, 59, 59, 999);
+                  const actualD = new Date(completedDate);
+                  if (actualD.getTime() > targetD.getTime()) {
+                    isLateCompletion = true;
+                    completionDiffDays = Math.ceil((actualD.getTime() - targetD.getTime()) / (1000 * 60 * 60 * 24));
                   }
                 }
 
@@ -1124,26 +1270,64 @@ const Projects: React.FC = () => {
                               })
                             : 'No deadline'}
                         </Typography>
-                        {finalEndDate && (
-                          <Chip
-                            label={statusChip.label}
-                            size="small"
-                            sx={{
-                              height: 19,
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                              bgcolor: statusChip.bg,
-                              color: statusChip.color,
-                              border: `1px solid ${statusChip.border}`
-                            }}
-                          />
+                        {activeTab === 'completed' ? (
+                          completedDate ? (
+                            <Chip
+                              label={
+                                isLateCompletion
+                                  ? `Completed: ${new Date(completedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} (+${completionDiffDays}d)`
+                                  : `Completed: ${new Date(completedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                              }
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                bgcolor: isLateCompletion ? '#FEF2F2' : '#ECFDF5',
+                                color: isLateCompletion ? '#DC2626' : '#059669',
+                                border: `1px solid ${isLateCompletion ? '#FCA5A5' : '#A7F3D0'}`
+                              }}
+                            />
+                          ) : null
+                        ) : (
+                          finalEndDate && (
+                            <Chip
+                              label={statusChip.label}
+                              size="small"
+                              sx={{
+                                height: 19,
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                bgcolor: statusChip.bg,
+                                color: statusChip.color,
+                                border: `1px solid ${statusChip.border}`
+                              }}
+                            />
+                          )
                         )}
                       </Box>
                     </TableCell>
 
                     {/* Actions */}
                     <TableCell align="right" sx={{ py: 2 }} onClick={(e) => e.stopPropagation()}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.75 }}>
+                        {/* Chat Icon Button */}
+                        <Tooltip title="Work Order Chat & Staff Updates">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleOpenChat(e, project)}
+                            sx={{
+                              color: '#C89F5A',
+                              p: 0.6,
+                              bgcolor: '#FFFDF9',
+                              border: '1px solid #FDE68A',
+                              '&:hover': { bgcolor: '#FFF4E5', borderColor: '#C89F5A' }
+                            }}
+                          >
+                            <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+
                         <Tooltip title="Open Work Order Details">
                           <IconButton
                             size="small"
@@ -1583,6 +1767,15 @@ const Projects: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Work Order Chat Drawer */}
+      <ProductChatDrawer
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        slab={chatSlab}
+        projectId={chatProjectId}
+        projectName={chatProjectName}
+      />
     </Box>
   );
 };
