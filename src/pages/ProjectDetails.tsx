@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Box, Typography, Button, Paper, Stepper, Step, StepLabel, TextField, Divider, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Autocomplete, Snackbar, createFilterOptions, InputAdornment, Grid, LinearProgress, CircularProgress, Tabs, Tab, Collapse, Checkbox, Radio, RadioGroup, FormControlLabel, Card, Tooltip, Menu, ListItemIcon, ListItemText } from '@mui/material';
@@ -802,6 +802,22 @@ const ProjectDetails: React.FC = () => {
       localStorage.setItem(`project_unit_${id}`, u);
     }
   };
+
+  useEffect(() => {
+    if (project) {
+      const qProd = project.quotations?.[0]?.products?.[0] || project.products?.[0];
+      if (qProd?.dimensionUnit) {
+        const u = qProd.dimensionUnit.toLowerCase();
+        setDefaultProjectUnit(u === 'sq_ft' ? 'feet' : u);
+      } else if (project.slabs?.[0]?.size) {
+        const dimsPart = (String(project.slabs[0].size).split('|')[0] || '').toLowerCase();
+        if (dimsPart.includes('feet') || dimsPart.includes('ft')) setDefaultProjectUnit('feet');
+        else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) setDefaultProjectUnit('sq_ft');
+        else if (dimsPart.includes('mm')) setDefaultProjectUnit('mm');
+        else if (dimsPart.includes('inch')) setDefaultProjectUnit('inch');
+      }
+    }
+  }, [project?.id]);
 
   // Master Maker State & Logic (Bulk Slabs & Pieces Generator)
   const [masterMakerOpen, setMasterMakerOpen] = useState(false);

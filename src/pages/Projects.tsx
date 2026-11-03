@@ -60,7 +60,73 @@ import { ProductChatDrawer } from '../components/Production/ProductChatDrawer';
 export const calculateProjectWorkSize = (project: any): string => {
   if (!project) return '-';
 
-  // 1. Check products array directly on project (from quotation)
+  // 1. Check slabs / pieces first (Reverse Integration from configured slabs & Master Maker)
+  if (project.slabs && Array.isArray(project.slabs) && project.slabs.length > 0) {
+    let totalSqFt = 0;
+    project.slabs.forEach((slab: any) => {
+      // Check explicit Sq.Ft in slab.size e.g. "(4.17 Sq.Ft)"
+      if (slab.size) {
+        const explicitSqFtMatch = String(slab.size).match(/([\d\.]+)\s*Sq\.?Ft/i);
+        if (explicitSqFtMatch) {
+          totalSqFt += parseFloat(explicitSqFtMatch[1]);
+          return;
+        }
+      }
+      // Or check pieces inside slab
+      const pList = slab.pieces || [];
+      if (pList.length > 0) {
+        let slabPiecesSqFt = 0;
+        pList.forEach((p: any) => {
+          const str = p.size || '';
+          const explicitMatch = str.match(/([\d\.]+)\s*Sq\.?Ft/i);
+          if (explicitMatch) {
+            slabPiecesSqFt += parseFloat(explicitMatch[1]);
+            return;
+          }
+          const dimsPart = (str.split('|')[0] || '').toLowerCase();
+          const lMatch = dimsPart.match(/(\d+(?:\.\d+)?)\s*L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
+          const wMatch = dimsPart.match(/(\d+(?:\.\d+)?)\s*W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+          if (lMatch && wMatch) {
+            const l = parseFloat(lMatch[1]);
+            const w = parseFloat(wMatch[1]);
+            if (dimsPart.includes('feet') || dimsPart.includes('ft')) {
+              slabPiecesSqFt += l * w;
+            } else if (dimsPart.includes('mm')) {
+              slabPiecesSqFt += (l * w) / 92903.04;
+            } else {
+              slabPiecesSqFt += (l * w) / 144;
+            }
+          }
+        });
+        if (slabPiecesSqFt > 0) {
+          totalSqFt += slabPiecesSqFt;
+          return;
+        }
+      }
+      // Or calculate from slab.size dimensions
+      if (slab.size) {
+        const dimsPart = (String(slab.size).split('|')[0] || '').toLowerCase();
+        const lMatch = dimsPart.match(/(\d+(?:\.\d+)?)\s*L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
+        const wMatch = dimsPart.match(/(\d+(?:\.\d+)?)\s*W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+        if (lMatch && wMatch) {
+          const l = parseFloat(lMatch[1]);
+          const w = parseFloat(wMatch[1]);
+          if (dimsPart.includes('feet') || dimsPart.includes('ft')) {
+            totalSqFt += l * w;
+          } else if (dimsPart.includes('mm')) {
+            totalSqFt += (l * w) / 92903.04;
+          } else {
+            totalSqFt += (l * w) / 144;
+          }
+        }
+      }
+    });
+    if (totalSqFt > 0) {
+      return `${totalSqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Sq.Ft`;
+    }
+  }
+
+  // 2. Check products array directly on project (from quotation / creation if slabs not generated)
   if (project.products && Array.isArray(project.products) && project.products.length > 0) {
     let totalSqFt = 0;
     project.products.forEach((prod: any) => {
@@ -87,7 +153,7 @@ export const calculateProjectWorkSize = (project: any): string => {
     }
   }
 
-  // 2. Check quotations array if present
+  // 3. Check quotations array if present
   if (project.quotations && project.quotations.length > 0) {
     const q = project.quotations[0];
     if (q.products && Array.isArray(q.products) && q.products.length > 0) {
@@ -114,35 +180,6 @@ export const calculateProjectWorkSize = (project: any): string => {
       if (totalSqFt > 0) {
         return `${totalSqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Sq.Ft`;
       }
-    }
-  }
-
-  // 3. Fallback: slabs / pieces
-  if (project.slabs && project.slabs.length > 0) {
-    let totalSqFt = 0;
-    project.slabs.forEach((slab: any) => {
-      const pList = slab.pieces || [];
-      if (pList.length > 0) {
-        pList.forEach((p: any) => {
-          const str = p.size || slab.size || '';
-          const match = str.match(/(\d+(\.\d+)?)\s*L?\s*[xX*×]\s*(\d+(\.\d+)?)\s*W?/i);
-          if (match) {
-            const l = parseFloat(match[1]);
-            const w = parseFloat(match[3]);
-            totalSqFt += (l * w) / 144;
-          }
-        });
-      } else if (slab.size) {
-        const match = slab.size.match(/(\d+(\.\d+)?)\s*L?\s*[xX*×]\s*(\d+(\.\d+)?)\s*W?/i);
-        if (match) {
-          const l = parseFloat(match[1]);
-          const w = parseFloat(match[3]);
-          totalSqFt += (l * w) / 144;
-        }
-      }
-    });
-    if (totalSqFt > 0) {
-      return `${totalSqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Sq.Ft`;
     }
   }
 
@@ -213,9 +250,39 @@ const Projects: React.FC = () => {
     if (project && project.id) {
       setEditingProjectId(project.id);
 
-      // Load existing products from project.products (quotation) OR project.slabs
+      // Load existing products from project.slabs (Reverse Integration: all slabs created via Master Maker or planning) OR project.products
       let loadedProducts: any[] = [];
-      if (Array.isArray(project.products) && project.products.length > 0) {
+      if (Array.isArray(project.slabs) && project.slabs.length > 0) {
+        loadedProducts = project.slabs.map((s: any) => {
+          let length = '';
+          let width = '';
+          let thickness = '';
+          let dimensionUnit = 'inch';
+          if (s.size) {
+            const dimsPart = (s.size.split('|')[0] || '').toLowerCase();
+            const lMatch = s.size.match(/(\d+(?:\.\d+)?)L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
+            const wMatch = s.size.match(/(\d+(?:\.\d+)?)W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+            const tMatch = s.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
+            if (lMatch) length = lMatch[1];
+            if (wMatch) width = wMatch[1];
+            if (tMatch) thickness = tMatch[1];
+            if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'")) dimensionUnit = 'feet';
+            else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) dimensionUnit = 'sq_ft';
+            else if (dimsPart.includes('mm')) dimensionUnit = 'mm';
+            else if (dimsPart.includes('inch') || dimsPart.includes('"')) dimensionUnit = 'inch';
+            else if (s.dimensionUnit) dimensionUnit = s.dimensionUnit;
+          }
+          return {
+            id: s.id,
+            name: s.name || '',
+            length,
+            width,
+            thickness,
+            unit: 'pieces',
+            dimensionUnit
+          };
+        });
+      } else if (Array.isArray(project.products) && project.products.length > 0) {
         loadedProducts = project.products.map((p: any) => {
           const u = (p.unit || 'pieces').toLowerCase().trim();
           const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
@@ -227,32 +294,6 @@ const Projects: React.FC = () => {
             thickness: p.breadth ? String(p.breadth) : (p.thickness ? String(p.thickness) : ''),
             unit: p.unit || 'pieces',
             dimensionUnit: p.dimensionUnit || (isPieces ? 'inch' : u)
-          };
-        });
-      } else if (Array.isArray(project.slabs) && project.slabs.length > 0) {
-        loadedProducts = project.slabs.map((s: any) => {
-          let length = '';
-          let width = '';
-          let thickness = '';
-          let dimensionUnit = 'inch';
-          if (s.size) {
-            const lMatch = s.size.match(/(\d+(?:\.\d+)?)L/i);
-            const wMatch = s.size.match(/(\d+(?:\.\d+)?)W/i);
-            const tMatch = s.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
-            if (lMatch) length = lMatch[1];
-            if (wMatch) width = wMatch[1];
-            if (tMatch) thickness = tMatch[1];
-            if (/mm/i.test(s.size)) dimensionUnit = 'mm';
-            else if (/ft|feet/i.test(s.size)) dimensionUnit = 'feet';
-          }
-          return {
-            id: s.id,
-            name: s.name || '',
-            length,
-            width,
-            thickness,
-            unit: 'pieces',
-            dimensionUnit
           };
         });
       }
@@ -659,6 +700,27 @@ const Projects: React.FC = () => {
             Track machine production progress, piece completions, and delivery deadlines in real time.
           </Typography>
         </Box>
+
+        {activeTab === 'active' && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpen()}
+            sx={{
+              bgcolor: '#B38B36',
+              color: '#FFFFFF',
+              fontWeight: 700,
+              textTransform: 'none',
+              borderRadius: 2.5,
+              px: 2.5,
+              py: 1,
+              boxShadow: '0 4px 14px rgba(179, 139, 54, 0.25)',
+              '&:hover': { bgcolor: '#96722B' }
+            }}
+          >
+            Direct Work Order
+          </Button>
+        )}
       </Box>
 
       {/* 2. Executive KPI Cards Ribbon */}
@@ -1163,12 +1225,28 @@ const Projects: React.FC = () => {
                               {project.name}
                             </Typography>
                           </Box>
-                          {(project.clientName || project.description) && (
+                          {(project.clientName || project.description || project.isDirectWorkOrder || (!project.enquiryId && !project.inquiryId && !project.leadId)) && (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.3, flexWrap: 'wrap' }}>
                               {project.clientName && (
                                 <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, fontSize: '0.75rem' }}>
                                   Client: {project.clientName}
                                 </Typography>
+                              )}
+                              {(project.isDirectWorkOrder || (!project.enquiryId && !project.inquiryId && !project.leadId) || project.orderType === 'direct') && (
+                                <Chip
+                                  label="Direct Order"
+                                  size="small"
+                                  sx={{
+                                    height: 18,
+                                    fontSize: '0.65rem',
+                                    fontWeight: 700,
+                                    bgcolor: '#FEF3C7',
+                                    color: '#B45309',
+                                    border: '1px solid #FDE68A',
+                                    borderRadius: 1,
+                                    px: 0.5
+                                  }}
+                                />
                               )}
                               {project.description && (
                                 <Typography
@@ -1495,7 +1573,7 @@ const Projects: React.FC = () => {
                     onClick={() =>
                       setFormData({
                         ...formData,
-                        products: [...(formData.products || []), { name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }]
+                        products: [...(formData.products || []), { name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: formData.products?.[0]?.dimensionUnit || 'inch' }]
                       })
                     }
                     sx={{
@@ -1666,8 +1744,17 @@ const Projects: React.FC = () => {
                                   label="Dimension In"
                                   value={prod.dimensionUnit || 'inch'}
                                   onChange={(e) => {
+                                    const newUnit = e.target.value;
                                     const newProds = [...formData.products];
-                                    newProds[index].dimensionUnit = e.target.value;
+                                    const oldFirstUnit = newProds[0]?.dimensionUnit || 'inch';
+                                    newProds[index].dimensionUnit = newUnit;
+                                    if (index === 0) {
+                                      for (let i = 1; i < newProds.length; i++) {
+                                        if (!newProds[i].dimensionUnit || newProds[i].dimensionUnit === oldFirstUnit) {
+                                          newProds[i].dimensionUnit = newUnit;
+                                        }
+                                      }
+                                    }
                                     setFormData({ ...formData, products: newProds });
                                   }}
                                 >

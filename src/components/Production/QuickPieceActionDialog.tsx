@@ -453,7 +453,16 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
                     .filter((l: any) => !l.status || ['completed', 'approved', 'done'].includes(String(l.status).toLowerCase()))
                     .map((l: any) => l.stage?.split(' - ')[0])
                     .filter(Boolean);
-                  const isDone = doneStages.length > 0;
+
+                  const isPieceStatusDone = ['completed', 'approved', 'done'].includes(String(p.status || '').toLowerCase());
+                  if (isPieceStatusDone) {
+                    const stgName = (p.stage || 'Production').split(' - ')[0];
+                    if (!doneStages.includes(stgName)) {
+                      doneStages.push(stgName);
+                    }
+                  }
+
+                  const isDone = doneStages.length > 0 || isPieceStatusDone;
 
                   return (
                     <MenuItem key={pId} value={pId}>

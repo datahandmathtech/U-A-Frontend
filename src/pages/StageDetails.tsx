@@ -5,7 +5,7 @@ import {
   TableContainer, TableHead, TableRow, IconButton, TextField, 
   Switch, FormControlLabel, Breadcrumbs, Link, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
   ToggleButton, ToggleButtonGroup, Tooltip, FormControl, InputLabel, Select, MenuItem, Grid, LinearProgress, InputAdornment, Avatar, Divider,
-  Tabs, Tab
+  Tabs, Tab, CircularProgress
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -28,6 +28,8 @@ import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
 import AddIcon from '@mui/icons-material/Add';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import * as XLSX from 'xlsx';
 import { 
   useGetProjectByIdQuery, 
@@ -38,7 +40,10 @@ import {
   useUpdatePieceMutation,
   useDeletePieceMutation,
   useGetProjectMaterialsQuery,
-  useDeleteProductionLogMutation
+  useDeleteProductionLogMutation,
+  useGetMachinesQuery,
+  useUploadFilesMutation,
+  useQuickCompletePieceMutation
 } from '../store/apiSlice';
 
 const StageDetails = () => {
@@ -50,11 +55,14 @@ const StageDetails = () => {
   const { data: productionLogs, refetch: refetchProductionLogs } = useGetProjectProductionLogsQuery(projectId as string, { skip: !projectId });
   const { data: machineLogs } = useGetMachineLogsQuery();
   const { data: projectMaterials } = useGetProjectMaterialsQuery(projectId as string, { skip: !projectId });
+  const { data: machines = [] } = useGetMachinesQuery();
 
   const [addPieces] = useAddPiecesMutation();
   const [updatePiece] = useUpdatePieceMutation();
   const [deletePiece] = useDeletePieceMutation();
   const [deleteProductionLog] = useDeleteProductionLogMutation();
+  const [uploadFiles, { isLoading: isUploadingPhoto }] = useUploadFilesMutation();
+  const [quickCompletePiece, { isLoading: isQuickCompleting }] = useQuickCompletePieceMutation();
   const [selectedDimUnit, setSelectedDimUnit] = useState<string>('');
 
   const slab = slabs?.find((s: any) => s.id === slabId);
@@ -79,12 +87,13 @@ const StageDetails = () => {
     } catch (e) {}
   }
   
-  const sizeLower = slab?.size?.toLowerCase() || '';
+  const rawSizeStr = slab?.size || '';
+  const dimsPart = (rawSizeStr.split('|')[0] || '').toLowerCase();
   const rawUnit = (matchedProduct?.unit || '').trim() || (
-    sizeLower.includes('sq. ft') || sizeLower.includes('sq_ft') || sizeLower.includes('sq.ft') || sizeLower.includes('sqft') ? 'sq_ft' :
-    sizeLower.includes('inch') ? 'inch' :
-    sizeLower.includes('feet') || sizeLower.includes('ft') ? 'feet' :
-    sizeLower.includes('mm') ? 'mm' : 'inch'
+    dimsPart.includes('sq. ft') || dimsPart.includes('sq_ft') || dimsPart.includes('sq.ft') || dimsPart.includes('sqft') ? 'sq_ft' :
+    dimsPart.includes('inch') || dimsPart.includes('"') ? 'inch' :
+    dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'") ? 'feet' :
+    dimsPart.includes('mm') ? 'mm' : 'inch'
   );
   
   const unitDisplayName = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches' 
@@ -96,16 +105,22 @@ const StageDetails = () => {
   // Determine dimension unit for pieces
   let detectedDimUnit = (matchedProduct?.dimensionUnit || '').toLowerCase().trim();
   if (!detectedDimUnit) {
-    if (sizeLower.includes('mm') || (matchedProduct?.length && Number(matchedProduct.length) >= 100) || (matchedProduct?.width && Number(matchedProduct.width) >= 100)) {
-      detectedDimUnit = 'mm';
-    } else if (sizeLower.includes('ft') || sizeLower.includes('feet')) {
+    if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'")) {
       detectedDimUnit = 'feet';
+    } else if (dimsPart.includes('inch') || dimsPart.includes('"')) {
+      detectedDimUnit = 'inch';
+    } else if (dimsPart.includes('mm') || (matchedProduct?.length && Number(matchedProduct.length) >= 100) || (matchedProduct?.width && Number(matchedProduct.width) >= 100)) {
+      detectedDimUnit = 'mm';
+    } else if (rawUnit === 'sq_ft' || rawUnit === 'feet') {
+      detectedDimUnit = 'feet';
+    } else if (rawUnit === 'mm') {
+      detectedDimUnit = 'mm';
     } else {
       detectedDimUnit = 'inch';
     }
   }
 
-  const effectiveDimUnit = (selectedDimUnit || detectedDimUnit || 'mm').toLowerCase();
+  const effectiveDimUnit = (selectedDimUnit || detectedDimUnit || 'inch').toLowerCase();
   const isPiecesUnit = rawUnit.toLowerCase().startsWith('piece') || rawUnit.toLowerCase() === 'pcs';
 
   const dimensionUnitName = effectiveDimUnit === 'inch' || effectiveDimUnit === 'inches' ? 'Inches' 
@@ -338,8 +353,30 @@ const StageDetails = () => {
     width: '',
     thickness: '',
     unit: 'inch',
-    status: 'pending'
+    status: 'pending',
+    machineId: '',
+    photoUrl: '',
+    remarks: ''
   });
+
+  const handlePiecePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('files', file);
+    try {
+      const res = await uploadFiles(formData).unwrap();
+      if (res?.success && res.urls?.length > 0) {
+        setEditPieceDims(prev => ({ ...prev, photoUrl: res.urls[0] }));
+      } else {
+        alert('Failed to upload photo');
+      }
+    } catch (err: any) {
+      alert(err?.data?.message || err?.message || 'Error uploading photo');
+    } finally {
+      e.target.value = '';
+    }
+  };
 
   const handleDeletePiece = async (pieceId: string) => {
     if (window.confirm('Are you sure you want to delete this tracked item?')) {
@@ -359,12 +396,19 @@ const StageDetails = () => {
     const l = parseFloat(editPieceDims.length) || 0;
     const w = parseFloat(editPieceDims.width) || 0;
     const t = parseFloat(editPieceDims.thickness) || 0;
-    const u = editPieceDims.unit;
+    const u = editPieceDims.unit || effectiveDimUnit || 'inch';
     const isFt = u === 'feet';
     const isMM = u === 'mm';
     const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
+    const calcSqFt = (
+      isFt
+        ? l * w
+        : isMM
+        ? (l * w) / 92903.04
+        : (l * w) / 144
+    ).toFixed(2);
     const sizeFormatted = (l > 0 && w > 0)
-      ? `${l}L x ${w}W ${unitLabel}${t ? ` | ${t}MM` : ''}`
+      ? `${l}L x ${w}W ${unitLabel}${t ? ` | ${t}MM` : ''} (${calcSqFt} Sq.Ft)`
       : (editingPiece.size || '');
 
     try {
@@ -376,7 +420,25 @@ const StageDetails = () => {
           status: editPieceDims.status || 'pending'
         }
       }).unwrap();
+
+      // If marked as completed, register with quickCompletePiece so approvals, pieceLogs & productionLogs update immediately
+      if (editPieceDims.status === 'completed' && slab?.id) {
+        try {
+          await quickCompletePiece({
+            slabId: slab.id,
+            pieceId: editingPiece.id,
+            machineId: editPieceDims.machineId || undefined,
+            photoUrl: editPieceDims.photoUrl || undefined,
+            stage: stageFormatted || slab.stage || 'Production',
+            remarks: editPieceDims.remarks || undefined
+          }).unwrap();
+        } catch (qcErr) {
+          console.warn('Quick complete piece error:', qcErr);
+        }
+      }
+
       refetchSlabs();
+      refetchProductionLogs();
       setEditingPiece(null);
     } catch (err: any) {
       console.error('Failed to update piece:', err);
@@ -650,12 +712,13 @@ const StageDetails = () => {
                   .replace(/ × (\d+MM)/i, ' | $1')
                   .trim();
                 const sizeLower = (p.size || '').toLowerCase();
+                const pDimsPart = (sizeLower.split('|')[0] || '');
                 let pUnit = dimensionUnitName;
-                if (sizeLower.includes('(inch)') || sizeLower.includes('(inches)') || sizeLower.includes('"')) {
+                if (pDimsPart.includes('(inch)') || pDimsPart.includes('(inches)') || pDimsPart.includes('inch') || pDimsPart.includes('"')) {
                   pUnit = 'Inches';
-                } else if (sizeLower.includes('(ft)') || sizeLower.includes('(feet)') || sizeLower.includes("'")) {
+                } else if (pDimsPart.includes('(ft)') || pDimsPart.includes('(feet)') || pDimsPart.includes('feet') || pDimsPart.includes("'")) {
                   pUnit = 'Feet';
-                } else if (sizeLower.includes('(mm)')) {
+                } else if (pDimsPart.includes('(mm)') || pDimsPart.includes('mm')) {
                   pUnit = 'MM';
                 } else if ((p as any).unit) {
                   const u = String((p as any).unit).toLowerCase();
@@ -774,7 +837,7 @@ const StageDetails = () => {
                     let length = '';
                     let width = '';
                     let thickness = '';
-                    let unit = 'inch';
+                    let unit = effectiveDimUnit || 'inch';
                     if (p.size) {
                       const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
                       const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
@@ -782,15 +845,26 @@ const StageDetails = () => {
                       if (lMatch) length = lMatch[1];
                       if (wMatch) width = wMatch[1];
                       if (tMatch) thickness = tMatch[1];
-                      if (/mm/i.test(p.size)) unit = 'mm';
-                      else if (/feet|ft/i.test(p.size)) unit = 'feet';
+                      const pDimsPart = (p.size.split('|')[0] || '').toLowerCase();
+                      if (pDimsPart.includes('feet') || pDimsPart.includes('ft') || pDimsPart.includes("'")) {
+                        unit = 'feet';
+                      } else if (pDimsPart.includes('inch') || pDimsPart.includes('"')) {
+                        unit = 'inch';
+                      } else if (pDimsPart.includes('mm')) {
+                        unit = effectiveDimUnit === 'inch' ? 'inch' : 'mm';
+                      } else {
+                        unit = effectiveDimUnit || 'inch';
+                      }
                     }
                     setEditPieceDims({
                       length,
                       width,
                       thickness,
                       unit,
-                      status: p.status || 'pending'
+                      status: p.status || 'pending',
+                      machineId: '',
+                      photoUrl: '',
+                      remarks: ''
                     });
                     setEditingPiece(p);
                   }}
@@ -1735,7 +1809,7 @@ const StageDetails = () => {
                   onChange={(e) => setEditPieceDims({ ...editPieceDims, unit: e.target.value })}
                   sx={{ borderRadius: 2 }}
                 >
-                  <MenuItem value="inch">Inch</MenuItem>
+                  <MenuItem value="inch">Inches</MenuItem>
                   <MenuItem value="feet">Feet</MenuItem>
                   <MenuItem value="mm">MM</MenuItem>
                 </Select>
@@ -1786,6 +1860,131 @@ const StageDetails = () => {
               <MenuItem value="completed">Completed</MenuItem>
             </Select>
           </FormControl>
+
+          {editPieceDims.status === 'completed' && (
+            <Box sx={{ p: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#166534', fontSize: '0.82rem' }}>
+                Completion Details (Optional)
+              </Typography>
+
+              <Grid container spacing={1.5}>
+                {/* Machine Dropdown */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Machine Name (Optional)</InputLabel>
+                    <Select
+                      label="Machine Name (Optional)"
+                      value={editPieceDims.machineId || ''}
+                      onChange={(e) => setEditPieceDims({ ...editPieceDims, machineId: e.target.value })}
+                      sx={{ borderRadius: 2, bgcolor: '#FFFFFF' }}
+                    >
+                      <MenuItem value="">
+                        <em>-- Manual / None --</em>
+                      </MenuItem>
+                      {machines.map((m: any) => (
+                        <MenuItem key={m.id || m._id} value={m.id || m._id}>
+                          {m.name} ({m.type || 'Machine'})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                {/* Remarks */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label="Remarks / Notes (Optional)"
+                    size="small"
+                    fullWidth
+                    value={editPieceDims.remarks || ''}
+                    onChange={(e) => setEditPieceDims({ ...editPieceDims, remarks: e.target.value })}
+                    sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                    slotProps={{ input: { sx: { borderRadius: 2 } } }}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Photo Upload */}
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', display: 'block', mb: 0.75 }}>
+                  Completion Photo (Optional Proof)
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    size="small"
+                    startIcon={<CameraAltIcon />}
+                    sx={{
+                      borderColor: '#CBD5E1',
+                      color: '#334155',
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: 2,
+                      bgcolor: '#FFFFFF'
+                    }}
+                  >
+                    Take Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      hidden
+                      onChange={handlePiecePhotoUpload}
+                    />
+                  </Button>
+
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    size="small"
+                    startIcon={<CloudUploadIcon />}
+                    sx={{
+                      borderColor: '#CBD5E1',
+                      color: '#334155',
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: 2,
+                      bgcolor: '#FFFFFF'
+                    }}
+                  >
+                    Choose from Gallery
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={handlePiecePhotoUpload}
+                    />
+                  </Button>
+
+                  {isUploadingPhoto && (
+                    <CircularProgress size={20} sx={{ color: '#059669' }} />
+                  )}
+
+                  {editPieceDims.photoUrl && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 0.5, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 2 }}>
+                      <Box
+                        component="img"
+                        src={editPieceDims.photoUrl}
+                        alt="Proof"
+                        sx={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 1.5 }}
+                      />
+                      <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
+                        Photo Attached
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => setEditPieceDims({ ...editPieceDims, photoUrl: '' })}
+                        sx={{ color: '#EF4444', p: 0.25 }}
+                      >
+                        <CloseIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            </Box>
+          )}
 
           {parseFloat(editPieceDims.length) > 0 && parseFloat(editPieceDims.width) > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
