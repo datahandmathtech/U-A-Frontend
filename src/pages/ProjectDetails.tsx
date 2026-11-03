@@ -654,21 +654,6 @@ const SlabRow = ({
               </Typography>
             </MenuItem>
 
-            <MenuItem
-              onClick={(e) => {
-                handleCloseMenu(e);
-                onQuickRevert(slab);
-              }}
-              sx={{ py: 1, gap: 1.5, color: '#D97706' }}
-            >
-              <ListItemIcon sx={{ minWidth: 'auto', color: '#D97706' }}>
-                <RemoveCircleOutlineRoundedIcon sx={{ fontSize: 19 }} />
-              </ListItemIcon>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.84rem' }}>
-                - Revert Piece
-              </Typography>
-            </MenuItem>
-
             <Divider sx={{ my: 0.5 }} />
 
             <MenuItem
@@ -1089,7 +1074,21 @@ const ProjectDetails: React.FC = () => {
   const isPlanningMode = false;
 
   const [selectedSlabIds, setSelectedSlabIds] = useState<string[]>([]);
-  const [bulkStages, setBulkStages] = useState<string[]>(['Production', 'Polishing - Honed']);
+  const [bulkStages, setBulkStages] = useState<string[]>(['Production', 'Packing', 'Dispatch']);
+
+  useEffect(() => {
+    if (selectedSlabIds.length > 0 && projectSlabs && projectSlabs.length > 0) {
+      const selected = projectSlabs.filter((s: any) => selectedSlabIds.includes(s.id));
+      const firstWithStages = selected.find((s: any) => s.requiredStages && s.requiredStages.length > 0);
+      if (firstWithStages?.requiredStages) {
+        setBulkStages(firstWithStages.requiredStages);
+      } else {
+        setBulkStages(['Production', 'Packing', 'Dispatch']);
+      }
+    } else {
+      setBulkStages(['Production', 'Packing', 'Dispatch']);
+    }
+  }, [selectedSlabIds, projectSlabs]);
   const [slabSearchQuery, setSlabSearchQuery] = useState<string>('');
   const [slabCategoryFilter, setSlabCategoryFilter] = useState<string>('All');
   const [bulkUpdateSlabStages, { isLoading: isBulkUpdating }] = useBulkUpdateSlabStagesMutation();
@@ -1160,7 +1159,7 @@ const ProjectDetails: React.FC = () => {
     try {
       await createSlab({ projectId: id, ...slabForm, status: 'active' }).unwrap();
       setSlabDialogOpen(false);
-      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
+      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Packing', 'Dispatch'] });
       refetchSlabs();
       setSnackbarMessage('Slab added successfully!');
     } catch (error) {
@@ -1197,7 +1196,7 @@ const ProjectDetails: React.FC = () => {
       inventoryId: slab.inventoryId || '',
       requiredStages: slab.requiredStages && slab.requiredStages.length > 0
         ? slab.requiredStages
-        : ['Production', 'Polishing - Honed', 'Packing', 'Dispatch']
+        : ['Production', 'Packing', 'Dispatch']
     });
     setEditSlabDialogOpen(true);
   };
@@ -5473,7 +5472,7 @@ const ProjectDetails: React.FC = () => {
             <Typography variant="subtitle2" sx={{ mb: 1.5, color: '#1E293B', fontWeight: 800 }}>Required Manufacturing Stages:</Typography>
             <Grid container spacing={1.5}>
               {['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(stage => {
-                const isSelected = slabForm.requiredStages?.includes(stage) || (stage === 'Polishing - Honed' && slabForm.requiredStages?.includes('Polishing')) || false;
+                const isSelected = slabForm.requiredStages?.includes(stage) || false;
                 return (
                   <Grid size={{ xs: 6, sm: 4 }} key={stage}>
                     <Box

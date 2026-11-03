@@ -446,6 +446,52 @@ const StageDetails = () => {
     }
   };
 
+  const handleOpenEditPiece = (p: any) => {
+    if (!p) return;
+    let length = '';
+    let width = '';
+    let thickness = '';
+    let unit = effectiveDimUnit || 'inch';
+    if (p.size) {
+      const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
+      const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
+      const tMatch = p.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
+      if (lMatch) length = lMatch[1];
+      if (wMatch) width = wMatch[1];
+      if (tMatch) thickness = tMatch[1];
+      const pDimsPart = (p.size.split('|')[0] || '').toLowerCase();
+      if (pDimsPart.includes('feet') || pDimsPart.includes('ft') || pDimsPart.includes("'")) {
+        unit = 'feet';
+      } else if (pDimsPart.includes('inch') || pDimsPart.includes('"')) {
+        unit = 'inch';
+      } else if (pDimsPart.includes('mm')) {
+        unit = effectiveDimUnit === 'inch' ? 'inch' : 'mm';
+      } else {
+        unit = effectiveDimUnit || 'inch';
+      }
+    }
+
+    const pieceLogsList = p.logs && Array.isArray(p.logs) ? p.logs : [];
+    const latestPieceLog = pieceLogsList[0] || pieceLogsList[pieceLogsList.length - 1];
+    const pieceProdLog = productionLogs?.find((l: any) => l.pieceIds?.includes(p.id) || l.productId === p.id);
+
+    const savedMachineId = latestPieceLog?.machineId || pieceProdLog?.machineId || '';
+    const savedPhotoUrl = latestPieceLog?.endPhotoUrl || latestPieceLog?.startPhotoUrl || pieceProdLog?.startPhotos?.unit || pieceProdLog?.startPhotos?.machine || '';
+    const savedRemarks = latestPieceLog?.remarks || pieceProdLog?.remarks || '';
+
+    setEditPieceDims({
+      length,
+      width,
+      thickness,
+      unit,
+      status: p.status || 'pending',
+      machineId: savedMachineId,
+      photoUrl: savedPhotoUrl,
+      remarks: savedRemarks
+    });
+    setEditingPiece(p);
+  };
+
 
 
   if (!slab) return <Typography sx={{ p: 3 }}>Loading...</Typography>;
@@ -833,41 +879,7 @@ const StageDetails = () => {
               <Tooltip title="Edit Piece">
                 <IconButton 
                   size="small" 
-                  onClick={() => {
-                    let length = '';
-                    let width = '';
-                    let thickness = '';
-                    let unit = effectiveDimUnit || 'inch';
-                    if (p.size) {
-                      const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
-                      const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
-                      const tMatch = p.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
-                      if (lMatch) length = lMatch[1];
-                      if (wMatch) width = wMatch[1];
-                      if (tMatch) thickness = tMatch[1];
-                      const pDimsPart = (p.size.split('|')[0] || '').toLowerCase();
-                      if (pDimsPart.includes('feet') || pDimsPart.includes('ft') || pDimsPart.includes("'")) {
-                        unit = 'feet';
-                      } else if (pDimsPart.includes('inch') || pDimsPart.includes('"')) {
-                        unit = 'inch';
-                      } else if (pDimsPart.includes('mm')) {
-                        unit = effectiveDimUnit === 'inch' ? 'inch' : 'mm';
-                      } else {
-                        unit = effectiveDimUnit || 'inch';
-                      }
-                    }
-                    setEditPieceDims({
-                      length,
-                      width,
-                      thickness,
-                      unit,
-                      status: p.status || 'pending',
-                      machineId: '',
-                      photoUrl: '',
-                      remarks: ''
-                    });
-                    setEditingPiece(p);
-                  }}
+                  onClick={() => handleOpenEditPiece(p)}
                   sx={{ color: '#475569', '&:hover': { bgcolor: '#F1F5F9' } }}
                 >
                   <EditIcon sx={{ fontSize: 17 }} />
@@ -2030,9 +2042,33 @@ const StageDetails = () => {
         fullWidth
         slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
       >
-        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B', display: 'flex', alignItems: 'center', gap: 1.5, fontSize: '1.2rem' }}>
-          <VisibilityIcon sx={{ color: '#0284C7' }} /> 
-          Timeline & Audit Trail: {viewPiece?.productName || viewPiece?.pieceNumber}
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, fontSize: '1.2rem', flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <VisibilityIcon sx={{ color: '#0284C7' }} /> 
+            Timeline & Audit Trail: {viewPiece?.productName || viewPiece?.pieceNumber}
+          </Box>
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+            onClick={() => {
+              const pToEdit = viewPiece;
+              setViewPiece(null);
+              handleOpenEditPiece(pToEdit);
+            }}
+            sx={{
+              borderRadius: 2,
+              bgcolor: '#B38B36',
+              color: '#FFFFFF',
+              fontWeight: 700,
+              textTransform: 'none',
+              px: 2,
+              boxShadow: '0 2px 8px rgba(179, 139, 54, 0.25)',
+              '&:hover': { bgcolor: '#96722B' }
+            }}
+          >
+            Edit Piece Details
+          </Button>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 3.5, bgcolor: '#FAFAFA' }}>
           {(() => {
@@ -2064,11 +2100,13 @@ const StageDetails = () => {
             }));
 
             const formattedProductionLogs = pieceProductionLogs.map((l: any) => {
+              const photo = l.startPhotos?.unit || l.startPhotos?.machine || l.startPhotos?.software || l.photoUrl;
               if (l.stage === 'Production Work') {
                 const parentMl = machineLogs?.find((ml: any) => ml.id === l.parentLogId);
                 return {
                   ...l,
                   displayType: 'Machine End',
+                  photoUrl: photo || parentMl?.endUnitPhotoUrl || parentMl?.endMachinePhotoUrl,
                   startPhotos: {
                     machine: parentMl?.endMachinePhotoUrl || l.startPhotos?.machine,
                     unit: parentMl?.endUnitPhotoUrl || l.startPhotos?.unit,
@@ -2078,15 +2116,38 @@ const StageDetails = () => {
               }
               return {
                 ...l,
+                photoUrl: photo,
                 displayType: l.transactionType === 'OUT' ? 'Material OUT' : 'Material IN'
               };
             });
 
-            let combinedLogs = [...formattedProductionLogs, ...formattedMachineLogs].filter((log: any) => {
+            const pieceDirectLogs = (viewPiece?.logs && Array.isArray(viewPiece.logs))
+              ? viewPiece.logs.map((pl: any) => ({
+                  ...pl,
+                  displayType: 'Piece Completion',
+                  stage: pl.stage || 'Production Work',
+                  approvalStatus: pl.status || 'approved',
+                  worker: pl.driverName || 'Operator',
+                  photoUrl: pl.endPhotoUrl || pl.startPhotoUrl,
+                  startTime: pl.createdAt || pl.endTime,
+                  createdAt: pl.createdAt || pl.endTime
+                }))
+              : [];
+
+            let combinedLogs = [...formattedProductionLogs, ...formattedMachineLogs, ...pieceDirectLogs].filter((log: any) => {
               if (stageFormatted === 'Production') {
-                return log.stage === 'Production Work' || log.stage === 'Production Work (Machine)' || log.stage === 'Production';
+                return log.stage === 'Production Work' || log.stage === 'Production Work (Machine)' || log.stage === 'Production' || log.stage?.toLowerCase()?.includes('production');
               }
-              return log.stage === stageFormatted || log.stage === `${stageFormatted} Work`;
+              return log.stage === stageFormatted || log.stage === `${stageFormatted} Work` || log.stage?.toLowerCase()?.includes(stageFormatted.toLowerCase());
+            });
+
+            // Deduplicate logs with same id or timestamp
+            const seenKeys = new Set();
+            combinedLogs = combinedLogs.filter((log: any) => {
+              const key = `${log.id}_${log.startTime || log.createdAt}_${log.stage}`;
+              if (seenKeys.has(key)) return false;
+              seenKeys.add(key);
+              return true;
             });
 
             combinedLogs.sort((a: any, b: any) => {
@@ -2135,13 +2196,13 @@ const StageDetails = () => {
                         flexWrap: 'wrap',
                         gap: 2
                       }}>
-                        <Box>
+                        <Box sx={{ flex: 1, minWidth: 240 }}>
                            <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 800, display: 'block', mb: 0.75, letterSpacing: '0.5px' }}>
                              {new Date(log.startTime || log.createdAt).toLocaleString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
                            </Typography>
                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                              <Typography variant="h6" sx={{ fontWeight: 800, color: isOut ? '#D97706' : '#0284C7' }}>
-                               {log.displayType}
+                               {log.displayType || 'Piece Completion'}
                              </Typography>
                              {log.approvalStatus === 'approved' && <Chip size="small" label="Approved" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 800, fontSize: '0.7rem', height: 22, border: '1px solid #A7F3D0' }} />}
                              {log.approvalStatus === 'pending' && <Chip size="small" label="Pending" sx={{ bgcolor: '#FFFBEB', color: '#D97706', fontWeight: 800, fontSize: '0.7rem', height: 22, border: '1px solid #FDE68A' }} />}
@@ -2149,11 +2210,27 @@ const StageDetails = () => {
                            <Typography variant="subtitle2" sx={{ color: '#1E293B', fontWeight: 700 }}>
                              {log.stage}
                            </Typography>
-                           <Typography variant="body2" sx={{ color: '#64748B', mt: 0.75 }}>
-                             Worker / Vendor: <strong style={{ color: '#1E293B' }}>{typeof log.worker === 'object' ? log.worker?.name : log.worker || log.vendorName || 'Unknown'}</strong>
+                           {(log.machineId || log.machine?.name) && (
+                             <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
+                               Machine: <strong style={{ color: '#1E293B' }}>{log.machine?.name || machines.find((m: any) => (m.id || m._id) === log.machineId)?.name || 'Machine'}</strong>
+                             </Typography>
+                           )}
+                           <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
+                             Worker / Vendor: <strong style={{ color: '#1E293B' }}>{typeof log.worker === 'object' ? log.worker?.name : log.worker || log.driverName || log.vendorName || log.operator?.name || 'Admin'}</strong>
                            </Typography>
+                           {log.remarks && (
+                             <Typography variant="body2" sx={{ color: '#475569', mt: 1, bgcolor: '#F8FAFC', p: 1, borderRadius: 1.5, border: '1px solid #E2E8F0', fontStyle: 'italic' }}>
+                               Remarks: {log.remarks}
+                             </Typography>
+                           )}
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                          {(log.photoUrl || log.endPhotoUrl || log.startPhotoUrl) && (
+                            <Box onClick={() => setPreviewPhotoUrl(log.photoUrl || log.endPhotoUrl || log.startPhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
+                               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#059669', mb: 0.5, fontWeight: 700 }}>Piece Photo</Typography>
+                               <img src={log.photoUrl || log.endPhotoUrl || log.startPhotoUrl} alt="Piece Completion Proof" style={{ width: 95, height: 95, borderRadius: 10, objectFit: 'cover', border: '2px solid #86EFAC', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} />
+                            </Box>
+                          )}
                           {(log.startPhotos?.machine || log.machinePhotoUrl) && (
                             <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.machine || log.machinePhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
                                <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#64748B', mb: 0.5, fontWeight: 700 }}>Machine</Typography>
@@ -2181,7 +2258,19 @@ const StageDetails = () => {
             );
           })()}
         </DialogContent>
-        <DialogActions sx={{ p: 2, px: 3 }}>
+        <DialogActions sx={{ p: 2, px: 3, display: 'flex', justifyContent: 'space-between' }}>
+          <Button 
+            variant="outlined"
+            startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+            onClick={() => {
+              const pToEdit = viewPiece;
+              setViewPiece(null);
+              handleOpenEditPiece(pToEdit);
+            }}
+            sx={{ borderRadius: 2, color: '#B38B36', borderColor: '#B38B36', fontWeight: 700, textTransform: 'none' }}
+          >
+            Edit Piece Details
+          </Button>
           <Button onClick={() => setViewPiece(null)} sx={{ borderRadius: 2, color: '#1E293B', fontWeight: 700, textTransform: 'none' }}>Close</Button>
         </DialogActions>
       </Dialog>
