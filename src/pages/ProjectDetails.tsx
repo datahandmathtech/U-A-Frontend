@@ -1220,14 +1220,14 @@ const ProjectDetails: React.FC = () => {
         name: slabForm.name,
         size: sizeFormatted,
         cost: Number(slabForm.cost) || 0,
-        requiredStages: slabForm.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch']
+        requiredStages: slabForm.requiredStages || ['Production', 'Packing', 'Dispatch']
       };
       if (slabForm.inventoryId && slabForm.inventoryId.length === 24) {
         payload.inventoryId = slabForm.inventoryId;
       }
       await updateSlab({ id: editingSlabId as string, data: payload }).unwrap();
       setEditSlabDialogOpen(false);
-      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
+      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Packing', 'Dispatch'] });
       setEditingSlabId(null);
       refetchSlabs();
       setSnackbarMessage('Slab updated successfully!');

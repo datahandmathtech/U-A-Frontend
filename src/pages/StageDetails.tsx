@@ -268,16 +268,13 @@ const StageDetails = () => {
         const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
         const finalName = p.pieceNumber ? `${base}.${p.pieceNumber}` : (p.name || base);
         
-        const pieceUnit = p.unit || effectiveDimUnit;
-        let suffix = '';
-        if (pieceUnit === 'inch') suffix = ' (inch)';
-        if (pieceUnit === 'mm') suffix = ' (mm)';
-        if (pieceUnit === 'sq_ft') suffix = ' (sq_ft)';
+        const pieceUnit = p.unit || effectiveDimUnit || 'inch';
+        const uLabel = pieceUnit === 'feet' ? 'Feet' : pieceUnit === 'mm' ? 'MM' : 'Inch';
 
         return {
           name: finalName,
           pieceNumber: (p.pieceNumber && !isNaN(Number(p.pieceNumber))) ? Number(p.pieceNumber) : undefined,
-          size: p.t ? `${p.l}L x ${p.w}W | ${p.t}MM${suffix}` : `${p.l}L x ${p.w}W${suffix}`,
+          size: p.t ? `${p.l}L x ${p.w}W ${uLabel} | ${p.t}MM` : `${p.l}L x ${p.w}W ${uLabel}`,
           length: p.l,
           width: p.w,
           thickness: p.t,
@@ -453,19 +450,21 @@ const StageDetails = () => {
     let thickness = '';
     let unit = effectiveDimUnit || 'inch';
     if (p.size) {
-      const lMatch = p.size.match(/(\d+(?:\.\d+)?)L/i);
-      const wMatch = p.size.match(/(\d+(?:\.\d+)?)W/i);
-      const tMatch = p.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
+      const lMatch = p.size.match(/(\d+(?:\.\d+)?)\s*L/i) || p.size.match(/^(\d+(?:\.\d+)?)/);
+      const wMatch = p.size.match(/(\d+(?:\.\d+)?)\s*W/i) || p.size.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+      const tMatch = p.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || p.size.match(/(\d+(?:\.\d+)?)\s*MM/i);
       if (lMatch) length = lMatch[1];
       if (wMatch) width = wMatch[1];
       if (tMatch) thickness = tMatch[1];
-      const pDimsPart = (p.size.split('|')[0] || '').toLowerCase();
-      if (pDimsPart.includes('feet') || pDimsPart.includes('ft') || pDimsPart.includes("'")) {
+      
+      const pStr = String(p.size).toLowerCase();
+      const pBeforePipe = (pStr.split('|')[0] || '');
+      if (pBeforePipe.includes('feet') || pBeforePipe.includes('ft') || pBeforePipe.includes("'") || pStr.includes('(feet)') || pStr.includes('(ft)')) {
         unit = 'feet';
-      } else if (pDimsPart.includes('inch') || pDimsPart.includes('"')) {
+      } else if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pStr.includes('(inch)') || pStr.includes('inches')) {
         unit = 'inch';
-      } else if (pDimsPart.includes('mm')) {
-        unit = effectiveDimUnit === 'inch' ? 'inch' : 'mm';
+      } else if (pBeforePipe.includes('mm') || pStr.includes('(mm)')) {
+        unit = 'mm';
       } else {
         unit = effectiveDimUnit || 'inch';
       }
