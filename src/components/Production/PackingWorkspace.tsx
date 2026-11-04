@@ -14,6 +14,7 @@ import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
 import { useNavigate } from 'react-router-dom';
@@ -28,8 +29,8 @@ interface PackingWorkspaceProps {
   onRefresh: () => void;
 }
 
-const parsePieceArea = (sizeStr?: string): number => {
-  if (!sizeStr) return 2.08;
+const parsePieceArea = (sizeStr?: any): number => {
+  if (!sizeStr || typeof sizeStr !== 'string') return 2.08;
   const sqftMatch = sizeStr.match(/([\d\.]+)\s*Sq\.?Ft/i);
   if (sqftMatch) return parseFloat(sqftMatch[1]);
   const lMatch = sizeStr.match(/([\d\.]+)\s*L/i);
@@ -66,8 +67,8 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  // Consolidate pieces: if slab has pieces use them, otherwise gather all project pieces
-  const allPieces = useMemo(() => {
+  // Consolidate raw pieces from slab or slabs
+  const rawPieces = useMemo(() => {
     if (slab?.pieces && Array.isArray(slab.pieces) && slab.pieces.length > 0) {
       return slab.pieces;
     }
@@ -79,6 +80,34 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     });
     return combined;
   }, [slab, slabs]);
+
+  // ONLY pieces whose production work is COMPLETED (or approved) are eligible for Packing!
+  const allPieces = useMemo(() => {
+    return rawPieces.filter((p: any) => {
+      if (!p) return false;
+      if (p.status === 'pending' || p.status === 'not_started') return false;
+
+      const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const pStageNorm = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+      const pIdx = stages.indexOf(pStageNorm);
+      const packingIdx = stages.indexOf('Packing');
+
+      // If already moved to Packing or Dispatch stage, it's completed
+      if (pIdx >= packingIdx) return true;
+
+      // If marked completed or approved in Production/Polishing
+      if (p.status === 'completed' || p.status === 'approved') return true;
+
+      // If has completed/approved logs
+      if (p.logs && Array.isArray(p.logs)) {
+        return p.logs.some((l: any) => l.status === 'completed' || l.status === 'approved');
+      }
+
+      return false;
+    });
+  }, [rawPieces]);
+
+  const totalSlabPiecesCount = rawPieces.length;
 
   // Derive packed boxes from production logs with stage Packing
   const packedBoxes = useMemo(() => {
@@ -236,7 +265,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   };
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: 'auto', pb: 12 }}>
+    <Box sx={{ width: '100%', maxWidth: '100%', mx: 'auto', pb: 6, boxSizing: 'border-box' }}>
       {/* Toast Notification */}
       <Snackbar
         open={toast.open}
@@ -248,6 +277,43 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
           {toast.message}
         </Alert>
       </Snackbar>
+
+      {/* HEADER & NAVIGATION BREADCRUMBS */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5, gap: 1.5 }}>
+        <IconButton 
+          onClick={() => navigate(`/projects/${projectId}`)} 
+          size="small"
+          sx={{ 
+            bgcolor: '#FFFFFF', 
+            border: '1px solid #E2E8F0',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            '&:hover': { bgcolor: '#F8FAFC' }
+          }}
+        >
+          <ArrowBackRoundedIcon fontSize="small" />
+        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600, color: '#64748B' }}>
+          <Typography 
+            component="span" 
+            onClick={() => navigate('/projects')}
+            sx={{ cursor: 'pointer', '&:hover': { color: '#0F172A', textDecoration: 'underline' } }}
+          >
+            Projects
+          </Typography>
+          <Typography component="span" sx={{ color: '#CBD5E1' }}>/</Typography>
+          <Typography 
+            component="span" 
+            onClick={() => navigate(`/projects/${projectId}`)}
+            sx={{ cursor: 'pointer', '&:hover': { color: '#0F172A', textDecoration: 'underline' } }}
+          >
+            {projectName || 'Project'}
+          </Typography>
+          <Typography component="span" sx={{ color: '#CBD5E1' }}>/</Typography>
+          <Typography component="span" sx={{ color: '#0F172A', fontWeight: 700 }}>
+            {slab?.name || 'Packing'}
+          </Typography>
+        </Box>
+      </Box>
 
       {/* 1. TOP HEADER & METRICS (Screenshot 4) */}
       <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 4, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
@@ -267,8 +333,10 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', px: 2, py: 1, borderRadius: 2.5 }}>
               <Inventory2RoundedIcon sx={{ color: '#0284C7', fontSize: 24 }} />
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 900, color: '#0369A1', lineHeight: 1 }}>{totalPieces}</Typography>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: '#0284C7', textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Pieces</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 900, color: '#0369A1', lineHeight: 1 }}>
+                  {totalPieces} {totalSlabPiecesCount > totalPieces ? `/${totalSlabPiecesCount}` : ''}
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#0284C7', textTransform: 'uppercase', fontSize: '0.65rem' }}>Ready to Pack</Typography>
               </Box>
             </Box>
 
@@ -291,10 +359,10 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         </Box>
       </Paper>
 
-      {/* 2. MAIN 2-COLUMN VIEW (Screenshot 4) */}
-      <Grid container spacing={3}>
+      {/* 2. MAIN 2-COLUMN VIEW (Robust CSS Grid) */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 4, width: '100%', minWidth: 0 }}>
         {/* LEFT COLUMN: PIECES GRID */}
-        <Grid item xs={12} md={7}>
+        <Box sx={{ minWidth: 0 }}>
           <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 480 }}>
             {/* Pieces Header with Search */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
@@ -332,7 +400,18 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
             </Box>
 
             {/* Pieces Grid */}
-            <Grid container spacing={1.5}>
+            {filteredPieces.length === 0 ? (
+              <Box sx={{ py: 8, textAlign: 'center', color: '#94A3B8' }}>
+                <Inventory2RoundedIcon sx={{ fontSize: 44, color: '#CBD5E1', mb: 1 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
+                  No completed pieces ready for packing
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', mt: 0.5 }}>
+                  Only pieces that are completed in Production will appear here to be packed.
+                </Typography>
+              </Box>
+            ) : (
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 1.5 }}>
               {filteredPieces.map((p: any) => {
                 const isPacked = packedPieceIdMap.has(p.id);
                 const isSelected = selectedPieceIds.includes(p.id);
@@ -340,7 +419,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                 const boxAssigned = packedPieceIdMap.get(p.id);
 
                 return (
-                  <Grid item xs={6} sm={4} md={3} key={p.id}>
+                  <Box key={p.id} sx={{ minWidth: 0 }}>
                     <Box
                       onClick={() => handleTogglePiece(p.id)}
                       sx={{
@@ -394,15 +473,16 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                         {areaSqFt.toFixed(2)} Sq.Ft
                       </Typography>
                     </Box>
-                  </Grid>
+                  </Box>
                 );
               })}
-            </Grid>
+            </Box>
+            )}
           </Paper>
-        </Grid>
+        </Box>
 
         {/* RIGHT COLUMN: PACKING BOXES */}
-        <Grid item xs={12} md={5}>
+        <Box sx={{ minWidth: 0 }}>
           <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 480 }}>
             {/* Packing Boxes Header */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1 }}>
@@ -525,19 +605,17 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
               </Box>
             )}
           </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* 3. DOCKED BOTTOM BAR (Screenshot 4) */}
       <Paper
         elevation={4}
         sx={{
-          position: 'fixed',
+          position: 'sticky',
           bottom: 16,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 'calc(100% - 48px)',
-          maxWidth: 1350,
+          width: '100%',
+          mt: 4,
           p: 2,
           px: 3,
           borderRadius: 3.5,

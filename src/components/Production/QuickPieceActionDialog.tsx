@@ -27,6 +27,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import PersonIcon from '@mui/icons-material/Person';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
 import EditIcon from '@mui/icons-material/Edit';
 import LayersIcon from '@mui/icons-material/Layers';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
@@ -81,6 +82,16 @@ const dropdownMenuProps = {
       mt: 1
     }
   }
+};
+
+const formatForDateTimeLocal = (date: Date = new Date()) => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  const MM = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
 };
 
 export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
@@ -216,6 +227,8 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
   const [selectedStage, setSelectedStage] = useState<string>('');
   const [machineId, setMachineId] = useState<string>('');
   const [driverName, setDriverName] = useState<string>('');
+  const [startTime, setStartTime] = useState<string>(() => formatForDateTimeLocal());
+  const [endTime, setEndTime] = useState<string>(() => formatForDateTimeLocal());
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('');
 
@@ -332,6 +345,16 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
         else setMachineId('');
         if (latestPieceLog?.driverName) setDriverName(latestPieceLog.driverName);
         else setDriverName('');
+        if (latestPieceLog?.startTime) {
+          setStartTime(formatForDateTimeLocal(new Date(latestPieceLog.startTime)));
+        } else {
+          setStartTime(formatForDateTimeLocal());
+        }
+        if (latestPieceLog?.endTime) {
+          setEndTime(formatForDateTimeLocal(new Date(latestPieceLog.endTime)));
+        } else {
+          setEndTime(formatForDateTimeLocal());
+        }
         if (latestPieceLog?.startPhotoUrl || latestPieceLog?.endPhotoUrl) {
           setPhotoUrl(latestPieceLog.endPhotoUrl || latestPieceLog.startPhotoUrl);
         } else setPhotoUrl('');
@@ -355,6 +378,8 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
       setPieceStatus('completed');
       setMachineId('');
       setDriverName('');
+      setStartTime(formatForDateTimeLocal());
+      setEndTime(formatForDateTimeLocal());
       setPhotoUrl('');
       setRemarks('');
       setSelectedStage(availableStages[0] || 'Production');
@@ -440,6 +465,8 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
           status: pieceStatus, // 'completed' or 'pending'
           machineId: machineId || undefined,
           driverName: driverName.trim() || undefined,
+          startTime: startTime ? new Date(startTime).toISOString() : undefined,
+          endTime: endTime ? new Date(endTime).toISOString() : undefined,
           photoUrl: photoUrl || undefined,
           stage: selectedStage || 'Production',
           remarks: remarks.trim() || undefined,
@@ -456,6 +483,8 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
           status: pieceStatus,
           machineId: machineId || undefined,
           driverName: driverName.trim() || undefined,
+          startTime: startTime ? new Date(startTime).toISOString() : undefined,
+          endTime: endTime ? new Date(endTime).toISOString() : undefined,
           photoUrl: photoUrl || undefined,
           remarks: remarks.trim() || undefined
         }).unwrap();
@@ -774,6 +803,44 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
                       slotProps={{
                         input: {
                           startAdornment: <PersonIcon sx={{ fontSize: 18, color: '#64748B', mr: 1 }} />
+                        }
+                      }}
+                      sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}
+                    />
+                  </Grid>
+
+                  {/* Machine In Date & Time (Start) */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="datetime-local"
+                      label="Machine In / Start Date & Time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      slotProps={{
+                        inputLabel: { shrink: true },
+                        input: {
+                          startAdornment: <AccessTimeRoundedIcon sx={{ fontSize: 18, color: '#059669', mr: 1 }} />
+                        }
+                      }}
+                      sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}
+                    />
+                  </Grid>
+
+                  {/* Machine Out Date & Time (End) */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="datetime-local"
+                      label="Machine Out / End Date & Time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      slotProps={{
+                        inputLabel: { shrink: true },
+                        input: {
+                          startAdornment: <AccessTimeRoundedIcon sx={{ fontSize: 18, color: '#DC2626', mr: 1 }} />
                         }
                       }}
                       sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}

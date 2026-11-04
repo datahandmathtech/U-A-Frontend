@@ -200,6 +200,16 @@ import {
 
 const filter = createFilterOptions<any>();
 
+export const parseSafeDate = (dInput: any): Date | null => {
+  if (!dInput) return null;
+  const d = new Date(dInput);
+  if (isNaN(d.getTime())) return null;
+  if (d.getFullYear() < 100) {
+    d.setFullYear(d.getFullYear() + 2000);
+  }
+  return d;
+};
+
 const Projects: React.FC = () => {
   const navigate = useNavigate();
   const { data: projects, isLoading, isError, refetch } = useGetProjectsQuery();
@@ -490,9 +500,9 @@ const Projects: React.FC = () => {
 
   // Helper to determine if an order is completed
   const isOrderCompleted = (wo: any) => {
-    if (wo.status === 'completed') return true;
+    if (wo.status === 'completed' || wo.projectClosure?.isClosed) return true;
     const prog = calculateOrderProgress(wo);
-    return prog.percent >= 100 && prog.totalProductRows > 0;
+    return (prog.overallProgressPercent ?? (prog as any).percent ?? 0) >= 100 && prog.totalProductRows > 0;
   };
 
   // All work orders from projects
@@ -532,7 +542,8 @@ const Projects: React.FC = () => {
       completedMainStones += prog.productionEquivalentCompleted;
 
       const targetDate = wo.deadline || wo.deliveryDate;
-      if (targetDate && new Date(targetDate) < today && wo.status !== 'completed') {
+      const targetD = parseSafeDate(targetDate);
+      if (targetD && targetD < today && wo.status !== 'completed') {
         overdueCount++;
       }
     });
@@ -569,11 +580,15 @@ const Projects: React.FC = () => {
       const targetDate = wo.deadline || wo.deliveryDate;
       const actualDate = wo.completedAt || wo.projectClosure?.completedAt || wo.updatedAt;
       if (targetDate && actualDate) {
-        const tD = new Date(targetDate);
-        const aD = new Date(actualDate);
-        tD.setHours(23, 59, 59, 999);
-        if (aD.getTime() > tD.getTime()) {
-          delayedCount++;
+        const tD = parseSafeDate(targetDate);
+        const aD = parseSafeDate(actualDate);
+        if (tD && aD) {
+          tD.setHours(23, 59, 59, 999);
+          if (aD.getTime() > tD.getTime()) {
+            delayedCount++;
+          } else {
+            onTimeCount++;
+          }
         } else {
           onTimeCount++;
         }
@@ -616,8 +631,10 @@ const Projects: React.FC = () => {
     const dataToExport = completedWorkOrders.map((p: any, idx: number) => {
       const prog = calculateOrderProgress(p);
       const targetDate = p.deadline || p.deliveryDate;
-      const targetFormatted = targetDate ? new Date(targetDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-      const startFormatted = p.startDate ? new Date(p.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+      const tD = parseSafeDate(targetDate);
+      const targetFormatted = tD ? tD.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+      const sD = parseSafeDate(p.startDate);
+      const startFormatted = sD ? sD.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 
       return {
         'S.No': idx + 1,
@@ -628,7 +645,7 @@ const Projects: React.FC = () => {
         'Work Size': calculateProjectWorkSize(p),
         'Total Pieces / Main Stones': p.totalPieces || prog.totalProductRows || 0,
         'Completed Pieces': prog.completedPiecesCount || p.completedPieces || 0,
-        'Progress': `${prog.percent}%`,
+        'Progress': '100%',
         'Start Date': startFormatted,
         'Deadline / Delivery': targetFormatted,
         'Status': 'Completed'
@@ -1149,20 +1166,22 @@ const Projects: React.FC = () => {
             ) : (
               filteredWorkOrders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((project: any) => {
                 const stoneProg = calculateOrderProgress(project);
-                const percent = stoneProg.overallProgressPercent;
+                const percent = activeTab === 'completed' ? 100 : stoneProg.overallProgressPercent;
 
                 const finalEndDate = project.deadline || project.deliveryDate;
                 let statusChip = { label: 'On Schedule', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
 
                 if (finalEndDate) {
                   const today = new Date();
-                  const delivery = new Date(finalEndDate);
-                  const diffDays = Math.ceil((delivery.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                  const delivery = parseSafeDate(finalEndDate);
+                  if (delivery) {
+                    const diffDays = Math.ceil((delivery.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-                  if (diffDays < 0 && project.status !== 'completed') {
-                    statusChip = { label: `Overdue by ${Math.abs(diffDays)}d`, color: '#DC2626', bg: '#FEF2F2', border: '#FCA5A5' };
-                  } else if (diffDays <= 3 && project.status !== 'completed') {
-                    statusChip = { label: `Due in ${diffDays}d`, color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
+                    if (diffDays < 0 && project.status !== 'completed') {
+                      statusChip = { label: `Overdue by ${Math.abs(diffDays)}d`, color: '#DC2626', bg: '#FEF2F2', border: '#FCA5A5' };
+                    } else if (diffDays <= 3 && project.status !== 'completed') {
+                      statusChip = { label: `Due in ${diffDays}d`, color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
+                    }
                   }
                 }
 
@@ -1171,12 +1190,14 @@ const Projects: React.FC = () => {
                 let isLateCompletion = false;
                 let completionDiffDays = 0;
                 if (finalEndDate && completedDate) {
-                  const targetD = new Date(finalEndDate);
-                  targetD.setHours(23, 59, 59, 999);
-                  const actualD = new Date(completedDate);
-                  if (actualD.getTime() > targetD.getTime()) {
-                    isLateCompletion = true;
-                    completionDiffDays = Math.ceil((actualD.getTime() - targetD.getTime()) / (1000 * 60 * 60 * 24));
+                  const targetD = parseSafeDate(finalEndDate);
+                  const actualD = parseSafeDate(completedDate);
+                  if (targetD && actualD) {
+                    targetD.setHours(23, 59, 59, 999);
+                    if (actualD.getTime() > targetD.getTime()) {
+                      isLateCompletion = true;
+                      completionDiffDays = Math.ceil((actualD.getTime() - targetD.getTime()) / (1000 * 60 * 60 * 24));
+                    }
                   }
                 }
 
@@ -1225,28 +1246,12 @@ const Projects: React.FC = () => {
                               {project.name}
                             </Typography>
                           </Box>
-                          {(project.clientName || project.description || project.isDirectWorkOrder || (!project.enquiryId && !project.inquiryId && !project.leadId)) && (
+                          {(project.clientName || project.description) && (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.3, flexWrap: 'wrap' }}>
                               {project.clientName && (
                                 <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, fontSize: '0.75rem' }}>
                                   Client: {project.clientName}
                                 </Typography>
-                              )}
-                              {(project.isDirectWorkOrder || (!project.enquiryId && !project.inquiryId && !project.leadId) || project.orderType === 'direct') && (
-                                <Chip
-                                  label="Direct Order"
-                                  size="small"
-                                  sx={{
-                                    height: 18,
-                                    fontSize: '0.65rem',
-                                    fontWeight: 700,
-                                    bgcolor: '#FEF3C7',
-                                    color: '#B45309',
-                                    border: '1px solid #FDE68A',
-                                    borderRadius: 1,
-                                    px: 0.5
-                                  }}
-                                />
                               )}
                               {project.description && (
                                 <Typography
@@ -1298,8 +1303,8 @@ const Projects: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <CalendarMonthIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
                         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                          {project.startDate
-                            ? new Date(project.startDate).toLocaleDateString('en-GB', {
+                          {project.startDate && parseSafeDate(project.startDate)
+                            ? parseSafeDate(project.startDate)!.toLocaleDateString('en-GB', {
                                 day: '2-digit',
                                 month: 'short',
                                 year: 'numeric'
@@ -1314,9 +1319,11 @@ const Projects: React.FC = () => {
                       <Box sx={{ width: '100%', maxWidth: 180 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                           <Typography variant="caption" sx={{ fontWeight: 700, color: '#1E293B' }}>
-                            {stoneProg.productionProgressDisplay}
+                            {activeTab === 'completed'
+                              ? `${stoneProg.totalProductRows}.00 / ${stoneProg.totalProductRows}`
+                              : stoneProg.productionProgressDisplay}
                           </Typography>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: '#B38B36' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: percent === 100 ? '#059669' : '#B38B36' }}>
                             {percent}%
                           </Typography>
                         </Box>
@@ -1340,8 +1347,8 @@ const Projects: React.FC = () => {
                     <TableCell sx={{ py: 2 }}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
                         <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155' }}>
-                          {finalEndDate
-                            ? new Date(finalEndDate).toLocaleDateString('en-GB', {
+                          {finalEndDate && parseSafeDate(finalEndDate)
+                            ? parseSafeDate(finalEndDate)!.toLocaleDateString('en-GB', {
                                 day: '2-digit',
                                 month: 'short',
                                 year: 'numeric'
@@ -1349,12 +1356,12 @@ const Projects: React.FC = () => {
                             : 'No deadline'}
                         </Typography>
                         {activeTab === 'completed' ? (
-                          completedDate ? (
+                          completedDate && parseSafeDate(completedDate) ? (
                             <Chip
                               label={
                                 isLateCompletion
-                                  ? `Completed: ${new Date(completedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} (+${completionDiffDays}d)`
-                                  : `Completed: ${new Date(completedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                                  ? `Completed: ${parseSafeDate(completedDate)!.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} (+${completionDiffDays}d)`
+                                  : `Completed: ${parseSafeDate(completedDate)!.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
                               }
                               size="small"
                               sx={{

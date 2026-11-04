@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Box, Typography, Paper, Grid, Button, Chip, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Checkbox, InputAdornment, Snackbar, Alert, Divider
+  Checkbox, IconButton, InputAdornment, Snackbar, Alert, Divider
 } from '@mui/material';
 import DirectionsCarRoundedIcon from '@mui/icons-material/DirectionsCarRounded';
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
@@ -15,6 +15,7 @@ import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
 import AutoFixHighRoundedIcon from '@mui/icons-material/AutoFixHighRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import { useNavigate } from 'react-router-dom';
 import { useDispatchBoxesMutation } from '../../store/apiSlice';
 
@@ -27,8 +28,8 @@ interface DispatchWorkspaceProps {
   onRefresh: () => void;
 }
 
-const parsePieceArea = (sizeStr?: string): number => {
-  if (!sizeStr) return 2.08;
+const parsePieceArea = (sizeStr?: any): number => {
+  if (!sizeStr || typeof sizeStr !== 'string') return 2.08;
   const sqftMatch = sizeStr.match(/([\d\.]+)\s*Sq\.?Ft/i);
   if (sqftMatch) return parseFloat(sqftMatch[1]);
   const lMatch = sizeStr.match(/([\d\.]+)\s*L/i);
@@ -43,6 +44,18 @@ const parsePieceArea = (sizeStr?: string): number => {
     return Number(((l * w) / 144).toFixed(2));
   }
   return 2.08;
+};
+
+const getLocalDateString = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const getLocalTimeString = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
@@ -109,11 +122,11 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
     }
   }, [packedBoxes]);
 
-  // Form State
-  const [vehicleNumber, setVehicleNumber] = useState('RJ-27-TA-9822');
-  const [driverName, setDriverName] = useState('Heerala');
-  const [dispatchDate, setDispatchDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dispatchTime, setDispatchTime] = useState('11:30 AM');
+  // Form State (empty by default so user enters real details)
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [dispatchDate, setDispatchDate] = useState(getLocalDateString);
+  const [dispatchTime, setDispatchTime] = useState(getLocalTimeString);
   const [lrNumber, setLrNumber] = useState('');
   const [remarks, setRemarks] = useState('');
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
@@ -196,7 +209,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
   };
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: 'auto', pb: 12 }}>
+    <Box sx={{ width: '100%', maxWidth: '100%', mx: 'auto', pb: 6, boxSizing: 'border-box' }}>
       {/* Toast Notification */}
       <Snackbar
         open={toast.open}
@@ -208,6 +221,43 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
           {toast.message}
         </Alert>
       </Snackbar>
+
+      {/* HEADER & NAVIGATION BREADCRUMBS */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5, gap: 1.5 }}>
+        <IconButton 
+          onClick={() => navigate(`/projects/${projectId}`)} 
+          size="small"
+          sx={{ 
+            bgcolor: '#FFFFFF', 
+            border: '1px solid #E2E8F0',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            '&:hover': { bgcolor: '#F8FAFC' }
+          }}
+        >
+          <ArrowBackRoundedIcon fontSize="small" />
+        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600, color: '#64748B' }}>
+          <Typography 
+            component="span" 
+            onClick={() => navigate('/projects')}
+            sx={{ cursor: 'pointer', '&:hover': { color: '#0F172A', textDecoration: 'underline' } }}
+          >
+            Projects
+          </Typography>
+          <Typography component="span" sx={{ color: '#CBD5E1' }}>/</Typography>
+          <Typography 
+            component="span" 
+            onClick={() => navigate(`/projects/${projectId}`)}
+            sx={{ cursor: 'pointer', '&:hover': { color: '#0F172A', textDecoration: 'underline' } }}
+          >
+            {projectName || 'Project'}
+          </Typography>
+          <Typography component="span" sx={{ color: '#CBD5E1' }}>/</Typography>
+          <Typography component="span" sx={{ color: '#0F172A', fontWeight: 700 }}>
+            {slab?.name || 'Dispatch'}
+          </Typography>
+        </Box>
+      </Box>
 
       {/* 1. TOP HEADER & METRICS (Screenshot 5) */}
       <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 4, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
@@ -303,10 +353,10 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         </Box>
       </Paper>
 
-      {/* 2. MAIN 2-COLUMN VIEW (Screenshot 5) */}
-      <Grid container spacing={3}>
+      {/* 2. MAIN 2-COLUMN VIEW (Robust CSS Grid) */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 4, width: '100%', minWidth: 0 }}>
         {/* LEFT COLUMN: PACKED BOXES TABLE */}
-        <Grid item xs={12} md={6}>
+        <Box sx={{ minWidth: 0 }}>
           <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 450 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
               <Inventory2RoundedIcon sx={{ color: '#0284C7', fontSize: 22 }} />
@@ -401,10 +451,10 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               </Table>
             </TableContainer>
           </Paper>
-        </Grid>
+        </Box>
 
         {/* RIGHT COLUMN: DISPATCH DETAILS FORM */}
-        <Grid item xs={12} md={6}>
+        <Box sx={{ minWidth: 0 }}>
           <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 450 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.5 }}>
               <LocalShippingRoundedIcon sx={{ color: '#059669', fontSize: 24 }} />
@@ -415,7 +465,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
 
             <Grid container spacing={2}>
               {/* Vehicle Number */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', mb: 0.5, display: 'block' }}>
                   Vehicle Number *
                 </Typography>
@@ -423,6 +473,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                   fullWidth
                   size="small"
                   placeholder="e.g. RJ-27-TA-9822"
+                  autoComplete="off"
                   value={vehicleNumber}
                   onChange={(e) => setVehicleNumber(e.target.value)}
                   slotProps={{
@@ -439,7 +490,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               </Grid>
 
               {/* Driver Name */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', mb: 0.5, display: 'block' }}>
                   Driver Name
                 </Typography>
@@ -447,6 +498,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                   fullWidth
                   size="small"
                   placeholder="Enter driver name"
+                  autoComplete="off"
                   value={driverName}
                   onChange={(e) => setDriverName(e.target.value)}
                   slotProps={{
@@ -463,7 +515,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               </Grid>
 
               {/* Dispatch Date & Time */}
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', mb: 0.5, display: 'block' }}>
                   Dispatch Date *
                 </Typography>
@@ -486,20 +538,22 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', mb: 0.5, display: 'block' }}>
                   Dispatch Time
                 </Typography>
                 <TextField
                   fullWidth
+                  type="time"
                   size="small"
+                  autoComplete="off"
                   value={dispatchTime}
                   onChange={(e) => setDispatchTime(e.target.value)}
                   slotProps={{
                     input: {
                       startAdornment: (
                         <InputAdornment position="start">
-                          <AccessTimeRoundedIcon sx={{ color: '#64748B', fontSize: 18 }} />
+                          <AccessTimeRoundedIcon sx={{ color: '#059669', fontSize: 18 }} />
                         </InputAdornment>
                       ),
                       sx: { borderRadius: 2, bgcolor: '#F8FAFC' }
@@ -509,7 +563,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               </Grid>
 
               {/* Transport / LR No. */}
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', mb: 0.5, display: 'block' }}>
                   Transport / LR No. (Optional)
                 </Typography>
@@ -533,7 +587,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               </Grid>
 
               {/* Remarks */}
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', mb: 0.5, display: 'block' }}>
                   Remarks (Optional)
                 </Typography>
@@ -550,19 +604,17 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               </Grid>
             </Grid>
           </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* 3. DOCKED BOTTOM BAR (Screenshot 5) */}
       <Paper
         elevation={4}
         sx={{
-          position: 'fixed',
+          position: 'sticky',
           bottom: 16,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 'calc(100% - 48px)',
-          maxWidth: 1350,
+          width: '100%',
+          mt: 4,
           p: 2,
           px: 3,
           borderRadius: 3.5,

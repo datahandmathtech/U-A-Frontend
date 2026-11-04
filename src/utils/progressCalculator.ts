@@ -2,15 +2,26 @@ export const calculateOrderProgress = (project: any) => {
   const slabs = project.slabs && project.slabs.length > 0 ? project.slabs : [];
   
   if (slabs.length === 0) {
+    const isCompleted = project.status === 'completed';
     return {
       totalProductRows: 0,
       productionEquivalentCompleted: 0,
       productionProgressDisplay: "0.00 / 0",
-      overallProgressPercent: 0
+      overallProgressPercent: isCompleted ? 100 : 0
     };
   }
 
   const totalProductRows = slabs.length;
+
+  // If work order is explicitly completed, progress is 100%!
+  if (project.status === 'completed') {
+    return {
+      totalProductRows,
+      productionEquivalentCompleted: totalProductRows,
+      productionProgressDisplay: `${totalProductRows}.00 / ${totalProductRows}`,
+      overallProgressPercent: 100
+    };
+  }
   let totalProductionEquivalent = 0;
   let totalSlabPercentSum = 0;
 
@@ -81,7 +92,10 @@ export const calculateOrderProgress = (project: any) => {
     totalSlabPercentSum += slabProgress;
   });
 
-  const overallProgressPercent = Math.round(totalSlabPercentSum / totalProductRows);
+  let overallProgressPercent = Math.round(totalSlabPercentSum / totalProductRows);
+  if (totalProductionEquivalent >= totalProductRows || project.status === 'completed') {
+    overallProgressPercent = 100;
+  }
 
   return {
     totalProductRows,

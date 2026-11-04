@@ -239,9 +239,11 @@ const SlabRow = ({
         const isPending = p.status === 'pending' || p.status === 'not_started';
         const isCurrentStageCompleted = !isPending && pStage === normalizedStageName && (p.status === 'completed' || p.status === 'approved');
 
-        if (!isPending && (hasCompletedLog || hasApprovedPieceLog || (isCurrentStageCompleted && (hasCompletedLog || hasApprovedPieceLog || (!p.logs || p.logs.length === 0))))) {
+        if (!isPending && pIdx > stageIdx) {
           piecesCompleted++;
-        } else if (!isPending && pIdx > stageIdx && (hasCompletedLog || hasApprovedPieceLog)) {
+        } else if (isCurrentStageCompleted) {
+          piecesCompleted++;
+        } else if (!isPending && (hasCompletedLog || hasApprovedPieceLog)) {
           piecesCompleted++;
         } else if (pIdx === stageIdx && (p.status === 'active' || p.status === 'in_progress')) {
           piecesActive++;
@@ -3822,159 +3824,8 @@ const ProjectDetails: React.FC = () => {
               </Paper>
             )}
 
-            {/* STEP 5: PRODUCTION TRACKING (OR COMPLETED EXPORT VIEW) */}
-            {stepToRender >= 5 && (
-              project?.status === 'completed' ? (
-                /* WHEN COMPLETED: ELEGANT, WORLD-CLASS COMPLETION CARD WITH EXCEL DOWNLOAD ONLY */
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: { xs: 4, sm: 5, md: 6 },
-                    textAlign: 'center',
-                    border: '1px solid rgba(16, 185, 129, 0.25)',
-                    borderRadius: 5,
-                    background: 'radial-gradient(100% 70% at 50% 0%, #F0FDF4 0%, #FFFFFF 100%)',
-                    boxShadow: '0 20px 45px -10px rgba(16, 185, 129, 0.12), 0 4px 16px rgba(0, 0, 0, 0.04)',
-                    maxWidth: 660,
-                    mx: 'auto',
-                    my: { xs: 3, md: 5 },
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {/* Top Decorative Emerald Glow Pill */}
-                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, px: 2, py: 0.6, bgcolor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 99, mb: 3 }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#059669' }} />
-                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#047857', letterSpacing: 1, textTransform: 'uppercase', fontSize: '0.72rem' }}>
-                      Work Order Finalized
-                    </Typography>
-                  </Box>
-
-                  {/* Icon with Glowing Layered Rings */}
-                  <Box
-                    sx={{
-                      width: 92,
-                      height: 92,
-                      borderRadius: '50%',
-                      bgcolor: '#DCFCE7',
-                      border: '4px solid #F0FDF4',
-                      boxShadow: '0 0 0 8px rgba(16, 185, 129, 0.12)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mx: 'auto',
-                      mb: 3
-                    }}
-                  >
-                    <CheckCircleRoundedIcon sx={{ fontSize: 56, color: '#059669' }} />
-                  </Box>
-
-                  {/* Title & Description */}
-                  <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', mb: 1.5, fontSize: { xs: '1.6rem', sm: '2.1rem' }, letterSpacing: '-0.5px' }}>
-                    Production Completed!
-                  </Typography>
-                  <Typography variant="body1" sx={{ color: '#64748B', maxWidth: 480, mx: 'auto', fontSize: '0.96rem', lineHeight: 1.6, mb: 3.5 }}>
-                    All manufacturing stages, machine cutting, polishing, and packing have been completed. The full execution audit ledger is ready for export.
-                  </Typography>
-
-                  {/* Quick Project Summary Stats Pill */}
-                  <Box
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: 2,
-                      p: 2,
-                      mb: 4,
-                      bgcolor: '#F8FAFC',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: 3
-                    }}
-                  >
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block', mb: 0.5 }}>
-                        Project
-                      </Typography>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {project?.projectCode || project?.title || '-'}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ textAlign: 'center', borderLeft: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }}>
-                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block', mb: 0.5 }}>
-                        Total Slabs
-                      </Typography>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#059669' }}>
-                        {projectSlabs?.length || 0} Slabs
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block', mb: 0.5 }}>
-                        Total Pieces
-                      </Typography>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#059669' }}>
-                        {projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} Pieces
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {/* Primary Action Button: DOWNLOAD EXCEL ONLY */}
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <Button
-                      variant="contained"
-                      size="large"
-                      startIcon={<TableChartRoundedIcon sx={{ fontSize: 26 }} />}
-                      onClick={() => exportProjectProductionExcel({ project, slabs: projectSlabs, machines, productionLogs })}
-                      sx={{
-                        width: { xs: '100%', sm: 'auto' },
-                        minWidth: 320,
-                        py: 1.8,
-                        px: 4.5,
-                        borderRadius: 3,
-                        fontWeight: 900,
-                        fontSize: '1.05rem',
-                        textTransform: 'none',
-                        letterSpacing: '0.2px',
-                        background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                        boxShadow: '0 8px 24px rgba(5, 150, 105, 0.35)',
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          background: 'linear-gradient(135deg, #047857 0%, #065F46 100%)',
-                          boxShadow: '0 12px 30px rgba(5, 150, 105, 0.45)',
-                          transform: 'translateY(-2px)'
-                        }
-                      }}
-                    >
-                      Download Production Excel Report (.xlsx)
-                    </Button>
-
-                    <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.78rem', mt: 1.5 }}>
-                      Includes slab specs, piece tracking, machines used, driver/operator & completion dates
-                    </Typography>
-
-                    {/* Secondary Navigation */}
-                    <Button
-                      variant="text"
-                      size="medium"
-                      startIcon={<ArrowBackIcon sx={{ fontSize: 18 }} />}
-                      onClick={() => navigate('/projects')}
-                      sx={{
-                        mt: 3.5,
-                        borderRadius: 2,
-                        px: 3,
-                        py: 0.8,
-                        fontWeight: 700,
-                        color: '#64748B',
-                        textTransform: 'none',
-                        fontSize: '0.88rem',
-                        '&:hover': { bgcolor: '#F1F5F9', color: '#1E293B' }
-                      }}
-                    >
-                      Exit to All Work Orders
-                    </Button>
-                  </Box>
-                </Paper>
-              ) : (() => {
+            {/* STEP 5: PRODUCTION TRACKING (ALWAYS VISIBLE ACTIVE WORK ORDER) */}
+            {stepToRender >= 5 && (() => {
               const categories = Array.from(new Set(projectSlabs?.map((s: any) => {
                 const prod = products?.find(p => s.name.startsWith(p.category));
                 return prod?.category || s.name.split(' ')[0];
@@ -4011,6 +3862,57 @@ const ProjectDetails: React.FC = () => {
                     </Button>
                   )}
 
+                  {/* WORK ORDER FINALIZED / COMPLETED BANNER */}
+                  {project?.status === 'completed' && (
+                    <Box
+                      sx={{
+                        p: 2.5,
+                        mb: 3,
+                        borderRadius: 3.5,
+                        bgcolor: '#F0FDF4',
+                        border: '1.5px solid #86EFAC',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 2,
+                        boxShadow: '0 4px 15px rgba(5, 150, 105, 0.06)'
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
+                        <Box sx={{ p: 1, bgcolor: '#DCFCE7', color: '#166534', borderRadius: '50%', display: 'flex' }}>
+                          <CheckCircleRoundedIcon sx={{ fontSize: 28 }} />
+                        </Box>
+                        <Box>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0F172A', lineHeight: 1.2, mb: 0.25 }}>
+                            Work Order Finalized & Production Completed!
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#047857', fontWeight: 600 }}>
+                            All manufacturing stages are complete. Full slab specifications, tracking details, and actions remain active below.
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        startIcon={<TableChartRoundedIcon sx={{ fontSize: 20 }} />}
+                        onClick={() => exportProjectProductionExcel({ project, slabs: projectSlabs, machines, productionLogs })}
+                        sx={{
+                          bgcolor: '#059669',
+                          fontWeight: 800,
+                          textTransform: 'none',
+                          borderRadius: 2,
+                          px: 2.5,
+                          py: 1,
+                          fontSize: '0.88rem',
+                          boxShadow: 'none',
+                          '&:hover': { bgcolor: '#047857' }
+                        }}
+                      >
+                        Download Excel Report (.xlsx)
+                      </Button>
+                    </Box>
+                  )}
+
                   {/* Executive Header Bar */}
                   <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 4, bgcolor: '#FFFFFF', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 2.5, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
@@ -4020,7 +3922,7 @@ const ProjectDetails: React.FC = () => {
                               Slabs & Production Planning
                             </Typography>
                             <Chip
-                              label={isPlanningMode ? 'Stage Configuration' : 'In Production'}
+                              label={isPlanningMode ? 'Stage Configuration' : (project?.status === 'completed' ? 'Completed' : 'In Production')}
                               size="small"
                               sx={{
                                 bgcolor: isPlanningMode ? '#FEF3C7' : '#ECFDF5',
@@ -4573,8 +4475,7 @@ const ProjectDetails: React.FC = () => {
                   </Box>
                 </Paper>
               );
-            })()
-          )}
+            })()}
 
           </Box>
         </Box> {/* End of LEFT MAIN COLUMN */}
