@@ -996,95 +996,21 @@ const StageDetails = () => {
             </TableCell>
           )}
 
-          <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip 
-                icon={displayStatus === 'completed' ? <CheckCircleRoundedIcon sx={{ fontSize: '13px !important', color: '#059669 !important' }} /> : <CircleIcon sx={{ fontSize: '7px !important', color: displayStatus === 'pending' ? '#94A3B8 !important' : '#D97706 !important' }} />}
-                label={displayStatus === 'completed' ? 'Completed' : (displayStatus === 'in_progress' || p.status === 'in_progress') ? '⚡ Machine ON' : 'Not Started'} 
-                size="small" 
-                sx={{ 
-                  fontWeight: 800, 
-                  fontSize: '0.72rem',
-                  height: 22,
-                  borderRadius: 1.5,
-                  ...(displayStatus === 'completed' ? { bgcolor: '#ECFDF5', color: '#059669' } : 
-                      (displayStatus === 'in_progress' || p.status === 'in_progress') ? { bgcolor: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' } : 
-                      { bgcolor: '#F1F5F9', color: '#64748B' })
-                }} 
-              />
-              {stageFormatted === 'Production' && displayStatus !== 'completed' && p.status !== 'in_progress' && (
-                <Tooltip title="Turn ON Machine for this Piece">
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => handleOpenQuickMachineStart(p)}
-                    sx={{
-                      minWidth: 'auto',
-                      px: 1,
-                      py: 0.2,
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      color: '#0284C7',
-                      borderColor: '#BAE6FD',
-                      bgcolor: '#F0F9FF',
-                      borderRadius: 1.5,
-                      textTransform: 'none',
-                      '&:hover': { bgcolor: '#E0F2FE' }
-                    }}
-                  >
-                    ▶ Turn ON
-                  </Button>
-                </Tooltip>
-              )}
-              {stageFormatted === 'Production' && displayStatus === 'completed' && (
-                <Tooltip title="Turn ON Machine Again for this Piece">
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => handleOpenQuickMachineStart(p)}
-                    sx={{
-                      minWidth: 'auto',
-                      px: 0.8,
-                      py: 0.15,
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      color: '#64748B',
-                      borderColor: '#CBD5E1',
-                      bgcolor: '#F8FAFC',
-                      borderRadius: 1.5,
-                      textTransform: 'none',
-                      '&:hover': { bgcolor: '#F1F5F9', color: '#0F172A' }
-                    }}
-                  >
-                    ▶ Re-Run
-                  </Button>
-                </Tooltip>
-              )}
-              {stageFormatted === 'Production' && (displayStatus === 'in_progress' || p.status === 'in_progress') && (
-                <Tooltip title="Turn OFF Machine & Complete">
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => handleQuickMachineStop(p)}
-                    sx={{
-                      minWidth: 'auto',
-                      px: 1,
-                      py: 0.2,
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      color: '#DC2626',
-                      borderColor: '#FECACA',
-                      bgcolor: '#FEF2F2',
-                      borderRadius: 1.5,
-                      textTransform: 'none',
-                      '&:hover': { bgcolor: '#FEE2E2' }
-                    }}
-                  >
-                    ⏹ Turn OFF
-                  </Button>
-                </Tooltip>
-              )}
-            </Box>
+                    <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
+            <Chip 
+              icon={displayStatus === 'completed' ? <CheckCircleRoundedIcon sx={{ fontSize: '13px !important', color: '#059669 !important' }} /> : <CircleIcon sx={{ fontSize: '7px !important', color: displayStatus === 'pending' ? '#94A3B8 !important' : '#D97706 !important' }} />}
+              label={displayStatus === 'completed' ? 'Completed' : displayStatus === 'pending' ? 'Not Started' : 'In Progress'} 
+              size="small" 
+              sx={{ 
+                fontWeight: 800, 
+                fontSize: '0.72rem',
+                height: 22,
+                borderRadius: 1.5,
+                ...(displayStatus === 'completed' ? { bgcolor: '#ECFDF5', color: '#059669' } : 
+                    displayStatus === 'pending' ? { bgcolor: '#F1F5F9', color: '#64748B' } : 
+                    { bgcolor: '#FFFBEB', color: '#D97706' })
+              }} 
+            />
           </TableCell>
 
           <TableCell align="right" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
@@ -2294,62 +2220,7 @@ const StageDetails = () => {
         </DialogActions>
       </Dialog>
 
-            {/* QUICK MACHINE ON DIALOG */}
-      <Dialog
-        open={!!quickMachinePiece}
-        onClose={() => setQuickMachinePiece(null)}
-        maxWidth="xs"
-        fullWidth
-        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B' }}>
-          ⚡ Turn ON Machine
-        </DialogTitle>
-        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          <Typography variant="body2" sx={{ color: '#475569' }}>
-            Piece: <strong>{quickMachinePiece?.productName || quickMachinePiece?.name || `Piece #${quickMachinePiece?.pieceNumber}`}</strong>
-          </Typography>
-
-          <FormControl fullWidth size="small">
-            <InputLabel>Select Machine</InputLabel>
-            <Select
-              label="Select Machine"
-              value={quickSelectedMachineId}
-              onChange={(e) => setQuickSelectedMachineId(e.target.value)}
-              sx={{ borderRadius: 2 }}
-            >
-              {machines.map((m: any) => (
-                <MenuItem key={m.id || m._id} value={m.id || m._id}>
-                  {m.name} ({m.type || 'Machine'})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <TextField
-            label="Machine ON Date & Time"
-            type="datetime-local"
-            size="small"
-            fullWidth
-            value={quickStartTime}
-            onChange={(e) => setQuickStartTime(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: 2 } } }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setQuickMachinePiece(null)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disabled={!quickSelectedMachineId}
-            onClick={handleConfirmQuickMachineStart}
-            sx={{ bgcolor: '#0284C7', fontWeight: 800, textTransform: 'none', borderRadius: 2, '&:hover': { bgcolor: '#0369A1' } }}
-          >
-            Turn ON Machine
-          </Button>
-        </DialogActions>
-      </Dialog>
+            
 
       {/* VIEW PIECE TIMELINE & HISTORY DIALOG */}
       <Dialog 
