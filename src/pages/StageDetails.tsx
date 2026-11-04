@@ -925,6 +925,7 @@ const StageDetails = () => {
     const packedDispatchedQty = dispatchedPackedLogs.reduce((sum: number, l: any) => sum + (l.quantityProduced || 0), 0);
 
     const pieceCompletedCount = (slab.pieces || []).filter((p: any) => {
+      if (p.status === 'pending' || p.status === 'not_started') return false;
       const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
       return pStage === 'Dispatch' && p.status === 'completed';
     }).length;
@@ -936,6 +937,7 @@ const StageDetails = () => {
       .reduce((sum: number, l: any) => sum + (l.quantityProduced || 0), 0) || 0;
 
     const pieceCompletedCount = (slab.pieces || []).filter((p: any) => {
+      if (p.status === 'pending' || p.status === 'not_started') return false;
       const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
       const hasCompletedLog = p.logs && p.logs.some((l: any) => {
         const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
@@ -947,6 +949,7 @@ const StageDetails = () => {
     completedPieces = Math.max(directLogsQty, pieceCompletedCount);
   } else {
     completedPieces = (slab.pieces || []).filter((p: any) => {
+      if (p.status === 'pending' || p.status === 'not_started') return false;
       const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
       const hasCompletedLog = p.logs && p.logs.some((l: any) => {
         const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
@@ -1117,7 +1120,7 @@ const StageDetails = () => {
                       </Avatar>
                       <Box>
                         <Typography variant="h5" sx={{ fontWeight: 900, color: '#D97706', lineHeight: 1 }}>{pendingPieces}</Typography>
-                        <Typography variant="caption" sx={{ color: '#D97706', fontWeight: 700, mt: 0.5, display: 'block', textTransform: 'uppercase', fontSize: '0.65rem' }}>Pending</Typography>
+                        <Typography variant="caption" sx={{ color: '#D97706', fontWeight: 700, mt: 0.5, display: 'block', textTransform: 'uppercase', fontSize: '0.65rem' }}>Not Started</Typography>
                       </Box>
                    </Box>
                 </Box>
@@ -1866,8 +1869,7 @@ const StageDetails = () => {
               onChange={(e) => setEditPieceDims({ ...editPieceDims, status: e.target.value })}
               sx={{ borderRadius: 2 }}
             >
-              <MenuItem value="pending">Pending</MenuItem>
-              <MenuItem value="active">Active / In Progress</MenuItem>
+              <MenuItem value="pending">Not Started</MenuItem>
               <MenuItem value="completed">Completed</MenuItem>
             </Select>
           </FormControl>

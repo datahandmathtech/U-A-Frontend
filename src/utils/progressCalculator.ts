@@ -52,6 +52,9 @@ export const calculateOrderProgress = (project: any) => {
 
       let completedCount = 0;
       pieces.forEach((p: any) => {
+        if (p.status === 'pending' || p.status === 'not_started') {
+          return; // If Not Started, do not count as completed!
+        }
         const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
         const pIdx = BASE_STAGES.indexOf(pStage);
         

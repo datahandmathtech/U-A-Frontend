@@ -219,11 +219,48 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('');
 
+  // Editable Piece Specifications
+  const [pieceName, setPieceName] = useState<string>('');
+  const [length, setLength] = useState<string>('');
+  const [width, setWidth] = useState<string>('');
+  const [thickness, setThickness] = useState<string>('');
+  const [unit, setUnit] = useState<string>('inch');
+  const [pieceStatus, setPieceStatus] = useState<string>('completed');
+  const [slabName, setSlabName] = useState<string>('');
+
   const getPieceId = (p: any): string => String(p?.id || p?._id || '');
+
+  // Helper to parse dimensions from size strings
+  const parseDims = (str: string) => {
+    let l = '';
+    let w = '';
+    let t = '';
+    let u = 'inch';
+    if (str) {
+      const lMatch = str.match(/(\d+(?:\.\d+)?)\s*L/i) || str.match(/^(\d+(?:\.\d+)?)/);
+      const wMatch = str.match(/(\d+(?:\.\d+)?)\s*W/i) || str.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+      const tMatch = str.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || str.match(/(\d+(?:\.\d+)?)\s*MM/i);
+      if (lMatch) l = lMatch[1];
+      if (wMatch) w = wMatch[1];
+      if (tMatch) t = tMatch[1];
+
+      const pStr = str.toLowerCase();
+      const pBeforePipe = (pStr.split('|')[0] || '');
+      if (pBeforePipe.includes('feet') || pBeforePipe.includes('ft') || pBeforePipe.includes("'") || pStr.includes('(feet)') || pStr.includes('(ft)')) {
+        u = 'feet';
+      } else if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pStr.includes('(inch)') || pStr.includes('inches')) {
+        u = 'inch';
+      } else if (pBeforePipe.includes('mm') || pStr.includes('(mm)')) {
+        u = 'mm';
+      }
+    }
+    return { l, w, t, u };
+  };
 
   // Helper to check if a stage is done for a piece
   const checkStageDone = (piece: any, stageKey: string): boolean => {
     if (!piece) return false;
+    if (piece.status === 'pending' || piece.status === 'not_started') return false;
     const norm = stageKey.split(' - ')[0].replace(' Work', '').trim().toLowerCase();
 
     // Check piece.logs
@@ -260,7 +297,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
 
   // Filter out stages that are already completed for the selected piece
   const pendingStages = useMemo(() => {
-    if (mode === 'edit') {
+    if (mode === 'edit' || pieceStatus === 'pending') {
       return availableStages;
     }
     if (selectedPieceId === 'new') {
@@ -269,37 +306,72 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
     if (!currentPiece) {
       return availableStages;
     }
-    // Only return stages that are NOT done
-    return availableStages.filter(stg => !checkStageDone(currentPiece, stg));
-  }, [availableStages, currentPiece, selectedPieceId, mode]);
+    const rem = availableStages.filter(stg => !checkStageDone(currentPiece, stg));
+    return rem.length > 0 ? rem : availableStages;
+  }, [availableStages, currentPiece, selectedPieceId, mode, pieceStatus]);
 
-  // When user selects a piece, pick its first pending stage so completed stages are not selected!
+  // When user selects a piece, populate dimensions & pick its first pending stage
   const handlePieceSelect = (pId: string) => {
     setSelectedPieceId(pId);
     if (pId && pId !== 'new') {
       const p = slab?.pieces?.find((x: any) => getPieceId(x) === pId);
       if (p) {
+        setPieceName(p.productName || p.name || `Piece #${p.pieceNumber}`);
+        const parsed = parseDims(p.size || slab?.size || '');
+        setLength(parsed.l);
+        setWidth(parsed.w);
+        setThickness(parsed.t);
+        setUnit(parsed.u || 'inch');
+        setPieceStatus('completed'); // Default to completed for quick complete, but user can change to Not Started
+
+        const pieceLogsList = p.logs && Array.isArray(p.logs) ? p.logs : [];
+        const latestPieceLog = pieceLogsList[0] || pieceLogsList[pieceLogsList.length - 1];
+        if (latestPieceLog?.machineId) setMachineId(latestPieceLog.machineId);
+        else setMachineId('');
+        if (latestPieceLog?.driverName) setDriverName(latestPieceLog.driverName);
+        else setDriverName('');
+        if (latestPieceLog?.startPhotoUrl || latestPieceLog?.endPhotoUrl) {
+          setPhotoUrl(latestPieceLog.endPhotoUrl || latestPieceLog.startPhotoUrl);
+        } else setPhotoUrl('');
+        if (latestPieceLog?.remarks) setRemarks(latestPieceLog.remarks);
+        else setRemarks('');
+
         const rem = availableStages.filter(stg => !checkStageDone(p, stg));
         if (rem.length > 0) {
           setSelectedStage(rem[0]);
         } else {
-          setSelectedStage('');
+          setSelectedStage(availableStages[0] || 'Production');
         }
       }
-    } else {
+    } else if (pId === 'new') {
+      setPieceName(`${slab?.name || 'Slab'} Piece ${(slab?.pieces?.length || 0) + 1}`);
+      const parsed = parseDims(slab?.size || '');
+      setLength(parsed.l);
+      setWidth(parsed.w);
+      setThickness(parsed.t);
+      setUnit(parsed.u || 'inch');
+      setPieceStatus('completed');
+      setMachineId('');
+      setDriverName('');
+      setPhotoUrl('');
+      setRemarks('');
       setSelectedStage(availableStages[0] || 'Production');
+    } else {
+      setPieceName('');
+      setLength('');
+      setWidth('');
+      setThickness('');
+      setUnit('inch');
+      setPieceStatus('completed');
+      setSelectedStage('');
     }
   };
 
-  // Available pieces to choose: in 'add' mode, hide pieces that are already 100% completed
+  // Available pieces to choose: show all slab pieces so user can complete or edit any piece
   const availablePieces = useMemo(() => {
     if (!slab?.pieces || !Array.isArray(slab.pieces)) return [];
-    if (mode === 'edit') return slab.pieces;
-    return slab.pieces.filter((p: any) => {
-      const isAllDone = availableStages.every(stg => checkStageDone(p, stg));
-      return !isAllDone;
-    });
-  }, [slab, mode, availableStages]);
+    return slab.pieces;
+  }, [slab]);
 
   // Clean reset: ALWAYS start completely empty so NOTHING is selected automatically!
   useEffect(() => {
@@ -310,6 +382,13 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
       setDriverName('');
       setPhotoUrl('');
       setRemarks('');
+      setPieceName('');
+      setLength('');
+      setWidth('');
+      setThickness('');
+      setUnit('inch');
+      setPieceStatus('completed');
+      setSlabName(slab?.name || '');
     }
   }, [open, slab?.id, mode]);
 
@@ -337,23 +416,42 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
   const handleSubmit = async () => {
     if (!slab?.id) return;
 
+    const l = parseFloat(length) || 0;
+    const w = parseFloat(width) || 0;
+    const t = parseFloat(thickness) || 0;
+    const u = unit || 'inch';
+    const isFt = u === 'feet';
+    const isMM = u === 'mm';
+    const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
+    const area = isFt ? l * w : isMM ? (l * w) / 92903.04 : (l * w) / 144;
+    const sizeFormatted = (l > 0 && w > 0)
+      ? `${l}L x ${w}W ${unitLabel}${t ? ` | ${t}MM` : ''} (${area.toFixed(2)} Sq.Ft)`
+      : undefined;
+
     try {
       if (mode === 'add') {
         const res = await quickCompletePiece({
           slabId: slab.id,
           pieceId: selectedPieceId || undefined,
+          productName: pieceName.trim() || undefined,
+          size: sizeFormatted,
+          status: pieceStatus, // 'completed' or 'pending'
           machineId: machineId || undefined,
           driverName: driverName.trim() || undefined,
           photoUrl: photoUrl || undefined,
-          stage: selectedStage,
-          remarks: remarks.trim() || undefined
+          stage: selectedStage || 'Production',
+          remarks: remarks.trim() || undefined,
+          slabName: slabName.trim() && slabName.trim() !== slab.name ? slabName.trim() : undefined
         }).unwrap();
 
-        onSuccess?.(res?.message || `${selectedStage} marked as completed!`);
+        onSuccess?.(res?.message || (pieceStatus === 'completed' ? `${selectedStage || 'Production'} marked as completed!` : 'Piece updated to Not Started'));
       } else {
         const res = await quickEditPieceLog({
           slabId: slab.id,
           pieceId: selectedPieceId || undefined,
+          productName: pieceName.trim() || undefined,
+          size: sizeFormatted,
+          status: pieceStatus,
           machineId: machineId || undefined,
           driverName: driverName.trim() || undefined,
           photoUrl: photoUrl || undefined,
@@ -478,7 +576,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
                           />
                         ) : (
                           <Chip
-                            label="Pending"
+                            label="Not Started"
                             size="small"
                             sx={{ height: 20, fontSize: '0.68rem', fontWeight: 600, bgcolor: '#F1F5F9', color: '#64748B' }}
                           />
@@ -492,6 +590,119 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
                 </MenuItem>
               </Select>
             </FormControl>
+
+            {/* 2. PIECE & SLAB SPECIFICATION (DIRECT EDIT & MANUAL APPROVAL) */}
+            {selectedPieceId && (
+              <Box sx={{ p: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Piece Specification & Dimensions
+                  </Typography>
+                  {parseFloat(length) > 0 && parseFloat(width) > 0 && (
+                    <Chip
+                      size="small"
+                      label={`Calculated Area: ${(
+                        unit === 'feet'
+                          ? parseFloat(length) * parseFloat(width)
+                          : unit === 'mm'
+                          ? (parseFloat(length) * parseFloat(width)) / 92903.04
+                          : (parseFloat(length) * parseFloat(width)) / 144
+                      ).toFixed(2)} Sq.Ft`}
+                      sx={{ bgcolor: '#FFF4E5', color: '#B38B36', fontWeight: 800, fontSize: '0.72rem' }}
+                    />
+                  )}
+                </Box>
+
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Product / Piece Name"
+                  placeholder="e.g. HYD Wall 2.1"
+                  value={pieceName}
+                  onChange={(e) => setPieceName(e.target.value)}
+                  sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                />
+
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Unit</InputLabel>
+                      <Select
+                        label="Unit"
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
+                        sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                      >
+                        <MenuItem value="inch">Inches</MenuItem>
+                        <MenuItem value="feet">Feet</MenuItem>
+                        <MenuItem value="mm">MM</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Length (L)"
+                      value={length}
+                      onChange={(e) => setLength(e.target.value)}
+                      sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Width (W)"
+                      value={width}
+                      onChange={(e) => setWidth(e.target.value)}
+                      sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                    />
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Thickness (MM)"
+                      value={thickness}
+                      onChange={(e) => setThickness(e.target.value)}
+                      sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                    />
+                  </Grid>
+                </Grid>
+
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Piece Status</InputLabel>
+                      <Select
+                        label="Piece Status"
+                        value={pieceStatus}
+                        onChange={(e) => setPieceStatus(e.target.value)}
+                        sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                      >
+                        <MenuItem value="completed">Completed</MenuItem>
+                        <MenuItem value="pending">Not Started</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Slab Name (Optional Edit)"
+                      value={slabName}
+                      onChange={(e) => setSlabName(e.target.value)}
+                      sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
 
             {/* 2. STAGE SELECTION - ONLY SHOW PENDING / REMAINING STAGES */}
             <FormControl fullWidth size="small">
@@ -703,10 +914,10 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={isSubmitting || isFetchingDetails || (mode === 'add' && (!selectedPieceId || pendingStages.length === 0))}
+          disabled={isSubmitting || isFetchingDetails || !selectedPieceId}
           startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : <CheckCircleRoundedIcon />}
           sx={{
-            bgcolor: mode === 'add' ? '#059669' : '#1E293B',
+            bgcolor: pieceStatus === 'pending' ? '#475569' : mode === 'add' ? '#059669' : '#1E293B',
             color: '#FFFFFF',
             fontWeight: 800,
             textTransform: 'none',
@@ -715,14 +926,16 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
             py: 1,
             boxShadow: '0 4px 12px rgba(5, 150, 105, 0.2)',
             '&:hover': {
-              bgcolor: mode === 'add' ? '#047857' : '#0F172A'
+              bgcolor: pieceStatus === 'pending' ? '#334155' : mode === 'add' ? '#047857' : '#0F172A'
             }
           }}
         >
           {isSubmitting
             ? 'Saving...'
+            : pieceStatus === 'pending'
+            ? 'Save as Not Started'
             : mode === 'add'
-            ? `Mark ${selectedStage} as Completed`
+            ? (selectedStage ? `Mark ${selectedStage} as Completed` : 'Save & Mark as Completed')
             : 'Update Piece Details'}
         </Button>
       </DialogActions>
