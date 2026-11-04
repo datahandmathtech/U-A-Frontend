@@ -546,6 +546,22 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Production', 'Project', 'Dispatch']
     }),
+    packBoxes: builder.mutation<any, { projectId?: string, slabId?: string, boxes: any[] }>({
+      query: (data) => ({
+        url: '/production/pack-boxes',
+        method: 'POST',
+        body: data
+      }),
+      invalidatesTags: ['Production', 'Project', 'Dispatch']
+    }),
+    dispatchBoxes: builder.mutation<any, { projectId?: string, slabId?: string, boxCodes?: string[], pieceIds?: string[], vehicleNumber?: string, driverName?: string, dispatchDate?: string, lrNumber?: string, remarks?: string }>({
+      query: (data) => ({
+        url: '/production/dispatch-boxes',
+        method: 'POST',
+        body: data
+      }),
+      invalidatesTags: ['Production', 'Project', 'Dispatch']
+    }),
     replicateSlabTemplate: builder.mutation<any, { projectId: string, sourceSlabId: string, targetSlabIds?: string[], fromSlabNumber?: number, toSlabNumber?: number }>({
       query: (data) => ({
         url: '/slabs/replicate-template',
@@ -734,5 +750,7 @@ export const {
   useGetProductChatQuery,
   useSendProductChatMessageMutation,
   useMarkProductChatReadMutation,
-  useGetAdminChatAlertsQuery
+  useGetAdminChatAlertsQuery,
+  usePackBoxesMutation,
+  useDispatchBoxesMutation
 } = apiSlice;

@@ -31,24 +31,24 @@ const STAGES = [
 
 // Helper to check if a piece has completed a stage
 const checkPieceStageDone = (piece: any, stageName: string): boolean => {
+  if (!piece) return false;
+  if (piece.status === 'pending' || piece.status === 'not_started') return false;
+
   const norm = stageName.replace(' Work', '').trim();
-  if (piece?.logs && Array.isArray(piece.logs)) {
-    const hasDone = piece.logs.some((l: any) => {
+
+  // If piece has logs, strictly check for an explicit approved log for this stage
+  if (piece?.logs && Array.isArray(piece.logs) && piece.logs.length > 0) {
+    return piece.logs.some((l: any) => {
       const lStage = (l.stage || '').replace(' Work', '').trim();
       return (lStage === norm || lStage.startsWith(norm) || (norm.startsWith('Polishing') && lStage.startsWith('Polishing'))) && 
              (l.status === 'completed' || l.status === 'approved');
     });
-    if (hasDone) return true;
   }
-  if (piece?.status === 'completed') {
+
+  // Fallback only if piece has no logs array at all
+  if (piece?.status === 'completed' || piece?.status === 'approved') {
     const pStage = (piece?.stage || '').replace(' Work', '').trim();
     if (pStage === norm || pStage.startsWith(norm) || (norm.startsWith('Polishing') && pStage.startsWith('Polishing'))) return true;
-    const STAGE_ORDER = ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
-    const currentIdx = STAGE_ORDER.findIndex(s => s === pStage || pStage.startsWith(s));
-    const targetIdx = STAGE_ORDER.findIndex(s => s === norm || norm.startsWith(s));
-    if (currentIdx > -1 && targetIdx > -1 && currentIdx >= targetIdx) {
-      return true;
-    }
   }
   return false;
 };

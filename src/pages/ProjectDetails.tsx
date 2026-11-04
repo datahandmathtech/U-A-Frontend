@@ -236,9 +236,12 @@ const SlabRow = ({
           if (lStage !== normalizedStageName && !lStage.startsWith(normalizedStageName)) return false;
           return l.pieceIds && l.pieceIds.includes(p.id);
         });
-        const isCurrentStageCompleted = pStage === normalizedStageName && (p.status === 'completed' || p.status === 'approved');
+        const isPending = p.status === 'pending' || p.status === 'not_started';
+        const isCurrentStageCompleted = !isPending && pStage === normalizedStageName && (p.status === 'completed' || p.status === 'approved');
 
-        if (hasCompletedLog || hasApprovedPieceLog || isCurrentStageCompleted || pIdx > stageIdx) {
+        if (!isPending && (hasCompletedLog || hasApprovedPieceLog || (isCurrentStageCompleted && (hasCompletedLog || hasApprovedPieceLog || (!p.logs || p.logs.length === 0))))) {
+          piecesCompleted++;
+        } else if (!isPending && pIdx > stageIdx && (hasCompletedLog || hasApprovedPieceLog)) {
           piecesCompleted++;
         } else if (pIdx === stageIdx && (p.status === 'active' || p.status === 'in_progress')) {
           piecesActive++;
@@ -278,10 +281,7 @@ const SlabRow = ({
 
   const DEFAULT_STAGE_COLUMNS = [
     { key: 'Production', label: 'Production', route: 'production' },
-    { key: 'Polishing - Honed', label: 'Polishing', route: 'polishing' },
-    { key: 'Polishing - Mirror', label: 'Polishing (Mirror)', route: 'polishing' },
-    { key: 'Packing', label: 'Packing', route: 'packing' },
-    { key: 'Dispatch', label: 'Dispatch', route: 'dispatch' }
+    { key: 'Polishing - Honed', label: 'Polishing', route: 'polishing' }
   ];
   const STAGE_COLUMNS = (activeStageColumns && activeStageColumns.length > 0) ? activeStageColumns : DEFAULT_STAGE_COLUMNS;
 
@@ -4145,6 +4145,65 @@ const ProjectDetails: React.FC = () => {
                             <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Pieces</Typography>
                           </Box>
                         </Box>
+
+                        {/* Packing & Dispatch Flow Summary Cards (Screenshot 3) */}
+                        <Divider orientation="vertical" flexItem sx={{ mx: 0.5, borderColor: '#E2E8F0', display: { xs: 'none', md: 'block' } }} />
+
+                        <Box
+                          onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/packing`)}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            p: 0.8,
+                            px: 1.8,
+                            borderRadius: 2.5,
+                            border: '1.5px solid #E2E8F0',
+                            bgcolor: '#FFFFFF',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            '&:hover': { borderColor: '#0284C7', bgcolor: '#F0F9FF' }
+                          }}
+                        >
+                          <Avatar sx={{ bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', color: '#0284C7', width: 36, height: 36, borderRadius: 2 }}>
+                            <Inventory2RoundedIcon sx={{ fontSize: 18 }} />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>Packing</Typography>
+                            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, fontSize: '0.65rem' }}>
+                              Not Started
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        <ArrowForwardRoundedIcon sx={{ color: '#CBD5E1', fontSize: 16, display: { xs: 'none', sm: 'block' } }} />
+
+                        <Box
+                          onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/dispatch`)}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            p: 0.8,
+                            px: 1.8,
+                            borderRadius: 2.5,
+                            border: '1.5px solid #E2E8F0',
+                            bgcolor: '#FFFFFF',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            '&:hover': { borderColor: '#059669', bgcolor: '#ECFDF5' }
+                          }}
+                        >
+                          <Avatar sx={{ bgcolor: '#ECFDF5', border: '1px solid #A7F3D0', color: '#059669', width: 36, height: 36, borderRadius: 2 }}>
+                            <LocalShippingRoundedIcon sx={{ fontSize: 18 }} />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>Dispatch</Typography>
+                            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, fontSize: '0.65rem' }}>
+                              Not Started
+                            </Typography>
+                          </Box>
+                        </Box>
                       </Box>
                     </Paper>
 
@@ -4295,10 +4354,7 @@ const ProjectDetails: React.FC = () => {
                   {(() => {
                     const ALL_STAGE_CONFIG = [
                       { key: 'Production', label: 'Production', route: 'production' },
-                      { key: 'Polishing - Honed', label: 'Polishing', route: 'polishing' },
-                      { key: 'Polishing - Mirror', label: 'Polishing (Mirror)', route: 'polishing' },
-                      { key: 'Packing', label: 'Packing', route: 'packing' },
-                      { key: 'Dispatch', label: 'Dispatch', route: 'dispatch' }
+                      { key: 'Polishing - Honed', label: 'Polishing', route: 'polishing' }
                     ];
 
                     // Dynamically calculate visible stage columns based on all project slabs
@@ -4320,6 +4376,7 @@ const ProjectDetails: React.FC = () => {
                     const columnsToRender = visibleProjectStageColumns.length > 0 ? visibleProjectStageColumns : ALL_STAGE_CONFIG;
 
                     return (
+                      <>
                       <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, mb: 3.5, overflowX: 'auto' }}>
                         <Table sx={{ minWidth: 1000 + columnsToRender.length * 80 }}>
                           <TableHead sx={{ bgcolor: '#F8FAFC' }}>
@@ -4402,6 +4459,67 @@ const ProjectDetails: React.FC = () => {
                       </TableBody>
                     </Table>
                   </TableContainer>
+
+                  {/* Next Stage (Common for All Slabs) Docked Banner Card (Screenshot 3) */}
+                  <Paper 
+                    elevation={0} 
+                    sx={{ 
+                      p: { xs: 2, sm: 2.5 }, 
+                      mb: 3.5, 
+                      borderRadius: 3.5, 
+                      border: '1.5px solid #E2E8F0', 
+                      bgcolor: '#FFFFFF', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      flexWrap: 'wrap', 
+                      gap: 2, 
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.03)' 
+                    }}
+                  >
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      Next Stage (Common for All Slabs)
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                      <Button
+                        variant="contained"
+                        startIcon={<Inventory2RoundedIcon />}
+                        onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/packing`)}
+                        sx={{
+                          bgcolor: '#0284C7',
+                          color: '#FFFFFF',
+                          fontWeight: 800,
+                          px: 3,
+                          py: 1.2,
+                          borderRadius: 2.5,
+                          textTransform: 'none',
+                          boxShadow: '0 2px 10px rgba(2, 132, 199, 0.25)',
+                          '&:hover': { bgcolor: '#0369A1' }
+                        }}
+                      >
+                        Start Packing ({projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} Pieces)
+                      </Button>
+                      <ArrowForwardRoundedIcon sx={{ color: '#CBD5E1', display: { xs: 'none', sm: 'block' } }} />
+                      <Button
+                        variant="contained"
+                        startIcon={<LocalShippingRoundedIcon />}
+                        onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/dispatch`)}
+                        sx={{
+                          bgcolor: '#F1F5F9',
+                          color: '#64748B',
+                          fontWeight: 800,
+                          px: 3,
+                          py: 1.2,
+                          borderRadius: 2.5,
+                          textTransform: 'none',
+                          '&:hover': { bgcolor: '#E2E8F0' }
+                        }}
+                      >
+                        Dispatch (after packing)
+                      </Button>
+                    </Box>
+                  </Paper>
+                      </>
                     );
                   })()}
 

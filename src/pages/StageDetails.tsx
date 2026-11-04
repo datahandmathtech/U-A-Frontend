@@ -32,6 +32,8 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import * as XLSX from 'xlsx';
+import PackingWorkspace from '../components/Production/PackingWorkspace';
+import DispatchWorkspace from '../components/Production/DispatchWorkspace';
 import { 
   useGetProjectByIdQuery, 
   useGetSlabsQuery,
@@ -90,12 +92,12 @@ const StageDetails = () => {
   }
   
   const rawSizeStr = slab?.size || '';
-  const dimsPart = (rawSizeStr.split('|')[0] || '').toLowerCase();
+  const rawBeforePipe = (rawSizeStr.split('|')[0] || '').toLowerCase().replace(/\s*x\s*\d+\s*mm/gi, '');
   const rawUnit = (matchedProduct?.unit || '').trim() || (
-    dimsPart.includes('sq. ft') || dimsPart.includes('sq_ft') || dimsPart.includes('sq.ft') || dimsPart.includes('sqft') ? 'sq_ft' :
-    dimsPart.includes('inch') || dimsPart.includes('"') ? 'inch' :
-    dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'") ? 'feet' :
-    dimsPart.includes('mm') ? 'mm' : 'inch'
+    rawBeforePipe.includes('sq. ft') || rawBeforePipe.includes('sq_ft') || rawBeforePipe.includes('sq.ft') || rawBeforePipe.includes('sqft') ? 'sq_ft' :
+    rawBeforePipe.includes('inch') || rawBeforePipe.includes('"') ? 'inch' :
+    rawBeforePipe.includes('feet') || rawBeforePipe.includes('ft') || rawBeforePipe.includes("'") ? 'feet' :
+    rawBeforePipe.includes('mm') ? 'mm' : 'inch'
   );
   
   const unitDisplayName = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches' 
@@ -106,12 +108,13 @@ const StageDetails = () => {
 
   // Determine dimension unit for pieces
   let detectedDimUnit = (matchedProduct?.dimensionUnit || '').toLowerCase().trim();
+  if (detectedDimUnit === 'sq_ft' || detectedDimUnit === 'sqft') detectedDimUnit = 'feet';
   if (!detectedDimUnit) {
-    if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'")) {
+    if (rawBeforePipe.includes('feet') || rawBeforePipe.includes('ft') || rawBeforePipe.includes("'")) {
       detectedDimUnit = 'feet';
-    } else if (dimsPart.includes('inch') || dimsPart.includes('"')) {
+    } else if (rawBeforePipe.includes('inch') || rawBeforePipe.includes('"')) {
       detectedDimUnit = 'inch';
-    } else if (dimsPart.includes('mm') || (matchedProduct?.length && Number(matchedProduct.length) >= 100) || (matchedProduct?.width && Number(matchedProduct.width) >= 100)) {
+    } else if (rawBeforePipe.includes('mm')) {
       detectedDimUnit = 'mm';
     } else if (rawUnit === 'sq_ft' || rawUnit === 'feet') {
       detectedDimUnit = 'feet';
@@ -420,8 +423,8 @@ const StageDetails = () => {
         }
       }).unwrap();
 
-      // If marked as completed, register with quickCompletePiece so approvals, pieceLogs & productionLogs update immediately
-      if (editPieceDims.status === 'completed' && slab?.id) {
+      // Register with quickCompletePiece so approvals, pieceLogs & productionLogs sync immediately
+      if (slab?.id) {
         try {
           await quickCompletePiece({
             slabId: slab.id,
@@ -429,6 +432,7 @@ const StageDetails = () => {
             machineId: editPieceDims.machineId || undefined,
             photoUrl: editPieceDims.photoUrl || undefined,
             stage: stageFormatted || slab.stage || 'Production',
+            status: editPieceDims.status || 'pending',
             remarks: editPieceDims.remarks || undefined
           }).unwrap();
         } catch (qcErr) {
@@ -460,16 +464,22 @@ const StageDetails = () => {
       if (tMatch) thickness = tMatch[1];
       
       const pStr = String(p.size).toLowerCase();
-      const pBeforePipe = (pStr.split('|')[0] || '');
-      if (pBeforePipe.includes('feet') || pBeforePipe.includes('ft') || pBeforePipe.includes("'") || pStr.includes('(feet)') || pStr.includes('(ft)')) {
+      const pBeforePipe = (pStr.split('|')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
+      if (pBeforePipe.includes('feet') || pBeforePipe.includes('ft') || pBeforePipe.includes("'") || pBeforePipe.includes('(feet)') || pBeforePipe.includes('(ft)')) {
         unit = 'feet';
-      } else if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pStr.includes('(inch)') || pStr.includes('inches')) {
+      } else if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pBeforePipe.includes('(inch)') || pBeforePipe.includes('inches')) {
         unit = 'inch';
-      } else if (pBeforePipe.includes('mm') || pStr.includes('(mm)')) {
+      } else if (pBeforePipe.includes('mm') || pBeforePipe.includes('(mm)')) {
         unit = 'mm';
+      } else if ((p as any).unit) {
+        const u = String((p as any).unit).toLowerCase();
+        unit = u === 'mm' ? 'mm' : u === 'feet' || u === 'ft' ? 'feet' : 'inch';
       } else {
         unit = effectiveDimUnit || 'inch';
       }
+    } else if ((p as any).unit) {
+      const u = String((p as any).unit).toLowerCase();
+      unit = u === 'mm' ? 'mm' : u === 'feet' || u === 'ft' ? 'feet' : 'inch';
     }
 
     const pieceLogsList = p.logs && Array.isArray(p.logs) ? p.logs : [];
@@ -493,7 +503,37 @@ const StageDetails = () => {
     setEditingPiece(p);
   };
 
+  if (stageFormatted === 'Packing') {
+    return (
+      <PackingWorkspace
+        projectId={projectId || ''}
+        projectName={project?.name || ''}
+        slab={slab || (slabs && slabs[0]) || {}}
+        slabs={slabs || []}
+        productionLogs={productionLogs || []}
+        onRefresh={() => {
+          refetchSlabs();
+          refetchProductionLogs();
+        }}
+      />
+    );
+  }
 
+  if (stageFormatted === 'Dispatch') {
+    return (
+      <DispatchWorkspace
+        projectId={projectId || ''}
+        projectName={project?.name || ''}
+        slab={slab || (slabs && slabs[0]) || {}}
+        slabs={slabs || []}
+        productionLogs={productionLogs || []}
+        onRefresh={() => {
+          refetchSlabs();
+          refetchProductionLogs();
+        }}
+      />
+    );
+  }
 
   if (!slab) return <Typography sx={{ p: 3 }}>Loading...</Typography>;
 
@@ -768,7 +808,7 @@ const StageDetails = () => {
                   .replace(/ × (\d+MM)/i, ' | $1')
                   .trim();
                 const sizeLower = (p.size || '').toLowerCase();
-                const pDimsPart = (sizeLower.split('|')[0] || '');
+                const pDimsPart = (sizeLower.split('|')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
                 let pUnit = dimensionUnitName;
                 if (pDimsPart.includes('(inch)') || pDimsPart.includes('(inches)') || pDimsPart.includes('inch') || pDimsPart.includes('"')) {
                   pUnit = 'Inches';
