@@ -57,7 +57,7 @@ const StageDetails = () => {
   const { data: project } = useGetProjectByIdQuery(projectId as string, { skip: !projectId });
   const { data: slabs, refetch: refetchSlabs } = useGetSlabsQuery(projectId as string, { skip: !projectId });
   const { data: productionLogs, refetch: refetchProductionLogs } = useGetProjectProductionLogsQuery(projectId as string, { skip: !projectId });
-  const { data: machineLogs } = useGetMachineLogsQuery();
+  const { data: machineLogs, refetch: refetchMachineLogs } = useGetMachineLogsQuery();
   const { data: projectMaterials } = useGetProjectMaterialsQuery(projectId as string, { skip: !projectId });
   const { data: machines = [] } = useGetMachinesQuery();
 
@@ -348,8 +348,22 @@ const StageDetails = () => {
     }
   };
 
+  const formatDateTimeLocal = (date = new Date()) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const y = date.getFullYear();
+    const m = pad(date.getMonth() + 1);
+    const d = pad(date.getDate());
+    const h = pad(date.getHours());
+    const min = pad(date.getMinutes());
+    return `${y}-${m}-${d}T${h}:${min}`;
+  };
+
   const [editingPiece, setEditingPiece] = useState<any>(null);
   const [viewPiece, setViewPiece] = useState<any>(null);
+  const [quickMachinePiece, setQuickMachinePiece] = useState<any>(null);
+  const [quickSelectedMachineId, setQuickSelectedMachineId] = useState<string>('');
+  const [quickStartTime, setQuickStartTime] = useState<string>(formatDateTimeLocal());
+
   const [editPieceDims, setEditPieceDims] = useState({
     length: '',
     width: '',
@@ -357,6 +371,8 @@ const StageDetails = () => {
     unit: 'inch',
     status: 'pending',
     machineId: '',
+    startTime: formatDateTimeLocal(),
+    endTime: formatDateTimeLocal(),
     photoUrl: '',
     remarks: ''
   });
@@ -433,6 +449,8 @@ const StageDetails = () => {
             photoUrl: editPieceDims.photoUrl || undefined,
             stage: stageFormatted || slab.stage || 'Production',
             status: editPieceDims.status || 'pending',
+            startTime: editPieceDims.startTime || undefined,
+            endTime: editPieceDims.endTime || undefined,
             remarks: editPieceDims.remarks || undefined
           }).unwrap();
         } catch (qcErr) {
@@ -442,6 +460,7 @@ const StageDetails = () => {
 
       refetchSlabs();
       refetchProductionLogs();
+      refetchMachineLogs?.();
       setEditingPiece(null);
     } catch (err: any) {
       console.error('Failed to update piece:', err);
@@ -482,13 +501,24 @@ const StageDetails = () => {
       unit = u === 'mm' ? 'mm' : u === 'feet' || u === 'ft' ? 'feet' : 'inch';
     }
 
+    const pieceMachineLog = machineLogs?.find((ml: any) => ml.productId === p.id);
     const pieceLogsList = p.logs && Array.isArray(p.logs) ? p.logs : [];
     const latestPieceLog = pieceLogsList[0] || pieceLogsList[pieceLogsList.length - 1];
     const pieceProdLog = productionLogs?.find((l: any) => l.pieceIds?.includes(p.id) || l.productId === p.id);
 
-    const savedMachineId = latestPieceLog?.machineId || pieceProdLog?.machineId || '';
-    const savedPhotoUrl = latestPieceLog?.endPhotoUrl || latestPieceLog?.startPhotoUrl || pieceProdLog?.startPhotos?.unit || pieceProdLog?.startPhotos?.machine || '';
-    const savedRemarks = latestPieceLog?.remarks || pieceProdLog?.remarks || '';
+    const savedMachineId = pieceMachineLog?.machineId || latestPieceLog?.machineId || pieceProdLog?.machineId || '';
+    const savedPhotoUrl = latestPieceLog?.endPhotoUrl || latestPieceLog?.startPhotoUrl || pieceProdLog?.startPhotos?.unit || pieceProdLog?.startPhotos?.machine || pieceMachineLog?.unitPhotoUrl || pieceMachineLog?.machinePhotoUrl || '';
+    const savedRemarks = pieceMachineLog?.remarks || latestPieceLog?.remarks || pieceProdLog?.remarks || '';
+    const savedStartTime = pieceMachineLog?.startTime 
+      ? formatDateTimeLocal(new Date(pieceMachineLog.startTime))
+      : latestPieceLog?.startTime
+      ? formatDateTimeLocal(new Date(latestPieceLog.startTime))
+      : formatDateTimeLocal();
+    const savedEndTime = pieceMachineLog?.endTime 
+      ? formatDateTimeLocal(new Date(pieceMachineLog.endTime))
+      : latestPieceLog?.endTime
+      ? formatDateTimeLocal(new Date(latestPieceLog.endTime))
+      : formatDateTimeLocal();
 
     setEditPieceDims({
       length,
@@ -497,10 +527,61 @@ const StageDetails = () => {
       unit,
       status: p.status || 'pending',
       machineId: savedMachineId,
+      startTime: savedStartTime,
+      endTime: savedEndTime,
       photoUrl: savedPhotoUrl,
       remarks: savedRemarks
     });
     setEditingPiece(p);
+  };
+
+  const handleOpenQuickMachineStart = (p: any) => {
+    setQuickMachinePiece(p);
+    setQuickSelectedMachineId(machines[0]?.id || machines[0]?._id || '');
+    setQuickStartTime(formatDateTimeLocal());
+  };
+
+  const handleConfirmQuickMachineStart = async () => {
+    if (!quickMachinePiece || !quickSelectedMachineId) return;
+    try {
+      await quickCompletePiece({
+        slabId: slab.id,
+        pieceId: quickMachinePiece.id,
+        machineId: quickSelectedMachineId,
+        stage: stageFormatted || slab.stage || 'Production',
+        status: 'in_progress',
+        startTime: quickStartTime || new Date().toISOString()
+      }).unwrap();
+
+      refetchSlabs();
+      refetchProductionLogs();
+      refetchMachineLogs?.();
+      setQuickMachinePiece(null);
+    } catch (err: any) {
+      alert(err?.data?.message || err?.message || 'Error turning ON machine');
+    }
+  };
+
+  const handleQuickMachineStop = async (p: any) => {
+    if (!window.confirm(`Turn OFF machine for ${p.productName || `Piece #${p.pieceNumber}`} and mark as completed?`)) return;
+    try {
+      const pMachineLog = machineLogs?.find((m: any) => m.productId === p.id);
+      await quickCompletePiece({
+        slabId: slab.id,
+        pieceId: p.id,
+        machineId: pMachineLog?.machineId || undefined,
+        stage: stageFormatted || slab.stage || 'Production',
+        status: 'completed',
+        startTime: pMachineLog?.startTime ? new Date(pMachineLog.startTime).toISOString() : undefined,
+        endTime: new Date().toISOString()
+      }).unwrap();
+
+      refetchSlabs();
+      refetchProductionLogs();
+      refetchMachineLogs?.();
+    } catch (err: any) {
+      alert(err?.data?.message || err?.message || 'Error turning OFF machine');
+    }
   };
 
   if (stageFormatted === 'Packing') {
@@ -577,13 +658,19 @@ const StageDetails = () => {
           pLog = logs.find((log: any) => !log.pieceIds || log.pieceIds.length === 0);
       }
 
-      // Find original machine log via parentLogId
-      const mLog = pLog?.parentLogId ? machineLogs?.find((m: any) => m.id === pLog.parentLogId) : null;
-      const mName = mLog?.machine?.name || pLog?.machine?.name || '';
+      // Find original machine log via parentLogId or direct productId
+      const mLog = (pLog?.parentLogId ? machineLogs?.find((m: any) => m.id === pLog.parentLogId) : null)
+        || machineLogs?.find((m: any) => m.productId === p.id);
+      const mName = mLog?.machine?.name || machines.find((m: any) => (m.id || m._id) === mLog?.machineId)?.name || pLog?.machine?.name || '';
       const vendorName = pLog?.vendorName || '';
       
-      const startDate = mLog?.startTime ? new Date(mLog.startTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
-      const endDate = mLog?.endTime ? new Date(mLog.endTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
+      const startDate = mLog?.startTime 
+        ? new Date(mLog.startTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) 
+        : (p.logs && p.logs[0]?.startTime ? new Date(p.logs[0].startTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(p.logs[0].startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-');
+
+      const endDate = mLog?.endTime 
+        ? new Date(mLog.endTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) 
+        : (mLog?.status === 'active' || p.status === 'in_progress' ? 'Running (ON)...' : (p.logs && p.logs[0]?.endTime ? new Date(p.logs[0].endTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(p.logs[0].endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'));
       
       // Polishing/Packing/Dispatch Logs Extraction
       const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(p.id) || (!l.pieceIds?.length && (l.slabId === p.id || l.productId === p.id))) || [];
@@ -615,7 +702,18 @@ const StageDetails = () => {
           {stageFormatted === 'Production' && (
             <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
               {mName ? (
-                <Chip label={mName} size="small" sx={{ bgcolor: '#F1F5F9', color: '#1E293B', fontWeight: 700, fontSize: '0.72rem', borderRadius: 1 }} />
+                <Chip 
+                  label={mName} 
+                  size="small" 
+                  sx={{ 
+                    bgcolor: (mLog?.status === 'active' || p.status === 'in_progress') ? '#FEF3C7' : '#F1F5F9', 
+                    color: (mLog?.status === 'active' || p.status === 'in_progress') ? '#B45309' : '#1E293B', 
+                    border: (mLog?.status === 'active' || p.status === 'in_progress') ? '1px solid #FCD34D' : 'none',
+                    fontWeight: 800, 
+                    fontSize: '0.72rem', 
+                    borderRadius: 1 
+                  }} 
+                />
               ) : vendorName ? (
                 <Chip label={vendorName} size="small" sx={{ bgcolor: '#F8FAFC', color: '#334155', fontWeight: 700, fontSize: '0.72rem', borderRadius: 1 }} />
               ) : (displayStatus === 'completed' || p.status === 'completed') ? (
@@ -899,20 +997,70 @@ const StageDetails = () => {
           )}
 
           <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
-            <Chip 
-              icon={displayStatus === 'completed' ? <CheckCircleRoundedIcon sx={{ fontSize: '13px !important', color: '#059669 !important' }} /> : <CircleIcon sx={{ fontSize: '7px !important', color: displayStatus === 'pending' ? '#94A3B8 !important' : '#D97706 !important' }} />}
-              label={displayStatus === 'completed' ? 'Completed' : displayStatus === 'pending' ? 'Not Started' : 'In Progress'} 
-              size="small" 
-              sx={{ 
-                fontWeight: 800, 
-                fontSize: '0.72rem',
-                height: 22,
-                borderRadius: 1.5,
-                ...(displayStatus === 'completed' ? { bgcolor: '#ECFDF5', color: '#059669' } : 
-                    displayStatus === 'pending' ? { bgcolor: '#F1F5F9', color: '#64748B' } : 
-                    { bgcolor: '#FFFBEB', color: '#D97706' })
-              }} 
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip 
+                icon={displayStatus === 'completed' ? <CheckCircleRoundedIcon sx={{ fontSize: '13px !important', color: '#059669 !important' }} /> : <CircleIcon sx={{ fontSize: '7px !important', color: displayStatus === 'pending' ? '#94A3B8 !important' : '#D97706 !important' }} />}
+                label={displayStatus === 'completed' ? 'Completed' : (displayStatus === 'in_progress' || p.status === 'in_progress') ? '⚡ Machine ON' : 'Not Started'} 
+                size="small" 
+                sx={{ 
+                  fontWeight: 800, 
+                  fontSize: '0.72rem',
+                  height: 22,
+                  borderRadius: 1.5,
+                  ...(displayStatus === 'completed' ? { bgcolor: '#ECFDF5', color: '#059669' } : 
+                      (displayStatus === 'in_progress' || p.status === 'in_progress') ? { bgcolor: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' } : 
+                      { bgcolor: '#F1F5F9', color: '#64748B' })
+                }} 
+              />
+              {stageFormatted === 'Production' && displayStatus !== 'completed' && p.status !== 'in_progress' && (
+                <Tooltip title="Turn ON Machine for this Piece">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleOpenQuickMachineStart(p)}
+                    sx={{
+                      minWidth: 'auto',
+                      px: 1,
+                      py: 0.2,
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      color: '#0284C7',
+                      borderColor: '#BAE6FD',
+                      bgcolor: '#F0F9FF',
+                      borderRadius: 1.5,
+                      textTransform: 'none',
+                      '&:hover': { bgcolor: '#E0F2FE' }
+                    }}
+                  >
+                    ▶ Turn ON
+                  </Button>
+                </Tooltip>
+              )}
+              {stageFormatted === 'Production' && (displayStatus === 'in_progress' || p.status === 'in_progress') && (
+                <Tooltip title="Turn OFF Machine & Complete">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleQuickMachineStop(p)}
+                    sx={{
+                      minWidth: 'auto',
+                      px: 1,
+                      py: 0.2,
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      color: '#DC2626',
+                      borderColor: '#FECACA',
+                      bgcolor: '#FEF2F2',
+                      borderRadius: 1.5,
+                      textTransform: 'none',
+                      '&:hover': { bgcolor: '#FEE2E2' }
+                    }}
+                  >
+                    ⏹ Turn OFF
+                  </Button>
+                </Tooltip>
+              )}
+            </Box>
           </TableCell>
 
           <TableCell align="right" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
@@ -1922,23 +2070,24 @@ const StageDetails = () => {
               sx={{ borderRadius: 2 }}
             >
               <MenuItem value="pending">Not Started</MenuItem>
-              <MenuItem value="completed">Completed</MenuItem>
+              <MenuItem value="in_progress">⚡ Machine ON (In Progress)</MenuItem>
+              <MenuItem value="completed">✓ Machine OFF (Completed)</MenuItem>
             </Select>
           </FormControl>
 
-          {editPieceDims.status === 'completed' && (
-            <Box sx={{ p: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#166534', fontSize: '0.82rem' }}>
-                Completion Details (Optional)
+          {(editPieceDims.status === 'in_progress' || editPieceDims.status === 'completed') && (
+            <Box sx={{ p: 2, bgcolor: editPieceDims.status === 'in_progress' ? '#FFFBEB' : '#F0FDF4', border: '1px solid ' + (editPieceDims.status === 'in_progress' ? '#FDE68A' : '#BBF7D0'), borderRadius: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: editPieceDims.status === 'in_progress' ? '#B45309' : '#166534', fontSize: '0.84rem' }}>
+                {editPieceDims.status === 'in_progress' ? '⚡ Machine ON Details' : '✓ Machine OFF / Completion Details'}
               </Typography>
 
               <Grid container spacing={1.5}>
                 {/* Machine Dropdown */}
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <FormControl fullWidth size="small">
-                    <InputLabel>Machine Name (Optional)</InputLabel>
+                    <InputLabel>Machine Name</InputLabel>
                     <Select
-                      label="Machine Name (Optional)"
+                      label="Machine Name"
                       value={editPieceDims.machineId || ''}
                       onChange={(e) => setEditPieceDims({ ...editPieceDims, machineId: e.target.value })}
                       sx={{ borderRadius: 2, bgcolor: '#FFFFFF' }}
@@ -1955,8 +2104,38 @@ const StageDetails = () => {
                   </FormControl>
                 </Grid>
 
-                {/* Remarks */}
+                {/* Machine ON Date & Time */}
                 <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label="Machine ON Date & Time"
+                    type="datetime-local"
+                    size="small"
+                    fullWidth
+                    value={editPieceDims.startTime || ''}
+                    onChange={(e) => setEditPieceDims({ ...editPieceDims, startTime: e.target.value })}
+                    sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                    slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: 2 } } }}
+                  />
+                </Grid>
+
+                {/* Machine OFF Date & Time (only when completed) */}
+                {editPieceDims.status === 'completed' && (
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      label="Machine OFF Date & Time"
+                      type="datetime-local"
+                      size="small"
+                      fullWidth
+                      value={editPieceDims.endTime || ''}
+                      onChange={(e) => setEditPieceDims({ ...editPieceDims, endTime: e.target.value })}
+                      sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                      slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: 2 } } }}
+                    />
+                  </Grid>
+                )}
+
+                {/* Remarks */}
+                <Grid size={{ xs: 12, sm: editPieceDims.status === 'completed' ? 6 : 12 }}>
                   <TextField
                     label="Remarks / Notes (Optional)"
                     size="small"
@@ -2083,6 +2262,63 @@ const StageDetails = () => {
             }}
           >
             Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+            {/* QUICK MACHINE ON DIALOG */}
+      <Dialog
+        open={!!quickMachinePiece}
+        onClose={() => setQuickMachinePiece(null)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E293B' }}>
+          ⚡ Turn ON Machine
+        </DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Typography variant="body2" sx={{ color: '#475569' }}>
+            Piece: <strong>{quickMachinePiece?.productName || quickMachinePiece?.name || `Piece #${quickMachinePiece?.pieceNumber}`}</strong>
+          </Typography>
+
+          <FormControl fullWidth size="small">
+            <InputLabel>Select Machine</InputLabel>
+            <Select
+              label="Select Machine"
+              value={quickSelectedMachineId}
+              onChange={(e) => setQuickSelectedMachineId(e.target.value)}
+              sx={{ borderRadius: 2 }}
+            >
+              {machines.map((m: any) => (
+                <MenuItem key={m.id || m._id} value={m.id || m._id}>
+                  {m.name} ({m.type || 'Machine'})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <TextField
+            label="Machine ON Date & Time"
+            type="datetime-local"
+            size="small"
+            fullWidth
+            value={quickStartTime}
+            onChange={(e) => setQuickStartTime(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: 2 } } }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setQuickMachinePiece(null)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!quickSelectedMachineId}
+            onClick={handleConfirmQuickMachineStart}
+            sx={{ bgcolor: '#0284C7', fontWeight: 800, textTransform: 'none', borderRadius: 2, '&:hover': { bgcolor: '#0369A1' } }}
+          >
+            Turn ON Machine
           </Button>
         </DialogActions>
       </Dialog>
