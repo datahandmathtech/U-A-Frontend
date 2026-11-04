@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   Box, Typography, Paper, Grid, Button, Chip, TextField, 
   CircularProgress, Alert, Snackbar, Checkbox, 
@@ -20,6 +20,7 @@ import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUnch
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
 const STAGES = [
   { name: 'Production', label: 'Production', icon: <PrecisionManufacturingIcon sx={{ fontSize: 24 }} />, color: '#059669', bg: '#ECFDF5' },
@@ -78,14 +79,26 @@ const getSlabAllowedStages = (slab: any): string[] => {
   return list.sort((a, b) => (STAGE_ORDER_MAP[a] || 99) - (STAGE_ORDER_MAP[b] || 99));
 };
 
-const ManualApproval: React.FC = () => {
+interface ManualApprovalProps {
+  initialProjectId?: string;
+  isDialog?: boolean;
+  onClose?: () => void;
+}
+
+const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDialog, onClose }) => {
   const { data: projects } = useGetProjectsQuery();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
   const [remarks, setRemarks] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedStageFilter, setSelectedStageFilter] = useState<string>('');
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [collapsedSlabIds, setCollapsedSlabIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (initialProjectId) {
+      setSelectedProjectId(initialProjectId);
+    }
+  }, [initialProjectId]);
 
   // Key format: "${pieceId}__${stageName}"
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -293,6 +306,11 @@ const ManualApproval: React.FC = () => {
       setSelectedKeys(new Set());
       setRemarks('');
       refetchSlabs();
+      if (isDialog && onClose) {
+        setTimeout(() => {
+          onClose();
+        }, 800);
+      }
     } catch (err: any) {
       console.error(err);
       setToast({ open: true, message: err?.data?.message || 'Error executing manual approval', severity: 'error' });
@@ -338,18 +356,25 @@ const ManualApproval: React.FC = () => {
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2.5 }}>
-          <Box sx={{ p: 1.25, bgcolor: '#ECFDF5', color: '#059669', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FlashOnRoundedIcon sx={{ fontSize: 32 }} />
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ p: 1.25, bgcolor: '#ECFDF5', color: '#059669', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FlashOnRoundedIcon sx={{ fontSize: 32 }} />
+            </Box>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.3px', fontSize: { xs: '1.3rem', sm: '1.6rem' } }}>
+                Direct Manual Approval
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600, mt: 0.2 }}>
+                Choose a project, pick the stage, and tap the pieces to approve them.
+              </Typography>
+            </Box>
           </Box>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.3px', fontSize: { xs: '1.3rem', sm: '1.6rem' } }}>
-              Direct Manual Approval
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600, mt: 0.2 }}>
-              Choose a project, pick the stage, and tap the pieces to approve them.
-            </Typography>
-          </Box>
+          {isDialog && onClose && (
+            <IconButton onClick={onClose} size="medium" sx={{ border: '1px solid #E2E8F0', bgcolor: '#F8FAFC', '&:hover': { bgcolor: '#F1F5F9' } }}>
+              <CloseRoundedIcon />
+            </IconButton>
+          )}
         </Box>
 
         {/* Project Selector & Search */}

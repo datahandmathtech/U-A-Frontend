@@ -48,6 +48,8 @@ import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import SearchIcon from '@mui/icons-material/Search';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import FlashOnRoundedIcon from '@mui/icons-material/FlashOnRounded';
+import ManualApproval from './ManualApproval';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -276,7 +278,7 @@ const SlabRow = ({
 
   const DEFAULT_STAGE_COLUMNS = [
     { key: 'Production', label: 'Production', route: 'production' },
-    { key: 'Polishing - Honed', label: 'Polishing (Honed)', route: 'polishing' },
+    { key: 'Polishing - Honed', label: 'Polishing', route: 'polishing' },
     { key: 'Polishing - Mirror', label: 'Polishing (Mirror)', route: 'polishing' },
     { key: 'Packing', label: 'Packing', route: 'packing' },
     { key: 'Dispatch', label: 'Dispatch', route: 'dispatch' }
@@ -773,6 +775,7 @@ const ProjectDetails: React.FC = () => {
   const [deleteSlab] = useDeleteSlabMutation();
   const [syncSlabs] = useSyncSlabsMutation();
   const [addPieces, { isLoading: isAddingPieces }] = useAddPiecesMutation();
+  const [manualApprovalOpen, setManualApprovalOpen] = useState(false);
 
   const [bulkCreateSlabs, { isLoading: isBulkCreatingSlabs }] = useBulkCreateSlabsMutation();
   const [replicateSlabTemplate, { isLoading: isReplicatingTemplate }] = useReplicateSlabTemplateMutation();
@@ -4062,27 +4065,19 @@ const ProjectDetails: React.FC = () => {
 
                           <Button 
                             variant="outlined" 
-                            startIcon={<SyncIcon />} 
-                            onClick={async () => {
-                              try {
-                                await syncSlabs(id as string).unwrap();
-                                refetchSlabs();
-                                setSnackbarMessage('Synced successfully with Quotation!');
-                              } catch(err) {
-                                setSnackbarMessage('Error syncing slabs.');
-                              }
-                            }}
+                            startIcon={<FlashOnRoundedIcon />} 
+                            onClick={() => setManualApprovalOpen(true)}
                             sx={{
                               borderRadius: 2,
                               textTransform: 'none',
                               fontWeight: 700,
-                              borderColor: '#CBD5E1',
-                              color: '#475569',
+                              borderColor: '#059669',
+                              color: '#059669',
                               bgcolor: '#FFFFFF',
-                              '&:hover': { borderColor: '#B38B36', bgcolor: '#FFFDF5' }
+                              '&:hover': { borderColor: '#047857', bgcolor: '#ECFDF5' }
                             }}
                           >
-                            Sync with Quotation
+                            Manual Approval
                           </Button>
 
                           <Button 
@@ -4300,7 +4295,7 @@ const ProjectDetails: React.FC = () => {
                   {(() => {
                     const ALL_STAGE_CONFIG = [
                       { key: 'Production', label: 'Production', route: 'production' },
-                      { key: 'Polishing - Honed', label: 'Polishing (Honed)', route: 'polishing' },
+                      { key: 'Polishing - Honed', label: 'Polishing', route: 'polishing' },
                       { key: 'Polishing - Mirror', label: 'Polishing (Mirror)', route: 'polishing' },
                       { key: 'Packing', label: 'Packing', route: 'packing' },
                       { key: 'Dispatch', label: 'Dispatch', route: 'dispatch' }
@@ -6379,6 +6374,33 @@ const ProjectDetails: React.FC = () => {
         }}
         onError={(err) => setSnackbarMessage(err)}
       />
+
+      {/* Project-Scoped Manual Direct Approval Dialog */}
+      <Dialog
+        open={manualApprovalOpen}
+        onClose={() => {
+          setManualApprovalOpen(false);
+          refetchSlabs();
+          refetchProduction();
+        }}
+        maxWidth="xl"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: { borderRadius: 4, maxHeight: '92vh', overflow: 'hidden' }
+          }
+        }}
+      >
+        <ManualApproval
+          initialProjectId={id}
+          isDialog
+          onClose={() => {
+            setManualApprovalOpen(false);
+            refetchSlabs();
+            refetchProduction();
+          }}
+        />
+      </Dialog>
 
       {/* Product Chat Drawer */}
       <ProductChatDrawer

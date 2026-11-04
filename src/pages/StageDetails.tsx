@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { 
   Box, Typography, Button, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, IconButton, TextField, 
@@ -49,6 +50,7 @@ import {
 const StageDetails = () => {
   const { id: projectId, slabId, stageName } = useParams();
   const navigate = useNavigate();
+  const currentUser = useSelector((state: any) => state.auth?.user);
   
   const { data: project } = useGetProjectByIdQuery(projectId as string, { skip: !projectId });
   const { data: slabs, refetch: refetchSlabs } = useGetSlabsQuery(projectId as string, { skip: !projectId });
@@ -577,7 +579,11 @@ const StageDetails = () => {
               ) : vendorName ? (
                 <Chip label={vendorName} size="small" sx={{ bgcolor: '#F8FAFC', color: '#334155', fontWeight: 700, fontSize: '0.72rem', borderRadius: 1 }} />
               ) : (displayStatus === 'completed' || p.status === 'completed') ? (
-                <Chip label="Manual" size="small" sx={{ bgcolor: '#FFFBEB', color: '#B45309', border: '1px solid #FDE68A', fontWeight: 700, fontSize: '0.72rem', height: 22, borderRadius: 1 }} />
+                <Chip 
+                  label={pLog?.worker?.name || pLog?.operator?.name || pieceProductionLogs?.[0]?.worker?.name || currentUser?.name || 'Admin User'} 
+                  size="small" 
+                  sx={{ bgcolor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', fontWeight: 700, fontSize: '0.72rem', height: 22, borderRadius: 1 }} 
+                />
               ) : (
                 <Typography variant="caption" sx={{ color: '#94A3B8' }}>Unassigned</Typography>
               )}
@@ -626,8 +632,13 @@ const StageDetails = () => {
                 }
 
                 if (isCompletedOrLogged) {
+                  const loggedName = polishLog?.worker?.name || polishLog?.operator?.name || pieceProductionLogs?.[0]?.worker?.name || currentUser?.name || 'Admin User';
                   return (
-                    <Chip label="Manual" size="small" sx={{ bgcolor: '#FFFBEB', color: '#B45309', border: '1px solid #FDE68A', fontWeight: 700, fontSize: '0.72rem', height: 22, borderRadius: 1 }} />
+                    <Chip 
+                      label={loggedName} 
+                      size="small" 
+                      sx={{ bgcolor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', fontWeight: 700, fontSize: '0.72rem', height: 22, borderRadius: 1 }} 
+                    />
                   );
                 }
 
@@ -1623,7 +1634,7 @@ const StageDetails = () => {
                         {/* Logged By */}
                         <TableCell sx={{ py: 2, whiteSpace: 'nowrap' }}>
                           {(() => {
-                            const logger = log.workerName || log.worker?.name || log.vendorName;
+                            const logger = log.worker?.name || log.operator?.name || log.workerName || log.vendorName || currentUser?.name || 'Admin User';
                             const isVendor = !!(log.vendorName || (logger && !['Admin User', 'Admin', 'Manual'].includes(logger) && log.isVendor));
                             if (isVendor) {
                               return (
@@ -1636,9 +1647,9 @@ const StageDetails = () => {
                               );
                             }
                             return (
-                              <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-                                <Typography variant="body2" sx={{ fontWeight: 800, color: '#B45309', fontSize: '0.82rem' }}>
-                                  Manual
+                              <Box sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 2, px: 1.25, py: 0.5, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.82rem' }}>
+                                  {logger}
                                 </Typography>
                               </Box>
                             );
@@ -1729,6 +1740,7 @@ const StageDetails = () => {
                                     const idToDelete = stageFormatted === 'Dispatch' ? log.logToDelete : log.id;
                                     await deleteProductionLog(idToDelete).unwrap();
                                     refetchProductionLogs();
+                                    refetchSlabs();
                                   } catch (err) {
                                     console.error(err);
                                   }

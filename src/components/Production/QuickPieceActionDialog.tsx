@@ -310,6 +310,8 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
     return rem.length > 0 ? rem : availableStages;
   }, [availableStages, currentPiece, selectedPieceId, mode, pieceStatus]);
 
+  const isPolishing = selectedStage?.startsWith('Polishing') || selectedStage === 'Polishing';
+
   // When user selects a piece, populate dimensions & pick its first pending stage
   const handlePieceSelect = (pId: string) => {
     setSelectedPieceId(pId);
@@ -592,7 +594,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
             </FormControl>
 
             {/* 2. PIECE & SLAB SPECIFICATION (DIRECT EDIT & MANUAL APPROVAL) */}
-            {selectedPieceId && (
+            {!isPolishing && selectedPieceId && (
               <Box sx={{ p: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="caption" sx={{ fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -712,13 +714,14 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
                 label="Manufacturing Stage"
                 value={selectedStage}
                 onChange={(e) => setSelectedStage(e.target.value)}
+                renderValue={(val: string) => val === 'Polishing - Honed' ? 'Polishing' : val}
                 sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}
                 MenuProps={dropdownMenuProps}
               >
                 {pendingStages.length > 0 ? (
                   pendingStages.map((stg: string) => (
                     <MenuItem key={stg} value={stg}>
-                      {stg}
+                      {stg === 'Polishing - Honed' ? 'Polishing' : stg}
                     </MenuItem>
                   ))
                 ) : (
@@ -730,53 +733,55 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
             </FormControl>
 
             {/* 3. MACHINE & DRIVER */}
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, mb: 1, display: 'block' }}>
-                Machine & Operator / Driver
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel id="quick-machine-label">Machine (Optional)</InputLabel>
-                    <Select
-                      labelId="quick-machine-label"
-                      label="Machine (Optional)"
-                      value={machineId}
-                      onChange={(e) => setMachineId(e.target.value)}
-                      disabled={isMachinesLoading}
-                      MenuProps={dropdownMenuProps}
-                      sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}
-                    >
-                      <MenuItem value="">
-                        <em>— No Machine / Manual Work —</em>
-                      </MenuItem>
-                      {machines.map((m: any) => (
-                        <MenuItem key={m.id || m._id} value={m.id || m._id}>
-                          {m.name} {m.model ? `(${m.model})` : ''}
+            {!isPolishing && (
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, mb: 1, display: 'block' }}>
+                  Machine & Operator / Driver
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel id="quick-machine-label">Machine (Optional)</InputLabel>
+                      <Select
+                        labelId="quick-machine-label"
+                        label="Machine (Optional)"
+                        value={machineId}
+                        onChange={(e) => setMachineId(e.target.value)}
+                        disabled={isMachinesLoading}
+                        MenuProps={dropdownMenuProps}
+                        sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}
+                      >
+                        <MenuItem value="">
+                          <em>— No Machine / Manual Work —</em>
                         </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
+                        {machines.map((m: any) => (
+                          <MenuItem key={m.id || m._id} value={m.id || m._id}>
+                            {m.name} {m.model ? `(${m.model})` : ''}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
 
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Driver / Operator Name"
-                    placeholder="Enter driver or operator name"
-                    value={driverName}
-                    onChange={(e) => setDriverName(e.target.value)}
-                    slotProps={{
-                      input: {
-                        startAdornment: <PersonIcon sx={{ fontSize: 18, color: '#64748B', mr: 1 }} />
-                      }
-                    }}
-                    sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}
-                  />
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Driver / Operator Name"
+                      placeholder="Enter driver or operator name"
+                      value={driverName}
+                      onChange={(e) => setDriverName(e.target.value)}
+                      slotProps={{
+                        input: {
+                          startAdornment: <PersonIcon sx={{ fontSize: 18, color: '#64748B', mr: 1 }} />
+                        }
+                      }}
+                      sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}
+                    />
+                  </Grid>
                 </Grid>
-              </Grid>
-            </Box>
+              </Box>
+            )}
 
             {/* 4. PHOTO WITH BOTH CAMERA & GALLERY OPTIONS */}
             <Box>
@@ -935,7 +940,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
             : pieceStatus === 'pending'
             ? 'Save as Not Started'
             : mode === 'add'
-            ? (selectedStage ? `Mark ${selectedStage} as Completed` : 'Save & Mark as Completed')
+            ? (isPolishing ? 'Mark Polishing as Completed' : selectedStage ? `Mark ${selectedStage === 'Polishing - Honed' ? 'Polishing' : selectedStage} as Completed` : 'Save & Mark as Completed')
             : 'Update Piece Details'}
         </Button>
       </DialogActions>

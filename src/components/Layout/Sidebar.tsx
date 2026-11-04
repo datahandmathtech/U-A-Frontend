@@ -53,7 +53,6 @@ const ALL_MENU_ITEMS: MenuItemDef[] = [
   { text: 'Enquiries Pipeline', icon: <FilterAltRoundedIcon />, path: '/crm', category: 'Operations' },
   { text: 'Active Work Orders', icon: <WorkRoundedIcon />, path: '/projects', category: 'Operations' },
   { text: 'Approvals Queue', icon: <PendingActionsRoundedIcon />, path: '/approvals', category: 'Stock & Machines' },
-  { text: 'Manual Approval', icon: <FlashOnRoundedIcon />, path: '/manual-approval', category: 'Stock & Machines' },
   { text: 'In/Out Ledger', icon: <FolderSpecialRoundedIcon />, path: '/in-out-ledger', category: 'Stock & Machines' },
   { text: 'Inventory', icon: <Inventory2RoundedIcon />, path: '/inventory', category: 'Stock & Machines' },
   { text: 'Machine Master', icon: <PrecisionManufacturingRoundedIcon />, path: '/machines', category: 'Stock & Machines' },
