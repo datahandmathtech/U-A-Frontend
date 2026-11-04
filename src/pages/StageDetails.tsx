@@ -1036,6 +1036,30 @@ const StageDetails = () => {
                   </Button>
                 </Tooltip>
               )}
+              {stageFormatted === 'Production' && displayStatus === 'completed' && (
+                <Tooltip title="Turn ON Machine Again for this Piece">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleOpenQuickMachineStart(p)}
+                    sx={{
+                      minWidth: 'auto',
+                      px: 0.8,
+                      py: 0.15,
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      color: '#64748B',
+                      borderColor: '#CBD5E1',
+                      bgcolor: '#F8FAFC',
+                      borderRadius: 1.5,
+                      textTransform: 'none',
+                      '&:hover': { bgcolor: '#F1F5F9', color: '#0F172A' }
+                    }}
+                  >
+                    ▶ Re-Run
+                  </Button>
+                </Tooltip>
+              )}
               {stageFormatted === 'Production' && (displayStatus === 'in_progress' || p.status === 'in_progress') && (
                 <Tooltip title="Turn OFF Machine & Complete">
                   <Button
@@ -1148,13 +1172,17 @@ const StageDetails = () => {
     completedPieces = Math.max(directLogsQty, pieceCompletedCount);
   } else {
     completedPieces = (slab.pieces || []).filter((p: any) => {
-      if (p.status === 'pending' || p.status === 'not_started') return false;
-      const normalizedPieceStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '');
+      const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const pieceStageNormalized = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+      const pieceIdx = stages.indexOf(pieceStageNormalized);
+      const viewIdx = stages.indexOf(stageFormatted);
+      if (pieceIdx > viewIdx) return true;
+      if (pieceIdx === viewIdx && p.status === 'completed') return true;
       const hasCompletedLog = p.logs && p.logs.some((l: any) => {
         const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
         return (lStage === stageFormatted || lStage.startsWith(stageFormatted)) && (l.status === 'completed' || l.status === 'approved');
       });
-      return hasCompletedLog || (normalizedPieceStage === stageFormatted && p.status === 'completed');
+      return Boolean(hasCompletedLog);
     }).length;
   }
   
