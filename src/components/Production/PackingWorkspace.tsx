@@ -63,6 +63,10 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   const [selectedPieceIds, setSelectedPieceIds] = useState<string[]>([]);
   const [isAddBoxOpen, setIsAddBoxOpen] = useState(false);
   const [newBoxName, setNewBoxName] = useState('');
+  const [newBoxSize, setNewBoxSize] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
   const [viewBox, setViewBox] = useState<any>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
@@ -94,8 +98,23 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
       (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
     );
 
-    return logs.map((l: any, idx: number) => {
-      const bName = (l.boxCode || `Box ${idx + 1}`).split('|')[0].trim();
+    // Deduplicate logs with exact same pieceIds or same boxCode to prevent duplicates
+    const seenKey = new Set<string>();
+    const dedupedLogs: any[] = [];
+    for (const l of logs) {
+      const pIds = (Array.isArray(l.pieceIds) ? l.pieceIds : []).slice().sort().join(',');
+      const code = (l.boxCode || '').trim();
+      const key = pIds ? `${code}_${pIds}` : (l.id || `${code}_${l.createdAt}`);
+      if (seenKey.has(key)) continue;
+      seenKey.add(key);
+      dedupedLogs.push(l);
+    }
+
+    return dedupedLogs.map((l: any, idx: number) => {
+      const rawCode = l.boxCode || `Box ${idx + 1}`;
+      const parts = rawCode.split('|').map((s: string) => s.trim());
+      const bName = parts[0] || `Box ${idx + 1}`;
+      const bSize = parts[1] || '';
       const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
       const boxPieces = allPieces.filter((p: any) => pIds.includes(p.id));
       const boxArea = boxPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
@@ -105,6 +124,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         logId: l.id,
         boxNumber: idx + 1,
         boxName: bName,
+        boxSize: bSize,
         pieceIds: pIds,
         pieces: boxPieces,
         pieceCount,
@@ -160,11 +180,46 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   // Open add box modal
   const handleOpenAddBox = () => {
     setNewBoxName(`Box ${packedBoxes.length + 1}`);
+    const defaultDim = slab?.size || (allPieces[0]?.size) || '';
+    setNewBoxSize(defaultDim ? `${defaultDim} Inch` : '');
     setIsAddBoxOpen(true);
+  };
+
+  // Range and Batch Selection Handlers for 100+ pieces
+  const handleSelectRange = () => {
+    const from = parseInt(rangeFrom, 10);
+    const to = parseInt(rangeTo, 10);
+    if (isNaN(from) || isNaN(to) || from > to) {
+      setToast({ open: true, message: 'Please enter valid From and To piece numbers (e.g. 1 to 20)', severity: 'error' });
+      return;
+    }
+    const toSelect = filteredPieces.filter((p: any) => {
+      if (packedPieceIdMap.has(p.id)) return false;
+      const pNum = Number(p.pieceNumber);
+      return !isNaN(pNum) && pNum >= from && pNum <= to;
+    }).map((p: any) => p.id);
+
+    if (toSelect.length === 0) {
+      setToast({ open: true, message: `No unpacked pieces found in range #${from} to #${to}`, severity: 'error' });
+      return;
+    }
+    setSelectedPieceIds(prev => Array.from(new Set([...prev, ...toSelect])));
+    setToast({ open: true, message: `Selected ${toSelect.length} pieces in range #${from} to #${to}`, severity: 'success' });
+  };
+
+  const handleSelectAllUnpacked = () => {
+    const unpacked = filteredPieces.filter((p: any) => !packedPieceIdMap.has(p.id)).map((p: any) => p.id);
+    setSelectedPieceIds(unpacked);
+  };
+
+  const handleSelectBatch = (count: number) => {
+    const unpacked = filteredPieces.filter((p: any) => !packedPieceIdMap.has(p.id) && !selectedPieceIds.includes(p.id)).slice(0, count).map((p: any) => p.id);
+    setSelectedPieceIds(prev => [...prev, ...unpacked]);
   };
 
   // Create single box
   const handleSaveBox = async () => {
+    if (isSubmitting || isPacking) return;
     const targetPieces = selectedPieceIds.length > 0 
       ? selectedPieceIds 
       : allPieces.filter((p: any) => !packedPieceIdMap.has(p.id)).slice(0, 4).map((p: any) => p.id);
@@ -175,11 +230,15 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     }
 
     try {
+      setIsSubmitting(true);
+      const bName = newBoxName.trim() || `Box ${packedBoxes.length + 1}`;
+      const bSize = newBoxSize.trim();
       await packBoxes({
         projectId,
         slabId: slab?.id,
         boxes: [{
-          boxName: newBoxName.trim() || `Box ${packedBoxes.length + 1}`,
+          boxName: bName,
+          boxSize: bSize,
           pieceIds: targetPieces
         }]
       }).unwrap();
@@ -187,9 +246,11 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
       setSelectedPieceIds([]);
       setIsAddBoxOpen(false);
       onRefresh();
-      setToast({ open: true, message: `${newBoxName} created with ${targetPieces.length} pieces!`, severity: 'success' });
+      setToast({ open: true, message: `${bName} created with ${targetPieces.length} pieces!`, severity: 'success' });
     } catch (err: any) {
       setToast({ open: true, message: err?.data?.message || 'Error packing box', severity: 'error' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -375,6 +436,76 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
               />
             </Box>
 
+            {/* Quick Batch & Range Selection Bar (Handles 100+ Pieces) */}
+            <Box sx={{ mb: 2, p: 1.25, bgcolor: '#F8FAFC', borderRadius: 2.5, border: '1px solid #E2E8F0', display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: '0.68rem' }}>
+                  Range:
+                </Typography>
+                <TextField
+                  size="small"
+                  placeholder="From #"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                  sx={{ width: 68, '& .MuiInputBase-input': { py: 0.4, px: 0.8, fontSize: '0.78rem', textAlign: 'center' } }}
+                />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', fontSize: '0.75rem' }}>to</Typography>
+                <TextField
+                  size="small"
+                  placeholder="To #"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                  sx={{ width: 68, '& .MuiInputBase-input': { py: 0.4, px: 0.8, fontSize: '0.78rem', textAlign: 'center' } }}
+                />
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={handleSelectRange}
+                  sx={{ py: 0.4, px: 1.2, fontSize: '0.72rem', fontWeight: 800, bgcolor: '#0284C7', textTransform: 'none', '&:hover': { bgcolor: '#0369A1' } }}
+                >
+                  Select Range
+                </Button>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleSelectAllUnpacked}
+                  sx={{ py: 0.35, px: 1, fontSize: '0.72rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155' }}
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handleSelectBatch(10)}
+                  sx={{ py: 0.35, px: 1, fontSize: '0.72rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155' }}
+                >
+                  +10
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handleSelectBatch(20)}
+                  sx={{ py: 0.35, px: 1, fontSize: '0.72rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155' }}
+                >
+                  +20
+                </Button>
+                {selectedPieceIds.length > 0 && (
+                  <Button
+                    size="small"
+                    variant="text"
+                    color="error"
+                    onClick={() => setSelectedPieceIds([])}
+                    sx={{ py: 0.35, px: 1, fontSize: '0.72rem', fontWeight: 800, textTransform: 'none' }}
+                  >
+                    Clear ({selectedPieceIds.length})
+                  </Button>
+                )}
+              </Box>
+            </Box>
+
             {/* Pieces Grid */}
             {filteredPieces.length === 0 ? (
               <Box sx={{ py: 8, textAlign: 'center', color: '#94A3B8' }}>
@@ -543,10 +674,17 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                         <Inventory2RoundedIcon sx={{ fontSize: 26 }} />
                       </Box>
                       <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A' }}>
                             {b.boxName}
                           </Typography>
+                          {b.boxSize && (
+                            <Chip
+                              label={b.boxSize}
+                              size="small"
+                              sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700, bgcolor: '#F1F5F9', color: '#475569' }}
+                            />
+                          )}
                           <EditRoundedIcon sx={{ fontSize: 14, color: '#94A3B8', cursor: 'pointer' }} />
                         </Box>
                         <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
@@ -677,6 +815,14 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
             onChange={(e) => setNewBoxName(e.target.value)}
             sx={{ mb: 2, mt: 1 }}
           />
+          <TextField
+            fullWidth
+            label="Box Size / Dimensions"
+            placeholder="e.g. 36L x 36W x 10H Inch"
+            value={newBoxSize}
+            onChange={(e) => setNewBoxSize(e.target.value)}
+            sx={{ mb: 2 }}
+          />
           <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
             {selectedPieceIds.length > 0
               ? `${selectedPieceIds.length} piece(s) selected from grid will be assigned to this box.`
@@ -685,7 +831,14 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setIsAddBoxOpen(false)} color="inherit" sx={{ fontWeight: 700 }}>Cancel</Button>
-          <Button onClick={handleSaveBox} variant="contained" sx={{ bgcolor: '#0284C7', fontWeight: 800, '&:hover': { bgcolor: '#0369A1' } }}>Pack Box</Button>
+          <Button 
+            onClick={handleSaveBox} 
+            disabled={isPacking || isSubmitting}
+            variant="contained" 
+            sx={{ bgcolor: '#0284C7', fontWeight: 800, '&:hover': { bgcolor: '#0369A1' } }}
+          >
+            {isPacking || isSubmitting ? 'Packing...' : 'Pack Box'}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -697,7 +850,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         </DialogTitle>
         <DialogContent>
           <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, mb: 2, display: 'block' }}>
-            Total {viewBox?.pieceCount} Pieces • {viewBox?.area} Sq.Ft • {viewBox?.packedOn}
+            {viewBox?.boxSize ? `Box Size: ${viewBox.boxSize} • ` : ''}Total {viewBox?.pieceCount} Pieces • {viewBox?.area} Sq.Ft • {viewBox?.packedOn}
           </Typography>
           <Grid container spacing={1.5}>
             {(viewBox?.pieces || []).map((p: any) => (
@@ -727,7 +880,9 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
               <Box key={b.logId} sx={{ p: 1.5, border: '1px solid #E2E8F0', borderRadius: 2, bgcolor: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{b.boxName}</Typography>
-                  <Typography variant="caption" sx={{ color: '#64748B' }}>{b.pieceCount} Pieces • {b.area} Sq.Ft</Typography>
+                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
+                    {b.boxSize ? `Size: ${b.boxSize} • ` : ''}{b.pieceCount} Pieces • {b.area} Sq.Ft
+                  </Typography>
                 </Box>
                 <Chip label="Packed" size="small" sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 800 }} />
               </Box>

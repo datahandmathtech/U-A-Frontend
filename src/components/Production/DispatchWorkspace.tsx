@@ -89,8 +89,23 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
       (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
     );
 
-    return logs.map((l: any, idx: number) => {
-      const bName = (l.boxCode || `Box ${idx + 1}`).split('|')[0].trim();
+    // Deduplicate logs with exact same pieceIds or same boxCode
+    const seenKey = new Set<string>();
+    const dedupedLogs: any[] = [];
+    for (const l of logs) {
+      const pIds = (Array.isArray(l.pieceIds) ? l.pieceIds : []).slice().sort().join(',');
+      const code = (l.boxCode || '').trim();
+      const key = pIds ? `${code}_${pIds}` : (l.id || `${code}_${l.createdAt}`);
+      if (seenKey.has(key)) continue;
+      seenKey.add(key);
+      dedupedLogs.push(l);
+    }
+
+    return dedupedLogs.map((l: any, idx: number) => {
+      const rawCode = l.boxCode || `Box ${idx + 1}`;
+      const parts = rawCode.split('|').map((s: string) => s.trim());
+      const bName = parts[0] || `Box ${idx + 1}`;
+      const bSize = parts[1] || '';
       const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
       const boxPieces = allPieces.filter((p: any) => pIds.includes(p.id));
       const boxArea = boxPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
@@ -100,11 +115,12 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         logId: l.id,
         boxNumber: idx + 1,
         boxName: bName,
+        boxSize: bSize,
         pieceIds: pIds,
         pieces: boxPieces,
         pieceCount,
         area: boxArea > 0 ? boxArea.toFixed(2) : (pieceCount * 2.08).toFixed(2),
-        packedOn: l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + new Date(l.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '01 Oct 2026, 10:20 AM'
+        packedOn: l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + new Date(l.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Packed'
       };
     });
   }, [productionLogs, slab, allPieces]);
@@ -128,13 +144,45 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
   const [remarks, setRemarks] = useState('');
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  // Check if project has already been dispatched
-  const isAlreadyDispatched = useMemo(() => {
-    return (productionLogs || []).some((l: any) => 
+  // Check if project has already been dispatched and retrieve latest dispatch log
+  const latestDispatchLog = useMemo(() => {
+    return (productionLogs || []).find((l: any) => 
       (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
       (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
     );
   }, [productionLogs]);
+
+  const isAlreadyDispatched = Boolean(latestDispatchLog);
+
+  // Pre-fill form details if project is already dispatched
+  React.useEffect(() => {
+    if (latestDispatchLog) {
+      if (latestDispatchLog.vehicleNumber) {
+        setVehicleNumber(latestDispatchLog.vehicleNumber);
+      }
+      const driver = latestDispatchLog.vendorName || latestDispatchLog.driverName || latestDispatchLog.worker?.name || latestDispatchLog.remarks?.match(/Driver:\s*([^,\n|]+)/i)?.[1]?.trim() || '';
+      if (driver) {
+        setDriverName(driver);
+      }
+      if (latestDispatchLog.challanNumber) {
+        setLrNumber(latestDispatchLog.challanNumber);
+      }
+      if (latestDispatchLog.remarks) {
+        const customRemark = latestDispatchLog.remarks.replace(/^Vehicle:[^,\n]+,\s*Driver:[^,\n]+(,\s*LR:[^,\n]+)?\s*/i, '').trim();
+        setRemarks(customRemark || latestDispatchLog.remarks);
+      }
+      const dateVal = latestDispatchLog.startTime || latestDispatchLog.createdAt;
+      if (dateVal) {
+        try {
+          const d = new Date(dateVal);
+          if (!isNaN(d.getTime())) {
+            setDispatchDate(d.toISOString().split('T')[0]);
+            setDispatchTime(d.toTimeString().slice(0, 5));
+          }
+        } catch (e) {}
+      }
+    }
+  }, [latestDispatchLog]);
 
   // Calculations for selected boxes
   const selectedBoxes = useMemo(() => {
@@ -379,13 +427,16 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                       Box No.
                     </TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
+                      Box Size
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
                       Pieces (Qty)
                     </TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
                       Area (Sq.Ft)
                     </TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
-                      Packed On
+                      Status / Packed On
                     </TableCell>
                   </TableRow>
                 </TableHead>
@@ -426,6 +477,13 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                             </Box>
                           </TableCell>
                           <TableCell sx={{ py: 1.5 }}>
+                            <Chip 
+                              label={b.boxSize || 'Standard'} 
+                              size="small" 
+                              sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.72rem' }} 
+                            />
+                          </TableCell>
+                          <TableCell sx={{ py: 1.5 }}>
                             <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.82rem' }}>
                               {b.pieceCount} Pieces
                             </Typography>
@@ -436,9 +494,13 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                             </Typography>
                           </TableCell>
                           <TableCell sx={{ py: 1.5 }}>
-                            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                              {b.packedOn}
-                            </Typography>
+                            {isAlreadyDispatched ? (
+                              <Chip label="Dispatched" size="small" sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 800, fontSize: '0.7rem' }} />
+                            ) : (
+                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                                {b.packedOn}
+                              </Typography>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -453,12 +515,23 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         {/* RIGHT COLUMN: DISPATCH DETAILS FORM */}
         <Box sx={{ minWidth: 0 }}>
           <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 450 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.5 }}>
-              <LocalShippingRoundedIcon sx={{ color: '#059669', fontSize: 24 }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A' }}>
-                Dispatch Details
-              </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                <LocalShippingRoundedIcon sx={{ color: '#059669', fontSize: 24 }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A' }}>
+                  Dispatch Details
+                </Typography>
+              </Box>
+              {isAlreadyDispatched && (
+                <Chip label="✓ Dispatched" size="small" sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 800 }} />
+              )}
             </Box>
+
+            {isAlreadyDispatched && (
+              <Alert severity="success" sx={{ mb: 2, borderRadius: 2.5, fontWeight: 700, fontSize: '0.82rem' }}>
+                ✓ Order has been DISPATCHED with Vehicle: <strong>{vehicleNumber || 'Assigned'}</strong> {driverName ? `(Driver: ${driverName})` : ''} on {dispatchDate} {dispatchTime}.
+              </Alert>
+            )}
 
             <Grid container spacing={2}>
               {/* Vehicle Number */}
@@ -604,7 +677,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         </Box>
       </Box>
 
-      {/* 3. DOCKED BOTTOM BAR (Screenshot 5) */}
+      {/* 3. DOCKED BOTTOM BAR */}
       <Paper
         elevation={4}
         sx={{
@@ -615,8 +688,9 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
           p: 2,
           px: 3,
           borderRadius: 3.5,
-          border: '1.5px solid #E2E8F0',
-          bgcolor: '#FFFFFF',
+          border: '1.5px solid',
+          borderColor: isAlreadyDispatched ? '#86EFAC' : '#E2E8F0',
+          bgcolor: isAlreadyDispatched ? '#F0FDF4' : '#FFFFFF',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -631,7 +705,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
             <CheckRoundedIcon sx={{ fontSize: 18 }} />
           </Box>
           <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A' }}>
-            Ready to Dispatch
+            {isAlreadyDispatched ? `Order Dispatched (${vehicleNumber || 'Vehicle Assigned'})` : 'Ready to Dispatch'}
           </Typography>
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5, borderColor: '#CBD5E1' }} />
           <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', fontSize: '0.8rem' }}>
@@ -642,7 +716,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Button
             variant="outlined"
-            onClick={() => navigate(`/projects/${projectId}/slab/${slab?.id || 'all'}/stage/packing`)}
+            onClick={() => navigate(`/projects/${projectId}`)}
             sx={{
               borderRadius: 2,
               fontWeight: 700,
@@ -652,28 +726,50 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               '&:hover': { bgcolor: '#F8FAFC' }
             }}
           >
-            Cancel
+            Back to Project
           </Button>
 
-          <Button
-            variant="contained"
-            disabled={isDispatching || selectedBoxes.length === 0}
-            startIcon={<LocalShippingRoundedIcon />}
-            onClick={handleCompleteDispatch}
-            sx={{
-              bgcolor: '#059669',
-              color: '#FFFFFF',
-              fontWeight: 800,
-              borderRadius: 2.5,
-              px: 3,
-              py: 1,
-              textTransform: 'none',
-              boxShadow: '0 2px 10px rgba(5, 150, 105, 0.25)',
-              '&:hover': { bgcolor: '#047857' }
-            }}
-          >
-            Complete Dispatch
-          </Button>
+          {isAlreadyDispatched ? (
+            <Button
+              variant="contained"
+              disabled={isDispatching}
+              startIcon={<LocalShippingRoundedIcon />}
+              onClick={handleCompleteDispatch}
+              sx={{
+                bgcolor: '#059669',
+                color: '#FFFFFF',
+                fontWeight: 800,
+                borderRadius: 2.5,
+                px: 3,
+                py: 1,
+                textTransform: 'none',
+                boxShadow: '0 2px 10px rgba(5, 150, 105, 0.25)',
+                '&:hover': { bgcolor: '#047857' }
+              }}
+            >
+              Update Dispatch Info
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              disabled={isDispatching || selectedBoxes.length === 0}
+              startIcon={<LocalShippingRoundedIcon />}
+              onClick={handleCompleteDispatch}
+              sx={{
+                bgcolor: '#059669',
+                color: '#FFFFFF',
+                fontWeight: 800,
+                borderRadius: 2.5,
+                px: 3,
+                py: 1,
+                textTransform: 'none',
+                boxShadow: '0 2px 10px rgba(5, 150, 105, 0.25)',
+                '&:hover': { bgcolor: '#047857' }
+              }}
+            >
+              Complete Dispatch
+            </Button>
+          )}
         </Box>
       </Paper>
     </Box>

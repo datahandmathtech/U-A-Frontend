@@ -4070,71 +4070,115 @@ const ProjectDetails: React.FC = () => {
                         </Box>
 
                         {/* Packing & Dispatch Flow Summary Cards (Conditional on Required Stages) */}
-                        {(hasPackingStage || hasDispatchStage) && (
-                          <Divider orientation="vertical" flexItem sx={{ mx: 0.5, borderColor: '#E2E8F0', display: { xs: 'none', md: 'block' } }} />
-                        )}
+                        {(() => {
+                          const packingLogsList = (productionLogs || []).filter((l: any) =>
+                            (l.stage === 'Packing' || l.stage === 'Packing Work') &&
+                            (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
+                          );
+                          const packedBoxesCount = new Set(packingLogsList.map((l: any) => (l.boxCode || '').split('|')[0].trim()).filter(Boolean)).size;
+                          const packedPieceIds = new Set(packingLogsList.flatMap((l: any) => Array.isArray(l.pieceIds) ? l.pieceIds : []));
+                          const totalPiecesCount = projectSlabs?.reduce((acc: number, s: any) => acc + ((s.pieces && s.pieces.length > 0) ? s.pieces.length : 1), 0) || 0;
+                          const isPackingDone = totalPiecesCount > 0 && packedPieceIds.size >= totalPiecesCount;
+                          const isPackingStarted = packingLogsList.length > 0;
 
-                        {hasPackingStage && (
-                          <Box
-                            onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/packing`)}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1.5,
-                              p: 0.8,
-                              px: 1.8,
-                              borderRadius: 2.5,
-                              border: '1.5px solid #E2E8F0',
-                              bgcolor: '#FFFFFF',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              '&:hover': { borderColor: '#0284C7', bgcolor: '#F0F9FF' }
-                            }}
-                          >
-                            <Avatar sx={{ bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', color: '#0284C7', width: 36, height: 36, borderRadius: 2 }}>
-                              <Inventory2RoundedIcon sx={{ fontSize: 18 }} />
-                            </Avatar>
-                            <Box>
-                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>Packing</Typography>
-                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, fontSize: '0.65rem' }}>
-                                Not Started
-                              </Typography>
-                            </Box>
-                          </Box>
-                        )}
+                          const dispatchLogsList = (productionLogs || []).filter((l: any) =>
+                            (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
+                            (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
+                          );
+                          const isDispatched = dispatchLogsList.length > 0;
 
-                        {hasPackingStage && hasDispatchStage && (
-                          <ArrowForwardRoundedIcon sx={{ color: '#CBD5E1', fontSize: 16, display: { xs: 'none', sm: 'block' } }} />
-                        )}
+                          return (
+                            <>
+                              {(hasPackingStage || hasDispatchStage) && (
+                                <Divider orientation="vertical" flexItem sx={{ mx: 0.5, borderColor: '#E2E8F0', display: { xs: 'none', md: 'block' } }} />
+                              )}
 
-                        {hasDispatchStage && (
-                          <Box
-                            onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/dispatch`)}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1.5,
-                              p: 0.8,
-                              px: 1.8,
-                              borderRadius: 2.5,
-                              border: '1.5px solid #E2E8F0',
-                              bgcolor: '#FFFFFF',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              '&:hover': { borderColor: '#059669', bgcolor: '#ECFDF5' }
-                            }}
-                          >
-                            <Avatar sx={{ bgcolor: '#ECFDF5', border: '1px solid #A7F3D0', color: '#059669', width: 36, height: 36, borderRadius: 2 }}>
-                              <LocalShippingRoundedIcon sx={{ fontSize: 18 }} />
-                            </Avatar>
-                            <Box>
-                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>Dispatch</Typography>
-                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, fontSize: '0.65rem' }}>
-                                Not Started
-                              </Typography>
-                            </Box>
-                          </Box>
-                        )}
+                              {hasPackingStage && (
+                                <Box
+                                  onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/packing`)}
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1.5,
+                                    p: 0.8,
+                                    px: 1.8,
+                                    borderRadius: 2.5,
+                                    border: '1.5px solid',
+                                    borderColor: isPackingDone ? '#A7F3D0' : (isPackingStarted ? '#BAE6FD' : '#E2E8F0'),
+                                    bgcolor: isPackingDone ? '#ECFDF5' : (isPackingStarted ? '#F0F9FF' : '#FFFFFF'),
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    '&:hover': { borderColor: '#0284C7', bgcolor: '#F0F9FF' }
+                                  }}
+                                >
+                                  <Avatar sx={{ 
+                                    bgcolor: isPackingDone ? '#DCFCE7' : (isPackingStarted ? '#E0F2FE' : '#F8FAFC'), 
+                                    border: '1px solid',
+                                    borderColor: isPackingDone ? '#86EFAC' : (isPackingStarted ? '#BAE6FD' : '#E2E8F0'), 
+                                    color: isPackingDone ? '#166534' : (isPackingStarted ? '#0284C7' : '#64748B'), 
+                                    width: 36, height: 36, borderRadius: 2 
+                                  }}>
+                                    <Inventory2RoundedIcon sx={{ fontSize: 18 }} />
+                                  </Avatar>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>Packing</Typography>
+                                    <Typography variant="caption" sx={{ 
+                                      color: isPackingDone ? '#166534' : (isPackingStarted ? '#0284C7' : '#64748B'), 
+                                      fontWeight: 800, 
+                                      fontSize: '0.65rem' 
+                                    }}>
+                                      {isPackingDone ? 'Completed' : (isPackingStarted ? `${packedBoxesCount} Box(es) Packed` : 'Not Started')}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              )}
+
+                              {hasPackingStage && hasDispatchStage && (
+                                <ArrowForwardRoundedIcon sx={{ color: '#CBD5E1', fontSize: 16, display: { xs: 'none', sm: 'block' } }} />
+                              )}
+
+                              {hasDispatchStage && (
+                                <Box
+                                  onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/dispatch`)}
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1.5,
+                                    p: 0.8,
+                                    px: 1.8,
+                                    borderRadius: 2.5,
+                                    border: '1.5px solid',
+                                    borderColor: isDispatched ? '#A7F3D0' : '#E2E8F0',
+                                    bgcolor: isDispatched ? '#ECFDF5' : '#FFFFFF',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    '&:hover': { borderColor: '#059669', bgcolor: '#ECFDF5' }
+                                  }}
+                                >
+                                  <Avatar sx={{ 
+                                    bgcolor: isDispatched ? '#DCFCE7' : '#F8FAFC', 
+                                    border: '1px solid',
+                                    borderColor: isDispatched ? '#86EFAC' : '#E2E8F0', 
+                                    color: isDispatched ? '#166534' : '#64748B', 
+                                    width: 36, height: 36, borderRadius: 2 
+                                  }}>
+                                    <LocalShippingRoundedIcon sx={{ fontSize: 18 }} />
+                                  </Avatar>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>Dispatch</Typography>
+                                    <Typography variant="caption" sx={{ 
+                                      color: isDispatched ? '#166534' : '#64748B', 
+                                      fontWeight: 800, 
+                                      fontSize: '0.65rem' 
+                                    }}>
+                                      {isDispatched ? 'Dispatched' : 'Not Started'}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              )}
+                            </>
+                          );
+                        })()}
                       </Box>
                     </Paper>
 
