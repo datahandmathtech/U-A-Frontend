@@ -377,6 +377,83 @@ const StageDetails = () => {
     remarks: ''
   });
 
+  // Live Camera State for Piece Photo Capture
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [isCameraCapturing, setIsCameraCapturing] = useState(false);
+  const cameraVideoRef = React.useRef<HTMLVideoElement>(null);
+  const cameraCanvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      setCameraStream(null);
+    }
+    setIsCameraOpen(false);
+  };
+
+  const startCamera = async (facing: 'environment' | 'user' = 'environment') => {
+    try {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+      }
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      setCameraStream(stream);
+      setCameraFacing(facing);
+      setIsCameraOpen(true);
+      setTimeout(() => {
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          cameraVideoRef.current.play().catch(() => {});
+        }
+      }, 150);
+    } catch (err) {
+      console.warn('Camera access failed:', err);
+      alert('Camera could not be accessed. Please allow camera permissions or use Choose from Gallery.');
+    }
+  };
+
+  const capturePhoto = async () => {
+    if (!cameraVideoRef.current || !cameraCanvasRef.current) return;
+    const v = cameraVideoRef.current;
+    const c = cameraCanvasRef.current;
+    c.width = v.videoWidth || 640;
+    c.height = v.videoHeight || 480;
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+
+    setIsCameraCapturing(true);
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    c.toBlob(async (blob) => {
+      if (blob) {
+        const file = new File([blob], `Piece_Proof_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        stopCamera();
+        const formData = new FormData();
+        formData.append('files', file);
+        try {
+          const res = await uploadFiles(formData).unwrap();
+          if (res?.urls && res.urls.length > 0) {
+            setEditPieceDims(prev => ({ ...prev, photoUrl: res.urls[0] }));
+          }
+        } catch (e: any) {
+          alert(e?.data?.message || e?.message || 'Error uploading photo');
+        } finally {
+          setIsCameraCapturing(false);
+        }
+      } else {
+        setIsCameraCapturing(false);
+      }
+    }, 'image/jpeg', 0.92);
+  };
+
   const handlePiecePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
@@ -2019,20 +2096,19 @@ const StageDetails = () => {
             <InputLabel>Status</InputLabel>
             <Select
               label="Status"
-              value={editPieceDims.status || 'pending'}
+              value={editPieceDims.status === 'completed' ? 'completed' : 'pending'}
               onChange={(e) => setEditPieceDims({ ...editPieceDims, status: e.target.value })}
               sx={{ borderRadius: 2 }}
             >
               <MenuItem value="pending">Not Started</MenuItem>
-              <MenuItem value="in_progress">⚡ Machine ON (In Progress)</MenuItem>
-              <MenuItem value="completed">✓ Machine OFF (Completed)</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
             </Select>
           </FormControl>
 
-          {(editPieceDims.status === 'in_progress' || editPieceDims.status === 'completed') && (
-            <Box sx={{ p: 2, bgcolor: editPieceDims.status === 'in_progress' ? '#FFFBEB' : '#F0FDF4', border: '1px solid ' + (editPieceDims.status === 'in_progress' ? '#FDE68A' : '#BBF7D0'), borderRadius: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: editPieceDims.status === 'in_progress' ? '#B45309' : '#166534', fontSize: '0.84rem' }}>
-                {editPieceDims.status === 'in_progress' ? '⚡ Machine ON Details' : '✓ Machine OFF / Completion Details'}
+          {editPieceDims.status === 'completed' && (
+            <Box sx={{ p: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.84rem' }}>
+                ✓ Workstation & Completion Details
               </Typography>
 
               <Grid container spacing={1.5}>
@@ -2109,27 +2185,22 @@ const StageDetails = () => {
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                   <Button
-                    component="label"
                     variant="outlined"
                     size="small"
-                    startIcon={<CameraAltIcon />}
+                    startIcon={isCameraCapturing ? <CircularProgress size={16} /> : <CameraAltIcon />}
+                    onClick={() => startCamera(cameraFacing)}
+                    disabled={isUploadingPhoto || isCameraCapturing}
                     sx={{
                       borderColor: '#CBD5E1',
                       color: '#334155',
                       textTransform: 'none',
                       fontWeight: 600,
                       borderRadius: 2,
-                      bgcolor: '#FFFFFF'
+                      bgcolor: '#FFFFFF',
+                      '&:hover': { bgcolor: '#F0F9FF', borderColor: '#0284C7' }
                     }}
                   >
-                    Take Photo
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      hidden
-                      onChange={handlePiecePhotoUpload}
-                    />
+                    Take Photo (Camera)
                   </Button>
 
                   <Button
@@ -2217,6 +2288,102 @@ const StageDetails = () => {
           >
             Save Changes
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Live Camera Viewfinder Dialog */}
+      <Dialog
+        open={isCameraOpen}
+        onClose={stopCamera}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0B1120',
+              borderRadius: 4,
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#0B1120' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CameraAltIcon sx={{ color: '#10B981', fontSize: 22 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#FFFFFF', fontSize: '1rem' }}>
+              Live Camera
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={stopCamera} sx={{ color: '#94A3B8', '&:hover': { color: '#FFFFFF' } }}>
+            <CloseIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', bgcolor: '#0B1120' }}>
+          <Box
+            sx={{
+              width: '100%',
+              aspectRatio: '4/3',
+              bgcolor: '#000000',
+              borderRadius: 3,
+              overflow: 'hidden',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '2px solid rgba(255,255,255,0.1)'
+            }}
+          >
+            <video
+              ref={cameraVideoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            <canvas ref={cameraCanvasRef} style={{ display: 'none' }} />
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, px: 2.5, bgcolor: '#0B1120', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <Button
+            size="small"
+            onClick={() => startCamera(cameraFacing === 'environment' ? 'user' : 'environment')}
+            sx={{
+              color: '#94A3B8',
+              textTransform: 'none',
+              fontWeight: 700,
+              fontSize: '0.8rem',
+              '&:hover': { color: '#FFFFFF', bgcolor: 'rgba(255,255,255,0.08)' }
+            }}
+          >
+            Flip Camera
+          </Button>
+
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              onClick={stopCamera}
+              sx={{ color: '#94A3B8', textTransform: 'none', fontWeight: 600, '&:hover': { color: '#FFFFFF' } }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              disabled={isCameraCapturing}
+              onClick={capturePhoto}
+              startIcon={isCameraCapturing ? <CircularProgress size={16} color="inherit" /> : <CameraAltIcon />}
+              sx={{
+                bgcolor: '#059669',
+                color: '#FFFFFF',
+                fontWeight: 800,
+                textTransform: 'none',
+                '&:hover': { bgcolor: '#047857' }
+              }}
+            >
+              {isCameraCapturing ? 'Saving...' : 'Snap Photo'}
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
 

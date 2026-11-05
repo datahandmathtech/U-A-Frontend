@@ -331,7 +331,7 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
   }, [selectedStageFilter, allPendingProjectKeys, stagePendingMap, selectedKeys]);
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1400, mx: 'auto', pb: 6 }}>
+    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1400, mx: 'auto', pb: 10, width: '100%', height: '100%', overflowY: 'auto' }}>
       {/* Toast Notification */}
       <Snackbar 
         open={toast.open} 

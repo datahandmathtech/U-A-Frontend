@@ -69,27 +69,24 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
   const navigate = useNavigate();
   const [dispatchBoxes, { isLoading: isDispatching }] = useDispatchBoxesMutation();
 
-  // Consolidate pieces
+  // Consolidate pieces from all slabs in the project
   const allPieces = useMemo(() => {
-    if (slab?.pieces && Array.isArray(slab.pieces) && slab.pieces.length > 0) {
-      return slab.pieces;
-    }
     const combined: any[] = [];
-    slabs.forEach((s: any) => {
+    (slabs || []).forEach((s: any) => {
       if (Array.isArray(s.pieces)) {
-        s.pieces.forEach((p: any) => combined.push({ ...p, slabName: s.name }));
+        s.pieces.forEach((p: any) => combined.push({ ...p, slabId: s.id, slabName: s.name }));
       }
     });
-    return combined;
+    if (combined.length > 0) return combined;
+    if (slab?.pieces && Array.isArray(slab.pieces)) return slab.pieces;
+    return [];
   }, [slab, slabs]);
 
   // Derive packed boxes from production logs with stage Packing
   const packedBoxes = useMemo(() => {
     const logs = (productionLogs || []).filter((l: any) =>
       (l.stage === 'Packing' || l.stage === 'Packing Work') &&
-      (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
-      (l.slabId === slab?.id || l.productName === slab?.name || l.productId === slab?.id || 
-       (l.pieceIds && l.pieceIds.some((pid: string) => allPieces.some((p: any) => p.id === pid))))
+      (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
     );
 
     return logs.map((l: any, idx: number) => {
