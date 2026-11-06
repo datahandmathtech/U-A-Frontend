@@ -4474,7 +4474,55 @@ const ProjectDetails: React.FC = () => {
                               '&:hover': { bgcolor: '#0369A1' }
                             }}
                           >
-                            Start Packing ({projectSlabs?.reduce((acc: number, s: any) => acc + (s.pieces?.length || 0), 0) || 0} Pieces)
+                            Start Packing ({(() => {
+                              let count = 0;
+                              (projectSlabs || []).forEach((s: any) => {
+                                if (!Array.isArray(s.pieces)) return;
+                                const reqStages = s.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                                const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing') || st === 'Polishing');
+
+                                s.pieces.forEach((p: any) => {
+                                  const isAlreadyInPackingLog = (productionLogs || []).some((l: any) => 
+                                    (l.stage === 'Packing' || l.stage === 'Packing Work' || l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
+                                    (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
+                                    Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)
+                                  );
+                                  const isPieceStagePackingOrDispatch = p.stage === 'Packing' || p.stage === 'Dispatch';
+                                  if (isAlreadyInPackingLog || isPieceStagePackingOrDispatch) {
+                                    count++;
+                                    return;
+                                  }
+                                  let isReady = false;
+                                  if (requiresPolishing) {
+                                    const hasPolishLog = p.logs && p.logs.some((l: any) => 
+                                      (l.stage?.startsWith('Polishing') || l.stage?.startsWith('Polish')) && 
+                                      (l.status === 'completed' || l.status === 'approved')
+                                    );
+                                    const hasApprovedPolishProdLog = (productionLogs || []).some((l: any) => 
+                                      l.approvalStatus === 'approved' &&
+                                      (l.stage?.startsWith('Polishing') || l.stage?.startsWith('Polish')) &&
+                                      ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
+                                    );
+                                    const isPiecePolishCompleted = (p.stage?.startsWith('Polishing') || p.stage?.startsWith('Polish')) && p.status === 'completed';
+                                    if (hasPolishLog || hasApprovedPolishProdLog || isPiecePolishCompleted) isReady = true;
+                                  } else {
+                                    const hasProdLog = p.logs && p.logs.some((l: any) => 
+                                      l.stage?.startsWith('Production') && 
+                                      (l.status === 'completed' || l.status === 'approved')
+                                    );
+                                    const hasApprovedProdLog = (productionLogs || []).some((l: any) => 
+                                      l.approvalStatus === 'approved' &&
+                                      l.stage?.startsWith('Production') &&
+                                      ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
+                                    );
+                                    const isPieceProdCompleted = p.stage?.startsWith('Production') && p.status === 'completed';
+                                    if (hasProdLog || hasApprovedProdLog || isPieceProdCompleted) isReady = true;
+                                  }
+                                  if (isReady) count++;
+                                });
+                              });
+                              return count;
+                            })()} Pieces)
                           </Button>
                         )}
                         {hasPackingStage && hasDispatchStage && (

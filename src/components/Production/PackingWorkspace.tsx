@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import {
   Box, Typography, Paper, Grid, Button, Chip, TextField,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-  InputAdornment, Tooltip, Snackbar, Alert, Divider
+  InputAdornment, Tooltip, Snackbar, Alert, Divider,
+  Radio, RadioGroup, FormControlLabel
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -63,26 +64,84 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   const [selectedPieceIds, setSelectedPieceIds] = useState<string[]>([]);
   const [isAddBoxOpen, setIsAddBoxOpen] = useState(false);
   const [newBoxName, setNewBoxName] = useState('');
-  const [newBoxSize, setNewBoxSize] = useState('');
+  const [hasBoxSize, setHasBoxSize] = useState<'yes' | 'no'>('no');
+  const [boxLength, setBoxLength] = useState('');
+  const [boxWidth, setBoxWidth] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [rangeFrom, setRangeFrom] = useState('');
-  const [rangeTo, setRangeTo] = useState('');
   const [viewBox, setViewBox] = useState<any>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  // Consolidate raw pieces from all slabs for unified project packing
+  // Consolidate raw pieces from slabs whose manufacturing stages prior to Packing are completed
   const rawPieces = useMemo(() => {
     const combined: any[] = [];
     (slabs || []).forEach((s: any) => {
-      if (Array.isArray(s.pieces)) {
-        s.pieces.forEach((p: any) => combined.push({ ...p, slabId: s.id, slabName: s.name }));
-      }
+      if (!Array.isArray(s.pieces)) return;
+
+      const reqStages = s.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing') || st === 'Polishing');
+
+      s.pieces.forEach((p: any) => {
+        // 1. Is this piece already packed or in a packing/dispatch log?
+        const isAlreadyInPackingLog = (productionLogs || []).some((l: any) => 
+          (l.stage === 'Packing' || l.stage === 'Packing Work' || l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
+          (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
+          Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)
+        );
+        const isPieceStagePackingOrDispatch = p.stage === 'Packing' || p.stage === 'Dispatch';
+
+        if (isAlreadyInPackingLog || isPieceStagePackingOrDispatch) {
+          combined.push({ ...p, slabId: s.id, slabName: s.name });
+          return;
+        }
+
+        // 2. If not already packed, check if prior required stages are completed
+        let isReadyForPacking = false;
+
+        if (requiresPolishing) {
+          // Both Production & Polishing must be completed
+          const hasPolishLog = p.logs && p.logs.some((l: any) => 
+            (l.stage?.startsWith('Polishing') || l.stage?.startsWith('Polish')) && 
+            (l.status === 'completed' || l.status === 'approved')
+          );
+          const hasApprovedPolishProdLog = (productionLogs || []).some((l: any) => 
+            l.approvalStatus === 'approved' &&
+            (l.stage?.startsWith('Polishing') || l.stage?.startsWith('Polish')) &&
+            ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
+          );
+          const isPiecePolishCompleted = (p.stage?.startsWith('Polishing') || p.stage?.startsWith('Polish')) && p.status === 'completed';
+
+          if (hasPolishLog || hasApprovedPolishProdLog || isPiecePolishCompleted) {
+            isReadyForPacking = true;
+          }
+        } else {
+          // Only Production is required before Packing
+          const hasProdLog = p.logs && p.logs.some((l: any) => 
+            l.stage?.startsWith('Production') && 
+            (l.status === 'completed' || l.status === 'approved')
+          );
+          const hasApprovedProdLog = (productionLogs || []).some((l: any) => 
+            l.approvalStatus === 'approved' &&
+            l.stage?.startsWith('Production') &&
+            ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
+          );
+          const isPieceProdCompleted = p.stage?.startsWith('Production') && p.status === 'completed';
+
+          if (hasProdLog || hasApprovedProdLog || isPieceProdCompleted) {
+            isReadyForPacking = true;
+          }
+        }
+
+        if (isReadyForPacking) {
+          combined.push({ ...p, slabId: s.id, slabName: s.name });
+        }
+      });
     });
+
     if (combined.length > 0) return combined;
     if (slab?.pieces && Array.isArray(slab.pieces)) return slab.pieces;
     return [];
-  }, [slab, slabs]);
+  }, [slab, slabs, productionLogs]);
 
   // All pieces of all slabs in the project are available in unified packing workspace
   const allPieces = useMemo(() => {
@@ -180,31 +239,10 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   // Open add box modal
   const handleOpenAddBox = () => {
     setNewBoxName(`Box ${packedBoxes.length + 1}`);
-    const defaultDim = slab?.size || (allPieces[0]?.size) || '';
-    setNewBoxSize(defaultDim ? `${defaultDim} Inch` : '');
+    setHasBoxSize('no');
+    setBoxLength('');
+    setBoxWidth('');
     setIsAddBoxOpen(true);
-  };
-
-  // Range and Batch Selection Handlers for 100+ pieces
-  const handleSelectRange = () => {
-    const from = parseInt(rangeFrom, 10);
-    const to = parseInt(rangeTo, 10);
-    if (isNaN(from) || isNaN(to) || from > to) {
-      setToast({ open: true, message: 'Please enter valid From and To piece numbers (e.g. 1 to 20)', severity: 'error' });
-      return;
-    }
-    const toSelect = filteredPieces.filter((p: any) => {
-      if (packedPieceIdMap.has(p.id)) return false;
-      const pNum = Number(p.pieceNumber);
-      return !isNaN(pNum) && pNum >= from && pNum <= to;
-    }).map((p: any) => p.id);
-
-    if (toSelect.length === 0) {
-      setToast({ open: true, message: `No unpacked pieces found in range #${from} to #${to}`, severity: 'error' });
-      return;
-    }
-    setSelectedPieceIds(prev => Array.from(new Set([...prev, ...toSelect])));
-    setToast({ open: true, message: `Selected ${toSelect.length} pieces in range #${from} to #${to}`, severity: 'success' });
   };
 
   const handleSelectAllUnpacked = () => {
@@ -232,7 +270,17 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     try {
       setIsSubmitting(true);
       const bName = newBoxName.trim() || `Box ${packedBoxes.length + 1}`;
-      const bSize = newBoxSize.trim();
+      let bSize = 'Standard';
+      if (hasBoxSize === 'yes') {
+        const l = boxLength.trim();
+        const w = boxWidth.trim();
+        if (l && w) {
+          bSize = `${l} x ${w} Inch`;
+        } else if (l) {
+          bSize = `${l} Inch`;
+        }
+      }
+
       await packBoxes({
         projectId,
         slabId: slab?.id,
@@ -436,43 +484,18 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
               />
             </Box>
 
-            {/* Quick Batch & Range Selection Bar (Handles 100+ Pieces) */}
+            {/* Quick Batch Selection Bar */}
             <Box sx={{ mb: 2, p: 1.25, bgcolor: '#F8FAFC', borderRadius: 2.5, border: '1px solid #E2E8F0', display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: '0.68rem' }}>
-                  Range:
-                </Typography>
-                <TextField
-                  size="small"
-                  placeholder="From #"
-                  value={rangeFrom}
-                  onChange={(e) => setRangeFrom(e.target.value)}
-                  sx={{ width: 68, '& .MuiInputBase-input': { py: 0.4, px: 0.8, fontSize: '0.78rem', textAlign: 'center' } }}
-                />
-                <Typography variant="caption" sx={{ fontWeight: 700, color: '#94A3B8', fontSize: '0.75rem' }}>to</Typography>
-                <TextField
-                  size="small"
-                  placeholder="To #"
-                  value={rangeTo}
-                  onChange={(e) => setRangeTo(e.target.value)}
-                  sx={{ width: 68, '& .MuiInputBase-input': { py: 0.4, px: 0.8, fontSize: '0.78rem', textAlign: 'center' } }}
-                />
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={handleSelectRange}
-                  sx={{ py: 0.4, px: 1.2, fontSize: '0.72rem', fontWeight: 800, bgcolor: '#0284C7', textTransform: 'none', '&:hover': { bgcolor: '#0369A1' } }}
-                >
-                  Select Range
-                </Button>
-              </Box>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                Batch Selection:
+              </Typography>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                 <Button
                   size="small"
                   variant="outlined"
                   onClick={handleSelectAllUnpacked}
-                  sx={{ py: 0.35, px: 1, fontSize: '0.72rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155' }}
+                  sx={{ py: 0.35, px: 1.5, fontSize: '0.75rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155', '&:hover': { bgcolor: '#F1F5F9' } }}
                 >
                   Select All
                 </Button>
@@ -480,7 +503,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                   size="small"
                   variant="outlined"
                   onClick={() => handleSelectBatch(10)}
-                  sx={{ py: 0.35, px: 1, fontSize: '0.72rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155' }}
+                  sx={{ py: 0.35, px: 1.2, fontSize: '0.75rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155', '&:hover': { bgcolor: '#F1F5F9' } }}
                 >
                   +10
                 </Button>
@@ -488,7 +511,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                   size="small"
                   variant="outlined"
                   onClick={() => handleSelectBatch(20)}
-                  sx={{ py: 0.35, px: 1, fontSize: '0.72rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155' }}
+                  sx={{ py: 0.35, px: 1.2, fontSize: '0.75rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155', '&:hover': { bgcolor: '#F1F5F9' } }}
                 >
                   +20
                 </Button>
@@ -498,7 +521,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                     variant="text"
                     color="error"
                     onClick={() => setSelectedPieceIds([])}
-                    sx={{ py: 0.35, px: 1, fontSize: '0.72rem', fontWeight: 800, textTransform: 'none' }}
+                    sx={{ py: 0.35, px: 1.2, fontSize: '0.75rem', fontWeight: 800, textTransform: 'none' }}
                   >
                     Clear ({selectedPieceIds.length})
                   </Button>
@@ -782,7 +805,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
           <Button
             variant="contained"
             endIcon={<ArrowForwardRoundedIcon />}
-            onClick={() => navigate(`/projects/${projectId}/slab/${slab?.id || 'all'}/stage/dispatch`)}
+            onClick={() => navigate(`/projects/${projectId}`)}
             sx={{
               bgcolor: isPackagingCompleted ? '#16A34A' : '#0284C7',
               color: '#FFFFFF',
@@ -800,9 +823,9 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         </Box>
       </Paper>
 
-      {/* CREATE BOX MODAL */}
-      <Dialog open={isAddBoxOpen} onClose={() => setIsAddBoxOpen(false)} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* CREATE BOX MODAL (Exact design from user mockup) */}
+      <Dialog open={isAddBoxOpen} onClose={() => setIsAddBoxOpen(false)} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}>
+        <DialogTitle sx={{ fontWeight: 900, color: '#0F172A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
           Create Packing Box
           <IconButton onClick={() => setIsAddBoxOpen(false)} size="small"><CloseRoundedIcon fontSize="small" /></IconButton>
         </DialogTitle>
@@ -810,32 +833,104 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
           <TextField
             autoFocus
             fullWidth
-            label="Box Name / Code"
+            required
+            label="Box Name / Code *"
             value={newBoxName}
             onChange={(e) => setNewBoxName(e.target.value)}
-            sx={{ mb: 2, mt: 1 }}
+            sx={{ mb: 2.5, mt: 1 }}
           />
-          <TextField
-            fullWidth
-            label="Box Size / Dimensions"
-            placeholder="e.g. 36L x 36W x 10H Inch"
-            value={newBoxSize}
-            onChange={(e) => setNewBoxSize(e.target.value)}
-            sx={{ mb: 2 }}
-          />
+
+          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', mb: 1 }}>
+            Do you want to add Box Size? <Box component="span" sx={{ color: '#EF4444' }}>*</Box>
+          </Typography>
+
+          <RadioGroup
+            row
+            value={hasBoxSize}
+            onChange={(e) => setHasBoxSize(e.target.value as 'yes' | 'no')}
+            sx={{ mb: 2.5 }}
+          >
+            <FormControlLabel
+              value="yes"
+              control={<Radio size="small" sx={{ color: '#0284C7', '&.Mui-checked': { color: '#0284C7' } }} />}
+              label={<Typography variant="body2" sx={{ fontWeight: 700, color: hasBoxSize === 'yes' ? '#0284C7' : '#475569' }}>Yes</Typography>}
+              sx={{
+                border: '1.5px solid',
+                borderColor: hasBoxSize === 'yes' ? '#0284C7' : '#E2E8F0',
+                bgcolor: hasBoxSize === 'yes' ? '#F0F9FF' : '#FFFFFF',
+                borderRadius: 2.5,
+                px: 2,
+                py: 0.5,
+                mr: 2
+              }}
+            />
+            <FormControlLabel
+              value="no"
+              control={<Radio size="small" sx={{ color: '#0284C7', '&.Mui-checked': { color: '#0284C7' } }} />}
+              label={<Typography variant="body2" sx={{ fontWeight: 700, color: hasBoxSize === 'no' ? '#0284C7' : '#475569' }}>No</Typography>}
+              sx={{
+                border: '1.5px solid',
+                borderColor: hasBoxSize === 'no' ? '#0284C7' : '#E2E8F0',
+                bgcolor: hasBoxSize === 'no' ? '#F0F9FF' : '#FFFFFF',
+                borderRadius: 2.5,
+                px: 2,
+                py: 0.5
+              }}
+            />
+          </RadioGroup>
+
+          {hasBoxSize === 'yes' && (
+            <Box sx={{ p: 2, bgcolor: '#F0F9FF', border: '1.5px solid #BAE6FD', borderRadius: 2.5, mb: 2 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#0369A1', textTransform: 'uppercase', display: 'block', mb: 1.5, letterSpacing: '0.5px' }}>
+                Box Size (L × W)
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <TextField
+                  size="small"
+                  label="Length (L) *"
+                  placeholder="36"
+                  value={boxLength}
+                  onChange={(e) => setBoxLength(e.target.value)}
+                  slotProps={{
+                    input: {
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>Inch</Typography></InputAdornment>,
+                      sx: { bgcolor: '#FFFFFF', borderRadius: 1.5 }
+                    }
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <Typography variant="body1" sx={{ fontWeight: 800, color: '#64748B' }}>×</Typography>
+                <TextField
+                  size="small"
+                  label="Width (W) *"
+                  placeholder="24"
+                  value={boxWidth}
+                  onChange={(e) => setBoxWidth(e.target.value)}
+                  slotProps={{
+                    input: {
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>Inch</Typography></InputAdornment>,
+                      sx: { bgcolor: '#FFFFFF', borderRadius: 1.5 }
+                    }
+                  }}
+                  sx={{ flex: 1 }}
+                />
+              </Box>
+            </Box>
+          )}
+
           <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
             {selectedPieceIds.length > 0
               ? `${selectedPieceIds.length} piece(s) selected from grid will be assigned to this box.`
               : 'Next 4 unpacked pieces will be automatically assigned to this box.'}
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setIsAddBoxOpen(false)} color="inherit" sx={{ fontWeight: 700 }}>Cancel</Button>
+        <DialogActions sx={{ p: 2, pt: 1 }}>
+          <Button onClick={() => setIsAddBoxOpen(false)} color="inherit" sx={{ fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
           <Button 
             onClick={handleSaveBox} 
             disabled={isPacking || isSubmitting}
             variant="contained" 
-            sx={{ bgcolor: '#0284C7', fontWeight: 800, '&:hover': { bgcolor: '#0369A1' } }}
+            sx={{ bgcolor: '#0284C7', fontWeight: 800, textTransform: 'none', px: 3, borderRadius: 2, '&:hover': { bgcolor: '#0369A1' } }}
           >
             {isPacking || isSubmitting ? 'Packing...' : 'Pack Box'}
           </Button>
