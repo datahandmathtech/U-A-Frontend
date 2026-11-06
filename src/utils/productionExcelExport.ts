@@ -7,13 +7,30 @@ export interface ProductionExportParams {
   productionLogs?: any[];
 }
 
+const parsePieceArea = (sizeStr?: any): number => {
+  if (!sizeStr || typeof sizeStr !== 'string') return 2.08;
+  const sqftMatch = sizeStr.match(/([\d\.]+)\s*Sq\.?Ft/i);
+  if (sqftMatch) return parseFloat(sqftMatch[1]);
+  const lMatch = sizeStr.match(/([\d\.]+)\s*L/i);
+  const wMatch = sizeStr.match(/([\d\.]+)\s*W/i);
+  if (lMatch && wMatch) {
+    const l = parseFloat(lMatch[1]);
+    const w = parseFloat(wMatch[1]);
+    const sLower = sizeStr.toLowerCase();
+    const sWithoutThick = sLower.split('|')[0].replace(/\s*x\s*\d+\s*mm/gi, '');
+    if (sWithoutThick.includes('mm')) return Number(((l * w) / 92903.04).toFixed(2));
+    if (sWithoutThick.includes('feet') || sWithoutThick.includes('ft')) return Number((l * w).toFixed(2));
+    return Number(((l * w) / 144).toFixed(2));
+  }
+  return 2.08;
+};
+
 export const exportProjectProductionExcel = ({
   project,
   slabs = [],
   machines = [],
   productionLogs = []
 }: ProductionExportParams) => {
-  // Machine lookup map for easy display
   const machineMap = new Map<string, string>();
   if (Array.isArray(machines)) {
     machines.forEach((m: any) => {
@@ -48,170 +65,236 @@ export const exportProjectProductionExcel = ({
     }
   };
 
-  // Build Sheet 1: Machine & Work Execution Ledger
-  const executionRows: any[] = [];
-  let executionCounter = 1;
+  // Flatten all pieces across slabs
+  const allPieces: any[] = [];
+  slabs.forEach((s: any) => {
+    if (Array.isArray(s.pieces)) {
+      s.pieces.forEach((p: any) => allPieces.push({ ...p, slabName: s.name, slabSize: s.size }));
+    }
+  });
 
-  slabs.forEach((slab: any) => {
-    const slabName = slab.name || 'Unnamed Slab';
-    const slabSize = slab.size || `${slab.length || 0} x ${slab.height || 0} ${slab.unit || 'MM'}`;
-    const pieces = slab.pieces && Array.isArray(slab.pieces) ? slab.pieces : [];
+  // ==========================================
+  // SHEET 1: PIECES PRODUCED (Kitne piece bane & kya date ko bane)
+  // Exactly 1 clean row per piece
+  // ==========================================
+  let pieceCounter = 1;
+  const pieceRows: any[] = [];
 
-    pieces.forEach((piece: any) => {
-      const pieceLabel = `Piece #${piece.pieceNumber || 1}`;
-      const pieceName = piece.productName || slabName;
-      const pieceSize = piece.size || slabSize;
-      const logs = piece.logs && Array.isArray(piece.logs) && piece.logs.length > 0 ? piece.logs : [];
+  allPieces.forEach((piece: any) => {
+    const pieceSize = piece.size || piece.slabSize || '-';
+    const areaSqFt = parsePieceArea(pieceSize);
 
-      if (logs.length > 0) {
-        // Sort logs chronologically
-        const sortedLogs = [...logs].sort((a: any, b: any) => {
-          const tA = new Date(a.createdAt || a.endTime || 0).getTime();
-          const tB = new Date(b.createdAt || b.endTime || 0).getTime();
-          return tA - tB;
-        });
+    // Find production log for this piece
+    const prodLog = (piece.logs || []).find((l: any) => (l.stage || '').startsWith('Production')) ||
+      (productionLogs || []).find((l: any) => 
+        (l.stage === 'Production' || l.stage === 'Production Work') && 
+        Array.isArray(l.pieceIds) && l.pieceIds.includes(piece.id)
+      );
 
-        sortedLogs.forEach((log: any) => {
-          const machineName = log.machineId
-            ? (machineMap.get(String(log.machineId)) || `Machine: ${log.machineId}`)
-            : 'Manual / Hand Work';
-          const driverOrOp = log.driverName || log.operatorName || (log.operatorId ? `Operator ID: ${log.operatorId}` : '-');
-          const dateStr = formatDate(log.createdAt || log.endTime);
-          const timeStr = formatTime(log.createdAt || log.endTime);
-          const stageName = (log.stage || piece.stage || 'Production').replace(' Work', '');
-          const statusStr = (log.status || piece.status || 'Completed').toUpperCase();
-          const photo = log.endPhotoUrl || log.startPhotoUrl || '-';
+    const logDate = prodLog ? formatDate(prodLog.createdAt || prodLog.endTime) : (piece.createdAt ? formatDate(piece.createdAt) : '-');
+    const logTime = prodLog ? formatTime(prodLog.createdAt || prodLog.endTime) : (piece.createdAt ? formatTime(piece.createdAt) : '-');
 
-          executionRows.push({
-            'S.No': executionCounter++,
-            'Slab / Item Name': slabName,
-            'Piece No': pieceLabel,
-            'Product / Specification': pieceName,
-            'Size / Dimensions': pieceSize,
-            'Manufacturing Stage': stageName,
-            'Work Date': dateStr,
-            'Work Time': timeStr,
-            'Machine Used': machineName,
-            'Operator / Karigar / Driver': driverOrOp,
-            'Quantity': '1 Pc',
-            'Execution Status': statusStr,
-            'Remarks / Notes': log.remarks || 'Stage Completed',
-            'Photo Proof URL': photo
-          });
-        });
+    let machine = '-';
+    let operator = '-';
+    if (prodLog) {
+      if (prodLog.remarks?.includes('Manual') || prodLog.machineId === 'manual') {
+        machine = 'Manual';
+        operator = 'Manual';
       } else {
-        // Piece with no logs yet
-        executionRows.push({
-          'S.No': executionCounter++,
-          'Slab / Item Name': slabName,
-          'Piece No': pieceLabel,
-          'Product / Specification': pieceName,
-          'Size / Dimensions': pieceSize,
-          'Manufacturing Stage': (piece.stage || 'Production').replace(' Work', ''),
-          'Work Date': '-',
-          'Work Time': '-',
-          'Machine Used': '-',
-          'Operator / Karigar / Driver': '-',
-          'Quantity': '1 Pc',
-          'Execution Status': (piece.status || 'Pending').toUpperCase(),
-          'Remarks / Notes': 'Pending Execution',
-          'Photo Proof URL': '-'
-        });
+        machine = prodLog.machineId ? (machineMap.get(String(prodLog.machineId)) || 'Machine') : 'Manual';
+        operator = prodLog.driverName || prodLog.operatorName || (prodLog.operatorId ? `ID: ${prodLog.operatorId}` : 'Manual');
       }
+    }
+
+    const isCompleted = piece.status === 'completed' || piece.status === 'approved' || Boolean(prodLog);
+
+    pieceRows.push({
+      'S.No': pieceCounter++,
+      'Piece No': `Piece #${piece.pieceNumber || 1}`,
+      'Slab / Product Name': piece.productName || piece.slabName || 'Stone Slab',
+      'Size / Dimensions': pieceSize,
+      'Area (Sq.Ft)': areaSqFt.toFixed(2),
+      'Production Date': logDate,
+      'Production Time': logTime,
+      'Machine': machine,
+      'Operator / Karigar': operator,
+      'Status': isCompleted ? 'COMPLETED' : 'PENDING'
     });
   });
 
-  // Sheet 2: Slabs & Pieces Progress Summary
-  let summaryCounter = 1;
-  const summaryRows = slabs.map((slab: any) => {
-    const pieces = slab.pieces && Array.isArray(slab.pieces) ? slab.pieces : [];
-    const totalPcs = pieces.length || slab.totalPieces || 0;
-    const completedPcs = pieces.filter((p: any) => p.status === 'completed' || p.status === 'approved').length;
-    const progressPct = totalPcs > 0 ? Math.round((completedPcs / totalPcs) * 100) : 0;
-    const stages = Array.isArray(slab.requiredStages)
-      ? slab.requiredStages.join(' ➔ ')
-      : 'Production ➔ Polishing ➔ Packing ➔ Dispatch';
+  // ==========================================
+  // SHEET 2: PACKING SUMMARY (Boxes kitne pack hue)
+  // ==========================================
+  const packingLogs = (productionLogs || []).filter((l: any) =>
+    (l.stage === 'Packing' || l.stage === 'Packing Work') &&
+    (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
+  );
+
+  // Deduplicate packed boxes
+  const seenBoxes = new Set<string>();
+  const dedupedBoxLogs: any[] = [];
+  for (const l of packingLogs) {
+    const pIds = (Array.isArray(l.pieceIds) ? l.pieceIds : []).slice().sort().join(',');
+    const code = (l.boxCode || '').trim();
+    const key = pIds ? `${code}_${pIds}` : (l.id || `${code}_${l.createdAt}`);
+    if (seenBoxes.has(key)) continue;
+    seenBoxes.add(key);
+    dedupedBoxLogs.push(l);
+  }
+
+  // Check which boxes have been dispatched
+  const dispatchLogs = (productionLogs || []).filter((l: any) =>
+    (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
+    (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
+  );
+  const dispatchedBoxNames = new Set(
+    dispatchLogs.flatMap((l: any) => (l.boxCode || '').split(',').map((s: string) => s.trim()).filter(Boolean))
+  );
+
+  let boxCounter = 1;
+  const boxRows = dedupedBoxLogs.map((l: any) => {
+    const rawCode = l.boxCode || `Box ${boxCounter}`;
+    const parts = rawCode.split('|').map((s: string) => s.trim());
+    const bName = parts[0] || `Box ${boxCounter}`;
+    const bSize = parts[1] || 'Standard';
+
+    const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
+    const boxPieces = allPieces.filter((p: any) => pIds.includes(p.id));
+    const boxArea = boxPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || p.slabSize), 0);
+    const pieceCount = l.quantityProduced || pIds.length || boxPieces.length || 0;
+    const piecesList = boxPieces.map((p: any) => `#${p.pieceNumber}`).join(', ') || `${pieceCount} Pcs`;
+
+    const isBoxDispatched = dispatchedBoxNames.has(bName) || dispatchLogs.some((dl: any) => Array.isArray(dl.pieceIds) && pIds.some((pid: string) => dl.pieceIds.includes(pid)));
 
     return {
-      'S.No': summaryCounter++,
-      'Slab / Item Name': slab.name,
-      'Dimensions': slab.size || `${slab.length || 0} x ${slab.height || 0} ${slab.unit || 'MM'}`,
-      'Total Pieces': totalPcs,
-      'Completed Pieces': completedPcs,
-      'Remaining Pieces': Math.max(0, totalPcs - completedPcs),
-      'Progress %': `${progressPct}%`,
-      'Required Pipeline Stages': stages,
-      'Total Sq.Ft': slab.totalSqFt || slab.squareFeet || slab.sqft || '-',
-      'Slab Status': progressPct === 100 ? 'COMPLETED' : progressPct > 0 ? 'IN PROGRESS' : 'PENDING'
+      'S.No': boxCounter++,
+      'Box No / Name': bName,
+      'Box Size (L × W)': bSize,
+      'Total Pieces': pieceCount,
+      'Pieces Included': piecesList,
+      'Total Area (Sq.Ft)': boxArea > 0 ? boxArea.toFixed(2) : (pieceCount * 2.08).toFixed(2),
+      'Packed Date': formatDate(l.createdAt),
+      'Packed Time': formatTime(l.createdAt),
+      'Packing Status': isBoxDispatched ? 'DISPATCHED' : 'PACKED'
     };
   });
 
-  // Sheet 3: Project Overview & Metadata
-  const projectInfoRows = [
-    { 'Attribute': 'Company Name', 'Details': 'UNNATI ARTS — Architectural Stone & Crafts' },
-    { 'Attribute': 'Report Name', 'Details': 'Production Tracking & Machine Execution Ledger' },
-    { 'Attribute': 'Project Code', 'Details': project?.projectCode || '-' },
-    { 'Attribute': 'Project Title', 'Details': project?.title || project?.name || '-' },
-    { 'Attribute': 'Client Name', 'Details': project?.clientName || '-' },
-    { 'Attribute': 'Client Contact', 'Details': project?.clientPhone || project?.clientEmail || '-' },
-    { 'Attribute': 'Project Status', 'Details': (project?.status || 'completed').toUpperCase() },
-    { 'Attribute': 'Order Start Date', 'Details': formatDate(project?.startDate) },
-    { 'Attribute': 'Delivery Target Date', 'Details': formatDate(project?.targetDeliveryDate || project?.endDate) },
-    { 'Attribute': 'Total Slabs / Items', 'Details': slabs.length },
-    { 'Attribute': 'Total Pieces Tracked', 'Details': slabs.reduce((acc, s) => acc + (s.pieces?.length || 0), 0) },
-    { 'Attribute': 'Report Generated On', 'Details': `${formatDate(new Date())} at ${formatTime(new Date())}` }
+  // ==========================================
+  // SHEET 3: DISPATCH DETAILS (Kab / kaise dispatch hue)
+  // ==========================================
+  let dispatchCounter = 1;
+  const dispatchRows = dispatchLogs.map((l: any) => {
+    const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
+    const batchPieces = allPieces.filter((p: any) => pIds.includes(p.id));
+    const batchArea = batchPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || p.slabSize), 0);
+    const pieceCount = l.quantityProduced || pIds.length || batchPieces.length || 0;
+
+    const driver = l.vendorName || l.driverName || l.remarks?.match(/Driver:\s*([^,\n|]+)/i)?.[1]?.trim() || (l.remarks?.includes('Manual') ? 'Manual' : '-');
+    const lr = l.challanNumber || l.remarks?.match(/LR:\s*([^,\n|]+)/i)?.[1]?.trim() || '-';
+    const vehicle = l.vehicleNumber || (l.remarks?.match(/Vehicle:\s*([^,\n|]+)/i)?.[1]?.trim()) || (l.remarks?.includes('Manual') ? 'Manual' : '-');
+    const cleanRemarks = l.remarks?.startsWith('Vehicle:') ? '-' : (l.remarks || '-');
+
+    return {
+      'S.No': dispatchCounter++,
+      'Vehicle Number': vehicle,
+      'Driver Name': driver,
+      'Transport / LR No': lr,
+      'Boxes Dispatched': l.boxCode || '-',
+      'Pieces Count': pieceCount,
+      'Total Area (Sq.Ft)': batchArea > 0 ? batchArea.toFixed(2) : (pieceCount * 2.08).toFixed(2),
+      'Dispatch Date': formatDate(l.startTime || l.createdAt),
+      'Dispatch Time': formatTime(l.startTime || l.createdAt),
+      'Remarks': cleanRemarks
+    };
+  });
+
+  // ==========================================
+  // SHEET 4: ORDER SUMMARY
+  // ==========================================
+  const totalPiecesCount = allPieces.length;
+  const completedPiecesCount = allPieces.filter((p: any) => p.status === 'completed' || p.status === 'approved').length;
+  const totalAreaManufactured = allPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || p.slabSize), 0).toFixed(2);
+  const totalBoxesCount = dedupedBoxLogs.length;
+  const totalDispatchedVehicles = Array.from(new Set(dispatchLogs.map((l: any) => l.vehicleNumber).filter(Boolean))).join(', ') || '-';
+
+  const orderSummaryRows = [
+    { 'Particulars': 'Work Order Code', 'Value': project?.projectCode || '-' },
+    { 'Particulars': 'Project / Order Title', 'Value': project?.title || project?.name || '-' },
+    { 'Particulars': 'Client Name', 'Value': project?.clientName || '-' },
+    { 'Particulars': 'Total Slabs Tracked', 'Value': slabs.length },
+    { 'Particulars': 'Total Pieces Planned', 'Value': totalPiecesCount },
+    { 'Particulars': 'Pieces Completed', 'Value': completedPiecesCount },
+    { 'Particulars': 'Total Manufacturing Area', 'Value': `${totalAreaManufactured} Sq.Ft` },
+    { 'Particulars': 'Total Boxes Packed', 'Value': `${totalBoxesCount} Box(es)` },
+    { 'Particulars': 'Dispatched Vehicle(s)', 'Value': totalDispatchedVehicles },
+    { 'Particulars': 'Order Status', 'Value': (project?.status || 'In Production').toUpperCase() },
+    { 'Particulars': 'Order Start Date', 'Value': formatDate(project?.startDate) },
+    { 'Particulars': 'Report Generated Date', 'Value': `${formatDate(new Date())} at ${formatTime(new Date())}` }
   ];
 
-  // Create Workbook
+  // ==========================================
+  // WORKBOOK COMPILATION (Clean 4 Sheets)
+  // ==========================================
   const workbook = XLSX.utils.book_new();
 
-  // 1. Detailed Execution Ledger Sheet
-  const wsExecution = XLSX.utils.json_to_sheet(executionRows.length > 0 ? executionRows : [{ 'Notice': 'No piece execution logs recorded yet' }]);
-  wsExecution['!cols'] = [
+  // 1. Pieces Produced
+  const wsPieces = XLSX.utils.json_to_sheet(pieceRows.length > 0 ? pieceRows : [{ 'Notice': 'No pieces produced yet' }]);
+  wsPieces['!cols'] = [
     { wch: 8 },  // S.No
-    { wch: 22 }, // Slab / Item Name
     { wch: 14 }, // Piece No
-    { wch: 28 }, // Product / Specification
-    { wch: 20 }, // Size / Dimensions
-    { wch: 22 }, // Manufacturing Stage
-    { wch: 14 }, // Work Date
-    { wch: 14 }, // Work Time
-    { wch: 24 }, // Machine Used
-    { wch: 26 }, // Operator / Karigar / Driver
-    { wch: 12 }, // Quantity
-    { wch: 18 }, // Execution Status
-    { wch: 30 }, // Remarks / Notes
-    { wch: 45 }  // Photo Proof URL
+    { wch: 26 }, // Slab / Product Name
+    { wch: 28 }, // Size / Dimensions
+    { wch: 14 }, // Area (Sq.Ft)
+    { wch: 16 }, // Production Date
+    { wch: 14 }, // Production Time
+    { wch: 20 }, // Machine
+    { wch: 22 }, // Operator / Karigar
+    { wch: 14 }  // Status
   ];
-  XLSX.utils.book_append_sheet(workbook, wsExecution, 'Machine & Work Execution');
+  XLSX.utils.book_append_sheet(workbook, wsPieces, 'Pieces Produced');
 
-  // 2. Summary Sheet
-  const wsSummary = XLSX.utils.json_to_sheet(summaryRows.length > 0 ? summaryRows : [{ 'Notice': 'No slabs defined' }]);
-  wsSummary['!cols'] = [
+  // 2. Boxes Packed
+  const wsBoxes = XLSX.utils.json_to_sheet(boxRows.length > 0 ? boxRows : [{ 'Notice': 'No packing boxes created yet' }]);
+  wsBoxes['!cols'] = [
     { wch: 8 },  // S.No
-    { wch: 24 }, // Slab / Item Name
-    { wch: 20 }, // Dimensions
+    { wch: 18 }, // Box No / Name
+    { wch: 22 }, // Box Size
     { wch: 14 }, // Total Pieces
-    { wch: 16 }, // Completed Pieces
-    { wch: 16 }, // Remaining Pieces
-    { wch: 14 }, // Progress %
-    { wch: 45 }, // Required Pipeline Stages
-    { wch: 14 }, // Total Sq.Ft
-    { wch: 16 }  // Slab Status
+    { wch: 24 }, // Pieces Included
+    { wch: 18 }, // Total Area (Sq.Ft)
+    { wch: 16 }, // Packed Date
+    { wch: 14 }, // Packed Time
+    { wch: 16 }  // Status
   ];
-  XLSX.utils.book_append_sheet(workbook, wsSummary, 'Slabs Progress Summary');
+  XLSX.utils.book_append_sheet(workbook, wsBoxes, 'Boxes Packed');
 
-  // 3. Project Overview Sheet
-  const wsInfo = XLSX.utils.json_to_sheet(projectInfoRows);
-  wsInfo['!cols'] = [
-    { wch: 25 },
-    { wch: 60 }
+  // 3. Dispatch Details
+  const wsDispatch = XLSX.utils.json_to_sheet(dispatchRows.length > 0 ? dispatchRows : [{ 'Notice': 'No dispatch records created yet' }]);
+  wsDispatch['!cols'] = [
+    { wch: 8 },  // S.No
+    { wch: 18 }, // Vehicle Number
+    { wch: 22 }, // Driver Name
+    { wch: 20 }, // Transport / LR No
+    { wch: 24 }, // Boxes Dispatched
+    { wch: 14 }, // Pieces Count
+    { wch: 18 }, // Total Area (Sq.Ft)
+    { wch: 16 }, // Dispatch Date
+    { wch: 14 }, // Dispatch Time
+    { wch: 30 }  // Remarks
   ];
-  XLSX.utils.book_append_sheet(workbook, wsInfo, 'Project Overview');
+  XLSX.utils.book_append_sheet(workbook, wsDispatch, 'Dispatch Details');
+
+  // 4. Order Summary
+  const wsSummary = XLSX.utils.json_to_sheet(orderSummaryRows);
+  wsSummary['!cols'] = [
+    { wch: 30 },
+    { wch: 45 }
+  ];
+  XLSX.utils.book_append_sheet(workbook, wsSummary, 'Order Summary');
 
   // Generate File
-  const code = (project?.projectCode || project?.title || 'Project').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const code = (project?.projectCode || project?.title || 'WorkOrder').replace(/[^a-zA-Z0-9_-]/g, '_');
   const todayStr = new Date().toISOString().split('T')[0];
-  const fileName = `Production_Report_${code}_${todayStr}.xlsx`;
+  const fileName = `Production_Summary_${code}_${todayStr}.xlsx`;
   XLSX.writeFile(workbook, fileName);
 };
