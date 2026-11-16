@@ -526,8 +526,8 @@ const StageDetails = () => {
             photoUrl: editPieceDims.photoUrl || undefined,
             stage: stageFormatted || slab.stage || 'Production',
             status: editPieceDims.status || 'pending',
-            startTime: editPieceDims.startTime || undefined,
-            endTime: editPieceDims.endTime || undefined,
+            startTime: editPieceDims.startTime ? new Date(editPieceDims.startTime).toISOString() : new Date().toISOString(),
+            endTime: new Date().toISOString(),
             remarks: editPieceDims.remarks || undefined
           }).unwrap();
         } catch (qcErr) {
@@ -591,11 +591,7 @@ const StageDetails = () => {
       : latestPieceLog?.startTime
       ? formatDateTimeLocal(new Date(latestPieceLog.startTime))
       : formatDateTimeLocal();
-    const savedEndTime = pieceMachineLog?.endTime 
-      ? formatDateTimeLocal(new Date(pieceMachineLog.endTime))
-      : latestPieceLog?.endTime
-      ? formatDateTimeLocal(new Date(latestPieceLog.endTime))
-      : formatDateTimeLocal();
+    const savedEndTime = formatDateTimeLocal(new Date());
 
     setEditPieceDims({
       length,
@@ -2097,7 +2093,7 @@ const StageDetails = () => {
             <Select
               label="Status"
               value={editPieceDims.status === 'completed' ? 'completed' : 'pending'}
-              onChange={(e) => setEditPieceDims({ ...editPieceDims, status: e.target.value })}
+              onChange={(e) => setEditPieceDims({ ...editPieceDims, status: e.target.value, endTime: formatDateTimeLocal(new Date()) })}
               sx={{ borderRadius: 2 }}
             >
               <MenuItem value="pending">Not Started</MenuItem>
@@ -2152,13 +2148,13 @@ const StageDetails = () => {
                 {editPieceDims.status === 'completed' && (
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField
-                      label="Machine OFF Date & Time"
+                      label="Approval / OFF Time (Current)"
                       type="datetime-local"
                       size="small"
                       fullWidth
-                      value={editPieceDims.endTime || ''}
-                      onChange={(e) => setEditPieceDims({ ...editPieceDims, endTime: e.target.value })}
-                      sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                      disabled
+                      value={formatDateTimeLocal(new Date())}
+                      sx={{ bgcolor: '#F8FAFC', borderRadius: 2 }}
                       slotProps={{ inputLabel: { shrink: true }, input: { sx: { borderRadius: 2 } } }}
                     />
                   </Grid>

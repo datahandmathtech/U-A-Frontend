@@ -197,12 +197,15 @@ const SlabRow = ({
   const handleToggleStage = async (stageKey: string, e: React.MouseEvent | React.ChangeEvent) => {
     e.stopPropagation();
     let newRequired;
-    const isCurrentlyChecked = requiredStages.includes(stageKey) || (stageKey === 'Polishing - Honed' && requiredStages.includes('Polishing'));
+    const isPolishingKey = stageKey.startsWith('Polishing');
+    const isCurrentlyChecked = isPolishingKey
+      ? requiredStages.some((s: string) => s.startsWith('Polishing'))
+      : requiredStages.includes(stageKey);
     
     if (isCurrentlyChecked) {
-      newRequired = requiredStages.filter((s: string) => s !== stageKey && s !== 'Polishing');
+      newRequired = requiredStages.filter((s: string) => isPolishingKey ? !s.startsWith('Polishing') : s !== stageKey);
     } else {
-      newRequired = [...requiredStages.filter((s: string) => s !== 'Polishing'), stageKey];
+      newRequired = [...requiredStages.filter((s: string) => isPolishingKey ? !s.startsWith('Polishing') : true), stageKey];
     }
     try {
       await updateSlab({ id: slab.id, data: { requiredStages: newRequired } }).unwrap();
@@ -213,7 +216,9 @@ const SlabRow = ({
 
   const getStageStatus = (stageKey: string) => {
     const normalizedStageName = stageKey.split(' - ')[0];
-    const isRequired = requiredStages.includes(stageKey) || (stageKey === 'Polishing - Honed' && requiredStages.includes('Polishing'));
+    const isRequired = normalizedStageName === 'Polishing'
+      ? requiredStages.some((s: string) => s.startsWith('Polishing'))
+      : requiredStages.includes(stageKey);
     if (!isRequired) return 'N/A';
 
     const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
@@ -463,7 +468,9 @@ const SlabRow = ({
 
       {/* Stage Columns: Production, Polishing (Honed), Polishing (Mirror), Packing, Dispatch */}
       {STAGE_COLUMNS.map(col => {
-        const isChecked = requiredStages.includes(col.key) || (col.key === 'Polishing - Honed' && requiredStages.includes('Polishing'));
+        const isChecked = col.key.startsWith('Polishing')
+          ? requiredStages.some((s: string) => s.startsWith('Polishing'))
+          : requiredStages.includes(col.key);
         
         if (isPlanningMode) {
           return (
@@ -1090,7 +1097,10 @@ const ProjectDetails: React.FC = () => {
       const selected = projectSlabs.filter((s: any) => selectedSlabIds.includes(s.id));
       const firstWithStages = selected.find((s: any) => s.requiredStages && s.requiredStages.length > 0);
       if (firstWithStages?.requiredStages) {
-        setBulkStages(firstWithStages.requiredStages);
+        const normalized = Array.from(new Set<string>(
+          firstWithStages.requiredStages.map((s: string) => s === 'Polishing' ? 'Polishing - Honed' : s)
+        ));
+        setBulkStages(normalized);
       } else {
         setBulkStages(['Production', 'Packing', 'Dispatch']);
       }
@@ -1112,9 +1122,10 @@ const ProjectDetails: React.FC = () => {
       return;
     }
     try {
+      const cleanStages = Array.from(new Set(bulkStages.filter(s => s !== 'Polishing')));
       await bulkUpdateSlabStages({ 
         slabIds: selectedSlabIds, 
-        requiredStages: bulkStages 
+        requiredStages: cleanStages 
       }).unwrap();
       refetchSlabs();
       setSelectedSlabIds([]);
@@ -4338,15 +4349,18 @@ const ProjectDetails: React.FC = () => {
                             { key: 'Packing', label: 'Packing' },
                             { key: 'Dispatch', label: 'Dispatch' }
                           ].map(stage => {
-                            const isChecked = bulkStages.includes(stage.key);
+                            const isChecked = bulkStages.includes(stage.key) || (stage.key === 'Polishing - Honed' && bulkStages.includes('Polishing'));
                             return (
                               <Chip
                                 key={stage.key}
                                 label={stage.label}
                                 size="small"
                                 onClick={() => {
-                                  if (isChecked) setBulkStages(bulkStages.filter(s => s !== stage.key));
-                                  else setBulkStages([...bulkStages, stage.key]);
+                                  if (isChecked) {
+                                    setBulkStages(bulkStages.filter(s => s !== stage.key && !(stage.key.startsWith('Polishing') && s === 'Polishing')));
+                                  } else {
+                                    setBulkStages([...bulkStages.filter(s => s !== 'Polishing'), stage.key]);
+                                  }
                                 }}
                                 sx={{
                                   bgcolor: isChecked ? '#0284C7' : '#E0F2FE',
@@ -4473,7 +4487,7 @@ const ProjectDetails: React.FC = () => {
                         ? s.requiredStages
                         : ['Production', 'Polishing', 'Packing', 'Dispatch'];
                       req.forEach((stg: string) => {
-                        if (stg === 'Polishing') activeStageKeys.add('Polishing - Honed');
+                        if (stg.startsWith('Polishing')) activeStageKeys.add('Polishing - Honed');
                         else activeStageKeys.add(stg);
                       });
                     });

@@ -238,6 +238,10 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
 
   // Open add box modal
   const handleOpenAddBox = () => {
+    if (selectedPieceIds.length === 0) {
+      setToast({ open: true, message: 'Please select pieces from the left grid first to create a box', severity: 'error' });
+      return;
+    }
     setNewBoxName(`Box ${packedBoxes.length + 1}`);
     setHasBoxSize('no');
     setBoxLength('');
@@ -258,9 +262,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   // Create single box
   const handleSaveBox = async () => {
     if (isSubmitting || isPacking) return;
-    const targetPieces = selectedPieceIds.length > 0 
-      ? selectedPieceIds 
-      : allPieces.filter((p: any) => !packedPieceIdMap.has(p.id)).slice(0, 4).map((p: any) => p.id);
+    const targetPieces = selectedPieceIds;
 
     if (targetPieces.length === 0) {
       setToast({ open: true, message: 'Please select at least 1 piece to pack into the box', severity: 'error' });
@@ -921,7 +923,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
           <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
             {selectedPieceIds.length > 0
               ? `${selectedPieceIds.length} piece(s) selected from grid will be assigned to this box.`
-              : 'Next 4 unpacked pieces will be automatically assigned to this box.'}
+              : 'Please select pieces from the left grid to pack into this box.'}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2, pt: 1 }}>

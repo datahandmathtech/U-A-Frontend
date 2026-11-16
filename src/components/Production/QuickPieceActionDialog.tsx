@@ -466,7 +466,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
           machineId: machineId || undefined,
           driverName: driverName.trim() || undefined,
           startTime: startTime ? new Date(startTime).toISOString() : undefined,
-          endTime: endTime ? new Date(endTime).toISOString() : undefined,
+          endTime: new Date().toISOString(),
           photoUrl: photoUrl || undefined,
           stage: selectedStage || 'Production',
           remarks: remarks.trim() || undefined,
@@ -484,7 +484,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
           machineId: machineId || undefined,
           driverName: driverName.trim() || undefined,
           startTime: startTime ? new Date(startTime).toISOString() : undefined,
-          endTime: endTime ? new Date(endTime).toISOString() : undefined,
+          endTime: new Date().toISOString(),
           photoUrl: photoUrl || undefined,
           remarks: remarks.trim() || undefined
         }).unwrap();
@@ -834,9 +834,9 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
                       fullWidth
                       size="small"
                       type="datetime-local"
-                      label="Machine Out / End Date & Time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
+                      label="Approval / Out Time (Current)"
+                      disabled
+                      value={formatForDateTimeLocal()}
                       slotProps={{
                         inputLabel: { shrink: true },
                         input: {
