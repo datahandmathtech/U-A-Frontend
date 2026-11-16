@@ -788,7 +788,7 @@ const ProjectDetails: React.FC = () => {
 
   // Check if any slab in the work order requires Packing or Dispatch stages
   const hasPackingStage = useMemo(() => {
-    if (!projectSlabs || projectSlabs.length === 0) return true;
+    if (!projectSlabs || projectSlabs.length === 0) return false;
     return projectSlabs.some((s: any) => {
       const stages = Array.isArray(s.requiredStages) && s.requiredStages.length > 0
         ? s.requiredStages
@@ -798,7 +798,7 @@ const ProjectDetails: React.FC = () => {
   }, [projectSlabs]);
 
   const hasDispatchStage = useMemo(() => {
-    if (!projectSlabs || projectSlabs.length === 0) return true;
+    if (!projectSlabs || projectSlabs.length === 0) return false;
     return projectSlabs.some((s: any) => {
       const stages = Array.isArray(s.requiredStages) && s.requiredStages.length > 0
         ? s.requiredStages
@@ -1147,6 +1147,7 @@ const ProjectDetails: React.FC = () => {
     try {
       await bulkDeleteSlabs({ ids: selectedSlabIds }).unwrap();
       refetchSlabs();
+      refetchProduction();
       refetch();
       setSelectedSlabIds([]);
       setSnackbarMessage(`Successfully deleted ${selectedSlabIds.length} slab(s).`);
@@ -1264,6 +1265,8 @@ const ProjectDetails: React.FC = () => {
     if (window.confirm("Delete this slab?")) {
       await deleteSlab(slabId).unwrap();
       refetchSlabs();
+      refetchProduction();
+      refetch();
     }
   };
   
@@ -4216,20 +4219,37 @@ const ProjectDetails: React.FC = () => {
 
                         {/* Packing & Dispatch Flow Summary Cards (Conditional on Required Stages) */}
                         {(() => {
-                          const packingLogsList = (productionLogs || []).filter((l: any) =>
-                            (l.stage === 'Packing' || l.stage === 'Packing Work') &&
-                            (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
+                          const validPieceIdSet = new Set<string>(
+                            (projectSlabs || []).flatMap((s: any) =>
+                              (s.pieces && s.pieces.length > 0)
+                                ? s.pieces.map((p: any) => String(p.id))
+                                : [String(s.id)]
+                            )
                           );
+                          const packingLogsList = (productionLogs || []).filter((l: any) => {
+                            if (!(l.stage === 'Packing' || l.stage === 'Packing Work')) return false;
+                            if (!(l.approvalStatus === 'approved' || l.approvalStatus === 'completed')) return false;
+                            if (validPieceIdSet.size === 0) return false;
+                            const logPIds = Array.isArray(l.pieceIds) ? l.pieceIds.map(String) : [];
+                            return logPIds.length === 0 || logPIds.some((pid: string) => validPieceIdSet.has(pid));
+                          });
                           const packedBoxesCount = new Set(packingLogsList.map((l: any) => (l.boxCode || '').split('|')[0].trim()).filter(Boolean)).size;
-                          const packedPieceIds = new Set(packingLogsList.flatMap((l: any) => Array.isArray(l.pieceIds) ? l.pieceIds : []));
+                          const packedPieceIds = new Set(
+                            packingLogsList
+                              .flatMap((l: any) => Array.isArray(l.pieceIds) ? l.pieceIds.map(String) : [])
+                              .filter((pid: string) => validPieceIdSet.has(pid))
+                          );
                           const totalPiecesCount = projectSlabs?.reduce((acc: number, s: any) => acc + ((s.pieces && s.pieces.length > 0) ? s.pieces.length : 1), 0) || 0;
                           const isPackingDone = totalPiecesCount > 0 && packedPieceIds.size >= totalPiecesCount;
                           const isPackingStarted = packingLogsList.length > 0;
 
-                          const dispatchLogsList = (productionLogs || []).filter((l: any) =>
-                            (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
-                            (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
-                          );
+                          const dispatchLogsList = (productionLogs || []).filter((l: any) => {
+                            if (!(l.stage === 'Dispatch' || l.stage === 'Dispatch Work')) return false;
+                            if (!(l.approvalStatus === 'approved' || l.approvalStatus === 'completed')) return false;
+                            if (validPieceIdSet.size === 0) return false;
+                            const logPIds = Array.isArray(l.pieceIds) ? l.pieceIds.map(String) : [];
+                            return logPIds.length === 0 || logPIds.some((pid: string) => validPieceIdSet.has(pid));
+                          });
                           const isDispatched = dispatchLogsList.length > 0;
 
                           return (

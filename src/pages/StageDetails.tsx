@@ -144,13 +144,14 @@ const StageDetails = () => {
     // Override unit if explicit in size string (e.g. "10L x 10W (inch)")
     let overrideUnit = unitStr;
     const sLower = sizeStr.toLowerCase();
-    if (sLower.includes('(inch)') || sLower.includes('(inches)') || sLower.includes('inch') || sLower.includes('"')) {
+    const sBeforePipe = (sLower.split('|')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
+    if (sBeforePipe.includes('(inch)') || sBeforePipe.includes('(inches)') || sBeforePipe.includes('inch') || sBeforePipe.includes('"')) {
       overrideUnit = 'inch';
-    } else if (sLower.includes('(mm)')) {
+    } else if (sBeforePipe.includes('(mm)') || sBeforePipe.includes('mm')) {
       overrideUnit = 'mm';
-    } else if (sLower.includes('(sq.ft)') || sLower.includes('(sq_ft)')) {
+    } else if (sBeforePipe.includes('(sq.ft)') || sBeforePipe.includes('(sq_ft)') || sBeforePipe.includes('sq.ft') || sBeforePipe.includes('sq_ft') || sBeforePipe.includes('sqft')) {
       overrideUnit = 'sq_ft';
-    } else if (sLower.includes('(ft)') || sLower.includes('(feet)') || sLower.includes("'")) {
+    } else if (sBeforePipe.includes('(ft)') || sBeforePipe.includes('(feet)') || sBeforePipe.includes('feet') || /\bft\b/.test(sBeforePipe) || sBeforePipe.includes("'")) {
       overrideUnit = 'feet';
     }
     
@@ -178,11 +179,11 @@ const StageDetails = () => {
       const activeDimUnit = (productContext?.dimensionUnit || effectiveDimUnit || 'mm').toLowerCase();
       if (activeDimUnit === 'inch' || activeDimUnit === 'inches') sqft = ((l * w) / 144);
       else if (activeDimUnit === 'mm') sqft = ((l * w) / 92903.04);
-      else if (activeDimUnit === 'sq_ft' || activeDimUnit === 'feet' || activeDimUnit === 'ft') sqft = l * w;
+      else if (activeDimUnit === 'sq_ft' || activeDimUnit === 'sqft' || activeDimUnit === 'sq.ft' || activeDimUnit === 'feet' || activeDimUnit === 'ft') sqft = l * w;
       else sqft = 1;
     } else if (u === 'mm') {
       sqft = ((l * w) / 92903.04);
-    } else if (u === 'feet' || u === 'ft' || u === 'sq_ft') {
+    } else if (u === 'feet' || u === 'ft' || u === 'sq_ft' || u === 'sqft' || u === 'sq.ft') {
       sqft = (l * w);
     } else {
       sqft = u.includes('inch') ? ((l * w) / 144) : (l * w);
@@ -273,17 +274,23 @@ const StageDetails = () => {
         const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
         const finalName = p.pieceNumber ? `${base}.${p.pieceNumber}` : (p.name || base);
         
-        const pieceUnit = p.unit || effectiveDimUnit || 'inch';
-        const uLabel = pieceUnit === 'feet' ? 'Feet' : pieceUnit === 'mm' ? 'MM' : 'Inch';
+        const pieceUnit = String(p.unit || effectiveDimUnit || 'inch').toLowerCase();
+        const isFt = pieceUnit === 'feet' || pieceUnit === 'sq_ft' || pieceUnit === 'sqft' || pieceUnit === 'sq.ft' || pieceUnit === 'ft';
+        const isMM = pieceUnit === 'mm';
+        const uLabel = isFt ? 'Feet' : isMM ? 'MM' : 'Inch';
+        const lNum = Number(p.l) || 0;
+        const wNum = Number(p.w) || 0;
+        const areaSqFt = isFt ? (lNum * wNum) : isMM ? ((lNum * wNum) / 92903.04) : ((lNum * wNum) / 144);
+        const areaSuffix = (lNum > 0 && wNum > 0) ? ` (${areaSqFt.toFixed(2)} Sq.Ft)` : '';
 
         return {
           name: finalName,
           pieceNumber: (p.pieceNumber && !isNaN(Number(p.pieceNumber))) ? Number(p.pieceNumber) : undefined,
-          size: p.t ? `${p.l}L x ${p.w}W ${uLabel} | ${p.t}MM` : `${p.l}L x ${p.w}W ${uLabel}`,
+          size: p.t ? `${p.l}L x ${p.w}W ${uLabel} | ${p.t}MM${areaSuffix}` : `${p.l}L x ${p.w}W ${uLabel}${areaSuffix}`,
           length: p.l,
           width: p.w,
           thickness: p.t,
-          unit: pieceUnit
+          unit: isFt ? 'sq_ft' : pieceUnit
         };
       });
       await addPieces({ 
@@ -491,8 +498,8 @@ const StageDetails = () => {
     const l = parseFloat(editPieceDims.length) || 0;
     const w = parseFloat(editPieceDims.width) || 0;
     const t = parseFloat(editPieceDims.thickness) || 0;
-    const u = editPieceDims.unit || effectiveDimUnit || 'inch';
-    const isFt = u === 'feet';
+    const u = String(editPieceDims.unit || effectiveDimUnit || 'inch').toLowerCase();
+    const isFt = u === 'feet' || u === 'sq_ft' || u === 'sqft' || u === 'sq.ft' || u === 'ft';
     const isMM = u === 'mm';
     const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
     const calcSqFt = (
@@ -561,7 +568,7 @@ const StageDetails = () => {
       
       const pStr = String(p.size).toLowerCase();
       const pBeforePipe = (pStr.split('|')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
-      if (pBeforePipe.includes('feet') || pBeforePipe.includes('ft') || pBeforePipe.includes("'") || pBeforePipe.includes('(feet)') || pBeforePipe.includes('(ft)')) {
+      if (pBeforePipe.includes('feet') || pBeforePipe.includes('ft') || pBeforePipe.includes('sq_ft') || pBeforePipe.includes('sqft') || pBeforePipe.includes("'") || pBeforePipe.includes('(feet)') || pBeforePipe.includes('(ft)')) {
         unit = 'feet';
       } else if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pBeforePipe.includes('(inch)') || pBeforePipe.includes('inches')) {
         unit = 'inch';
@@ -569,13 +576,14 @@ const StageDetails = () => {
         unit = 'mm';
       } else if ((p as any).unit) {
         const u = String((p as any).unit).toLowerCase();
-        unit = u === 'mm' ? 'mm' : u === 'feet' || u === 'ft' ? 'feet' : 'inch';
+        unit = u === 'mm' ? 'mm' : (u === 'feet' || u === 'ft' || u === 'sq_ft' || u === 'sqft') ? 'feet' : 'inch';
       } else {
-        unit = effectiveDimUnit || 'inch';
+        const eff = String(effectiveDimUnit || 'inch').toLowerCase();
+        unit = eff === 'mm' ? 'mm' : (eff === 'feet' || eff === 'ft' || eff === 'sq_ft' || eff === 'sqft') ? 'feet' : 'inch';
       }
     } else if ((p as any).unit) {
       const u = String((p as any).unit).toLowerCase();
-      unit = u === 'mm' ? 'mm' : u === 'feet' || u === 'ft' ? 'feet' : 'inch';
+      unit = u === 'mm' ? 'mm' : (u === 'feet' || u === 'ft' || u === 'sq_ft' || u === 'sqft') ? 'feet' : 'inch';
     }
 
     const pieceMachineLog = machineLogs?.find((ml: any) => ml.productId === p.id);
@@ -983,13 +991,13 @@ const StageDetails = () => {
                 let pUnit = dimensionUnitName;
                 if (pDimsPart.includes('(inch)') || pDimsPart.includes('(inches)') || pDimsPart.includes('inch') || pDimsPart.includes('"')) {
                   pUnit = 'Inches';
-                } else if (pDimsPart.includes('(ft)') || pDimsPart.includes('(feet)') || pDimsPart.includes('feet') || pDimsPart.includes("'")) {
-                  pUnit = 'Feet';
+                } else if (pDimsPart.includes('(ft)') || pDimsPart.includes('(feet)') || pDimsPart.includes('feet') || pDimsPart.includes('sq_ft') || pDimsPart.includes('sqft') || pDimsPart.includes("'")) {
+                  pUnit = 'Sq.Ft';
                 } else if (pDimsPart.includes('(mm)') || pDimsPart.includes('mm')) {
                   pUnit = 'MM';
                 } else if ((p as any).unit) {
                   const u = String((p as any).unit).toLowerCase();
-                  pUnit = u === 'mm' ? 'MM' : u === 'inch' ? 'Inches' : u === 'feet' || u === 'ft' ? 'Feet' : dimensionUnitName;
+                  pUnit = u === 'mm' ? 'MM' : u === 'inch' ? 'Inches' : (u === 'feet' || u === 'ft' || u === 'sq_ft' || u === 'sqft') ? 'Sq.Ft' : dimensionUnitName;
                 }
                 const pArea = calculateAreaFromSize(p.size as string, pUnit.toLowerCase(), { ...matchedProduct, dimensionUnit: effectiveDimUnit });
 
@@ -1487,7 +1495,10 @@ const StageDetails = () => {
                     <TableCell sx={{ py: 1.25 }}>
                       <Select
                         size="small"
-                        value={p.unit || effectiveDimUnit}
+                        value={(() => {
+                          const rawU = String(p.unit || effectiveDimUnit || 'inch').toLowerCase();
+                          return (rawU === 'feet' || rawU === 'ft' || rawU === 'sq_ft' || rawU === 'sqft') ? 'sq_ft' : rawU;
+                        })()}
                         onChange={(e) => handlePieceChange(idx, 'unit', e.target.value)}
                         sx={{ bgcolor: '#FFF', height: 36, minWidth: 80, '& .MuiSelect-select': { py: 0.5, fontSize: '0.8rem', fontWeight: 700 } }}
                       >
@@ -2051,7 +2062,7 @@ const StageDetails = () => {
                   sx={{ borderRadius: 2 }}
                 >
                   <MenuItem value="inch">Inches</MenuItem>
-                  <MenuItem value="feet">Feet</MenuItem>
+                  <MenuItem value="feet">Sq.Ft</MenuItem>
                   <MenuItem value="mm">MM</MenuItem>
                 </Select>
               </FormControl>
@@ -2256,7 +2267,7 @@ const StageDetails = () => {
               <Chip
                 size="small"
                 label={`Calculated Area: ${(
-                  editPieceDims.unit === 'feet'
+                  editPieceDims.unit === 'feet' || editPieceDims.unit === 'sq_ft'
                     ? parseFloat(editPieceDims.length) * parseFloat(editPieceDims.width)
                     : editPieceDims.unit === 'mm'
                     ? (parseFloat(editPieceDims.length) * parseFloat(editPieceDims.width)) / 92903.04

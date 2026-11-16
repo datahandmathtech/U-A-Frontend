@@ -150,8 +150,10 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
 
   const totalSlabPiecesCount = rawPieces.length;
 
-  // Derive packed boxes from production logs with stage Packing
+  // Derive packed boxes from production logs with stage Packing (only for existing pieces)
   const packedBoxes = useMemo(() => {
+    if (allPieces.length === 0 && rawPieces.length === 0) return [];
+    const existingPool = rawPieces.length > 0 ? rawPieces : allPieces;
     const logs = (productionLogs || []).filter((l: any) =>
       (l.stage === 'Packing' || l.stage === 'Packing Work') &&
       (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
@@ -169,29 +171,34 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
       dedupedLogs.push(l);
     }
 
-    return dedupedLogs.map((l: any, idx: number) => {
-      const rawCode = l.boxCode || `Box ${idx + 1}`;
-      const parts = rawCode.split('|').map((s: string) => s.trim());
-      const bName = parts[0] || `Box ${idx + 1}`;
-      const bSize = parts[1] || '';
-      const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
-      const boxPieces = allPieces.filter((p: any) => pIds.includes(p.id));
-      const boxArea = boxPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
-      const pieceCount = l.quantityProduced || pIds.length || boxPieces.length || 0;
+    const validBoxes = dedupedLogs
+      .map((l: any, idx: number) => {
+        const rawCode = l.boxCode || `Box ${idx + 1}`;
+        const parts = rawCode.split('|').map((s: string) => s.trim());
+        const bName = parts[0] || `Box ${idx + 1}`;
+        const bSize = parts[1] || '';
+        const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
+        const boxPieces = existingPool.filter((p: any) => pIds.includes(p.id));
+        if (boxPieces.length === 0) return null;
+        const boxArea = boxPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
+        const pieceCount = boxPieces.length;
 
-      return {
-        logId: l.id,
-        boxNumber: idx + 1,
-        boxName: bName,
-        boxSize: bSize,
-        pieceIds: pIds,
-        pieces: boxPieces,
-        pieceCount,
-        area: boxArea > 0 ? boxArea.toFixed(2) : (pieceCount * 2.08).toFixed(2),
-        packedOn: l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + new Date(l.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Packed'
-      };
-    });
-  }, [productionLogs, slab, allPieces]);
+        return {
+          logId: l.id,
+          boxNumber: idx + 1,
+          boxName: bName,
+          boxSize: bSize,
+          pieceIds: boxPieces.map((p: any) => p.id),
+          pieces: boxPieces,
+          pieceCount,
+          area: boxArea.toFixed(2),
+          packedOn: l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + new Date(l.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Packed'
+        };
+      })
+      .filter(Boolean);
+
+    return validBoxes.map((b: any, i: number) => ({ ...b, boxNumber: i + 1 }));
+  }, [productionLogs, slab, allPieces, rawPieces]);
 
   // Set of pieces already packed in a box
   const packedPieceIdMap = useMemo(() => {

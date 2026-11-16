@@ -88,8 +88,9 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
     return [];
   }, [slab, slabs]);
 
-  // Derive packed boxes from production logs with stage Packing
+  // Derive packed boxes from production logs with stage Packing (only for existing pieces)
   const packedBoxes = useMemo(() => {
+    if (allPieces.length === 0) return [];
     const logs = (productionLogs || []).filter((l: any) =>
       (l.stage === 'Packing' || l.stage === 'Packing Work') &&
       (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
@@ -107,73 +108,84 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
       dedupedLogs.push(l);
     }
 
-    return dedupedLogs.map((l: any, idx: number) => {
-      const rawCode = l.boxCode || `Box ${idx + 1}`;
-      const parts = rawCode.split('|').map((s: string) => s.trim());
-      const bName = parts[0] || `Box ${idx + 1}`;
-      const bSize = parts[1] || 'Standard';
-      const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
-      const boxPieces = allPieces.filter((p: any) => pIds.includes(p.id));
-      const boxArea = boxPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
-      const pieceCount = l.quantityProduced || pIds.length || boxPieces.length || 0;
+    const validBoxes = dedupedLogs
+      .map((l: any, idx: number) => {
+        const rawCode = l.boxCode || `Box ${idx + 1}`;
+        const parts = rawCode.split('|').map((s: string) => s.trim());
+        const bName = parts[0] || `Box ${idx + 1}`;
+        const bSize = parts[1] || 'Standard';
+        const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
+        const boxPieces = allPieces.filter((p: any) => pIds.includes(p.id));
+        if (boxPieces.length === 0) return null;
+        const boxArea = boxPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
+        const pieceCount = boxPieces.length;
 
-      return {
-        logId: l.id,
-        boxNumber: idx + 1,
-        boxName: bName,
-        boxSize: bSize,
-        pieceIds: pIds,
-        pieces: boxPieces,
-        pieceCount,
-        area: boxArea > 0 ? boxArea.toFixed(2) : (pieceCount * 2.08).toFixed(2),
-        packedOn: l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + new Date(l.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Packed'
-      };
-    });
+        return {
+          logId: l.id,
+          boxNumber: idx + 1,
+          boxName: bName,
+          boxSize: bSize,
+          pieceIds: boxPieces.map((p: any) => p.id),
+          pieces: boxPieces,
+          pieceCount,
+          area: boxArea.toFixed(2),
+          packedOn: l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + new Date(l.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Packed'
+        };
+      })
+      .filter(Boolean);
+
+    return validBoxes.map((b: any, i: number) => ({ ...b, boxNumber: i + 1 }));
   }, [productionLogs, slab, allPieces]);
 
-  // Derive all dispatch batches (each represents a vehicle dispatch)
+  // Derive all dispatch batches (each represents a vehicle dispatch for existing pieces)
   const dispatchBatches = useMemo(() => {
+    if (allPieces.length === 0) return [];
     const logs = (productionLogs || []).filter((l: any) =>
       (l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
       (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
     );
 
-    return logs.map((l: any, idx: number) => {
-      const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
-      const batchPieces = allPieces.filter((p: any) => pIds.includes(p.id));
-      const batchArea = batchPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
-      const pieceCount = l.quantityProduced || pIds.length || batchPieces.length || 0;
-      const boxCodes: string[] = (l.boxCode || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+    const validBatches = logs
+      .map((l: any, idx: number) => {
+        const pIds: string[] = Array.isArray(l.pieceIds) ? l.pieceIds : [];
+        const batchPieces = allPieces.filter((p: any) => pIds.includes(p.id));
+        if (batchPieces.length === 0) return null;
+        const batchArea = batchPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
+        const pieceCount = batchPieces.length;
+        const boxCodes: string[] = (l.boxCode || '').split(',').map((s: string) => s.trim()).filter(Boolean);
 
-      const driver = l.vendorName || l.driverName || l.worker?.name || l.remarks?.match(/Driver:\s*([^,\n|]+)/i)?.[1]?.trim() || '-';
-      const lr = l.challanNumber || l.remarks?.match(/LR:\s*([^,\n|]+)/i)?.[1]?.trim() || '-';
-      const vehicle = l.vehicleNumber || (l.remarks?.match(/Vehicle:\s*([^,\n|]+)/i)?.[1]?.trim()) || 'Manual';
+        const driver = l.vendorName || l.driverName || l.worker?.name || l.remarks?.match(/Driver:\s*([^,\n|]+)/i)?.[1]?.trim() || '-';
+        const lr = l.challanNumber || l.remarks?.match(/LR:\s*([^,\n|]+)/i)?.[1]?.trim() || '-';
+        const vehicle = l.vehicleNumber || (l.remarks?.match(/Vehicle:\s*([^,\n|]+)/i)?.[1]?.trim()) || 'Manual';
 
-      let dispatchTimeFormatted = '-';
-      const dVal = l.startTime || l.createdAt;
-      if (dVal) {
-        const d = new Date(dVal);
-        if (!isNaN(d.getTime())) {
-          dispatchTimeFormatted = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+        let dispatchTimeFormatted = '-';
+        const dVal = l.startTime || l.createdAt;
+        if (dVal) {
+          const d = new Date(dVal);
+          if (!isNaN(d.getTime())) {
+            dispatchTimeFormatted = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+          }
         }
-      }
 
-      return {
-        id: l.id,
-        batchNumber: idx + 1,
-        vehicleNumber: vehicle,
-        driverName: driver,
-        lrNumber: lr,
-        boxCodes,
-        pieceIds: pIds,
-        pieces: batchPieces,
-        pieceCount,
-        area: batchArea > 0 ? batchArea.toFixed(2) : (pieceCount * 2.08).toFixed(2),
-        dispatchTime: dispatchTimeFormatted,
-        remarks: l.remarks || '',
-        createdAt: l.createdAt
-      };
-    });
+        return {
+          id: l.id,
+          batchNumber: idx + 1,
+          vehicleNumber: vehicle,
+          driverName: driver,
+          lrNumber: lr,
+          boxCodes,
+          pieceIds: batchPieces.map((p: any) => p.id),
+          pieces: batchPieces,
+          pieceCount,
+          area: batchArea.toFixed(2),
+          dispatchTime: dispatchTimeFormatted,
+          remarks: l.remarks || '',
+          createdAt: l.createdAt
+        };
+      })
+      .filter(Boolean);
+
+    return validBatches.map((b: any, i: number) => ({ ...b, batchNumber: i + 1 }));
   }, [productionLogs, allPieces, slab]);
 
   // Set of box names that are already dispatched across any batch
@@ -213,9 +225,14 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [viewSlipBatch, setViewSlipBatch] = useState<any>(null);
 
-  // If already dispatched and form is empty, pre-fill with latest dispatch details as reference
+  // If already dispatched and form is empty, pre-fill with latest dispatch details as reference; if empty, clear
   React.useEffect(() => {
-    if (dispatchBatches.length > 0 && !vehicleNumber) {
+    if (dispatchBatches.length === 0) {
+      setVehicleNumber('');
+      setDriverName('');
+      setLrNumber('');
+      setRemarks('');
+    } else if (!vehicleNumber) {
       const latest = dispatchBatches[dispatchBatches.length - 1];
       if (latest) {
         setVehicleNumber(latest.vehicleNumber !== '-' ? latest.vehicleNumber : '');
@@ -224,7 +241,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         if (latest.remarks && !latest.remarks.startsWith('Vehicle:')) setRemarks(latest.remarks);
       }
     }
-  }, [dispatchBatches]);
+  }, [dispatchBatches.length]);
 
   // Calculations for selected boxes
   const selectedBoxes = useMemo(() => {
@@ -413,22 +430,6 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               <Typography variant="h6" sx={{ fontWeight: 900, color: '#166534', lineHeight: 1 }}>{totalProjectArea}</Typography>
               <Typography variant="caption" sx={{ fontWeight: 700, color: '#16A34A', textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Area (Sq.Ft)</Typography>
             </Box>
-
-            <Chip
-              label={isFullyDispatched ? "Dispatched" : (isPartiallyDispatched ? "Partially Dispatched" : "Ready for Dispatch")}
-              size="medium"
-              sx={{
-                bgcolor: isFullyDispatched ? '#ECFDF5' : (isPartiallyDispatched ? '#FEF3C7' : '#EFF6FF'),
-                color: isFullyDispatched ? '#059669' : (isPartiallyDispatched ? '#D97706' : '#0284C7'),
-                border: '1.5px solid',
-                borderColor: isFullyDispatched ? '#A7F3D0' : (isPartiallyDispatched ? '#FDE68A' : '#BAE6FD'),
-                fontWeight: 800,
-                fontSize: '0.8rem',
-                height: 38,
-                px: 1,
-                borderRadius: 2.5
-              }}
-            />
           </Box>
         </Box>
 
