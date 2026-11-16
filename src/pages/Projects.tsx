@@ -188,6 +188,7 @@ export const calculateProjectWorkSize = (project: any): string => {
 
 import {
   useGetProjectsQuery,
+  useGetProjectByIdQuery,
   useCreateProjectMutation,
   useUpdateProjectMutation,
   useDeleteProjectMutation,
@@ -212,7 +213,9 @@ export const parseSafeDate = (dInput: any): Date | null => {
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();
-  const { data: projects, isLoading, isError, refetch } = useGetProjectsQuery();
+  const { data: projects, isLoading, isError, refetch } = useGetProjectsQuery(undefined, {
+    refetchOnMountOrArgChange: true
+  });
   const [createProject] = useCreateProjectMutation();
   const [updateProject] = useUpdateProjectMutation();
   const [deleteProject] = useDeleteProjectMutation();
@@ -224,6 +227,10 @@ const Projects: React.FC = () => {
 
   const [open, setOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const { data: freshEditingProject } = useGetProjectByIdQuery(editingProjectId as string, {
+    skip: !open || !editingProjectId,
+    refetchOnMountOrArgChange: true
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
   const [chatSlab, setChatSlab] = useState<any>(null);
@@ -255,103 +262,113 @@ const Projects: React.FC = () => {
 
   const projectsData = projects;
 
+  const populateFormFromProject = (project: any) => {
+    let loadedProducts: any[] = [];
+    const quoteProducts: any[] = Array.isArray(project.quotations?.[0]?.products) && project.quotations[0].products.length > 0
+      ? project.quotations[0].products
+      : (Array.isArray(project.products) ? project.products : []);
+    const matchedQuoteIds = new Set<string>();
+
+    if (Array.isArray(project.slabs) && project.slabs.length > 0) {
+      loadedProducts = project.slabs.map((s: any) => {
+        let length = '';
+        let width = '';
+        let thickness = '';
+        let dimensionUnit = 'inch';
+        if (s.size) {
+          const dimsPart = (s.size.split('|')[0] || '').toLowerCase();
+          const lMatch = s.size.match(/(\d+(?:\.\d+)?)\s*L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
+          const wMatch = s.size.match(/(\d+(?:\.\d+)?)\s*W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+          const tMatch = s.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || s.size.match(/(\d+(?:\.\d+)?)\s*MM/i);
+          if (lMatch) length = lMatch[1];
+          if (wMatch) width = wMatch[1];
+          if (tMatch) thickness = tMatch[1];
+          if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'")) dimensionUnit = 'sq_ft';
+          else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) dimensionUnit = 'sq_ft';
+          else if (dimsPart.includes('mm')) dimensionUnit = 'mm';
+          else if (dimsPart.includes('inch') || dimsPart.includes('"')) dimensionUnit = 'inch';
+          else if (s.dimensionUnit) dimensionUnit = s.dimensionUnit;
+        }
+
+        const matchedQuoteProd = quoteProducts.find((qp: any) =>
+          qp.id === s.id ||
+          qp.slabId === s.id ||
+          (qp.productName || qp.category || qp.name || '').trim().toLowerCase() === (s.name || '').trim().toLowerCase()
+        );
+        if (matchedQuoteProd?.id) {
+          matchedQuoteIds.add(matchedQuoteProd.id);
+        }
+
+        return {
+          id: s.id,
+          name: s.name || '',
+          length: length || (matchedQuoteProd?.length ? String(matchedQuoteProd.length) : ''),
+          width: width || (matchedQuoteProd?.width ? String(matchedQuoteProd.width) : ''),
+          thickness: thickness || (matchedQuoteProd?.breadth ? String(matchedQuoteProd.breadth) : (matchedQuoteProd?.thickness ? String(matchedQuoteProd.thickness) : '')),
+          unit: matchedQuoteProd?.unit || (dimensionUnit === 'sq_ft' ? 'Sq. Ft' : dimensionUnit),
+          dimensionUnit: dimensionUnit || matchedQuoteProd?.dimensionUnit || 'inch',
+          rate: matchedQuoteProd?.rate || 0,
+          amount: matchedQuoteProd?.amount || 0,
+          photo: matchedQuoteProd?.photo
+        };
+      });
+    }
+
+    // Also include any quotation products from Costing & Quotation not yet in loadedProducts
+    quoteProducts.forEach((p: any) => {
+      const pName = (p.productName || p.category || p.name || '').trim();
+      if (!pName) return;
+      const alreadyLoaded = loadedProducts.some((lp: any) =>
+        (p.id && lp.id === p.id) ||
+        lp.name.trim().toLowerCase() === pName.toLowerCase() ||
+        lp.name.trim().toLowerCase().startsWith(pName.toLowerCase() + ' ')
+      );
+      if (!alreadyLoaded && (!p.id || !matchedQuoteIds.has(p.id))) {
+        const u = (p.unit || 'pieces').toLowerCase().trim();
+        const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
+        loadedProducts.push({
+          id: p.id,
+          name: pName,
+          length: p.length ? String(p.length) : '',
+          width: p.width ? String(p.width) : '',
+          thickness: p.breadth ? String(p.breadth) : (p.thickness ? String(p.thickness) : ''),
+          unit: p.unit || 'pieces',
+          dimensionUnit: p.dimensionUnit || (isPieces ? 'inch' : u),
+          rate: p.rate || 0,
+          amount: p.amount || 0,
+          photo: p.photo
+        });
+      }
+    });
+
+    if (loadedProducts.length === 0) {
+      loadedProducts = [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }];
+    }
+
+    setFormData({
+      name: project.name || '',
+      clientName: project.clientName || '',
+      description: project.description || '',
+      status: project.status || 'production',
+      totalPieces: loadedProducts.length || project.totalPieces || 0,
+      products: loadedProducts,
+      deliveryDate: project.deliveryDate ? new Date(project.deliveryDate).toISOString().split('T')[0] : '',
+      startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
+      deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
+      clientHandle: project.clientHandle || ''
+    });
+  };
+
+  React.useEffect(() => {
+    if (open && editingProjectId && freshEditingProject && freshEditingProject.id === editingProjectId) {
+      populateFormFromProject(freshEditingProject);
+    }
+  }, [open, editingProjectId, freshEditingProject]);
+
   const handleOpen = (project?: any) => {
     if (project && project.id) {
       setEditingProjectId(project.id);
-
-      // Load existing products from both project.slabs and project.products (Costing & Quotation)
-      let loadedProducts: any[] = [];
-      const quoteProducts: any[] = Array.isArray(project.products) ? project.products : [];
-      const matchedQuoteIds = new Set<string>();
-
-      if (Array.isArray(project.slabs) && project.slabs.length > 0) {
-        loadedProducts = project.slabs.map((s: any) => {
-          let length = '';
-          let width = '';
-          let thickness = '';
-          let dimensionUnit = 'inch';
-          if (s.size) {
-            const dimsPart = (s.size.split('|')[0] || '').toLowerCase();
-            const lMatch = s.size.match(/(\d+(?:\.\d+)?)L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
-            const wMatch = s.size.match(/(\d+(?:\.\d+)?)W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
-            const tMatch = s.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i);
-            if (lMatch) length = lMatch[1];
-            if (wMatch) width = wMatch[1];
-            if (tMatch) thickness = tMatch[1];
-            if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'")) dimensionUnit = 'sq_ft';
-            else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) dimensionUnit = 'sq_ft';
-            else if (dimsPart.includes('mm')) dimensionUnit = 'mm';
-            else if (dimsPart.includes('inch') || dimsPart.includes('"')) dimensionUnit = 'inch';
-            else if (s.dimensionUnit) dimensionUnit = s.dimensionUnit;
-          }
-
-          const matchedQuoteProd = quoteProducts.find((qp: any) =>
-            qp.id === s.id ||
-            qp.slabId === s.id ||
-            (qp.productName || qp.category || qp.name || '').trim().toLowerCase() === (s.name || '').trim().toLowerCase()
-          );
-          if (matchedQuoteProd?.id) {
-            matchedQuoteIds.add(matchedQuoteProd.id);
-          }
-
-          return {
-            id: s.id,
-            name: s.name || '',
-            length: length || (matchedQuoteProd?.length ? String(matchedQuoteProd.length) : ''),
-            width: width || (matchedQuoteProd?.width ? String(matchedQuoteProd.width) : ''),
-            thickness: thickness || (matchedQuoteProd?.breadth ? String(matchedQuoteProd.breadth) : (matchedQuoteProd?.thickness ? String(matchedQuoteProd.thickness) : '')),
-            unit: matchedQuoteProd?.unit || 'pieces',
-            dimensionUnit: dimensionUnit || matchedQuoteProd?.dimensionUnit || 'inch',
-            rate: matchedQuoteProd?.rate || 0,
-            amount: matchedQuoteProd?.amount || 0,
-            photo: matchedQuoteProd?.photo
-          };
-        });
-      }
-
-      // Also include any quotation products from Costing & Quotation not yet in loadedProducts
-      quoteProducts.forEach((p: any) => {
-        const pName = (p.productName || p.category || p.name || '').trim();
-        if (!pName) return;
-        const alreadyLoaded = loadedProducts.some((lp: any) =>
-          (p.id && lp.id === p.id) ||
-          lp.name.trim().toLowerCase() === pName.toLowerCase() ||
-          lp.name.trim().toLowerCase().startsWith(pName.toLowerCase() + ' ')
-        );
-        if (!alreadyLoaded && (!p.id || !matchedQuoteIds.has(p.id))) {
-          const u = (p.unit || 'pieces').toLowerCase().trim();
-          const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
-          loadedProducts.push({
-            id: p.id,
-            name: pName,
-            length: p.length ? String(p.length) : '',
-            width: p.width ? String(p.width) : '',
-            thickness: p.breadth ? String(p.breadth) : (p.thickness ? String(p.thickness) : ''),
-            unit: p.unit || 'pieces',
-            dimensionUnit: p.dimensionUnit || (isPieces ? 'inch' : u),
-            rate: p.rate || 0,
-            amount: p.amount || 0,
-            photo: p.photo
-          });
-        }
-      });
-
-      if (loadedProducts.length === 0) {
-        loadedProducts = [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }];
-      }
-
-      setFormData({
-        name: project.name || '',
-        clientName: project.clientName || '',
-        description: project.description || '',
-        status: project.status || 'production',
-        totalPieces: loadedProducts.length || project.totalPieces || 0,
-        products: loadedProducts,
-        deliveryDate: project.deliveryDate ? new Date(project.deliveryDate).toISOString().split('T')[0] : '',
-        startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
-        deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '',
-        clientHandle: project.clientHandle || ''
-      });
+      populateFormFromProject(project);
     } else {
       setEditingProjectId(null);
       setFormData({

@@ -1227,10 +1227,12 @@ const ProjectDetails: React.FC = () => {
         payload.inventoryId = slabForm.inventoryId;
       }
       await updateSlab({ id: editingSlabId as string, data: payload }).unwrap();
+      if (id) localStorage.removeItem(`quoteProducts_${id}`);
       setEditSlabDialogOpen(false);
       setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Packing', 'Dispatch'] });
       setEditingSlabId(null);
       refetchSlabs();
+      refetch();
       setSnackbarMessage('Slab updated successfully!');
     } catch (error: any) {
       console.error('Failed to update slab:', error);
@@ -4200,18 +4202,36 @@ const ProjectDetails: React.FC = () => {
                         {/* Packing & Dispatch Flow Summary Cards (Conditional on Required Stages) */}
                         {(() => {
                           const validPieceIdSet = new Set<string>(
-                            (projectSlabs || []).flatMap((s: any) =>
-                              (s.pieces && s.pieces.length > 0)
-                                ? s.pieces.map((p: any) => String(p.id))
-                                : [String(s.id)]
-                            )
+                            (projectSlabs || []).flatMap((s: any) => [
+                              String(s.id),
+                              ...((s.pieces && s.pieces.length > 0) ? s.pieces.map((p: any) => String(p.id)) : [])
+                            ])
                           );
+                          const validSlabNames = new Set<string>(
+                            (projectSlabs || []).map((s: any) => String(s.name || '').trim().toLowerCase()).filter(Boolean)
+                          );
+                          const isLogMatchingCurrentSlabs = (l: any) => {
+                            if (validPieceIdSet.size === 0) return false;
+                            const logPIds = Array.isArray(l.pieceIds) ? l.pieceIds.map(String) : [];
+                            if (logPIds.length > 0) {
+                              return logPIds.some((pid: string) => validPieceIdSet.has(pid));
+                            }
+                            if (l.slabId && String(l.slabId) !== 'all') {
+                              return validPieceIdSet.has(String(l.slabId));
+                            }
+                            if (l.productId && String(l.productId) !== 'all') {
+                              return validPieceIdSet.has(String(l.productId));
+                            }
+                            const pName = String(l.productName || '').trim().toLowerCase();
+                            if (pName && pName !== 'all' && pName !== 'all slabs') {
+                              return validSlabNames.has(pName);
+                            }
+                            return false;
+                          };
                           const packingLogsList = (productionLogs || []).filter((l: any) => {
                             if (!(l.stage === 'Packing' || l.stage === 'Packing Work')) return false;
                             if (!(l.approvalStatus === 'approved' || l.approvalStatus === 'completed')) return false;
-                            if (validPieceIdSet.size === 0) return false;
-                            const logPIds = Array.isArray(l.pieceIds) ? l.pieceIds.map(String) : [];
-                            return logPIds.length === 0 || logPIds.some((pid: string) => validPieceIdSet.has(pid));
+                            return isLogMatchingCurrentSlabs(l);
                           });
                           const packedBoxesCount = new Set(packingLogsList.map((l: any) => (l.boxCode || '').split('|')[0].trim()).filter(Boolean)).size;
                           const packedPieceIds = new Set(
@@ -4226,9 +4246,7 @@ const ProjectDetails: React.FC = () => {
                           const dispatchLogsList = (productionLogs || []).filter((l: any) => {
                             if (!(l.stage === 'Dispatch' || l.stage === 'Dispatch Work')) return false;
                             if (!(l.approvalStatus === 'approved' || l.approvalStatus === 'completed')) return false;
-                            if (validPieceIdSet.size === 0) return false;
-                            const logPIds = Array.isArray(l.pieceIds) ? l.pieceIds.map(String) : [];
-                            return logPIds.length === 0 || logPIds.some((pid: string) => validPieceIdSet.has(pid));
+                            return isLogMatchingCurrentSlabs(l);
                           });
                           const isDispatched = dispatchLogsList.length > 0;
 
