@@ -331,7 +331,7 @@ export const apiSlice = createApi({
     }),
     createSlab: builder.mutation<any, any>({
       query: (body) => ({ url: '/slabs', method: 'POST', body }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Project']
     }),
     bulkCreateSlabs: builder.mutation<any, { projectId: string; slabs: any[] }>({
       query: (body) => ({ url: '/slabs/bulk-create', method: 'POST', body }),
@@ -339,15 +339,15 @@ export const apiSlice = createApi({
     }),
     updateSlab: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({ url: `/slabs/${id}`, method: 'PUT', body: data }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Project']
     }),
     deleteSlab: builder.mutation<any, string>({
       query: (id) => ({ url: `/slabs/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Project']
     }),
     syncSlabs: builder.mutation<any, string>({
       query: (projectId) => ({ url: `/projects/${projectId}/sync-slabs`, method: 'POST' }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Project']
     }),
     updatePiece: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({ url: `/slabs/piece/${id}`, method: 'PUT', body: data }),
@@ -424,14 +424,14 @@ export const apiSlice = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: ['Project']
+      invalidatesTags: ['Project', 'Production']
     }),
     deleteProject: builder.mutation<any, string>({
       query: (id) => ({
         url: `/projects/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Project']
+      invalidatesTags: ['Project', 'Production']
     }),
     getProjectMaterials: builder.query<any[], string>({
       query: (projectId) => `/projects/${projectId}/materials`,
@@ -466,7 +466,7 @@ export const apiSlice = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Project']
+      invalidatesTags: ['Project', 'Production']
     }),
     updateQuotation: builder.mutation<any, { id: string; data: Partial<any> }>({
       query: ({ id, data }) => ({
@@ -474,7 +474,7 @@ export const apiSlice = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: ['Project']
+      invalidatesTags: ['Project', 'Production']
     }),
     updateMaterialLog: builder.mutation<any, { id: string; returnedQty: number; returnDate: string }>({
       query: ({ id, returnedQty, returnDate }) => ({ url: `/production/${id}/return`, method: 'PATCH', body: { returnedQty, returnDate } }),

@@ -260,8 +260,11 @@ const Projects: React.FC = () => {
     if (project && project.id) {
       setEditingProjectId(project.id);
 
-      // Load existing products from project.slabs (Reverse Integration: all slabs created via Master Maker or planning) OR project.products
+      // Load existing products from both project.slabs and project.products (Costing & Quotation)
       let loadedProducts: any[] = [];
+      const quoteProducts: any[] = Array.isArray(project.products) ? project.products : [];
+      const matchedQuoteIds = new Set<string>();
+
       if (Array.isArray(project.slabs) && project.slabs.length > 0) {
         loadedProducts = project.slabs.map((s: any) => {
           let length = '';
@@ -276,37 +279,63 @@ const Projects: React.FC = () => {
             if (lMatch) length = lMatch[1];
             if (wMatch) width = wMatch[1];
             if (tMatch) thickness = tMatch[1];
-            if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'")) dimensionUnit = 'feet';
+            if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'")) dimensionUnit = 'sq_ft';
             else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) dimensionUnit = 'sq_ft';
             else if (dimsPart.includes('mm')) dimensionUnit = 'mm';
             else if (dimsPart.includes('inch') || dimsPart.includes('"')) dimensionUnit = 'inch';
             else if (s.dimensionUnit) dimensionUnit = s.dimensionUnit;
           }
+
+          const matchedQuoteProd = quoteProducts.find((qp: any) =>
+            qp.id === s.id ||
+            qp.slabId === s.id ||
+            (qp.productName || qp.category || qp.name || '').trim().toLowerCase() === (s.name || '').trim().toLowerCase()
+          );
+          if (matchedQuoteProd?.id) {
+            matchedQuoteIds.add(matchedQuoteProd.id);
+          }
+
           return {
             id: s.id,
             name: s.name || '',
-            length,
-            width,
-            thickness,
-            unit: 'pieces',
-            dimensionUnit
+            length: length || (matchedQuoteProd?.length ? String(matchedQuoteProd.length) : ''),
+            width: width || (matchedQuoteProd?.width ? String(matchedQuoteProd.width) : ''),
+            thickness: thickness || (matchedQuoteProd?.breadth ? String(matchedQuoteProd.breadth) : (matchedQuoteProd?.thickness ? String(matchedQuoteProd.thickness) : '')),
+            unit: matchedQuoteProd?.unit || 'pieces',
+            dimensionUnit: dimensionUnit || matchedQuoteProd?.dimensionUnit || 'inch',
+            rate: matchedQuoteProd?.rate || 0,
+            amount: matchedQuoteProd?.amount || 0,
+            photo: matchedQuoteProd?.photo
           };
         });
-      } else if (Array.isArray(project.products) && project.products.length > 0) {
-        loadedProducts = project.products.map((p: any) => {
+      }
+
+      // Also include any quotation products from Costing & Quotation not yet in loadedProducts
+      quoteProducts.forEach((p: any) => {
+        const pName = (p.productName || p.category || p.name || '').trim();
+        if (!pName) return;
+        const alreadyLoaded = loadedProducts.some((lp: any) =>
+          (p.id && lp.id === p.id) ||
+          lp.name.trim().toLowerCase() === pName.toLowerCase() ||
+          lp.name.trim().toLowerCase().startsWith(pName.toLowerCase() + ' ')
+        );
+        if (!alreadyLoaded && (!p.id || !matchedQuoteIds.has(p.id))) {
           const u = (p.unit || 'pieces').toLowerCase().trim();
           const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
-          return {
+          loadedProducts.push({
             id: p.id,
-            name: p.productName || p.category || p.name || '',
+            name: pName,
             length: p.length ? String(p.length) : '',
             width: p.width ? String(p.width) : '',
             thickness: p.breadth ? String(p.breadth) : (p.thickness ? String(p.thickness) : ''),
             unit: p.unit || 'pieces',
-            dimensionUnit: p.dimensionUnit || (isPieces ? 'inch' : u)
-          };
-        });
-      }
+            dimensionUnit: p.dimensionUnit || (isPieces ? 'inch' : u),
+            rate: p.rate || 0,
+            amount: p.amount || 0,
+            photo: p.photo
+          });
+        }
+      });
 
       if (loadedProducts.length === 0) {
         loadedProducts = [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }];
@@ -317,7 +346,7 @@ const Projects: React.FC = () => {
         clientName: project.clientName || '',
         description: project.description || '',
         status: project.status || 'production',
-        totalPieces: project.totalPieces || loadedProducts.length,
+        totalPieces: loadedProducts.length || project.totalPieces || 0,
         products: loadedProducts,
         deliveryDate: project.deliveryDate ? new Date(project.deliveryDate).toISOString().split('T')[0] : '',
         startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
@@ -355,6 +384,7 @@ const Projects: React.FC = () => {
     try {
       const existingProject = projectsData?.find((p: any) => p.id === editingProjectId);
       if (editingProjectId && existingProject) {
+        const validProducts = (formData.products || []).filter((p: any) => p.name && p.name.trim());
         await updateProject({
           id: editingProjectId,
           data: {
@@ -363,20 +393,22 @@ const Projects: React.FC = () => {
             clientHandle: formData.clientHandle,
             description: formData.description,
             status: formData.status || existingProject.status || 'production',
-            totalPieces: parseInt(formData.totalPieces) || formData.products?.length || 0,
+            totalPieces: validProducts.length || parseInt(formData.totalPieces) || 0,
             deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : null,
             startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
             deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
-            products: formData.products
+            products: validProducts
           }
         }).unwrap();
+        localStorage.removeItem(`quoteProducts_${editingProjectId}`);
         refetch();
         handleClose();
         return;
       } else {
+        const validProducts = (formData.products || []).filter((prod: any) => prod.name && prod.name.trim());
         const createdProject = await createProject({
           ...formData,
-          totalPieces: 0,
+          totalPieces: validProducts.length,
           projectId: `U-A-${Math.floor(100 + Math.random() * 900)}`,
           status: 'production',
           isDirectWorkOrder: true,
@@ -385,42 +417,58 @@ const Projects: React.FC = () => {
           deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined
         }).unwrap();
 
-        // Create quotation and slabs for each product
-        if (formData.products && formData.products.length > 0) {
-          const quotationProducts = formData.products
-            .filter((prod: any) => prod.name && (prod.length || prod.width))
-            .map((prod: any, i: number) => {
-              const u = (prod.unit || 'pieces').toLowerCase().trim();
-              const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
-              let isFt = false;
-              let isMM = false;
-              if (isPieces) {
-                const dimU = (prod.dimensionUnit || 'inch').toLowerCase().trim();
-                isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft';
-                isMM = dimU === 'mm';
-              } else {
-                isFt = u === 'sq_ft' || u === 'sqft' || u === 'sq. ft' || u === 'sq ft' || u.includes('feet') || u.includes('sq') || u.includes('ft') || u.includes('rft');
-                isMM = u === 'mm' || u.includes('millimeter');
-              }
-              const dimUnit = isFt ? 'sq_ft' : (isMM ? 'mm' : 'inch');
-              const l = parseFloat(prod.length) || 0;
-              const w = parseFloat(prod.width) || 0;
-              const sqft = isFt ? l * w : (isMM ? (l * w) / 92903.04 : (l * w) / 144);
-              return {
-                id: `prod_${Date.now()}_${i}`,
-                category: prod.name,
-                productName: prod.name,
-                unit: prod.unit || 'pieces',
-                dimensionUnit: dimUnit,
-                length: l,
-                width: w,
-                breadth: parseFloat(prod.thickness) || 0,
-                qty: 1,
-                rate: 0,
-                amount: 0,
-                sqft: Number(sqft.toFixed(2))
-              };
+        // Create slabs and quotation for each product
+        if (validProducts.length > 0) {
+          const quotationProducts = [];
+
+          for (let i = 0; i < validProducts.length; i++) {
+            const prod = validProducts[i];
+            const u = (prod.unit || 'pieces').toLowerCase().trim();
+            const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
+            let isFt = false;
+            let isMM = false;
+            if (isPieces) {
+              const dimU = (prod.dimensionUnit || 'inch').toLowerCase().trim();
+              isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft';
+              isMM = dimU === 'mm';
+            } else {
+              isFt = u === 'sq_ft' || u === 'sqft' || u === 'sq. ft' || u === 'sq ft' || u.includes('feet') || u.includes('sq') || u.includes('ft') || u.includes('rft');
+              isMM = u === 'mm' || u.includes('millimeter');
+            }
+            const dimUnit = isFt ? 'sq_ft' : (isMM ? 'mm' : 'inch');
+            const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
+            const l = parseFloat(prod.length) || 0;
+            const w = parseFloat(prod.width) || 0;
+            const sqft = isFt ? l * w : (isMM ? (l * w) / 92903.04 : (l * w) / 144);
+            const calcSqFt = sqft.toFixed(2);
+            const sizeFormatted = `${l}L x ${w}W ${unitLabel}${prod.thickness ? ` | ${prod.thickness}MM` : ''} (${calcSqFt} Sq.Ft)`;
+
+            const createdSlab = await createSlab({
+              projectId: createdProject.id,
+              name: prod.name.trim(),
+              size: sizeFormatted,
+              cost: 0,
+              requiredStages: ['Production', 'Polishing', 'Packing', 'Dispatch']
+            }).unwrap();
+
+            quotationProducts.push({
+              id: createdSlab?.id || `prod_${Date.now()}_${i}`,
+              slabId: createdSlab?.id,
+              category: prod.name.trim(),
+              productName: prod.name.trim(),
+              name: prod.name.trim(),
+              unit: prod.unit || 'pieces',
+              dimensionUnit: dimUnit,
+              length: l,
+              width: w,
+              breadth: parseFloat(prod.thickness) || 0,
+              thickness: parseFloat(prod.thickness) || 0,
+              qty: 1,
+              rate: 0,
+              amount: 0,
+              sqft: Number(calcSqFt)
             });
+          }
 
           if (quotationProducts.length > 0) {
             await createQuotation({
@@ -428,43 +476,7 @@ const Projects: React.FC = () => {
               products: quotationProducts,
               status: 'approved'
             }).unwrap().catch((e: any) => console.error('Quotation create error:', e));
-          }
-
-          for (const prod of formData.products) {
-            if (prod.name && (prod.length || prod.width)) {
-              const u = (prod.unit || 'pieces').toLowerCase().trim();
-              const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
-              let isFt = false;
-              let isMM = false;
-              if (isPieces) {
-                const dimU = (prod.dimensionUnit || 'inch').toLowerCase().trim();
-                isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft';
-                isMM = dimU === 'mm';
-              } else {
-                isFt = u === 'sq_ft' || u === 'sqft' || u === 'sq. ft' || u === 'sq ft' || u.includes('feet') || u.includes('sq') || u.includes('ft') || u.includes('rft');
-                isMM = u === 'mm' || u.includes('millimeter');
-              }
-              const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
-              const l = parseFloat(prod.length) || 0;
-              const w = parseFloat(prod.width) || 0;
-              const calcSqFt = (
-                isFt
-                  ? l * w
-                  : isMM
-                  ? (l * w) / 92903.04
-                  : (l * w) / 144
-              ).toFixed(2);
-
-              const sizeFormatted = `${prod.length || 0}L x ${prod.width || 0}W ${unitLabel}${prod.thickness ? ` | ${prod.thickness}MM` : ''} (${calcSqFt} Sq.Ft)`;
-
-              await createSlab({
-                projectId: createdProject.id,
-                name: prod.name,
-                size: sizeFormatted,
-                cost: 0,
-                requiredStages: ['Production', 'Polishing', 'Packing', 'Dispatch']
-              }).unwrap();
-            }
+            localStorage.setItem(`quoteProducts_${createdProject.id}`, JSON.stringify(quotationProducts));
           }
         }
 

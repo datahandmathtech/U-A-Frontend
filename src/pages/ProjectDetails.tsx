@@ -887,26 +887,9 @@ const ProjectDetails: React.FC = () => {
     const existingSlabCount = (projectSlabs || []).length;
     const matrix = [];
 
-    const templatePieces = (sourceSlab?.pieces && sourceSlab.pieces.length > 0)
-      ? sourceSlab.pieces
-      : [];
-
     for (let i = 1; i <= countNum; i++) {
       const slabNum = existingSlabCount + i;
       const slabName = `${cleanBase} ${slabNum}`;
-
-      const clonedPieces = templatePieces.length > 0
-        ? templatePieces.map((tp: any, pIdx: number) => {
-            const pNum = tp.pieceNumber ? Number(tp.pieceNumber) : (pIdx + 1);
-            return {
-              pieceNumber: pNum,
-              productName: `${slabName}.${pNum}`,
-              size: tp.size || sizeStr,
-              stage: tp.stage || 'Production',
-              status: 'pending'
-            };
-          })
-        : [];
 
       matrix.push({
         slabNumber: slabNum,
@@ -918,7 +901,7 @@ const ProjectDetails: React.FC = () => {
         size: sizeStr,
         area: parseFloat(areaSqFt.toFixed(2)),
         requiredStages: reqStages,
-        pieces: clonedPieces
+        pieces: []
       });
     }
     setMasterGeneratedMatrix(matrix);
@@ -1314,14 +1297,20 @@ const ProjectDetails: React.FC = () => {
   
   type Product = {
     id: string;
+    slabId?: string;
     category: string;
+    productName?: string;
+    name?: string;
     unit: string;
+    dimensionUnit?: string;
     length: number;
     width: number;
     breadth: number;
+    thickness?: number;
     qty: number;
     rate: number;
     amount: number;
+    sqft?: number;
     photo?: string;
   };
   const [products, setProducts] = useState<Product[]>(() => {
@@ -1330,7 +1319,9 @@ const ProjectDetails: React.FC = () => {
   });
 
   React.useEffect(() => {
-    localStorage.setItem(`quoteProducts_${id}`, JSON.stringify(products));
+    if (products && products.length > 0) {
+      localStorage.setItem(`quoteProducts_${id}`, JSON.stringify(products));
+    }
   }, [products, id]);
 
   const [activeCostProductId, setActiveCostProductId] = useState<string>('');
@@ -1476,23 +1467,113 @@ const ProjectDetails: React.FC = () => {
         if (inv.paymentDate) setPaymentDate(new Date(inv.paymentDate).toISOString().split('T')[0]);
       }
 
-      // Load saved quotation from database if project is past the quotation stage,
-      // OR if no local draft exists (or draft is empty).
-      if (project.quotations && project.quotations.length > 0) {
-        const latestQuote = project.quotations[0];
+      // Synchronize quotation products from database and slabs
+      const latestQuote = project.quotations?.[0];
+      const rawQuoteProducts: any[] = Array.isArray(latestQuote?.products) && latestQuote.products.length > 0
+        ? latestQuote.products
+        : (Array.isArray(project.products) ? project.products : []);
+
+      const slabsSource: any[] = (projectSlabs && projectSlabs.length > 0)
+        ? projectSlabs
+        : (Array.isArray(project.slabs) ? project.slabs : []);
+
+      const mergedProducts: Product[] = rawQuoteProducts.map((qp: any, idx: number) => ({
+        id: qp.id || qp.slabId || `prod_${idx}`,
+        slabId: qp.slabId || qp.id,
+        category: qp.category || qp.productName || qp.name || 'Product',
+        productName: qp.productName || qp.category || qp.name || 'Product',
+        name: qp.name || qp.category || qp.productName || 'Product',
+        unit: qp.unit || 'pieces',
+        dimensionUnit: qp.dimensionUnit || 'inch',
+        length: Number(qp.length) || 0,
+        width: Number(qp.width) || 0,
+        breadth: Number(qp.breadth ?? qp.thickness) || 0,
+        thickness: Number(qp.thickness ?? qp.breadth) || 0,
+        qty: Math.max(1, Number(qp.qty) || 1),
+        rate: Number(qp.rate) || 0,
+        amount: Number(qp.amount) || 0,
+        sqft: Number(qp.sqft) || 0,
+        ...(qp.photo ? { photo: qp.photo } : {})
+      }));
+
+      if (slabsSource.length > 0) {
+        slabsSource.forEach((slab: any) => {
+          const sName = (slab.name || '').trim();
+          if (!sName) return;
+          const sId = slab.id;
+
+          let l = 0, w = 0, t = 0;
+          let dimUnit = 'inch';
+          if (slab.size) {
+            const rawSize = String(slab.size);
+            const dimsPart = (rawSize.split('|')[0] || '').toLowerCase();
+            const lMatch = rawSize.match(/(\d+(?:\.\d+)?)\s*L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
+            const wMatch = rawSize.match(/(\d+(?:\.\d+)?)\s*W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+            const tMatch = rawSize.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || rawSize.match(/(\d+(?:\.\d+)?)\s*MM/i);
+            if (lMatch) l = parseFloat(lMatch[1]) || 0;
+            if (wMatch) w = parseFloat(wMatch[1]) || 0;
+            if (tMatch) t = parseFloat(tMatch[1]) || 0;
+            if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq')) dimUnit = 'sq_ft';
+            else if (dimsPart.includes('mm')) dimUnit = 'mm';
+            else dimUnit = 'inch';
+          }
+
+          const existingIdx = mergedProducts.findIndex((p) => {
+            const pNameNorm = (p.category || p.productName || p.name || '').trim().toLowerCase();
+            const sNameNorm = sName.toLowerCase();
+            if (p.id === sId || p.slabId === sId || pNameNorm === sNameNorm) return true;
+            if ((p.qty || 1) > 1 && sNameNorm.startsWith(pNameNorm + ' ')) return true;
+            return false;
+          });
+
+          if (existingIdx === -1) {
+            const isFt = dimUnit === 'sq_ft' || dimUnit === 'feet';
+            const isMM = dimUnit === 'mm';
+            const sqft = isFt ? l * w : (isMM ? (l * w) / 92903.04 : (l * w) / 144);
+            mergedProducts.push({
+              id: sId,
+              slabId: sId,
+              category: sName,
+              productName: sName,
+              name: sName,
+              unit: 'pieces',
+              dimensionUnit: dimUnit,
+              length: l,
+              width: w,
+              breadth: t,
+              thickness: t,
+              qty: 1,
+              rate: 0,
+              amount: 0,
+              sqft: Number(sqft.toFixed(2))
+            });
+          } else if ((mergedProducts[existingIdx].qty || 1) === 1) {
+            const ep = mergedProducts[existingIdx];
+            mergedProducts[existingIdx] = {
+              ...ep,
+              id: sId || ep.id,
+              slabId: sId || ep.slabId,
+              category: sName || ep.category,
+              productName: sName || ep.productName,
+              name: sName || ep.name,
+              length: l || ep.length,
+              width: w || ep.width,
+              breadth: t || ep.breadth,
+              thickness: t || ep.thickness,
+              dimensionUnit: dimUnit || ep.dimensionUnit
+            };
+          }
+        });
+      }
+
+      if (mergedProducts.length > 0) {
+        setProducts(mergedProducts);
+      }
+
+      if (latestQuote) {
         const isPastQuotation = getStepIndex(project.status) > 2;
-
-        const savedProductsStr = localStorage.getItem(`quoteProducts_${id}`);
-        const savedProducts = savedProductsStr ? JSON.parse(savedProductsStr) : [];
-
         const savedDraftStr = localStorage.getItem(`quoteDraft_${id}`);
         const savedDraft = savedDraftStr ? JSON.parse(savedDraftStr) : null;
-
-        if (isPastQuotation || savedProducts.length === 0) {
-          if (latestQuote.products && Array.isArray(latestQuote.products) && latestQuote.products.length > 0) {
-            setProducts(latestQuote.products as any);
-          }
-        }
 
         if (isPastQuotation || !savedDraft) {
           if (latestQuote.additionalCosts && typeof latestQuote.additionalCosts === 'object') {
@@ -1537,7 +1618,7 @@ const ProjectDetails: React.FC = () => {
         }
       }
     }
-  }, [project, id]);
+  }, [project, projectSlabs, id]);
 
   // Clean up camera stream when dialog closes or component unmounts
   React.useEffect(() => {
@@ -1656,7 +1737,8 @@ const ProjectDetails: React.FC = () => {
     setEditingProducts([{
       id: Date.now().toString(),
       category: '',
-      unit: '',
+      unit: 'pieces',
+      dimensionUnit: defaultProjectUnit || 'inch',
       length: 0,
       width: 0,
       breadth: 0,
@@ -1682,7 +1764,8 @@ const ProjectDetails: React.FC = () => {
     setEditingProducts([...editingProducts, {
       id: Date.now().toString() + Math.random().toString(),
       category: '',
-      unit: '',
+      unit: 'pieces',
+      dimensionUnit: defaultProjectUnit || 'inch',
       length: 0,
       width: 0,
       breadth: 0,
@@ -1692,6 +1775,61 @@ const ProjectDetails: React.FC = () => {
 
   const handleRemoveRow = (index: number) => {
     setEditingProducts(editingProducts.filter((_, i) => i !== index));
+  };
+
+  const persistProductsToQuotation = async (newProducts: Product[]) => {
+    try {
+      if (id) {
+        localStorage.setItem(`quoteProducts_${id}`, JSON.stringify(newProducts));
+      }
+      let existingQuoteId = project?.quotations?.[0]?.id;
+      if (existingQuoteId && String(existingQuoteId).startsWith('temp_quote_')) {
+        existingQuoteId = undefined;
+      }
+
+      if (!existingQuoteId) {
+        try {
+          const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+          const r = await fetch(`/api/quotations/project/${id}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (r.ok) {
+            const list = await r.json();
+            const realQuote = Array.isArray(list) ? list.find((q: any) => q.id && !String(q.id).startsWith('temp_quote_')) : null;
+            if (realQuote) {
+              existingQuoteId = realQuote.id;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not check quotations by project', e);
+        }
+      }
+
+      if (existingQuoteId) {
+        await updateQuotation({ id: existingQuoteId, data: { products: newProducts } }).unwrap();
+      } else {
+        await createQuotation({
+          projectId: id,
+          products: newProducts,
+          additionalCosts: quoteDetails,
+          terms: selectedTerms,
+          globalCosts: {
+            packageCostEnabled,
+            packageCost,
+            transportCostEnabled,
+            transportCost,
+            gstPercent
+          },
+          status: 'approved'
+        }).unwrap();
+      }
+
+      await syncSlabs(id as string).unwrap().catch(() => {});
+      refetchSlabs();
+      refetch();
+    } catch (e) {
+      console.error('Failed to persist products to quotation:', e);
+    }
   };
 
   const handleSaveProducts = async () => {
@@ -1708,24 +1846,15 @@ const ProjectDetails: React.FC = () => {
     setIsProductDialogOpen(false);
     setEditingProducts([]);
 
-    // Persist to backend if a quotation exists for this project
-    try {
-      const { data: quotations } = await fetch(`/api/quotations/project/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      }).then(r => r.json()).then(data => ({ data }));
-      if (quotations && quotations.length > 0) {
-        await updateQuotation({ id: quotations[0].id, data: { products: newProducts } });
-        await syncSlabs(id as string).unwrap();
-        refetchSlabs();
-      }
-    } catch (e) {
-      // Silent fail - products are still updated in local state
-      console.error('Failed to persist products to quotation:', e);
-    }
+    await persistProductsToQuotation(newProducts);
+    setSnackbarMessage('Product saved & synced with Work Order!');
   };
 
-  const handleRemoveProduct = (id: string) => {
-    setProducts(products.filter(p => p.id !== id));
+  const handleRemoveProduct = async (prodId: string) => {
+    const newProducts = products.filter(p => p.id !== prodId);
+    setProducts(newProducts);
+    await persistProductsToQuotation(newProducts);
+    setSnackbarMessage('Product removed & synced with Work Order!');
   };
 
   const handleNextStage = async (newStatus: string) => {
@@ -1785,6 +1914,10 @@ const ProjectDetails: React.FC = () => {
       };
 
       let existingQuoteId = project?.quotations?.[0]?.id;
+      if (existingQuoteId && String(existingQuoteId).startsWith('temp_quote_')) {
+        existingQuoteId = undefined;
+      }
+
       if (!existingQuoteId) {
         try {
           const token = sessionStorage.getItem('token') || localStorage.getItem('token');
@@ -1793,8 +1926,9 @@ const ProjectDetails: React.FC = () => {
           });
           if (r.ok) {
             const list = await r.json();
-            if (list && list.length > 0) {
-              existingQuoteId = list[0].id;
+            const realQuote = Array.isArray(list) ? list.find((q: any) => q.id && !String(q.id).startsWith('temp_quote_')) : null;
+            if (realQuote) {
+              existingQuoteId = realQuote.id;
             }
           }
         } catch (e) {
@@ -6399,7 +6533,6 @@ const ProjectDetails: React.FC = () => {
                         <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Unit</TableCell>
                         <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Dimensions</TableCell>
                         <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Area</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase' }}>Pieces Inside</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -6421,17 +6554,6 @@ const ProjectDetails: React.FC = () => {
                           <TableCell sx={{ py: 0.75 }}>{p.unit}</TableCell>
                           <TableCell sx={{ py: 0.75 }}>{p.length} x {p.width} | {p.thickness}mm</TableCell>
                           <TableCell sx={{ py: 0.75 }}>{p.area} Sq.Ft</TableCell>
-                          <TableCell sx={{ py: 0.75 }}>
-                            {p.pieces && p.pieces.length > 0 ? (
-                              <Chip 
-                                size="small" 
-                                label={`${p.pieces.length} Pieces (Cloned)`} 
-                                sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700, bgcolor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #DBEAFE' }} 
-                              />
-                            ) : (
-                              <Chip size="small" label="1 Piece (Whole Slab)" sx={{ height: 20, fontSize: '0.68rem' }} />
-                            )}
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
