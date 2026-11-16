@@ -45,8 +45,10 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
   const currentUser = useSelector((state: any) => state.auth?.user);
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
 
-  const { data: chatData, isLoading: isChatLoading, refetch } = useGetProductChatQuery(slab?.id, {
-    skip: !open || !slab?.id,
+  const chatKey = projectId || slab?.projectId || slab?.id;
+
+  const { data: chatData, isLoading: isChatLoading, refetch } = useGetProductChatQuery(chatKey, {
+    skip: !open || !chatKey,
     pollingInterval: open ? 5000 : undefined // auto-poll when drawer is open
   });
 
@@ -60,10 +62,10 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
 
   // Mark as read when opened by Admin
   useEffect(() => {
-    if (open && slab?.id && isAdmin) {
-      markAsRead(slab.id).catch(() => {});
+    if (open && chatKey && isAdmin) {
+      markAsRead(chatKey).catch(() => {});
     }
-  }, [open, slab?.id, isAdmin, markAsRead, chatData?.unreadCount]);
+  }, [open, chatKey, isAdmin, markAsRead, chatData?.unreadCount]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -92,12 +94,12 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
   };
 
   const handleSend = async () => {
-    if ((!text.trim() && attachments.length === 0) || !slab?.id) return;
+    if ((!text.trim() && attachments.length === 0) || !chatKey) return;
 
     try {
       await sendMessage({
-        slabId: slab.id,
-        projectId: projectId || slab.projectId,
+        slabId: slab?.id || chatKey,
+        projectId: projectId || slab?.projectId || chatKey,
         message: text.trim() || 'Sent an attachment',
         attachments
       }).unwrap();
@@ -157,10 +159,10 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
               variant="subtitle1"
               sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2, textTransform: 'uppercase', noWrap: true }}
             >
-              {slab?.name || 'Product Discussion'}
+              {projectName || slab?.name || 'Work Order Chat'}
             </Typography>
             <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-              {projectName ? `${projectName} • ` : ''}Product Chat & Updates
+              Work Order Chat & Staff Updates
             </Typography>
           </Box>
         </Box>

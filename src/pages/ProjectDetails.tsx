@@ -583,23 +583,6 @@ const SlabRow = ({
       {/* Actions */}
       <TableCell align="center" sx={{ py: 1.75, whiteSpace: 'nowrap' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
-          {/* Chat Icon */}
-          <Tooltip title="Product Chat & Staff Updates">
-            <IconButton
-              size="small"
-              onClick={(e) => { e.stopPropagation(); onOpenChat(slab); }}
-              sx={{
-                color: '#C89F5A',
-                p: 0.6,
-                bgcolor: '#FFFDF9',
-                border: '1px solid #FDE68A',
-                '&:hover': { bgcolor: '#FFF4E5', borderColor: '#C89F5A' }
-              }}
-            >
-              <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Tooltip>
-
           {/* Details Link */}
           <Button
             size="small"
@@ -1053,18 +1036,15 @@ const ProjectDetails: React.FC = () => {
   // Open chat if navigated with chatSlabId param from Admin Dashboard alerts
   React.useEffect(() => {
     const chatSlabId = queryParams.get('chatSlabId');
-    if (chatSlabId && projectSlabs && projectSlabs.length > 0) {
-      const target = projectSlabs.find((s: any) => s.id === chatSlabId);
-      if (target) {
-        setChatSlab(target);
-        setIsChatOpen(true);
-        // Clear param to prevent re-opening on future state updates
-        const p = new URLSearchParams(location.search);
-        p.delete('chatSlabId');
-        navigate({ search: p.toString() }, { replace: true });
-      }
+    if (chatSlabId && id) {
+      const target = projectSlabs?.find((s: any) => s.id === chatSlabId) || projectSlabs?.[0] || { id, name: project?.name || 'Work Order', projectId: id };
+      setChatSlab(target);
+      setIsChatOpen(true);
+      const p = new URLSearchParams(location.search);
+      p.delete('chatSlabId');
+      navigate({ search: p.toString() }, { replace: true });
     }
-  }, [location.search, projectSlabs]);
+  }, [location.search, projectSlabs, id, project?.name]);
   const [designFinalizedDate, setDesignFinalizedDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -4341,6 +4321,45 @@ const ProjectDetails: React.FC = () => {
                                   </Box>
                                 </Box>
                               )}
+
+                              {/* Single Work Order Chat Box (Shared with Main Active Work Orders Screen) */}
+                              <Box
+                                onClick={() => handleOpenChat(projectSlabs?.[0] || { id: id, name: project?.name || 'Work Order', projectId: id })}
+                                sx={{
+                                  ml: 'auto',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1.5,
+                                  p: 0.8,
+                                  px: 2,
+                                  borderRadius: 2.5,
+                                  border: '1.5px solid #FDE68A',
+                                  bgcolor: '#FFFDF9',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  boxShadow: '0 2px 6px rgba(200, 159, 90, 0.08)',
+                                  '&:hover': { borderColor: '#C89F5A', bgcolor: '#FFF4E5' }
+                                }}
+                              >
+                                <Avatar sx={{
+                                  bgcolor: '#FEF3C7',
+                                  border: '1px solid #FDE68A',
+                                  color: '#C89F5A',
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: 2
+                                }}>
+                                  <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 18 }} />
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#0F172A', display: 'block', lineHeight: 1.1 }}>
+                                    Work Order Chat
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 800, fontSize: '0.65rem' }}>
+                                    Open Chat Box
+                                  </Typography>
+                                </Box>
+                              </Box>
                             </>
                           );
                         })()}

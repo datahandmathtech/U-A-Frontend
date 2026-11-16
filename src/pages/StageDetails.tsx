@@ -992,12 +992,12 @@ const StageDetails = () => {
                 if (pDimsPart.includes('(inch)') || pDimsPart.includes('(inches)') || pDimsPart.includes('inch') || pDimsPart.includes('"')) {
                   pUnit = 'Inches';
                 } else if (pDimsPart.includes('(ft)') || pDimsPart.includes('(feet)') || pDimsPart.includes('feet') || pDimsPart.includes('sq_ft') || pDimsPart.includes('sqft') || pDimsPart.includes("'")) {
-                  pUnit = 'Sq.Ft';
+                  pUnit = 'Feet';
                 } else if (pDimsPart.includes('(mm)') || pDimsPart.includes('mm')) {
                   pUnit = 'MM';
                 } else if ((p as any).unit) {
                   const u = String((p as any).unit).toLowerCase();
-                  pUnit = u === 'mm' ? 'MM' : u === 'inch' ? 'Inches' : (u === 'feet' || u === 'ft' || u === 'sq_ft' || u === 'sqft') ? 'Sq.Ft' : dimensionUnitName;
+                  pUnit = u === 'mm' ? 'MM' : u === 'inch' ? 'Inches' : (u === 'feet' || u === 'ft' || u === 'sq_ft' || u === 'sqft') ? 'Feet' : dimensionUnitName;
                 }
                 const pArea = calculateAreaFromSize(p.size as string, pUnit.toLowerCase(), { ...matchedProduct, dimensionUnit: effectiveDimUnit });
 
@@ -1287,7 +1287,29 @@ const StageDetails = () => {
                <ToggleButtonGroup
                   value={cutPiecesOption}
                   exclusive
-                  onChange={(e, val) => setCutPiecesOption(val !== null ? val : null)}
+                  onChange={(e, val) => {
+                    const nextVal = val !== null ? val : null;
+                    setCutPiecesOption(nextVal);
+                    if (nextVal === 'yes' && piecesData.length === 0) {
+                      const existingPieces = slab.pieces || [];
+                      const maxNum = existingPieces.length > 0
+                        ? Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0))
+                        : 0;
+                      const nextNum = maxNum + 1;
+                      const defaultUnit = (effectiveDimUnit === 'feet' || effectiveDimUnit === 'ft' || effectiveDimUnit === 'sq_ft' || effectiveDimUnit === 'sqft')
+                        ? 'feet'
+                        : (effectiveDimUnit === 'mm' ? 'mm' : 'inch');
+                      setPiecesData([{
+                        pieceNumber: nextNum,
+                        baseName: slab.name,
+                        name: `${slab.name}.${nextNum}`,
+                        l: 0,
+                        w: 0,
+                        t: 0,
+                        unit: defaultUnit
+                      }]);
+                    }
+                  }}
                   sx={{ 
                     bgcolor: '#FFFFFF', 
                     p: 0.5,
@@ -1497,14 +1519,18 @@ const StageDetails = () => {
                         size="small"
                         value={(() => {
                           const rawU = String(p.unit || effectiveDimUnit || 'inch').toLowerCase();
-                          return (rawU === 'feet' || rawU === 'ft' || rawU === 'sq_ft' || rawU === 'sqft') ? 'sq_ft' : rawU;
+                          if (rawU === 'sq_ft' || rawU === 'sqft') return 'sq_ft';
+                          if (rawU === 'feet' || rawU === 'ft') return 'feet';
+                          if (rawU === 'mm') return 'mm';
+                          return 'inch';
                         })()}
                         onChange={(e) => handlePieceChange(idx, 'unit', e.target.value)}
-                        sx={{ bgcolor: '#FFF', height: 36, minWidth: 80, '& .MuiSelect-select': { py: 0.5, fontSize: '0.8rem', fontWeight: 700 } }}
+                        sx={{ bgcolor: '#FFF', height: 36, minWidth: 90, '& .MuiSelect-select': { py: 0.5, fontSize: '0.8rem', fontWeight: 700 } }}
                       >
                         <MenuItem value="inch">Inches</MenuItem>
-                        <MenuItem value="mm">MM</MenuItem>
+                        <MenuItem value="feet">Feet</MenuItem>
                         <MenuItem value="sq_ft">Sq.Ft</MenuItem>
+                        <MenuItem value="mm">MM</MenuItem>
                       </Select>
                     </TableCell>
                     <TableCell sx={{ py: 1.25 }}>
@@ -1640,10 +1666,7 @@ const StageDetails = () => {
 
             <Button 
               variant="contained" 
-              onClick={() => {
-                handleSavePieces();
-                setCutPiecesOption(null);
-              }} 
+              onClick={handleSavePieces} 
               disabled={isSaving || piecesData.length === 0}
               sx={{ 
                 borderRadius: 2.5, 
@@ -2062,7 +2085,8 @@ const StageDetails = () => {
                   sx={{ borderRadius: 2 }}
                 >
                   <MenuItem value="inch">Inches</MenuItem>
-                  <MenuItem value="feet">Sq.Ft</MenuItem>
+                  <MenuItem value="feet">Feet</MenuItem>
+                  <MenuItem value="sq_ft">Sq.Ft</MenuItem>
                   <MenuItem value="mm">MM</MenuItem>
                 </Select>
               </FormControl>

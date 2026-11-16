@@ -232,14 +232,13 @@ const Projects: React.FC = () => {
 
   const handleOpenChat = (e: React.MouseEvent, project: any) => {
     e.stopPropagation();
-    if (project.slabs && project.slabs.length > 0) {
-      setChatSlab(project.slabs[0]);
-      setChatProjectId(project.id);
-      setChatProjectName(project.name || project.projectId || 'Work Order');
-      setChatOpen(true);
-    } else {
-      navigate(`/projects/${project.id}`);
-    }
+    const firstSlab = (project.slabs && project.slabs.length > 0)
+      ? project.slabs[0]
+      : { id: project.id, name: project.name || project.projectId || 'Work Order', projectId: project.id };
+    setChatSlab(firstSlab);
+    setChatProjectId(project.id);
+    setChatProjectName(project.name || project.projectId || 'Work Order');
+    setChatOpen(true);
   };
   const [formData, setFormData] = useState<any>({
     name: '',
