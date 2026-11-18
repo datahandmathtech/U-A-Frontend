@@ -147,7 +147,16 @@ const SlabRow = ({
     setMenuAnchor(null);
   };
 
-  const matchedProduct = products?.find(p => slab.name.startsWith(p.category));
+  const baseSlabName = (slab.name || '').replace(/\s+\d+(\.\d+)?$/, '').trim().toLowerCase();
+  const matchedProduct = products?.find(p => {
+    const pCat = (p.category || p.productName || p.name || '').trim().toLowerCase();
+    const basePCat = pCat.replace(/\s+\d+(\.\d+)?$/, '').trim();
+    return (
+      (p.id && (p.id === slab.id || (p as any).slabId === slab.id)) ||
+      (slab.name && slab.name.toLowerCase().startsWith(pCat)) ||
+      (baseSlabName && (baseSlabName === basePCat || slab.name.toLowerCase().startsWith(basePCat)))
+    );
+  });
 
   // Smart dimension parser and normalizer so all copied/generated slabs match original spec format
   const parseDimensions = (sizeRaw: string) => {
@@ -159,22 +168,29 @@ const SlabRow = ({
     const lVal = lMatch ? parseFloat(lMatch[1]) : 0;
     const wVal = wMatch ? parseFloat(wMatch[1]) : 0;
     const isLargeMM = lVal > 150 || wVal > 150;
+    const prodUnit = (matchedProduct?.dimensionUnit || matchedProduct?.unit || defaultProjectUnit || '').toLowerCase();
+    const isUnitMM = prodUnit === 'mm' || prodUnit.includes('milli') || isLargeMM;
 
-    if (/sq\.?ft/i.test(cleanSize) && !(isLargeMM && cleanSize.toLowerCase().includes('inch'))) {
-      return cleanSize;
+    if (/sq\.?ft/i.test(cleanSize)) {
+      const explicitSqFtMatch = cleanSize.match(/([\d.]+)\s*Sq\.?Ft/i);
+      const explicitSqFt = explicitSqFtMatch ? parseFloat(explicitSqFtMatch[1]) : 0;
+      if (isUnitMM && explicitSqFt > 100) {
+        // Fall through to recalculate with MM instead of inflated Inch area!
+      } else if (!cleanSize.toLowerCase().includes('inch') || !isUnitMM) {
+        return cleanSize;
+      }
     }
     if (lMatch && wMatch) {
       const l = lVal;
       const w = wVal;
       const t = tMatch ? tMatch[1] : (matchedProduct?.breadth || matchedProduct?.thickness || '10');
       const dimsPart = cleanSize.split('|')[0].toLowerCase();
-      const prodUnit = (matchedProduct?.dimensionUnit || matchedProduct?.unit || defaultProjectUnit || '').toLowerCase();
 
       let u = 'inch';
-      if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq_ft') || dimsPart.includes('sqft') || prodUnit.includes('feet') || prodUnit.includes('ft') || prodUnit.includes('sq')) {
-        u = 'feet';
-      } else if (dimsPart.includes('mm') || prodUnit === 'mm' || prodUnit.includes('milli') || isLargeMM) {
+      if (isUnitMM || dimsPart.includes('mm')) {
         u = 'mm';
+      } else if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq_ft') || dimsPart.includes('sqft') || prodUnit.includes('feet') || prodUnit.includes('ft') || prodUnit.includes('sq')) {
+        u = 'feet';
       } else if (dimsPart.includes('inch') || dimsPart.includes('"') || prodUnit.includes('inch')) {
         u = 'inch';
       }
@@ -1831,11 +1847,12 @@ const ProjectDetails: React.FC = () => {
   };
 
   const handleAddNewRow = () => {
+    const prevUnit = editingProducts[0]?.dimensionUnit || defaultProjectUnit || 'inch';
     setEditingProducts([...editingProducts, {
       id: Date.now().toString() + Math.random().toString(),
       category: '',
       unit: 'pieces',
-      dimensionUnit: defaultProjectUnit || 'inch',
+      dimensionUnit: prevUnit,
       length: 0,
       width: 0,
       breadth: 0,
@@ -1910,23 +1927,33 @@ const ProjectDetails: React.FC = () => {
       const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
       const dimU = (isPieces ? ((ep as any).dimensionUnit || 'inch') : u).toLowerCase().trim();
       const isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft' || dimU.includes('sq');
-      const isMM = dimU === 'mm' || dimU.includes('millimeter');
+      const isMM = dimU === 'mm' || dimU.includes('millimeter') || (l > 150 || w > 150);
       const singleSlabSqFt = Math.round((isFt ? (l * w) : isMM ? ((l * w) / 92903.04) : ((l * w) / 144)) * 100) / 100;
       ep.sqft = singleSlabSqFt;
 
-      const matchedSlab = (projectSlabs || []).find((s: any) =>
-        s.id === ep.id || s.id === (ep as any).slabId ||
-        String(s.name || '').trim().toLowerCase() === String(ep.category || ep.productName || ep.name || '').trim().toLowerCase()
-      );
+      const baseEpName = String(ep.category || ep.productName || ep.name || '').replace(/\s+\d+(\.\d+)?$/, '').trim().toLowerCase();
+      const matchedSlab = (projectSlabs || []).find((s: any) => {
+        const sName = String(s.name || '').trim().toLowerCase();
+        const baseSName = sName.replace(/\s+\d+(\.\d+)?$/, '').trim();
+        return (
+          s.id === ep.id || s.id === (ep as any).slabId ||
+          sName === String(ep.category || ep.productName || ep.name || '').trim().toLowerCase() ||
+          (baseEpName && (baseSName === baseEpName || sName.startsWith(baseEpName)))
+        );
+      });
       if (matchedSlab) {
         const existingPiecesArea = getExistingPiecesAreaForSlab(matchedSlab);
-        if (existingPiecesArea > 0 && singleSlabSqFt > 0 && singleSlabSqFt + 0.01 < existingPiecesArea) {
-          alert(
-            `Cannot reduce "${matchedSlab.name}" size to ${singleSlabSqFt.toFixed(2)} Sq.Ft!\n` +
-            `Inside pieces already have a total area of ${existingPiecesArea.toFixed(2)} Sq.Ft.\n` +
-            `You can increase the size or keep it at least ${existingPiecesArea.toFixed(2)} Sq.Ft.`
+        const qty = Math.max(1, Number(ep.qty) || 1);
+        const totalEpArea = singleSlabSqFt * qty;
+        // Only warn if both single piece AND total area are below inside pieces
+        if (existingPiecesArea > 0 && singleSlabSqFt > 0 && singleSlabSqFt + 0.05 < existingPiecesArea && totalEpArea + 0.05 < existingPiecesArea) {
+          const proceed = window.confirm(
+            `Notice for "${matchedSlab.name}":\n` +
+            `Existing inside pieces total ${existingPiecesArea.toFixed(2)} Sq.Ft.\n` +
+            `New size is ${singleSlabSqFt.toFixed(2)} Sq.Ft (Total for ${qty} pcs: ${totalEpArea.toFixed(2)} Sq.Ft).\n\n` +
+            `Do you want to save anyway?`
           );
-          return;
+          if (!proceed) return;
         }
       }
     }

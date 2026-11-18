@@ -1683,12 +1683,23 @@ const Projects: React.FC = () => {
                   <Button
                     size="small"
                     startIcon={<AddIcon />}
-                    onClick={() =>
+                    onClick={() => {
+                      const lastProd = formData.products?.[formData.products.length - 1] || formData.products?.[0];
                       setFormData({
                         ...formData,
-                        products: [...(formData.products || []), { name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: formData.products?.[0]?.dimensionUnit || 'inch' }]
-                      })
-                    }
+                        products: [
+                          ...(formData.products || []),
+                          {
+                            name: '',
+                            length: '',
+                            width: '',
+                            thickness: lastProd?.thickness || '',
+                            unit: lastProd?.unit || 'pieces',
+                            dimensionUnit: lastProd?.dimensionUnit || 'inch'
+                          }
+                        ]
+                      });
+                    }}
                     sx={{
                       bgcolor: '#FFFDF5',
                       color: '#B38B36',

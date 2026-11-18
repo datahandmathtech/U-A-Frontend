@@ -19,7 +19,9 @@ import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined
 import FilterListIcon from '@mui/icons-material/FilterList';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
+import CloseIcon from '@mui/icons-material/Close';
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
+import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 
 const DEFAULT_STAGE_TABS = ['Production', 'Spare Part', 'Polishing', 'Packing', 'Dispatch'];
 
@@ -45,6 +47,15 @@ const formatDate = (dateStr: any) => {
   return `${day}-${month}-${year}`;
 };
 
+const formatTime = (dateStr: any) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  // Only display if hours/minutes are not midnight 00:00:00
+  if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) return '';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 const VendorLedger: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -60,6 +71,7 @@ const VendorLedger: React.FC = () => {
 
   const [entryModalOpen, setEntryModalOpen] = useState(false);
   const [editLog, setEditLog] = useState<any>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const [activeStageTab, setActiveStageTab] = useState<string>('Production');
   const [trackBy, setTrackBy] = useState<string>('Work Stage');
   const [sortAsc, setSortAsc] = useState<boolean>(true); // Chronological by default matching image
@@ -81,10 +93,13 @@ const VendorLedger: React.FC = () => {
     const grouped = new Map<string, any[]>();
     stageTabs.forEach((stg) => grouped.set(stg, []));
 
-    // Sort all raw entries chronologically (oldest -> newest) first for accurate running balance
-    const sortedChronological = [...(ledger || [])].sort(
-      (a: any, b: any) => new Date(a.date || a.createdAt).getTime() - new Date(b.date || b.createdAt).getTime()
-    );
+    // Sort all raw entries chronologically by exact timestamp (oldest -> newest) for accurate running balance
+    const sortedChronological = [...(ledger || [])].sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt || a.date).getTime();
+      const timeB = new Date(b.createdAt || b.date).getTime();
+      if (timeA !== timeB) return timeA - timeB;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
 
     sortedChronological.forEach((entry: any) => {
       const stg = normalizeLedgerStage(entry.stage);
@@ -569,6 +584,7 @@ const VendorLedger: React.FC = () => {
               <TableCell sx={{ fontWeight: 800, color: '#16A34A', fontSize: '0.78rem' }}>INWARD (+)</TableCell>
               <TableCell sx={{ fontWeight: 800, color: '#1D4ED8', fontSize: '0.78rem' }}>RUNNING BALANCE</TableCell>
               <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>STATUS</TableCell>
+              <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>PHOTO</TableCell>
               <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>REMARKS</TableCell>
             </TableRow>
           </TableHead>
@@ -595,7 +611,14 @@ const VendorLedger: React.FC = () => {
                     {idx + 1}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 600, color: '#1E293B', fontSize: '0.82rem', py: 1.1 }}>
-                    {formatDate(entry.date || entry.createdAt)}
+                    <Typography sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#1E293B' }}>
+                      {formatDate(entry.date || entry.createdAt)}
+                    </Typography>
+                    {formatTime(entry.createdAt || entry.date) && (
+                      <Typography sx={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 500 }}>
+                        {formatTime(entry.createdAt || entry.date)}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 600, color: '#334155', fontSize: '0.82rem', py: 1.1 }}>
                     {entry.stage || activeStageTab}
@@ -627,6 +650,32 @@ const VendorLedger: React.FC = () => {
                       />
                     )}
                   </TableCell>
+                  <TableCell sx={{ py: 1.1 }}>
+                    {entry.photoUrl ? (
+                      <Box
+                        component="img"
+                        src={getOptimizedUrl(entry.photoUrl)}
+                        alt="Proof"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewPhoto(entry.photoUrl);
+                        }}
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 1.5,
+                          objectFit: 'cover',
+                          border: '1.5px solid #CBD5E1',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                          transition: 'transform 0.15s ease',
+                          '&:hover': { transform: 'scale(1.15)', borderColor: '#1976D2' }
+                        }}
+                      />
+                    ) : (
+                      <Typography variant="caption" sx={{ color: '#CBD5E1', fontWeight: 600 }}>-</Typography>
+                    )}
+                  </TableCell>
                   <TableCell sx={{ color: '#475569', fontWeight: 500, fontSize: '0.82rem', py: 1.1 }}>
                     {entry.productName || entry.remarks || (isOut ? 'Material sent to vendor' : 'Received from vendor')}
                   </TableCell>
@@ -635,7 +684,7 @@ const VendorLedger: React.FC = () => {
             })}
             {activeEntries.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 5, color: '#64748B', fontWeight: 600 }}>
+                <TableCell colSpan={10} align="center" sx={{ py: 5, color: '#64748B', fontWeight: 600 }}>
                   No {activeStageTab} transactions recorded yet for this vendor.
                 </TableCell>
               </TableRow>
@@ -711,6 +760,55 @@ const VendorLedger: React.FC = () => {
         defaultVendorId={id}
         isEditMode={!!editLog}
       />
+      {/* Fullscreen Photo Preview Modal */}
+      <Dialog
+        open={Boolean(previewPhoto)}
+        onClose={() => setPreviewPhoto(null)}
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            bgcolor: 'transparent',
+            boxShadow: 'none',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative'
+          }
+        }}
+      >
+        <Box sx={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+          <IconButton
+            onClick={() => setPreviewPhoto(null)}
+            sx={{
+              position: 'absolute',
+              top: 12,
+              right: 12,
+              bgcolor: 'rgba(0,0,0,0.7)',
+              color: '#FFFFFF',
+              zIndex: 10,
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+          {previewPhoto && (
+            <Box
+              component="img"
+              src={getFullQualityUrl(previewPhoto)}
+              alt="Verification Proof"
+              sx={{
+                width: '100%',
+                maxHeight: '85vh',
+                objectFit: 'contain',
+                borderRadius: 2,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                bgcolor: '#0F172A'
+              }}
+            />
+          )}
+        </Box>
+      </Dialog>
     </Box>
   );
 };
