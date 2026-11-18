@@ -84,30 +84,42 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
 
   const selectedProject = projects?.find((p: any) => p.id === selectedProjectId);
 
-  // Merge reserved projectMaterials with any available factory stock if none reserved yet
+  // Strict Client Material Isolation: only display materials strictly belonging to or reserved for this client/project
   const displayedMaterials = useMemo(() => {
     const reservedList = Array.isArray(projectMaterials) ? projectMaterials.filter((pm: any) => pm.inventory) : [];
-    if (reservedList.length > 0) return reservedList;
 
-    // Fallback: if this project has no explicit ProjectMaterial rows yet, show matching or available factory inventory items
-    if (!allInventory || !selectedProject) return [];
+    if (!selectedProject) return reservedList;
     const pName = (selectedProject.name || '').trim().toLowerCase();
     const pClient = (selectedProject.clientName || '').trim().toLowerCase();
 
-    const matchedInv = allInventory.filter((item: any) => {
+    const matchedInv = (allInventory || []).filter((item: any) => {
       const sup = (item.supplier || '').trim().toLowerCase();
-      if (pClient && sup === pClient) return true;
+      // Only match if supplier explicitly matches this client's name (and isn't generic company stock)
+      if (pClient && pClient !== 'unnati arts' && sup === pClient) return true;
       if (pName && sup === pName) return true;
       if (Array.isArray(item.projectMaterials) && item.projectMaterials.some((pm: any) => pm.projectId === selectedProjectId || pm.project?.id === selectedProjectId)) return true;
       if (Array.isArray(item.slabs) && item.slabs.some((s: any) => s.projectId === selectedProjectId || s.project?.id === selectedProjectId)) return true;
       return false;
     });
 
-    const sourceList = matchedInv.length > 0
-      ? matchedInv
-      : allInventory.filter((item: any) => item.jobWorkType === 'company' || (item.supplier || '').toLowerCase().includes('unnati'));
+    if (reservedList.length > 0) {
+      const reservedInvIds = new Set(reservedList.map((pm: any) => (pm.inventory?.id || pm.inventoryId)?.toString()).filter(Boolean));
+      const extraMatched = matchedInv.filter((inv: any) => !reservedInvIds.has(inv.id?.toString())).map((inv: any) => ({
+        id: `inv_${inv.id}`,
+        projectId: selectedProjectId,
+        inventoryId: inv.id,
+        quantity: inv.quantity,
+        procure: inv.procure || inv.quantity || 0,
+        used: inv.used || 0,
+        balance: inv.quantity || 0,
+        addedAt: inv.createdAt,
+        inventory: inv
+      }));
+      return [...reservedList, ...extraMatched];
+    }
 
-    return sourceList.map((inv: any) => ({
+    // STRICT ISOLATION: Never fall back to company stock or other clients' items!
+    return matchedInv.map((inv: any) => ({
       id: `inv_${inv.id}`,
       projectId: selectedProjectId,
       inventoryId: inv.id,
@@ -182,59 +194,111 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
         <IconButton onClick={onClose} sx={{ bgcolor: '#F1F5F9' }}><CloseIcon /></IconButton>
       </DialogTitle>
       <DialogContent sx={{ p: 3.5 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#475569', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          1. Select Active Project
-        </Typography>
-        <Autocomplete
-          options={projects || []}
-          getOptionLabel={(o: any) => {
-            const code = o.projectId ? `${o.projectId}` : '';
-            const name = o.name || '';
-            const client = o.clientName ? `(${o.clientName})` : '';
-            if (code && name && name.toLowerCase() !== code.toLowerCase()) {
-              return `${code} - ${name} ${client}`.trim();
-            }
-            return `${code || name} ${client}`.trim();
-          }}
-          renderOption={(props, o: any) => {
-            const { key, ...restProps } = props as any;
-            return (
-              <li key={key} {...restProps}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2, py: 0.4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                    {o.projectId && (
-                      <Chip
-                        label={o.projectId}
-                        size="small"
-                        sx={{
-                          fontWeight: 800,
-                          fontSize: '0.72rem',
-                          height: 20,
-                          bgcolor: '#FFF7ED',
-                          color: '#C2410C',
-                          border: '1px solid #FFEDD5',
-                          borderRadius: 1
-                        }}
-                      />
-                    )}
-                    <Typography sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>
-                      {o.name || 'Unnamed Project'}
-                    </Typography>
-                  </Box>
-                  {o.clientName && (
-                    <Typography sx={{ fontSize: '0.76rem', color: '#64748B', fontWeight: 500, pl: o.projectId ? 0.5 : 0 }}>
-                      Client: {o.clientName}
-                    </Typography>
-                  )}
-                </Box>
-              </li>
-            );
-          }}
-          value={selectedProject || null}
-          onChange={(_, val) => setSelectedProjectId(val ? val.id : null)}
-          renderInput={(params) => <TextField {...params} variant="outlined" placeholder="Search project name, ID, or client..." />}
-          sx={{ mb: 3.5, maxWidth: 520, bgcolor: '#FFF', borderRadius: 2 }}
-        />
+        {initialProjectId ? (
+          <Paper
+            elevation={0}
+            sx={{
+              mb: 3,
+              p: 2,
+              borderRadius: 3,
+              border: '1.5px solid #BAE6FD',
+              bgcolor: '#F0F9FF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 1.5
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+              {selectedProject?.projectId && (
+                <Chip
+                  label={selectedProject.projectId}
+                  sx={{
+                    fontWeight: 900,
+                    bgcolor: '#FFF',
+                    color: '#0284C7',
+                    border: '1.5px solid #0284C7',
+                    borderRadius: 1.5,
+                    fontSize: '0.82rem',
+                    height: 28
+                  }}
+                />
+              )}
+              <Box>
+                <Typography variant="h6" fontWeight="900" color="#0F172A" sx={{ lineHeight: 1.2 }}>
+                  {selectedProject?.name || 'Client Project Material Planning'}
+                </Typography>
+                {selectedProject?.clientName && (
+                  <Typography variant="body2" sx={{ color: '#0369A1', fontWeight: 700, mt: 0.3 }}>
+                    Client: {selectedProject.clientName}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            <Chip
+              label="Direct Client Material Planning"
+              color="info"
+              sx={{ fontWeight: 800, bgcolor: '#E0F2FE', color: '#0369A1', borderRadius: 2 }}
+            />
+          </Paper>
+        ) : (
+          <Box sx={{ mb: 3.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#475569', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              1. Select Active Project
+            </Typography>
+            <Autocomplete
+              options={projects || []}
+              getOptionLabel={(o: any) => {
+                const code = o.projectId ? `${o.projectId}` : '';
+                const name = o.name || '';
+                const client = o.clientName ? `(${o.clientName})` : '';
+                if (code && name && name.toLowerCase() !== code.toLowerCase()) {
+                  return `${code} - ${name} ${client}`.trim();
+                }
+                return `${code || name} ${client}`.trim();
+              }}
+              renderOption={(props, o: any) => {
+                const { key, ...restProps } = props as any;
+                return (
+                  <li key={key} {...restProps}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2, py: 0.4 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        {o.projectId && (
+                          <Chip
+                            label={o.projectId}
+                            size="small"
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: '0.72rem',
+                              height: 20,
+                              bgcolor: '#FFF7ED',
+                              color: '#C2410C',
+                              border: '1px solid #FFEDD5',
+                              borderRadius: 1
+                            }}
+                          />
+                        )}
+                        <Typography sx={{ fontWeight: 700, color: '#0F172A', fontSize: '0.88rem' }}>
+                          {o.name || 'Unnamed Project'}
+                        </Typography>
+                      </Box>
+                      {o.clientName && (
+                        <Typography sx={{ fontSize: '0.76rem', color: '#64748B', fontWeight: 500, pl: o.projectId ? 0.5 : 0 }}>
+                          Client: {o.clientName}
+                        </Typography>
+                      )}
+                    </Box>
+                  </li>
+                );
+              }}
+              value={selectedProject || null}
+              onChange={(_, val) => setSelectedProjectId(val ? val.id : null)}
+              renderInput={(params) => <TextField {...params} variant="outlined" placeholder="Search project name, ID, or client..." />}
+              sx={{ maxWidth: 520, bgcolor: '#FFF', borderRadius: 2 }}
+            />
+          </Box>
+        )}
 
         {selectedProjectId && (
           <Box>
@@ -629,7 +693,7 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                               thickness: Number(row.thickness) || 0,
                               quantity: qty,
                               unit: 'sq_ft',
-                              supplier: row.isUnnati ? 'Unnati Arts' : (selectedProject?.clientName || 'Client')
+                              supplier: selectedProject?.clientName || (row.isUnnati ? 'Unnati Arts' : 'Client')
                             }).unwrap();
 
                             await reserveProjectMaterial({
@@ -792,7 +856,7 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                           thickness: Number(row.thickness) || 0,
                           quantity: qty, 
                           unit: 'sq_ft', 
-                          supplier: row.isUnnati ? 'Unnati Arts' : (selectedProject?.clientName || 'Client')
+                          supplier: selectedProject?.clientName || (row.isUnnati ? 'Unnati Arts' : 'Client')
                         }).unwrap();
                         
                         await reserveProjectMaterial({ 
