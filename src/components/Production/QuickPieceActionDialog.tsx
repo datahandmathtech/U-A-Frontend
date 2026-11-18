@@ -54,6 +54,7 @@ interface QuickPieceActionDialogProps {
 
 const STAGE_CONFIG: { [key: string]: { label: string; icon: any; color: string; bg: string } } = {
   'Production': { label: 'Production', icon: <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />, color: '#059669', bg: '#ECFDF5' },
+  'Bridge Cutting': { label: 'Bridge Cutting', icon: <PrecisionManufacturingIcon sx={{ fontSize: 18 }} />, color: '#0284C7', bg: '#F0F9FF' },
   'Polishing - Honed': { label: 'Polishing (Honed)', icon: <AutoFixHighIcon sx={{ fontSize: 18 }} />, color: '#D97706', bg: '#FFFBEB' },
   'Polishing - Mirror': { label: 'Polishing (Mirror)', icon: <AutoFixHighIcon sx={{ fontSize: 18 }} />, color: '#D97706', bg: '#FFFBEB' },
   'Polishing': { label: 'Polishing', icon: <AutoFixHighIcon sx={{ fontSize: 18 }} />, color: '#D97706', bg: '#FFFBEB' },
@@ -218,9 +219,10 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
 
   const availableStages = useMemo(() => {
     if (slab?.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0) {
-      return slab.requiredStages;
+      const clean = slab.requiredStages.filter((s: string) => s !== 'Polishing');
+      return clean.length > 0 ? clean : ['Production'];
     }
-    return ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+    return ['Production'];
   }, [slab]);
 
   const [selectedPieceId, setSelectedPieceId] = useState<string>('');
@@ -288,7 +290,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
     }
 
     // Check piece stage progress
-    const BASE_STAGES = ['production', 'polishing', 'packing', 'dispatch'];
+    const BASE_STAGES = ['production', 'bridge cutting', 'polishing', 'packing', 'dispatch'];
     const pStage = (piece.stage || '').split(' - ')[0].replace(' Work', '').trim().toLowerCase();
     const pIdx = BASE_STAGES.indexOf(pStage);
     const targetIdx = BASE_STAGES.indexOf(norm);

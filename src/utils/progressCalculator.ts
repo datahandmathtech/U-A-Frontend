@@ -29,23 +29,28 @@ export const calculateOrderProgress = (project: any) => {
     const pieces = slab.pieces || [];
     const totalSubPieces = pieces.length > 0 ? pieces.length : 1;
 
-    const reqStages = slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
-    const hasProduction = reqStages.includes('Production');
+    const reqStages = (slab.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0)
+      ? slab.requiredStages.filter((s: string) => s !== 'Polishing')
+      : ['Production'];
+    const hasProduction = reqStages.includes('Production') || reqStages.length === 0;
+    const hasBridgeCutting = reqStages.includes('Bridge Cutting');
     const hasPolishing = reqStages.some((s: string) => s.startsWith('Polishing'));
     const hasPacking = reqStages.includes('Packing');
     const hasDispatch = reqStages.includes('Dispatch');
 
-    let wPoli = hasPolishing ? 20 : 0;
+    let wBridge = hasBridgeCutting ? 15 : 0;
+    let wPoli = hasPolishing ? 15 : 0;
     let wPack = hasPacking ? 10 : 0;
     let wDisp = hasDispatch ? 10 : 0;
     let wProd = 0;
 
-    if (hasProduction || hasPolishing || hasPacking || hasDispatch) {
-      wProd = 100 - wPoli - wPack - wDisp;
+    if (hasProduction || hasBridgeCutting || hasPolishing || hasPacking || hasDispatch) {
+      wProd = 100 - wBridge - wPoli - wPack - wDisp;
       if (!hasProduction) {
         wProd = 0;
-        const remaining = wPoli + wPack + wDisp;
+        const remaining = wBridge + wPoli + wPack + wDisp;
         if (remaining > 0) {
+          wBridge = (wBridge / remaining) * 100;
           wPoli = (wPoli / remaining) * 100;
           wPack = (wPack / remaining) * 100;
           wDisp = (wDisp / remaining) * 100;
@@ -58,7 +63,7 @@ export const calculateOrderProgress = (project: any) => {
          return slab.status === 'completed' ? 1.0 : 0;
       }
       
-      const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const BASE_STAGES = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
       const stageIdx = BASE_STAGES.indexOf(stageName);
 
       let completedCount = 0;
@@ -83,12 +88,13 @@ export const calculateOrderProgress = (project: any) => {
     };
 
     const cProd = hasProduction ? (slab.status === 'completed' ? 1.0 : getStageCompletionRatio('Production')) : 0;
+    const cBridge = hasBridgeCutting ? getStageCompletionRatio('Bridge Cutting') : 0;
     const cPoli = hasPolishing ? getStageCompletionRatio('Polishing') : 0;
     const cPack = hasPacking ? getStageCompletionRatio('Packing') : 0;
     const cDisp = hasDispatch ? getStageCompletionRatio('Dispatch') : 0;
 
     totalProductionEquivalent += cProd;
-    const slabProgress = (wProd * cProd) + (wPoli * cPoli) + (wPack * cPack) + (wDisp * cDisp);
+    const slabProgress = (wProd * cProd) + (wBridge * cBridge) + (wPoli * cPoli) + (wPack * cPack) + (wDisp * cDisp);
     totalSlabPercentSum += slabProgress;
   });
 

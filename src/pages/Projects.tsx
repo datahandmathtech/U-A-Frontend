@@ -299,13 +299,18 @@ const Projects: React.FC = () => {
           matchedQuoteIds.add(matchedQuoteProd.id);
         }
 
+        const existingUnit = (matchedQuoteProd?.unit || '').trim();
+        const resolvedUnit = (existingUnit && existingUnit.toLowerCase() !== 'pieces' && existingUnit.toLowerCase() !== 'piece' && existingUnit.toLowerCase() !== 'pcs')
+          ? existingUnit
+          : (dimensionUnit === 'sq_ft' ? 'Sq. Ft' : dimensionUnit);
+
         return {
           id: s.id,
           name: s.name || '',
           length: length || (matchedQuoteProd?.length ? String(matchedQuoteProd.length) : ''),
           width: width || (matchedQuoteProd?.width ? String(matchedQuoteProd.width) : ''),
           thickness: thickness || (matchedQuoteProd?.breadth ? String(matchedQuoteProd.breadth) : (matchedQuoteProd?.thickness ? String(matchedQuoteProd.thickness) : '')),
-          unit: matchedQuoteProd?.unit || (dimensionUnit === 'sq_ft' ? 'Sq. Ft' : dimensionUnit),
+          unit: resolvedUnit,
           dimensionUnit: dimensionUnit || matchedQuoteProd?.dimensionUnit || 'inch',
           rate: matchedQuoteProd?.rate || 0,
           amount: matchedQuoteProd?.amount || 0,
@@ -398,9 +403,55 @@ const Projects: React.FC = () => {
       return;
     }
     try {
-      const existingProject = projectsData?.find((p: any) => p.id === editingProjectId);
+      const existingProject = freshEditingProject || projectsData?.find((p: any) => p.id === editingProjectId);
       if (editingProjectId && existingProject) {
         const validProducts = (formData.products || []).filter((p: any) => p.name && p.name.trim());
+        const existingSlabsList: any[] = Array.isArray(existingProject.slabs) ? existingProject.slabs : [];
+        for (const prod of validProducts) {
+          const matchedSlab = existingSlabsList.find((s: any) =>
+            (prod.id && s.id === prod.id) ||
+            String(s.name || '').trim().toLowerCase() === String(prod.name || '').trim().toLowerCase()
+          );
+          if (matchedSlab && Array.isArray(matchedSlab.pieces) && matchedSlab.pieces.length > 0) {
+            const isSingleFullSlab = matchedSlab.pieces.length === 1 && String(matchedSlab.pieces[0]?.productName || '').includes('(Full Slab)');
+            if (!isSingleFullSlab) {
+              const piecesArea = Math.round(matchedSlab.pieces.reduce((acc: number, p: any) => {
+                const str = String(p.size || '');
+                const expMatch = str.match(/([\d.]+)\s*Sq\.?Ft/i);
+                if (expMatch) return acc + (parseFloat(expMatch[1]) || 0);
+                const dimsPart = (str.split('|')[0] || '').toLowerCase();
+                const lM = dimsPart.match(/(\d+(?:\.\d+)?)\s*L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
+                const wM = dimsPart.match(/(\d+(?:\.\d+)?)\s*W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+                if (lM && wM) {
+                  const pl = parseFloat(lM[1]) || 0;
+                  const pw = parseFloat(wM[1]) || 0;
+                  if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq')) return acc + (pl * pw);
+                  if (dimsPart.includes('mm')) return acc + ((pl * pw) / 92903.04);
+                  return acc + ((pl * pw) / 144);
+                }
+                return acc;
+              }, 0) * 100) / 100;
+
+              const u = (prod.unit || 'inch').toLowerCase().trim();
+              const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
+              const dimU = isPieces ? (prod.dimensionUnit || 'inch').toLowerCase().trim() : u;
+              const isFt = dimU.includes('sq') || dimU.includes('feet') || dimU.includes('ft');
+              const isMM = dimU === 'mm' || dimU.includes('millimeter');
+              const l = parseFloat(prod.length) || 0;
+              const w = parseFloat(prod.width) || 0;
+              const newSlabArea = Math.round((isFt ? (l * w) : isMM ? ((l * w) / 92903.04) : ((l * w) / 144)) * 100) / 100;
+
+              if (piecesArea > 0 && newSlabArea > 0 && newSlabArea + 0.01 < piecesArea) {
+                alert(
+                  `Cannot reduce "${prod.name}" size to ${newSlabArea.toFixed(2)} Sq.Ft!\n` +
+                  `Inside pieces already have a total area of ${piecesArea.toFixed(2)} Sq.Ft.\n` +
+                  `You can increase the size or keep it at least ${piecesArea.toFixed(2)} Sq.Ft.`
+                );
+                return;
+              }
+            }
+          }
+        }
         await updateProject({
           id: editingProjectId,
           data: {
@@ -464,7 +515,7 @@ const Projects: React.FC = () => {
               name: prod.name.trim(),
               size: sizeFormatted,
               cost: 0,
-              requiredStages: ['Production', 'Polishing', 'Packing', 'Dispatch']
+              requiredStages: ['Production']
             }).unwrap();
 
             quotationProducts.push({
@@ -473,7 +524,7 @@ const Projects: React.FC = () => {
               category: prod.name.trim(),
               productName: prod.name.trim(),
               name: prod.name.trim(),
-              unit: prod.unit || 'pieces',
+              unit: (prod.unit && prod.unit.toLowerCase() !== 'pieces') ? prod.unit : (dimUnit === 'sq_ft' ? 'Sq. Ft' : dimUnit),
               dimensionUnit: dimUnit,
               length: l,
               width: w,

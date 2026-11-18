@@ -192,7 +192,10 @@ const SlabRow = ({
     : rawUnit.toLowerCase() === 'mm' ? 'MM'
     : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
 
-  const requiredStages = slab.requiredStages || ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+  const rawReqStages = Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0
+    ? slab.requiredStages.filter((s: string) => s !== 'Polishing')
+    : ['Production'];
+  const requiredStages = rawReqStages.length > 0 ? rawReqStages : ['Production'];
 
   const handleToggleStage = async (stageKey: string, e: React.MouseEvent | React.ChangeEvent) => {
     e.stopPropagation();
@@ -221,7 +224,7 @@ const SlabRow = ({
       : requiredStages.includes(stageKey);
     if (!isRequired) return 'N/A';
 
-    const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const BASE_STAGES = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
     const stageIdx = BASE_STAGES.indexOf(normalizedStageName);
     const targetQty = (slab.pieces && slab.pieces.length > 0) ? slab.pieces.length : 1;
 
@@ -288,26 +291,30 @@ const SlabRow = ({
 
   const DEFAULT_STAGE_COLUMNS = [
     { key: 'Production', label: 'Production', route: 'production' },
+    { key: 'Bridge Cutting', label: 'Bridge Cutting', route: 'bridge_cutting' },
     { key: 'Polishing - Honed', label: 'Polishing', route: 'polishing' }
   ];
   const STAGE_COLUMNS = (activeStageColumns && activeStageColumns.length > 0) ? activeStageColumns : DEFAULT_STAGE_COLUMNS;
 
   const calculateSlabCompletedPieces = () => {
     const totalSubPieces = slab.pieces && slab.pieces.length > 0 ? slab.pieces.length : 1;
-    const reqStages = slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const reqStages = requiredStages;
     const hasProduction = reqStages.includes('Production');
+    const hasBridgeCutting = reqStages.includes('Bridge Cutting');
     const hasPolishing = reqStages.some((s: string) => s.startsWith('Polishing'));
     const hasPacking = reqStages.includes('Packing');
     const hasDispatch = reqStages.includes('Dispatch');
 
-    let wProd = hasProduction ? (hasPolishing ? 60 : 80) : 0;
-    let wPoli = hasPolishing ? 20 : 0;
+    let wProd = hasProduction ? 50 : 0;
+    let wBridge = hasBridgeCutting ? 15 : 0;
+    let wPoli = hasPolishing ? 15 : 0;
     let wPack = hasPacking ? 10 : 0;
     let wDisp = hasDispatch ? 10 : 0;
 
-    const totalWeight = wProd + wPoli + wPack + wDisp;
+    const totalWeight = wProd + wBridge + wPoli + wPack + wDisp;
     if (totalWeight > 0) {
       wProd = (wProd / totalWeight);
+      wBridge = (wBridge / totalWeight);
       wPoli = (wPoli / totalWeight);
       wPack = (wPack / totalWeight);
       wDisp = (wDisp / totalWeight);
@@ -315,13 +322,15 @@ const SlabRow = ({
       return 0;
     }
 
+    const BASE_STAGES = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
+
     const getStageCompletionRatio = (stageName: string) => {
       if (slab.pieces && slab.pieces.length > 0) {
         let completedCount = 0;
         slab.pieces.forEach((p: any) => {
           const pStage = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
-          const pIdx = ['Production', 'Polishing', 'Packing', 'Dispatch'].indexOf(pStage);
-          const stageIdx = ['Production', 'Polishing', 'Packing', 'Dispatch'].indexOf(stageName);
+          const pIdx = BASE_STAGES.indexOf(pStage);
+          const stageIdx = BASE_STAGES.indexOf(stageName);
           const hasLog = p.logs && p.logs.some((l: any) => {
             const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
             return (lStage === stageName || lStage.startsWith(stageName)) && (l.status === 'completed' || l.status === 'approved');
@@ -355,17 +364,18 @@ const SlabRow = ({
     };
 
     const cProd = hasProduction ? (slab.status === 'completed' ? 1.0 : getStageCompletionRatio('Production')) : 0;
+    const cBridge = hasBridgeCutting ? getStageCompletionRatio('Bridge Cutting') : 0;
     const cPoli = hasPolishing ? getStageCompletionRatio('Polishing') : 0;
     const cPack = hasPacking ? getStageCompletionRatio('Packing') : 0;
     const cDisp = hasDispatch ? getStageCompletionRatio('Dispatch') : 0;
 
-    const fraction = (wProd * cProd) + (wPoli * cPoli) + (wPack * cPack) + (wDisp * cDisp);
+    const fraction = (wProd * cProd) + (wBridge * cBridge) + (wPoli * cPoli) + (wPack * cPack) + (wDisp * cDisp);
     return parseFloat((fraction * totalSubPieces).toFixed(2));
   };
 
   const calculateOverallStatus = () => {
     if (slab.status === 'completed') return 'Completed';
-    const reqStages = slab.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
+    const reqStages = requiredStages;
     const activeReqStages = reqStages.filter((st: string) => st !== 'N/A');
     if (activeReqStages.length === 0) return 'Not Started';
 
@@ -688,11 +698,45 @@ const SlabRow = ({
 
 const filter = createFilterOptions<any>();
 
+const parseSizeAreaSqFt = (sizeStr?: string | null): number => {
+  if (!sizeStr) return 0;
+  const raw = String(sizeStr);
+  const explicitMatch = raw.match(/([\d.]+)\s*Sq\.?Ft/i);
+  if (explicitMatch && explicitMatch[1]) {
+    return parseFloat(explicitMatch[1]) || 0;
+  }
+  const dimsPart = (raw.split('|')[0] || '').toLowerCase();
+  const lMatch = raw.match(/(\d+(?:\.\d+)?)\s*L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
+  const wMatch = raw.match(/(\d+(?:\.\d+)?)\s*W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
+  if (lMatch && lMatch[1] && wMatch && wMatch[1]) {
+    const l = parseFloat(lMatch[1]) || 0;
+    const w = parseFloat(wMatch[1]) || 0;
+    if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) {
+      return l * w;
+    }
+    if (dimsPart.includes('mm')) {
+      return (l * w) / 92903.04;
+    }
+    return (l * w) / 144;
+  }
+  return 0;
+};
+
+const getExistingPiecesAreaForSlab = (slab: any): number => {
+  if (!slab || !Array.isArray(slab.pieces) || slab.pieces.length === 0) return 0;
+  if (slab.pieces.length === 1 && String(slab.pieces[0]?.productName || '').includes('(Full Slab)')) {
+    return 0;
+  }
+  const sum = slab.pieces.reduce((acc: number, p: any) => acc + parseSizeAreaSqFt(p.size), 0);
+  return Math.round(sum * 100) / 100;
+};
+
 const getSlabAllowedStages = (slab: any): string[] => {
   if (slab?.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0) {
-    return slab.requiredStages;
+    const filtered = slab.requiredStages.filter((s: string) => s !== 'Polishing');
+    return filtered.length > 0 ? filtered : ['Production'];
   }
-  return ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+  return ['Production'];
 };
 
 const ProjectDetails: React.FC = () => {
@@ -775,7 +819,7 @@ const ProjectDetails: React.FC = () => {
     return projectSlabs.some((s: any) => {
       const stages = Array.isArray(s.requiredStages) && s.requiredStages.length > 0
         ? s.requiredStages
-        : ['Production', 'Packing', 'Dispatch'];
+        : ['Production'];
       return stages.includes('Packing') || stages.includes('Packing Work');
     });
   }, [projectSlabs]);
@@ -785,7 +829,7 @@ const ProjectDetails: React.FC = () => {
     return projectSlabs.some((s: any) => {
       const stages = Array.isArray(s.requiredStages) && s.requiredStages.length > 0
         ? s.requiredStages
-        : ['Production', 'Packing', 'Dispatch'];
+        : ['Production'];
       return stages.includes('Dispatch') || stages.includes('Dispatch Work');
     });
   }, [projectSlabs]);
@@ -835,7 +879,7 @@ const ProjectDetails: React.FC = () => {
   const [masterWidth, setMasterWidth] = useState<string>('30');
   const [masterThickness, setMasterThickness] = useState<string>('10');
   const [masterUnit, setMasterUnit] = useState<string>('inch');
-  const [masterRequiredStages, setMasterRequiredStages] = useState<string[]>(['Production', 'Packing', 'Dispatch']);
+  const [masterRequiredStages, setMasterRequiredStages] = useState<string[]>(['Production']);
   const [masterGeneratedMatrix, setMasterGeneratedMatrix] = useState<any[]>([]);
 
   const generateMasterMatrixPreview = (
@@ -929,9 +973,7 @@ const ProjectDetails: React.FC = () => {
       if (matchT) thick = matchT[1];
     }
 
-    const reqStages = slab.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0
-      ? slab.requiredStages
-      : ['Production', 'Packing', 'Dispatch'];
+    const reqStages = ['Production'];
 
     setMasterLength(len);
     setMasterWidth(wid);
@@ -1058,7 +1100,7 @@ const ProjectDetails: React.FC = () => {
     thickness: '',
     unit: 'inch'
   });
-  const [slabForm, setSlabForm] = useState({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'] });
+  const [slabForm, setSlabForm] = useState({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production'] });
   const [materialSource, setMaterialSource] = useState('unnati');
   const [clientSlabs, setClientSlabs] = useState([{ isUnnati: true, unnatiId: '', unnatiQty: '', materialName: '', blockNo: '', unit: 'inch', length: '', width: '', thickness: '' }]);
   const [clientMaterialUnit, setClientMaterialUnit] = useState<'inch' | 'feet'>('inch');
@@ -1070,7 +1112,7 @@ const ProjectDetails: React.FC = () => {
   const isPlanningMode = false;
 
   const [selectedSlabIds, setSelectedSlabIds] = useState<string[]>([]);
-  const [bulkStages, setBulkStages] = useState<string[]>(['Production', 'Packing', 'Dispatch']);
+  const [bulkStages, setBulkStages] = useState<string[]>(['Production']);
 
   useEffect(() => {
     if (selectedSlabIds.length > 0 && projectSlabs && projectSlabs.length > 0) {
@@ -1078,14 +1120,14 @@ const ProjectDetails: React.FC = () => {
       const firstWithStages = selected.find((s: any) => s.requiredStages && s.requiredStages.length > 0);
       if (firstWithStages?.requiredStages) {
         const normalized = Array.from(new Set<string>(
-          firstWithStages.requiredStages.map((s: string) => s === 'Polishing' ? 'Polishing - Honed' : s)
+          firstWithStages.requiredStages.filter((s: string) => s !== 'Polishing')
         ));
-        setBulkStages(normalized);
+        setBulkStages(normalized.length > 0 ? normalized : ['Production']);
       } else {
-        setBulkStages(['Production', 'Packing', 'Dispatch']);
+        setBulkStages(['Production']);
       }
     } else {
-      setBulkStages(['Production', 'Packing', 'Dispatch']);
+      setBulkStages(['Production']);
     }
   }, [selectedSlabIds, projectSlabs]);
   const [slabSearchQuery, setSlabSearchQuery] = useState<string>('');
@@ -1160,7 +1202,7 @@ const ProjectDetails: React.FC = () => {
     try {
       await createSlab({ projectId: id, ...slabForm, status: 'active' }).unwrap();
       setSlabDialogOpen(false);
-      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Packing', 'Dispatch'] });
+      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production'] });
       refetchSlabs();
       setSnackbarMessage('Slab added successfully!');
     } catch (error) {
@@ -1190,14 +1232,15 @@ const ProjectDetails: React.FC = () => {
     }
     setEditSlabDims({ length, width, thickness, unit });
     setDefaultProjectUnit(unit);
+    const cleanedStages = (slab.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0)
+      ? slab.requiredStages.filter((s: string) => s !== 'Polishing')
+      : ['Production'];
     setSlabForm({ 
       name: slab.name, 
       size: slab.size || '', 
       cost: slab.cost || 0, 
       inventoryId: slab.inventoryId || '',
-      requiredStages: slab.requiredStages && slab.requiredStages.length > 0
-        ? slab.requiredStages
-        : ['Production', 'Packing', 'Dispatch']
+      requiredStages: cleanedStages.length > 0 ? cleanedStages : ['Production']
     });
     setEditSlabDialogOpen(true);
   };
@@ -1213,6 +1256,19 @@ const ProjectDetails: React.FC = () => {
       const isMM = u === 'mm';
       const unitLabel = isFt ? 'Feet' : (isMM ? 'MM' : 'Inch');
       const area = isFt ? l * w : isMM ? (l * w) / 92903.04 : (l * w) / 144;
+      const roundedNewArea = Math.round(area * 100) / 100;
+
+      const targetSlab = (projectSlabs || []).find((s: any) => s.id === editingSlabId);
+      const existingPiecesArea = getExistingPiecesAreaForSlab(targetSlab);
+      if (existingPiecesArea > 0 && roundedNewArea > 0 && roundedNewArea + 0.01 < existingPiecesArea) {
+        alert(
+          `Cannot reduce slab size to ${roundedNewArea.toFixed(2)} Sq.Ft!\n` +
+          `Inside pieces already have a total area of ${existingPiecesArea.toFixed(2)} Sq.Ft.\n` +
+          `You can increase the slab size or keep it at least ${existingPiecesArea.toFixed(2)} Sq.Ft, but cannot make it smaller than its inside pieces.`
+        );
+        return;
+      }
+
       const sizeFormatted = (l > 0 && w > 0)
         ? `${l}L x ${w}W ${unitLabel}${t ? ` | ${t}MM` : ''} (${area.toFixed(2)} Sq.Ft)`
         : (slabForm.size || '');
@@ -1221,7 +1277,7 @@ const ProjectDetails: React.FC = () => {
         name: slabForm.name,
         size: sizeFormatted,
         cost: Number(slabForm.cost) || 0,
-        requiredStages: slabForm.requiredStages || ['Production', 'Packing', 'Dispatch']
+        requiredStages: (slabForm.requiredStages || ['Production']).filter((s: string) => s !== 'Polishing')
       };
       if (slabForm.inventoryId && slabForm.inventoryId.length === 24) {
         payload.inventoryId = slabForm.inventoryId;
@@ -1229,7 +1285,7 @@ const ProjectDetails: React.FC = () => {
       await updateSlab({ id: editingSlabId as string, data: payload }).unwrap();
       if (id) localStorage.removeItem(`quoteProducts_${id}`);
       setEditSlabDialogOpen(false);
-      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production', 'Packing', 'Dispatch'] });
+      setSlabForm({ name: '', size: '', cost: 0, inventoryId: '', requiredStages: ['Production'] });
       setEditingSlabId(null);
       refetchSlabs();
       refetch();
@@ -1526,13 +1582,14 @@ const ProjectDetails: React.FC = () => {
             const isFt = dimUnit === 'sq_ft' || dimUnit === 'feet';
             const isMM = dimUnit === 'mm';
             const sqft = isFt ? l * w : (isMM ? (l * w) / 92903.04 : (l * w) / 144);
+            const defaultUnitFromSlab = dimUnit === 'sq_ft' ? 'Sq. Ft' : dimUnit;
             mergedProducts.push({
               id: sId,
               slabId: sId,
               category: sName,
               productName: sName,
               name: sName,
-              unit: 'pieces',
+              unit: defaultUnitFromSlab,
               dimensionUnit: dimUnit,
               length: l,
               width: w,
@@ -1545,6 +1602,10 @@ const ProjectDetails: React.FC = () => {
             });
           } else if ((mergedProducts[existingIdx].qty || 1) === 1) {
             const ep = mergedProducts[existingIdx];
+            const defaultUnitFromSlab = dimUnit === 'sq_ft' ? 'Sq. Ft' : dimUnit;
+            const cleanUnit = (ep.unit && ep.unit.toLowerCase() !== 'pieces' && ep.unit.toLowerCase() !== 'piece' && ep.unit.toLowerCase() !== 'pcs')
+              ? ep.unit
+              : defaultUnitFromSlab;
             mergedProducts[existingIdx] = {
               ...ep,
               id: sId || ep.id,
@@ -1552,6 +1613,7 @@ const ProjectDetails: React.FC = () => {
               category: sName || ep.category,
               productName: sName || ep.productName,
               name: sName || ep.name,
+              unit: cleanUnit,
               length: l || ep.length,
               width: w || ep.width,
               breadth: t || ep.breadth,
@@ -1829,6 +1891,25 @@ const ProjectDetails: React.FC = () => {
   };
 
   const handleSaveProducts = async () => {
+    for (const ep of editingProducts) {
+      const matchedSlab = (projectSlabs || []).find((s: any) =>
+        s.id === ep.id || s.id === (ep as any).slabId ||
+        String(s.name || '').trim().toLowerCase() === String(ep.category || ep.productName || ep.name || '').trim().toLowerCase()
+      );
+      if (matchedSlab) {
+        const existingPiecesArea = getExistingPiecesAreaForSlab(matchedSlab);
+        const qty = Math.max(1, Number(ep.qty) || 1);
+        const singleSlabSqFt = Math.round(((Number(ep.sqft) || 0) / qty) * 100) / 100;
+        if (existingPiecesArea > 0 && singleSlabSqFt > 0 && singleSlabSqFt + 0.01 < existingPiecesArea) {
+          alert(
+            `Cannot reduce "${matchedSlab.name}" size to ${singleSlabSqFt.toFixed(2)} Sq.Ft!\n` +
+            `Inside pieces already have a total area of ${existingPiecesArea.toFixed(2)} Sq.Ft.\n` +
+            `You can increase the size or keep it at least ${existingPiecesArea.toFixed(2)} Sq.Ft.`
+          );
+          return;
+        }
+      }
+    }
     let newProducts = [...products];
     editingProducts.forEach(ep => {
       const existingIdx = newProducts.findIndex(p => p.id === ep.id);
@@ -4401,12 +4482,13 @@ const ProjectDetails: React.FC = () => {
                         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                           {[
                             { key: 'Production', label: 'Production' },
+                            { key: 'Bridge Cutting', label: 'Bridge Cutting' },
                             { key: 'Polishing - Honed', label: 'Honed' },
                             { key: 'Polishing - Mirror', label: 'Mirror' },
                             { key: 'Packing', label: 'Packing' },
                             { key: 'Dispatch', label: 'Dispatch' }
                           ].map(stage => {
-                            const isChecked = bulkStages.includes(stage.key) || (stage.key === 'Polishing - Honed' && bulkStages.includes('Polishing'));
+                            const isChecked = bulkStages.includes(stage.key);
                             return (
                               <Chip
                                 key={stage.key}
@@ -4534,6 +4616,7 @@ const ProjectDetails: React.FC = () => {
                   {(() => {
                     const ALL_STAGE_CONFIG = [
                       { key: 'Production', label: 'Production', route: 'production' },
+                      { key: 'Bridge Cutting', label: 'Bridge Cutting', route: 'bridge_cutting' },
                       { key: 'Polishing - Honed', label: 'Polishing', route: 'polishing' }
                     ];
 
@@ -4541,10 +4624,10 @@ const ProjectDetails: React.FC = () => {
                     const activeStageKeys = new Set<string>();
                     (projectSlabs || []).forEach((s: any) => {
                       const req = (s.requiredStages && Array.isArray(s.requiredStages) && s.requiredStages.length > 0)
-                        ? s.requiredStages
-                        : ['Production', 'Polishing', 'Packing', 'Dispatch'];
+                        ? s.requiredStages.filter((st: string) => st !== 'Polishing')
+                        : ['Production'];
                       req.forEach((stg: string) => {
-                        if (stg.startsWith('Polishing')) activeStageKeys.add('Polishing - Honed');
+                        if (stg === 'Polishing - Honed' || stg === 'Polishing - Mirror') activeStageKeys.add('Polishing - Honed');
                         else activeStageKeys.add(stg);
                       });
                     });
@@ -4683,8 +4766,9 @@ const ProjectDetails: React.FC = () => {
                               let count = 0;
                               (projectSlabs || []).forEach((s: any) => {
                                 if (!Array.isArray(s.pieces)) return;
-                                const reqStages = s.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
-                                const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing') || st === 'Polishing');
+                                const reqStages = (s.requiredStages || ['Production']).filter((st: string) => st !== 'Polishing');
+                                const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing'));
+                                const requiresBridgeCutting = reqStages.includes('Bridge Cutting');
 
                                 s.pieces.forEach((p: any) => {
                                   const isAlreadyInPackingLog = (productionLogs || []).some((l: any) => 
@@ -4710,6 +4794,18 @@ const ProjectDetails: React.FC = () => {
                                     );
                                     const isPiecePolishCompleted = (p.stage?.startsWith('Polishing') || p.stage?.startsWith('Polish')) && p.status === 'completed';
                                     if (hasPolishLog || hasApprovedPolishProdLog || isPiecePolishCompleted) isReady = true;
+                                  } else if (requiresBridgeCutting) {
+                                    const hasBridgeLog = p.logs && p.logs.some((l: any) => 
+                                      l.stage?.startsWith('Bridge Cutting') && 
+                                      (l.status === 'completed' || l.status === 'approved')
+                                    );
+                                    const hasApprovedBridgeProdLog = (productionLogs || []).some((l: any) => 
+                                      l.approvalStatus === 'approved' &&
+                                      l.stage?.startsWith('Bridge Cutting') &&
+                                      ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
+                                    );
+                                    const isPieceBridgeCompleted = p.stage?.startsWith('Bridge Cutting') && p.status === 'completed';
+                                    if (hasBridgeLog || hasApprovedBridgeProdLog || isPieceBridgeCompleted) isReady = true;
                                   } else {
                                     const hasProdLog = p.logs && p.logs.some((l: any) => 
                                       l.stage?.startsWith('Production') && 
@@ -5801,25 +5897,43 @@ const ProjectDetails: React.FC = () => {
             </Grid>
           </Grid>
 
-          {parseFloat(editSlabDims.length) > 0 && parseFloat(editSlabDims.width) > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Chip
-                size="small"
-                label={`Calculated Area: ${(
-                  editSlabDims.unit === 'feet'
-                    ? parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)
-                    : editSlabDims.unit === 'mm'
-                    ? (parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)) / 92903.04
-                    : (parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)) / 144
-                ).toFixed(2)} Sq.Ft`}
-                sx={{ bgcolor: '#FFF4E5', color: '#B38B36', fontWeight: 700 }}
-              />
-            </Box>
-          )}
+          {parseFloat(editSlabDims.length) > 0 && parseFloat(editSlabDims.width) > 0 && (() => {
+            const calcArea = Math.round((
+              editSlabDims.unit === 'feet' || editSlabDims.unit === 'sq_ft'
+                ? parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)
+                : editSlabDims.unit === 'mm'
+                ? (parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)) / 92903.04
+                : (parseFloat(editSlabDims.length) * parseFloat(editSlabDims.width)) / 144
+            ) * 100) / 100;
+            const targetSlab = (projectSlabs || []).find((s: any) => s.id === editingSlabId);
+            const minRequiredArea = getExistingPiecesAreaForSlab(targetSlab);
+            const isBelowMin = minRequiredArea > 0 && calcArea + 0.01 < minRequiredArea;
+            return (
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap' }}>
+                {minRequiredArea > 0 && (
+                  <Chip
+                    size="small"
+                    label={`Inside Pieces Area: ${minRequiredArea.toFixed(2)} Sq.Ft (Min Allowed)`}
+                    sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700 }}
+                  />
+                )}
+                <Chip
+                  size="small"
+                  label={`Calculated Area: ${calcArea.toFixed(2)} Sq.Ft${isBelowMin ? ' (Too Small!)' : ''}`}
+                  sx={{
+                    bgcolor: isBelowMin ? '#FEF2F2' : '#FFF4E5',
+                    color: isBelowMin ? '#DC2626' : '#B38B36',
+                    border: isBelowMin ? '1px solid #FCA5A5' : 'none',
+                    fontWeight: 700
+                  }}
+                />
+              </Box>
+            );
+          })()}
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1.5, color: '#1E293B', fontWeight: 800 }}>Required Manufacturing Stages:</Typography>
             <Grid container spacing={1.5}>
-              {['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(stage => {
+              {['Production', 'Bridge Cutting', 'Polishing - Honed', 'Polishing - Mirror', 'Packing', 'Dispatch'].map(stage => {
                 const isSelected = slabForm.requiredStages?.includes(stage) || false;
                 return (
                   <Grid size={{ xs: 6, sm: 4 }} key={stage}>

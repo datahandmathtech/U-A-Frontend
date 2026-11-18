@@ -70,7 +70,10 @@ const StageDetails = () => {
   const [selectedDimUnit, setSelectedDimUnit] = useState<string>('');
 
   const slab = slabs?.find((s: any) => s.id === slabId);
-  const stageFormatted = stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : '';
+  const rawStageLower = (stageName || '').toLowerCase().trim();
+  const stageFormatted = rawStageLower === 'bridge_cutting' || rawStageLower === 'bridge-cutting' || rawStageLower === 'bridge cutting'
+    ? 'Bridge Cutting'
+    : (stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : '');
   
   let matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => 
     p.category === slab?.name || 
@@ -768,13 +771,20 @@ const StageDetails = () => {
       const outDate = formatDateTime(outLog?.createdAt);
       const inDate = formatDateTime(inLog?.createdAt);
 
-      const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
-      const pieceIdx = stages.indexOf(p.stage || 'Production');
+      const stages = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
+      const pieceStageNorm = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
+      const pieceIdx = stages.indexOf(pieceStageNorm);
       const viewIdx = stages.indexOf(stageFormatted);
+      const hasStageLogDone = p.logs && p.logs.some((l: any) => {
+        const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
+        return (lStage === stageFormatted || lStage.startsWith(stageFormatted)) && (l.status === 'completed' || l.status === 'approved');
+      });
       
       let displayStatus = 'pending';
-      if (pieceIdx > viewIdx) displayStatus = 'completed';
-      else if (pieceIdx === viewIdx) displayStatus = p.status;
+      if (p.status !== 'pending' && p.status !== 'not_started') {
+        if (hasStageLogDone || pieceIdx > viewIdx) displayStatus = 'completed';
+        else if (pieceIdx === viewIdx) displayStatus = p.status;
+      }
 
       const cleanPieceName = String(p.productName || (p.pieceNumber ? `Piece ${p.pieceNumber}` : '')).replace(' (Cut Piece)', '').replace(' (Full Slab)', '').replace('(Cut Piece)', '').replace('(Full Slab)', '').trim();
 
@@ -832,9 +842,9 @@ const StageDetails = () => {
           </TableCell>
 
           <TableCell sx={{ py: 1.25 }}>
-            {stageFormatted === 'Polishing' ? (
+            {(stageFormatted === 'Polishing' || stageFormatted === 'Bridge Cutting') ? (
               (() => {
-                const polishLog = pieceProductionLogs.find((l: any) => (l.stage?.startsWith('Polishing') || l.stage === 'Polishing') && (l.approvalStatus === 'approved' || l.approvalStatus === 'completed'));
+                const polishLog = pieceProductionLogs.find((l: any) => (l.stage?.startsWith(stageFormatted) || l.stage === stageFormatted) && (l.approvalStatus === 'approved' || l.approvalStatus === 'completed'));
                 const isVendor = !!(polishLog?.vendorName || p.vendorName || (vendorName && !pLog?.machine));
                 const vendorLabel = polishLog?.vendorName || p.vendorName || vendorName;
                 const isCompletedOrLogged = displayStatus === 'completed' || !!polishLog;
@@ -1061,7 +1071,7 @@ const StageDetails = () => {
             </TableCell>
           )}
 
-          {['Polishing', 'Packing'].includes(stageFormatted) && (
+          {['Bridge Cutting', 'Polishing', 'Packing'].includes(stageFormatted) && (
             <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
               <Typography variant="body2" sx={{ fontSize: '0.8rem', color: inDate !== '-' ? '#059669' : '#94A3B8', fontWeight: inDate !== '-' ? 700 : 400 }}>
                 {inDate}
@@ -1130,7 +1140,7 @@ const StageDetails = () => {
     });
   };
 
-  const BASE_STAGES = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+  const BASE_STAGES = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
   const stageIdx = BASE_STAGES.indexOf(stageFormatted);
   
   const totalPieces = slab.pieces?.length || 0;
@@ -1179,7 +1189,7 @@ const StageDetails = () => {
     completedPieces = Math.max(directLogsQty, pieceCompletedCount);
   } else {
     completedPieces = (slab.pieces || []).filter((p: any) => {
-      const stages = ['Production', 'Polishing', 'Packing', 'Dispatch'];
+      const stages = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
       const pieceStageNormalized = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
       const pieceIdx = stages.indexOf(pieceStageNormalized);
       const viewIdx = stages.indexOf(stageFormatted);
@@ -2025,7 +2035,7 @@ const StageDetails = () => {
                     Piece Name
                   </TableCell>
                   <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
-                    {stageFormatted === 'Polishing' ? 'Workstation' : 'Used Raw Block'}
+                    {(stageFormatted === 'Polishing' || stageFormatted === 'Bridge Cutting') ? 'Workstation' : 'Used Raw Block'}
                   </TableCell>
                   <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
                     Actual Dimensions
@@ -2035,7 +2045,7 @@ const StageDetails = () => {
                       Timing
                     </TableCell>
                   )}
-                  {stageFormatted === 'Polishing' && (
+                  {(stageFormatted === 'Polishing' || stageFormatted === 'Bridge Cutting') && (
                     <TableCell sx={{ fontWeight: 800, bgcolor: '#F8FAFC', color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, whiteSpace: 'nowrap' }}>
                       Completed Date
                     </TableCell>

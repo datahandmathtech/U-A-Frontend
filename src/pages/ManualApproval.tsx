@@ -24,6 +24,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
 const STAGES = [
   { name: 'Production', label: 'Production', icon: <PrecisionManufacturingIcon sx={{ fontSize: 24 }} />, color: '#059669', bg: '#ECFDF5' },
+  { name: 'Bridge Cutting', label: 'Bridge Cutting', icon: <PrecisionManufacturingIcon sx={{ fontSize: 24 }} />, color: '#0284C7', bg: '#F0F9FF' },
   { name: 'Polishing - Honed', label: 'Polishing', icon: <AutoFixHighIcon sx={{ fontSize: 24 }} />, color: '#D97706', bg: '#FFFDF5' },
   { name: 'Packing', label: 'Packing', icon: <Inventory2Icon sx={{ fontSize: 24 }} />, color: '#9333EA', bg: '#FDF4FF' },
   { name: 'Dispatch', label: 'Dispatch', icon: <LocalShippingIcon sx={{ fontSize: 24 }} />, color: '#0284C7', bg: '#EFF6FF' }
@@ -56,10 +57,12 @@ const checkPieceStageDone = (piece: any, stageName: string): boolean => {
 // Canonical stage order sorting
 const STAGE_ORDER_MAP: { [key: string]: number } = {
   'Production': 1,
-  'Polishing - Honed': 2,
-  'Polishing': 2,
-  'Packing': 3,
-  'Dispatch': 4
+  'Bridge Cutting': 2,
+  'Polishing - Honed': 3,
+  'Polishing - Mirror': 3,
+  'Polishing': 3,
+  'Packing': 4,
+  'Dispatch': 5
 };
 
 // Helper to get allowed stages for a slab
@@ -67,14 +70,16 @@ const getSlabAllowedStages = (slab: any): string[] => {
   let list: string[] = [];
   if (slab?.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0) {
     slab.requiredStages.forEach((s: string) => {
-      if (s === 'Polishing' || s.startsWith('Polishing')) {
+      if (s === 'Polishing') return;
+      if (s.startsWith('Polishing')) {
         if (!list.includes('Polishing - Honed')) list.push('Polishing - Honed');
       } else {
         if (!list.includes(s)) list.push(s);
       }
     });
-  } else {
-    list = ['Production', 'Polishing - Honed', 'Packing', 'Dispatch'];
+  }
+  if (list.length === 0) {
+    list = ['Production'];
   }
   return list.sort((a, b) => (STAGE_ORDER_MAP[a] || 99) - (STAGE_ORDER_MAP[b] || 99));
 };

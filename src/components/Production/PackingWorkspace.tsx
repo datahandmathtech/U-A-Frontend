@@ -78,8 +78,9 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     (slabs || []).forEach((s: any) => {
       if (!Array.isArray(s.pieces)) return;
 
-      const reqStages = s.requiredStages || ['Production', 'Polishing', 'Packing', 'Dispatch'];
-      const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing') || st === 'Polishing');
+      const reqStages = (s.requiredStages || ['Production']).filter((st: string) => st !== 'Polishing');
+      const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing'));
+      const requiresBridgeCutting = reqStages.includes('Bridge Cutting');
 
       s.pieces.forEach((p: any) => {
         // 1. Is this piece already packed or in a packing/dispatch log?
@@ -112,6 +113,21 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
           const isPiecePolishCompleted = (p.stage?.startsWith('Polishing') || p.stage?.startsWith('Polish')) && p.status === 'completed';
 
           if (hasPolishLog || hasApprovedPolishProdLog || isPiecePolishCompleted) {
+            isReadyForPacking = true;
+          }
+        } else if (requiresBridgeCutting) {
+          const hasBridgeLog = p.logs && p.logs.some((l: any) => 
+            l.stage?.startsWith('Bridge Cutting') && 
+            (l.status === 'completed' || l.status === 'approved')
+          );
+          const hasApprovedBridgeProdLog = (productionLogs || []).some((l: any) => 
+            l.approvalStatus === 'approved' &&
+            l.stage?.startsWith('Bridge Cutting') &&
+            ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
+          );
+          const isPieceBridgeCompleted = p.stage?.startsWith('Bridge Cutting') && p.status === 'completed';
+
+          if (hasBridgeLog || hasApprovedBridgeProdLog || isPieceBridgeCompleted) {
             isReadyForPacking = true;
           }
         } else {
