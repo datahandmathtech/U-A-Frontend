@@ -11,6 +11,9 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import BoltIcon from '@mui/icons-material/Bolt';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
+import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
+import * as XLSX from 'xlsx';
 import { 
   useGetProjectsQuery, 
   useGetProjectMaterialsQuery, 
@@ -390,13 +393,153 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                 </AccordionDetails>
               </Accordion>
 
-              {/* TABLE HEADER & SUMMARY */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              {/* TABLE HEADER & SUMMARY WITH EXCEL UPLOAD & PROFORMA DOWNLOAD (Change 5) */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
                 <Box>
                   <Typography variant="h6" fontWeight="900" color="#0F172A">Add Slabs / Blocks</Typography>
-                  <Typography variant="caption" color="text.secondary">Review row by row or duplicate / break slabs as needed</Typography>
+                  <Typography variant="caption" color="text.secondary">Upload Excel sheet to auto-create stock in one click, or enter rows below</Typography>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<FileDownloadRoundedIcon />}
+                    onClick={() => {
+                      const sampleRows = [
+                        { 'Source': 'Unnati', 'Material Name': 'Table Top', 'Block No': '1', 'Unit': 'Inches', 'Length': 200, 'Width': 20, 'Thickness (MM)': 10 },
+                        { 'Source': 'Unnati', 'Material Name': 'Table Top', 'Block No': '2', 'Unit': 'Inches', 'Length': 180, 'Width': 24, 'Thickness (MM)': 10 },
+                        { 'Source': 'Client', 'Material Name': 'Lanka White', 'Block No': 'BLK-1', 'Unit': 'Feet', 'Length': 8, 'Width': 4, 'Thickness (MM)': 18 }
+                      ];
+                      const wb = XLSX.utils.book_new();
+                      const ws = XLSX.utils.json_to_sheet(sampleRows);
+                      ws['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
+                      XLSX.utils.book_append_sheet(wb, ws, 'Material Planning');
+                      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'Material_Planning_Proforma.xlsx';
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, borderColor: '#CBD5E1', color: '#334155' }}
+                  >
+                    Download Proforma
+                  </Button>
+
+                  <Button
+                    size="small"
+                    variant="contained"
+                    component="label"
+                    disabled={isReservingClientMaterial}
+                    startIcon={isReservingClientMaterial ? <CircularProgress size={16} color="inherit" /> : <UploadFileRoundedIcon />}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 800,
+                      bgcolor: '#0284C7',
+                      color: '#FFFFFF',
+                      '&:hover': { bgcolor: '#0369A1' }
+                    }}
+                  >
+                    {isReservingClientMaterial ? 'Uploading & Creating Stock...' : 'Upload Excel & Create Stock'}
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      hidden
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !selectedProjectId) return;
+                        try {
+                          setIsReservingClientMaterial(true);
+                          const buf = await file.arrayBuffer();
+                          const wb = XLSX.read(buf, { type: 'array' });
+                          const firstSheetName = wb.SheetNames[0];
+                          const sheet = wb.Sheets[firstSheetName];
+                          const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+                          const parsedRows: any[] = [];
+                          rawRows.forEach((r: any, idx: number) => {
+                            const getVal = (keys: string[]) => {
+                              for (const k of Object.keys(r)) {
+                                const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                if (keys.includes(norm) && String(r[k]).trim() !== '') {
+                                  return String(r[k]).trim();
+                                }
+                              }
+                              return '';
+                            };
+
+                            const matName = getVal(['materialname', 'material', 'itemname', 'item', 'stone', 'stonename', 'particulars', 'product', 'name', 'slabname']);
+                            const blockNo = getVal(['blockno', 'blocknumber', 'block', 'slabno', 'sno', 'serialno']) || String(idx + 1);
+                            const srcRaw = getVal(['source', 'type', 'jobworktype', 'owner']).toLowerCase();
+                            const isUnnati = !srcRaw.includes('client');
+                            const unitRaw = getVal(['unit', 'uom', 'dimensionunit']).toLowerCase();
+                            const unit = (unitRaw.includes('feet') || unitRaw.includes('ft') || unitRaw.includes('sq')) ? 'feet' : 'inch';
+                            const length = getVal(['length', 'len', 'l', 'lengthl']);
+                            const width = getVal(['width', 'wid', 'w', 'breadth', 'b', 'widthw']);
+                            const thickness = getVal(['thickness', 'thick', 'thicknessmm', 'thickmm', 't', 'mm']) || '10';
+
+                            if (matName && Number(length) > 0 && Number(width) > 0) {
+                              parsedRows.push({
+                                isUnnati,
+                                unnatiId: '',
+                                unnatiQty: '',
+                                materialName: matName,
+                                blockNo,
+                                unit,
+                                length,
+                                width,
+                                thickness
+                              });
+                            }
+                          });
+
+                          if (parsedRows.length === 0) {
+                            alert('No valid rows found in Excel! Please ensure columns include Material Name, Block No, Length, and Width.');
+                            return;
+                          }
+
+                          // Immediately create and reserve stock for all uploaded rows
+                          for (const row of parsedRows) {
+                            const len = Number(row.length || 0);
+                            const wid = Number(row.width || 0);
+                            const qty = row.unit === 'inch' ? (len * wid) / 144 : (len * wid);
+
+                            const newItem = await createInventory({
+                              type: 'slab',
+                              jobWorkType: row.isUnnati ? 'company' : 'client',
+                              itemName: row.materialName,
+                              blockNumber: row.blockNo,
+                              length: len,
+                              width: wid,
+                              thickness: Number(row.thickness) || 0,
+                              quantity: qty,
+                              unit: 'sq_ft',
+                              supplier: row.isUnnati ? 'Unnati Arts' : (selectedProject?.clientName || 'Client')
+                            }).unwrap();
+
+                            await reserveProjectMaterial({
+                              projectId: selectedProjectId as string,
+                              data: { inventoryId: newItem.id, quantity: qty, cost: 0 }
+                            }).unwrap();
+                          }
+
+                          refetchMaterials();
+                        } catch (err) {
+                          console.error('Excel upload error:', err);
+                          alert('Failed to upload Excel file.');
+                        } finally {
+                          setIsReservingClientMaterial(false);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </Button>
+
                   <Chip 
                     label={`Total Blocks: ${clientSlabs.length}`} 
                     sx={{ bgcolor: '#F1F5F9', fontWeight: 800, color: '#334155' }} 

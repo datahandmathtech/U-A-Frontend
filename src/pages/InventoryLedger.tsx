@@ -1,19 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
-import { useGetInventoryQuery, useGetInventoryLogsQuery } from '../store/apiSlice';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import { useGetInventoryQuery, useGetInventoryLogsQuery, useGetProjectsQuery } from '../store/apiSlice';
+import { MaterialPlanningModal } from '../components/MaterialPlanningModal';
 import * as XLSX from 'xlsx';
 
 const InventoryLedger = () => {
   const { supplier } = useParams<{ supplier: string }>();
   const navigate = useNavigate();
   const decodedSupplier = decodeURIComponent(supplier || '');
+  const [planningModalOpen, setPlanningModalOpen] = useState(false);
   
-  const { data: allInventory, isLoading: isLoadingInv } = useGetInventoryQuery();
-  const { data: logs, isLoading: isLoadingLogs } = useGetInventoryLogsQuery(decodedSupplier);
+  const { data: allInventory, isLoading: isLoadingInv, refetch: refetchInv } = useGetInventoryQuery();
+  const { data: logs, isLoading: isLoadingLogs, refetch: refetchLogs } = useGetInventoryLogsQuery(decodedSupplier);
+  const { data: projects } = useGetProjectsQuery();
 
   if (isLoadingInv || isLoadingLogs) return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
 
@@ -66,7 +70,12 @@ const InventoryLedger = () => {
 
   const isRawStock = decodedSupplier.toLowerCase().includes('raw stock') || decodedSupplier.toLowerCase() === 'unnati arts (raw stock)';
   const firstMatchedProject = !isRawStock
-    ? (supplierInventory[0]?.projectMaterials?.[0]?.project || supplierInventory[0]?.slabs?.[0]?.project)
+    ? (supplierInventory[0]?.projectMaterials?.[0]?.project ||
+       supplierInventory[0]?.slabs?.[0]?.project ||
+       (projects || []).find((p: any) =>
+         (p.clientName && p.clientName.toLowerCase().trim() === decodedSupplier.toLowerCase().trim()) ||
+         (p.name && p.name.toLowerCase().trim() === decodedSupplier.toLowerCase().trim())
+       ))
     : null;
 
   const pageTitle = isRawStock
@@ -199,14 +208,32 @@ const InventoryLedger = () => {
         Back to Inventory
       </Button>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ color: '#333', mb: 1 }}>{pageTitle}</Typography>
           <Typography variant="subtitle1" color="text.secondary">Inventory Items Summary</Typography>
         </Box>
-        <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportExcel} color="primary" sx={{ fontWeight: 'bold' }}>
-          Export Excel (All Data)
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button
+            variant="contained"
+            startIcon={<AssignmentIcon />}
+            onClick={() => setPlanningModalOpen(true)}
+            sx={{
+              fontWeight: 800,
+              bgcolor: '#059669',
+              color: '#FFFFFF',
+              textTransform: 'none',
+              borderRadius: 2,
+              px: 2.5,
+              '&:hover': { bgcolor: '#047857' }
+            }}
+          >
+            Material Planning
+          </Button>
+          <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportExcel} color="primary" sx={{ fontWeight: 'bold' }}>
+            Export Excel (All Data)
+          </Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
@@ -277,6 +304,18 @@ const InventoryLedger = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {planningModalOpen && (
+        <MaterialPlanningModal
+          open={planningModalOpen}
+          onClose={() => {
+            setPlanningModalOpen(false);
+            refetchInv();
+            refetchLogs();
+          }}
+          initialProjectId={firstMatchedProject?.id}
+        />
+      )}
     </Box>
   );
 };

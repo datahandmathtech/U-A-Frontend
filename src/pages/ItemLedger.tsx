@@ -133,7 +133,6 @@ const ItemLedger = () => {
 
   const [openDeduct, setOpenDeduct] = useState(false);
   const [deductForm, setDeductForm] = useState({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0,10), productName: '', unit: 'inch' });
-  const [openEdit, setOpenEdit] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
   
   const { data: projectHierarchy = [] } = useGetProjectHierarchyQuery();
@@ -278,33 +277,65 @@ const ItemLedger = () => {
         }
       }
 
-      if (usedArea > (inventory?.quantity || 0)) {
-        const msg = `Not enough stock available! Remaining stock is only ${(inventory?.quantity || 0).toFixed(2)} Sq.Ft (Requested: ${usedArea.toFixed(2)} Sq.Ft)`;
-        setDeductError(msg);
-        return;
-      }
+        const availForCheck = (inventory?.quantity || 0) + (editForm?.id ? (Number(editForm.quantity) || 0) : 0);
+        if (usedArea > availForCheck + 0.01) {
+          const msg = `Not enough stock available! Remaining stock is only ${availForCheck.toFixed(2)} Sq.Ft (Requested: ${usedArea.toFixed(2)} Sq.Ft)`;
+          setDeductError(msg);
+          return;
+        }
 
-      await deductInventory({
-        inventoryId: itemId as string,
-        usedQuantity: usedArea,
-        wasteQuantity: 0,
-        projectName: activeProject ? activeProject.name : deductForm.productName,
-        projectId: activeProject?.id,
-        slabId: selectedSlab?.id,
-        pieceId: selectedPiece?.id,
-        pieceName: selectedPiece?.productName || selectedPiece?.name || selectedSlab?.name || '',
-        length: deductForm.length,
-        width: deductForm.width,
-        thickness: deductForm.thickness,
-        unit: deductForm.unit,
-        date: deductForm.date
-      }).unwrap();
-      setOpenDeduct(false);
-      setSelectedProject(undefined);
-      setSelectedSlab(null);
-      setSelectedPiece(null);
-      setDeductForm({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0,10), productName: '', unit: 'inch' });
-      refetch();
+        if (editForm?.id) {
+          const projLabel = activeProject ? activeProject.name : (deductForm.productName || 'Manual Deduction');
+          const pNameLabel = selectedPiece?.productName || selectedPiece?.name || selectedSlab?.name || '';
+          let outRemarks = projLabel ? `${projLabel}${pNameLabel ? ` (${pNameLabel})` : ''}` : 'Manual Deduction';
+          if (selectedPiece?.id) {
+            outRemarks = `[Piece:${selectedPiece.id}] ${outRemarks}`;
+          } else if (selectedSlab?.id) {
+            outRemarks = `[Slab:${selectedSlab.id}] ${outRemarks}`;
+          } else if (editForm.rawPieceTag) {
+            outRemarks = `${editForm.rawPieceTag} ${editForm.baseName || outRemarks}`;
+          }
+          const t = deductForm.thickness ? ` | ${deductForm.thickness}MM` : '';
+          if (deductForm.unit === 'feet') {
+            outRemarks += ` (${len}ft x ${wid}ft${t} | ${usedArea.toFixed(2)} Sq.Ft)`;
+          } else if (deductForm.unit === 'mm') {
+            outRemarks += ` (${len}mm x ${wid}mm${t} | ${usedArea.toFixed(2)} Sq.Ft)`;
+          } else {
+            outRemarks += ` (${len}" x ${wid}"${t} | ${usedArea.toFixed(2)} Sq.Ft)`;
+          }
+
+          await updateLog({
+            id: editForm.id,
+            data: {
+              quantity: usedArea,
+              remarks: outRemarks,
+              date: deductForm.date
+            }
+          }).unwrap();
+        } else {
+          await deductInventory({
+            inventoryId: itemId as string,
+            usedQuantity: usedArea,
+            wasteQuantity: 0,
+            projectName: activeProject ? activeProject.name : deductForm.productName,
+            projectId: activeProject?.id,
+            slabId: selectedSlab?.id,
+            pieceId: selectedPiece?.id,
+            pieceName: selectedPiece?.productName || selectedPiece?.name || selectedSlab?.name || '',
+            length: deductForm.length,
+            width: deductForm.width,
+            thickness: deductForm.thickness,
+            unit: deductForm.unit,
+            date: deductForm.date
+          }).unwrap();
+        }
+        setOpenDeduct(false);
+        setEditForm(null);
+        setSelectedProject(undefined);
+        setSelectedSlab(null);
+        setSelectedPiece(null);
+        setDeductForm({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0,10), productName: '', unit: 'inch' });
+        refetch();
     } catch (error: any) {
       console.error('Failed to deduct inventory:', error);
       setDeductError(error?.data?.message || error?.message || 'Failed to deduct stock');
@@ -340,7 +371,13 @@ const ItemLedger = () => {
 
   const handleEditClick = (log: any) => {
     let l = '', w = '', t = '', unit = 'inch';
-    let cleanName = (log.remarks || '').replace('Project: ', '').trim();
+    const rawRemarks = log.remarks || '';
+    const pieceTagMatch = rawRemarks.match(/(\[(?:Piece|Slab):[a-f0-9]+\])/i);
+    const rawPieceTag = pieceTagMatch ? pieceTagMatch[1] : '';
+    const taggedPieceId = rawRemarks.match(/\[Piece:([a-f0-9]+)\]/i)?.[1] || '';
+    const taggedSlabId = rawRemarks.match(/\[Slab:([a-f0-9]+)\]/i)?.[1] || '';
+
+    let cleanName = rawRemarks.replace(/\[(?:Piece|Slab):[a-f0-9]+\]\s*/gi, '').replace('Project: ', '').trim();
     
     if (cleanName.toLowerCase().includes('mm x') || cleanName.toLowerCase().includes('mm ×')) {
       unit = 'mm';
@@ -353,7 +390,7 @@ const ItemLedger = () => {
     const tMatch = cleanName.match(/(\d+(?:\.\d+)?)\s*MM/i);
     if (tMatch) t = tMatch[1];
 
-    const matches = [...cleanName.matchAll(/\((\d+(?:\.\d+)?)\s*(?:mm|ft|in|L)?[xX×]\s*(\d+(?:\.\d+)?)\s*(?:mm|ft|in|W)?[^)]*\)/gi)];
+    const matches = [...cleanName.matchAll(/\((\d+(?:\.\d+)?)\s*(?:mm|ft|in|L|")?\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(?:mm|ft|in|W|")?[^)]*\)/gi)];
     if (matches.length > 0) {
       const lastMatch = matches[matches.length - 1];
       l = lastMatch[1];
@@ -366,65 +403,56 @@ const ItemLedger = () => {
       }
     }
 
-    cleanName = cleanName.replace(/\s*\(\d+(?:\.\d+)?\s*(?:mm|ft|in|L)?[xX×]\s*\d+(?:\.\d+)?\s*(?:mm|ft|in|W)?[^)]*\)/gi, '').trim();
+    const baseName = cleanName.replace(/\s*\(\d+(?:\.\d+)?\s*(?:mm|ft|in|L|")?\s*[xX×]\s*\d+(?:\.\d+)?\s*(?:mm|ft|in|W|")?[^)]*\)/gi, '').trim();
 
-    setEditForm({ 
-      id: log.id, 
-      productName: cleanName,
-      length: l || '', 
+    // Find matching project, slab, and piece in projectHierarchy so Deduct Stock modal opens pre-selected
+    let foundProj: any = null;
+    let foundSlab: any = null;
+    let foundPiece: any = null;
+
+    for (const proj of (projectHierarchy || [])) {
+      for (const s of (proj.slabs || [])) {
+        if (taggedSlabId && s.id === taggedSlabId) {
+          foundProj = proj;
+          foundSlab = s;
+        }
+        for (const p of (s.pieces || [])) {
+          if (taggedPieceId && p.id === taggedPieceId) {
+            foundProj = proj;
+            foundSlab = s;
+            foundPiece = p;
+            break;
+          }
+        }
+        if (foundPiece) break;
+      }
+      if (foundPiece) break;
+    }
+
+    if (!foundProj && baseName) {
+      const projPrefix = baseName.split('(')[0].trim().toLowerCase();
+      foundProj = (projectHierarchy || []).find((p: any) => (p.name || '').toLowerCase() === projPrefix);
+    }
+
+    setSelectedProject(foundProj || autoProject || null);
+    setSelectedSlab(foundSlab || null);
+    setSelectedPiece(foundPiece || null);
+    setDeductError('');
+    setEditForm({
+      id: log.id,
+      quantity: Number(log.quantity) || 0,
+      rawPieceTag,
+      baseName
+    });
+    setDeductForm({
+      length: l || '',
       width: w || '',
       thickness: t || '',
-      unit: unit,
-      date: new Date(log.createdAt).toISOString().substring(0,10) 
+      unit,
+      productName: foundProj?.name || baseName,
+      date: new Date(log.createdAt).toISOString().substring(0, 10)
     });
-    setOpenEdit(true);
-  };
-
-  const handleEditSubmit = async () => {
-    try {
-      const len = Number(editForm.length) || 0;
-      const wid = Number(editForm.width) || 0;
-      if (len <= 0 || wid <= 0) return;
-      
-      let usedArea = 0;
-      if (editForm.unit === 'feet') {
-        usedArea = len * wid;
-      } else if (editForm.unit === 'mm') {
-        usedArea = (len * wid) / 92903.04;
-      } else {
-        usedArea = (len * wid) / 144;
-      }
-      
-      let cleanBaseName = (editForm.productName || '').replace(/\s*\(\d+(?:\.\d+)?\s*(?:mm|ft|in|L)?[xX×]\s*\d+(?:\.\d+)?\s*(?:mm|ft|in|W)?[^)]*\)/gi, '').trim();
-      
-      const t = editForm.thickness ? ` | ${editForm.thickness}MM` : '';
-      let remarks = '';
-      if (editForm.unit === 'feet') {
-        remarks = `${cleanBaseName} (${len}ft x ${wid}ft${t} | ${usedArea.toFixed(2)} Sq.Ft)`;
-      } else if (editForm.unit === 'mm') {
-        const lFt = (len / 304.8).toFixed(2);
-        const wFt = (wid / 304.8).toFixed(2);
-        remarks = `${cleanBaseName} (${len}mm x ${wid}mm | ${lFt}ft x ${wFt}ft${t} | ${usedArea.toFixed(2)} Sq.Ft)`;
-      } else {
-        const lFt = (len / 12).toFixed(2);
-        const wFt = (wid / 12).toFixed(2);
-        remarks = `${cleanBaseName} (${len}" x ${wid}" | ${lFt}ft x ${wFt}ft${t} | ${usedArea.toFixed(2)} Sq.Ft)`;
-      }
-      
-      await updateLog({
-        id: editForm.id,
-        data: {
-          quantity: usedArea,
-          remarks,
-          date: editForm.date
-        }
-      }).unwrap();
-      
-      setOpenEdit(false);
-      refetch();
-    } catch (error) {
-      console.error(error);
-    }
+    setOpenDeduct(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -670,7 +698,15 @@ const ItemLedger = () => {
           <Button 
             variant="contained" 
             color="error" 
-            onClick={() => setOpenDeduct(true)} 
+            onClick={() => {
+              setEditForm(null);
+              setDeductError('');
+              setSelectedProject(undefined);
+              setSelectedSlab(null);
+              setSelectedPiece(null);
+              setDeductForm({ length: '', width: '', thickness: '', date: new Date().toISOString().substring(0, 10), productName: '', unit: 'inch' });
+              setOpenDeduct(true);
+            }} 
             sx={{ 
               fontWeight: 800, 
               boxShadow: 'none',
@@ -819,22 +855,14 @@ const ItemLedger = () => {
           </TableBody>
           <TableFooter sx={{ bgcolor: '#F8FAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 900, color: '#0F172A', py: 2 }}>Grand Total</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#64748B', py: 2 }}>
-                Used: <Typography component="span" sx={{ color: '#2563EB', fontWeight: 800 }}>{usedPct}%</Typography> | Waste: <Typography component="span" sx={{ color: '#EA580C', fontWeight: 800 }}>{wastePct}%</Typography>
-              </TableCell>
-              <TableCell sx={{ fontWeight: 900, color: '#16A34A', py: 2 }}>
-                + {totalIn.toFixed(2)} Sq.Ft
-              </TableCell>
-              <TableCell sx={{ fontWeight: 900, color: '#DC2626', py: 2 }}>
-                - {(totalUsed + totalWaste).toFixed(2)} Sq.Ft
-              </TableCell>
-              <TableCell sx={{ fontWeight: 900, color: remBalance > 0 ? '#16A34A' : '#DC2626', py: 2 }}>
+              <TableCell sx={{ py: 2 }} />
+              <TableCell sx={{ py: 2 }} />
+              <TableCell sx={{ py: 2 }} />
+              <TableCell sx={{ py: 2 }} />
+              <TableCell sx={{ fontWeight: 900, color: remBalance > 0 ? '#16A34A' : '#DC2626', py: 2, fontSize: '0.95rem' }}>
                 {remBalance.toFixed(2)} Sq.Ft
               </TableCell>
-              <TableCell align="center" sx={{ py: 2 }}>
-                <Chip label={`Waste: ${wastePct}%`} size="small" sx={{ bgcolor: '#FFF7ED', color: '#EA580C', fontWeight: 800, fontSize: '0.75rem' }} />
-              </TableCell>
+              <TableCell sx={{ py: 2 }} />
             </TableRow>
           </TableFooter>
         </Table>
@@ -963,13 +991,15 @@ const ItemLedger = () => {
             {/* 1. Select Slab / Stone (Pattar) — Clean name only (Change 11) */}
             {activeProject && (() => {
               const slabsWithPending = (activeProject.slabs || []).filter((s: any) => {
+                if (selectedSlab && s.id === selectedSlab.id) return true;
                 const pendingCount = (s.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false)).length;
                 return pendingCount > 0;
               });
+              const slabOptions = slabsWithPending.length > 0 ? slabsWithPending : (activeProject.slabs || []);
 
               return (
                 <Autocomplete
-                  options={slabsWithPending}
+                  options={slabOptions}
                   noOptionsText="No pending slabs/stones for this project!"
                   getOptionLabel={(option: any) => option?.name || 'Slab'}
                   value={selectedSlab}
@@ -990,8 +1020,8 @@ const ItemLedger = () => {
 
             {/* 2. Select Piece (Pic) — Clean piece name only (Change 11) */}
             {selectedSlab && (() => {
-              const piecesInProduction = (selectedSlab.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false));
-              const displayPieces = piecesInProduction.length > 0 ? piecesInProduction : (selectedSlab.pieces || []).filter((p: any) => !p.sourceMaterialId);
+              const piecesInProduction = (selectedSlab.pieces || []).filter((p: any) => (selectedPiece && p.id === selectedPiece.id) || (!p.sourceMaterialId && (p.hasProduction !== false)));
+              const displayPieces = piecesInProduction.length > 0 ? piecesInProduction : (selectedSlab.pieces || []);
               return (
                 <Autocomplete
                   options={displayPieces}
@@ -1162,6 +1192,7 @@ const ItemLedger = () => {
         <DialogActions sx={{ p: 3, pt: 0 }}>
           <Button onClick={() => {
             setOpenDeduct(false);
+            setEditForm(null);
             setSelectedProject(null);
             setSelectedSlab(null);
             setSelectedPiece(null);
@@ -1173,7 +1204,8 @@ const ItemLedger = () => {
             if (deductForm.unit === 'feet') usedArea = l * w;
             else if (deductForm.unit === 'mm') usedArea = (l * w) / 92903.04;
             else usedArea = (l * w) / 144;
-            const isDisabled = isDeducting || !(l > 0 && w > 0) || (usedArea > (inventory?.quantity || 0));
+            const availForCheck = (inventory?.quantity || 0) + (editForm?.id ? (Number(editForm.quantity) || 0) : 0);
+            const isDisabled = isDeducting || !(l > 0 && w > 0) || (usedArea > availForCheck + 0.01);
             return (
               <Button 
                 variant="contained" 
@@ -1182,145 +1214,10 @@ const ItemLedger = () => {
                 disabled={isDisabled}
                 sx={{ fontWeight: 800 }}
               >
-                {isDeducting ? 'Deducting...' : 'Confirm Deduction'}
+                {isDeducting ? 'Saving...' : (editForm?.id ? 'Update Deduction' : 'Confirm Deduction')}
               </Button>
             );
           })()}
-        </DialogActions>
-      </Dialog>
-
-      {/* Edit Log Dialog (Change 14: Removed Project / Product Name raw tag field) */}
-      <Dialog open={openEdit} onClose={() => setOpenEdit(false)} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 3.5 } } }}>
-        <DialogTitle sx={{ fontWeight: 'bold', bgcolor: '#f8f9fa' }}>Edit Deducted Stock</DialogTitle>
-        <DialogContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
-            <TextField
-              label="Date"
-              type="date"
-              fullWidth
-              slotProps={{ inputLabel: { shrink: true } }}
-              value={editForm?.date || ''}
-              onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-            />
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1.2fr 1fr 1fr 1fr' }, gap: 1.5 }}>
-              <FormControl size="small" fullWidth>
-                <InputLabel id="edit-unit-label">Unit</InputLabel>
-                <Select
-                  labelId="edit-unit-label"
-                  label="Unit"
-                  value={editForm?.unit || 'inch'}
-                  onChange={(e) => {
-                    const newUnit = e.target.value;
-                    const oldUnit = editForm?.unit || 'inch';
-                    const currentL = Number(editForm?.length) || 0;
-                    const currentW = Number(editForm?.width) || 0;
-                    
-                    if (currentL > 0 && currentW > 0) {
-                      let baseFeetL = currentL;
-                      let baseFeetW = currentW;
-                      if (oldUnit === 'inch') {
-                        baseFeetL = currentL / 12;
-                        baseFeetW = currentW / 12;
-                      } else if (oldUnit === 'mm') {
-                        baseFeetL = currentL / 304.8;
-                        baseFeetW = currentW / 304.8;
-                      }
-
-                      let newL = String(currentL);
-                      let newW = String(currentW);
-                      if (newUnit === 'feet') {
-                        newL = baseFeetL.toFixed(2);
-                        newW = baseFeetW.toFixed(2);
-                      } else if (newUnit === 'inch') {
-                        newL = (baseFeetL * 12).toFixed(1);
-                        newW = (baseFeetW * 12).toFixed(1);
-                      } else if (newUnit === 'mm') {
-                        newL = String(Math.round(baseFeetL * 304.8));
-                        newW = String(Math.round(baseFeetW * 304.8));
-                      }
-
-                      setEditForm((prev: any) => ({
-                        ...prev,
-                        unit: newUnit,
-                        length: newL,
-                        width: newW
-                      }));
-                    } else {
-                      setEditForm((prev: any) => ({ ...prev, unit: newUnit }));
-                    }
-                  }}
-                >
-                  <MenuItem value="inch">Inches (in)</MenuItem>
-                  <MenuItem value="feet">Feet (ft)</MenuItem>
-                  <MenuItem value="mm">MM (mm)</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField 
-                size="small"
-                label={`Length (${editForm?.unit === 'feet' ? 'ft' : editForm?.unit === 'mm' ? 'mm' : 'in'})`} 
-                type="number" 
-                fullWidth 
-                value={editForm?.length || ''} 
-                onChange={(e) => setEditForm({ ...editForm, length: e.target.value })} 
-              />
-              <TextField 
-                size="small"
-                label={`Width (${editForm?.unit === 'feet' ? 'ft' : editForm?.unit === 'mm' ? 'mm' : 'in'})`} 
-                type="number" 
-                fullWidth 
-                value={editForm?.width || ''} 
-                onChange={(e) => setEditForm({ ...editForm, width: e.target.value })} 
-              />
-              <TextField 
-                size="small"
-                label="Thick (MM)" 
-                type="number" 
-                fullWidth 
-                value={editForm?.thickness || ''} 
-                onChange={(e) => setEditForm({ ...editForm, thickness: e.target.value })} 
-              />
-            </Box>
-
-            {(() => {
-              const l = Number(editForm?.length) || 0;
-              const w = Number(editForm?.width) || 0;
-              if (l > 0 && w > 0) {
-                let usedArea = 0;
-                let primaryText = '';
-                let equivText = '';
-                
-                if (editForm?.unit === 'feet') {
-                  usedArea = l * w;
-                  primaryText = `${l} ft × ${w} ft (Feet)`;
-                } else if (editForm?.unit === 'mm') {
-                  usedArea = (l * w) / 92903.04;
-                  primaryText = `${l} mm × ${w} mm (MM)`;
-                } else {
-                  usedArea = (l * w) / 144;
-                  primaryText = `${l}" × ${w}" (Inches)`;
-                }
-
-                return (
-                  <Box sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    <Typography variant="body2" color="#64748B" fontWeight="600">
-                      Total Used: <strong>{primaryText}</strong>
-                    </Typography>
-                    <Typography variant="subtitle1" fontWeight="900" color="#1976d2">
-                      {usedArea.toFixed(2)} Sq.Ft
-                    </Typography>
-                  </Box>
-                );
-              }
-              return null;
-            })()}
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 0 }}>
-          <Button onClick={() => setOpenEdit(false)}>Cancel</Button>
-          <Button variant="contained" color="primary" onClick={handleEditSubmit} sx={{ fontWeight: 800 }}>
-            Update Entry
-          </Button>
         </DialogActions>
       </Dialog>
     </Box>
