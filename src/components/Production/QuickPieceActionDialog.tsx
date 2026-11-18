@@ -218,11 +218,13 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
   };
 
   const availableStages = useMemo(() => {
-    if (slab?.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0) {
-      const clean = slab.requiredStages.filter((s: string) => s !== 'Polishing');
-      return clean.length > 0 ? clean : ['Production'];
+    const req = Array.isArray(slab?.requiredStages) ? slab.requiredStages : [];
+    const list: string[] = ['Production'];
+    if (req.includes('Bridge Cutting')) {
+      list.push('Bridge Cutting');
     }
-    return ['Production'];
+    list.push('Polishing');
+    return list;
   }, [slab]);
 
   const [selectedPieceId, setSelectedPieceId] = useState<string>('');
@@ -327,6 +329,33 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
 
   const isPolishing = selectedStage?.startsWith('Polishing') || selectedStage === 'Polishing';
 
+  const populateFieldsForPieceAndStage = (p: any, stageToLoad: string) => {
+    if (!p) return;
+    const normStg = (stageToLoad || 'Production').split(' - ')[0].replace(' Work', '').trim().toLowerCase();
+    const pieceLogsList = (p.logs && Array.isArray(p.logs))
+      ? p.logs.filter((l: any) => String(l.stage || '').toLowerCase().startsWith(normStg))
+      : [];
+    const latestPieceLog = pieceLogsList[0] || pieceLogsList[pieceLogsList.length - 1];
+
+    if (latestPieceLog?.machineId) setMachineId(latestPieceLog.machineId);
+    else setMachineId('');
+    if (latestPieceLog?.driverName) setDriverName(latestPieceLog.driverName);
+    else setDriverName('');
+    if (latestPieceLog?.startTime) {
+      setStartTime(formatForDateTimeLocal(new Date(latestPieceLog.startTime)));
+    } else {
+      setStartTime(formatForDateTimeLocal());
+    }
+    setEndTime(formatForDateTimeLocal());
+    if (latestPieceLog?.startPhotoUrl || latestPieceLog?.endPhotoUrl) {
+      setPhotoUrl(latestPieceLog.endPhotoUrl || latestPieceLog.startPhotoUrl);
+    } else {
+      setPhotoUrl('');
+    }
+    if (latestPieceLog?.remarks) setRemarks(latestPieceLog.remarks);
+    else setRemarks('');
+  };
+
   // When user selects a piece, populate dimensions & pick its first pending stage
   const handlePieceSelect = (pId: string) => {
     setSelectedPieceId(pId);
@@ -339,36 +368,16 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
         setWidth(parsed.w);
         setThickness(parsed.t);
         setUnit(parsed.u || 'inch');
-        setPieceStatus('completed'); // Default to completed for quick complete, but user can change to Not Started
+        setPieceStatus('completed');
 
-        const pieceLogsList = p.logs && Array.isArray(p.logs) ? p.logs : [];
-        const latestPieceLog = pieceLogsList[0] || pieceLogsList[pieceLogsList.length - 1];
-        if (latestPieceLog?.machineId) setMachineId(latestPieceLog.machineId);
-        else setMachineId('');
-        if (latestPieceLog?.driverName) setDriverName(latestPieceLog.driverName);
-        else setDriverName('');
-        if (latestPieceLog?.startTime) {
-          setStartTime(formatForDateTimeLocal(new Date(latestPieceLog.startTime)));
-        } else {
-          setStartTime(formatForDateTimeLocal());
+        const isProdDone = checkStageDone(p, 'Production');
+        let nextStage = 'Production';
+        if (isProdDone) {
+          const rem = availableStages.filter(stg => !checkStageDone(p, stg));
+          nextStage = rem.length > 0 ? rem[0] : (availableStages[availableStages.length - 1] || 'Production');
         }
-        if (latestPieceLog?.endTime) {
-          setEndTime(formatForDateTimeLocal(new Date(latestPieceLog.endTime)));
-        } else {
-          setEndTime(formatForDateTimeLocal());
-        }
-        if (latestPieceLog?.startPhotoUrl || latestPieceLog?.endPhotoUrl) {
-          setPhotoUrl(latestPieceLog.endPhotoUrl || latestPieceLog.startPhotoUrl);
-        } else setPhotoUrl('');
-        if (latestPieceLog?.remarks) setRemarks(latestPieceLog.remarks);
-        else setRemarks('');
-
-        const rem = availableStages.filter(stg => !checkStageDone(p, stg));
-        if (rem.length > 0) {
-          setSelectedStage(rem[0]);
-        } else {
-          setSelectedStage(availableStages[0] || 'Production');
-        }
+        setSelectedStage(nextStage);
+        populateFieldsForPieceAndStage(p, nextStage);
       }
     } else if (pId === 'new') {
       setPieceName(`${slab?.name || 'Slab'} Piece ${(slab?.pieces?.length || 0) + 1}`);
@@ -456,6 +465,38 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
     const sizeFormatted = (l > 0 && w > 0)
       ? `${l}L x ${w}W ${unitLabel}${t ? ` | ${t}MM` : ''} (${area.toFixed(2)} Sq.Ft)`
       : undefined;
+
+    // Validate piece area against parent slab limit
+    if (l > 0 && w > 0 && slab?.size) {
+      const parseAreaSqFt = (str?: string): number => {
+        if (!str) return 0;
+        const expM = String(str).match(/([\d.]+)\s*Sq\.?Ft/i);
+        if (expM && expM[1]) return parseFloat(expM[1]) || 0;
+        const p = parseDims(str);
+        const pl = parseFloat(p.l) || 0;
+        const pw = parseFloat(p.w) || 0;
+        if (pl <= 0 || pw <= 0) return 0;
+        return p.u === 'feet' ? (pl * pw) : (p.u === 'mm' ? (pl * pw) / 92903.04 : (pl * pw) / 144);
+      };
+      const roundedSlabArea = Math.round(parseAreaSqFt(slab.size) * 100) / 100;
+      if (roundedSlabArea > 0) {
+        const otherArea = Math.round(
+          (slab.pieces || [])
+            .filter((p: any) => getPieceId(p) !== selectedPieceId)
+            .reduce((acc: number, p: any) => acc + parseAreaSqFt(p.size), 0) * 100
+        ) / 100;
+        const totalArea = Math.round((otherArea + area) * 100) / 100;
+        if (totalArea > roundedSlabArea + 0.01) {
+          alert(
+            `Total size exceeds allowed slab limit!\n` +
+            `Allowed: ${roundedSlabArea.toFixed(2)} Sq.Ft\n` +
+            `You are making: ${totalArea.toFixed(2)} Sq.Ft\n` +
+            `Please reduce: ${(totalArea - roundedSlabArea).toFixed(2)} Sq.Ft`
+          );
+          return;
+        }
+      }
+    }
 
     try {
       if (mode === 'add') {
@@ -737,29 +778,50 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
               </Box>
             )}
 
-            {/* 2. STAGE SELECTION - ONLY SHOW PENDING / REMAINING STAGES */}
+            {/* 2. STAGE SELECTION - PRODUCTION & POLISHING WITH SEQUENTIAL LOCK */}
             <FormControl fullWidth size="small">
               <InputLabel id="quick-stage-select-label">Manufacturing Stage</InputLabel>
               <Select
                 labelId="quick-stage-select-label"
                 label="Manufacturing Stage"
                 value={selectedStage}
-                onChange={(e) => setSelectedStage(e.target.value)}
-                renderValue={(val: string) => val === 'Polishing - Honed' ? 'Polishing' : val}
+                onChange={(e) => {
+                  const newStg = e.target.value;
+                  setSelectedStage(newStg);
+                  if (currentPiece) {
+                    populateFieldsForPieceAndStage(currentPiece, newStg);
+                  }
+                }}
+                renderValue={(val: string) => val.startsWith('Polishing') ? 'Polishing' : val}
                 sx={{ borderRadius: 2, bgcolor: '#F8FAFC' }}
                 MenuProps={dropdownMenuProps}
               >
-                {pendingStages.length > 0 ? (
-                  pendingStages.map((stg: string) => (
-                    <MenuItem key={stg} value={stg}>
-                      {stg === 'Polishing - Honed' ? 'Polishing' : stg}
+                {availableStages.map((stg: string) => {
+                  const isProdDone = currentPiece ? checkStageDone(currentPiece, 'Production') : false;
+                  const isBridgeDone = currentPiece
+                    ? (!availableStages.includes('Bridge Cutting') || checkStageDone(currentPiece, 'Bridge Cutting'))
+                    : false;
+                  const canSelect = stg === 'Production'
+                    ? true
+                    : stg === 'Bridge Cutting'
+                    ? isProdDone
+                    : (isProdDone && isBridgeDone);
+                  const displayLabel = stg.startsWith('Polishing') ? 'Polishing' : stg;
+                  return (
+                    <MenuItem key={stg} value={stg} disabled={!canSelect}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                        <Typography sx={{ fontWeight: canSelect ? 700 : 500, fontSize: '0.88rem' }}>
+                          {displayLabel}
+                        </Typography>
+                        {!canSelect && (
+                          <Typography variant="caption" sx={{ color: '#DC2626', fontWeight: 700, fontSize: '0.7rem' }}>
+                            (Complete Production first)
+                          </Typography>
+                        )}
+                      </Box>
                     </MenuItem>
-                  ))
-                ) : (
-                  <MenuItem value="" disabled>
-                    All stages completed for this piece
-                  </MenuItem>
-                )}
+                  );
+                })}
               </Select>
             </FormControl>
 

@@ -72,91 +72,46 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  // Consolidate raw pieces from slabs whose manufacturing stages prior to Packing are completed
+  // Consolidate raw pieces from slabs whose manufacturing stages prior to Packing are 100% completed
   const rawPieces = useMemo(() => {
     const combined: any[] = [];
     (slabs || []).forEach((s: any) => {
       if (!Array.isArray(s.pieces)) return;
 
       const reqStages = (s.requiredStages || ['Production']).filter((st: string) => st !== 'Polishing');
+      const requiresProduction = reqStages.includes('Production') || reqStages.length === 0;
       const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing'));
       const requiresBridgeCutting = reqStages.includes('Bridge Cutting');
 
-      s.pieces.forEach((p: any) => {
-        // 1. Is this piece already packed or in a packing/dispatch log?
-        const isAlreadyInPackingLog = (productionLogs || []).some((l: any) => 
-          (l.stage === 'Packing' || l.stage === 'Packing Work' || l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
-          (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
+      const checkPieceStageComplete = (p: any, stagePrefix: string) => {
+        const hasPieceLog = p.logs && p.logs.some((l: any) =>
+          l.stage?.startsWith(stagePrefix) &&
+          (l.status === 'completed' || l.status === 'approved')
+        );
+        const hasProdLog = (productionLogs || []).some((l: any) =>
+          l.approvalStatus === 'approved' &&
+          l.stage?.startsWith(stagePrefix) &&
           Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)
         );
-        const isPieceStagePackingOrDispatch = p.stage === 'Packing' || p.stage === 'Dispatch';
+        const isDirectStageDone = (!p.logs || p.logs.length === 0) &&
+          p.stage?.startsWith(stagePrefix) &&
+          (p.status === 'completed' || p.status === 'approved');
+        return Boolean(hasPieceLog || hasProdLog || isDirectStageDone);
+      };
 
-        if (isAlreadyInPackingLog || isPieceStagePackingOrDispatch) {
-          combined.push({ ...p, slabId: s.id, slabName: s.name });
-          return;
-        }
+      s.pieces.forEach((p: any) => {
+        // Every required stone stage (Production, Bridge Cutting, Polishing) must be 100% completed on this piece before it appears in Packing
+        const isProdDone = !requiresProduction || checkPieceStageComplete(p, 'Production');
+        const isBridgeDone = !requiresBridgeCutting || checkPieceStageComplete(p, 'Bridge Cutting');
+        const isPolishDone = !requiresPolishing || checkPieceStageComplete(p, 'Polish');
 
-        // 2. If not already packed, check if prior required stages are completed
-        let isReadyForPacking = false;
-
-        if (requiresPolishing) {
-          // Both Production & Polishing must be completed
-          const hasPolishLog = p.logs && p.logs.some((l: any) => 
-            (l.stage?.startsWith('Polishing') || l.stage?.startsWith('Polish')) && 
-            (l.status === 'completed' || l.status === 'approved')
-          );
-          const hasApprovedPolishProdLog = (productionLogs || []).some((l: any) => 
-            l.approvalStatus === 'approved' &&
-            (l.stage?.startsWith('Polishing') || l.stage?.startsWith('Polish')) &&
-            ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
-          );
-          const isPiecePolishCompleted = (p.stage?.startsWith('Polishing') || p.stage?.startsWith('Polish')) && p.status === 'completed';
-
-          if (hasPolishLog || hasApprovedPolishProdLog || isPiecePolishCompleted) {
-            isReadyForPacking = true;
-          }
-        } else if (requiresBridgeCutting) {
-          const hasBridgeLog = p.logs && p.logs.some((l: any) => 
-            l.stage?.startsWith('Bridge Cutting') && 
-            (l.status === 'completed' || l.status === 'approved')
-          );
-          const hasApprovedBridgeProdLog = (productionLogs || []).some((l: any) => 
-            l.approvalStatus === 'approved' &&
-            l.stage?.startsWith('Bridge Cutting') &&
-            ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
-          );
-          const isPieceBridgeCompleted = p.stage?.startsWith('Bridge Cutting') && p.status === 'completed';
-
-          if (hasBridgeLog || hasApprovedBridgeProdLog || isPieceBridgeCompleted) {
-            isReadyForPacking = true;
-          }
-        } else {
-          // Only Production is required before Packing
-          const hasProdLog = p.logs && p.logs.some((l: any) => 
-            l.stage?.startsWith('Production') && 
-            (l.status === 'completed' || l.status === 'approved')
-          );
-          const hasApprovedProdLog = (productionLogs || []).some((l: any) => 
-            l.approvalStatus === 'approved' &&
-            l.stage?.startsWith('Production') &&
-            ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
-          );
-          const isPieceProdCompleted = p.stage?.startsWith('Production') && p.status === 'completed';
-
-          if (hasProdLog || hasApprovedProdLog || isPieceProdCompleted) {
-            isReadyForPacking = true;
-          }
-        }
-
-        if (isReadyForPacking) {
+        if (isProdDone && isBridgeDone && isPolishDone) {
           combined.push({ ...p, slabId: s.id, slabName: s.name });
         }
       });
     });
 
-    if (combined.length > 0) return combined;
-    if (slab?.pieces && Array.isArray(slab.pieces)) return slab.pieces;
-    return [];
+    return combined;
   }, [slab, slabs, productionLogs]);
 
   // All pieces of all slabs in the project are available in unified packing workspace

@@ -13,8 +13,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import LayersIcon from '@mui/icons-material/Layers';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import Inventory2Icon from '@mui/icons-material/Inventory2';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -25,9 +23,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 const STAGES = [
   { name: 'Production', label: 'Production', icon: <PrecisionManufacturingIcon sx={{ fontSize: 24 }} />, color: '#059669', bg: '#ECFDF5' },
   { name: 'Bridge Cutting', label: 'Bridge Cutting', icon: <PrecisionManufacturingIcon sx={{ fontSize: 24 }} />, color: '#0284C7', bg: '#F0F9FF' },
-  { name: 'Polishing - Honed', label: 'Polishing', icon: <AutoFixHighIcon sx={{ fontSize: 24 }} />, color: '#D97706', bg: '#FFFDF5' },
-  { name: 'Packing', label: 'Packing', icon: <Inventory2Icon sx={{ fontSize: 24 }} />, color: '#9333EA', bg: '#FDF4FF' },
-  { name: 'Dispatch', label: 'Dispatch', icon: <LocalShippingIcon sx={{ fontSize: 24 }} />, color: '#0284C7', bg: '#EFF6FF' }
+  { name: 'Polishing - Honed', label: 'Polishing', icon: <AutoFixHighIcon sx={{ fontSize: 24 }} />, color: '#D97706', bg: '#FFFDF5' }
 ];
 
 // Helper to check if a piece has completed a stage
@@ -65,12 +61,12 @@ const STAGE_ORDER_MAP: { [key: string]: number } = {
   'Dispatch': 5
 };
 
-// Helper to get allowed stages for a slab
+// Helper to get allowed stages for a slab (only stone manufacturing stages: Production, Bridge Cutting, Polishing)
 const getSlabAllowedStages = (slab: any): string[] => {
   let list: string[] = [];
   if (slab?.requiredStages && Array.isArray(slab.requiredStages) && slab.requiredStages.length > 0) {
     slab.requiredStages.forEach((s: string) => {
-      if (s === 'Polishing') return;
+      if (s === 'Polishing' || s === 'Packing' || s === 'Dispatch') return;
       if (s.startsWith('Polishing')) {
         if (!list.includes('Polishing - Honed')) list.push('Polishing - Honed');
       } else {
@@ -198,9 +194,13 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
     });
   }, []);
 
-  // Toggle a single piece + stage
+  // Toggle a single piece + stage (with sequential check: Production must be completed before Bridge Cutting / Polishing)
   const toggleKey = useCallback((pieceId: string, stage: string) => {
     if (isStageDoneFast(pieceId, stage)) return;
+    if (stage !== 'Production' && !isStageDoneFast(pieceId, 'Production')) {
+      setToast({ open: true, message: 'Please complete Production first before approving ' + stage.replace(' - Honed', ''), severity: 'error' });
+      return;
+    }
     const key = pieceId + '__' + stage;
     setSelectedKeys(prev => {
       const next = new Set(prev);
@@ -236,11 +236,16 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
       targetKeys = slabPendingMap.get(slab.id) || [];
     } else {
       targetKeys = pieces
-        .filter((p: any) => allowed.includes(selectedStageFilter) && !isStageDoneFast(p.id, selectedStageFilter))
+        .filter((p: any) => allowed.includes(selectedStageFilter) && !isStageDoneFast(p.id, selectedStageFilter) && (selectedStageFilter === 'Production' || isStageDoneFast(p.id, 'Production')))
         .map((p: any) => p.id + '__' + selectedStageFilter);
     }
 
-    if (targetKeys.length === 0) return;
+    if (targetKeys.length === 0) {
+      if (selectedStageFilter !== 'Production') {
+        setToast({ open: true, message: `Please complete Production first before approving ${selectedStageFilter.replace(' - Honed', '')}`, severity: 'error' });
+      }
+      return;
+    }
 
     const isAllSelected = targetKeys.every(k => selectedKeys.has(k));
     setSelectedKeys(prev => {
@@ -260,11 +265,18 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
     if (selectedStageFilter === 'all') {
       targetKeys = allPendingProjectKeys;
     } else {
-      targetKeys = stagePendingMap.get(selectedStageFilter) || [];
+      targetKeys = (stagePendingMap.get(selectedStageFilter) || []).filter(k => {
+        const pId = k.split('__')[0];
+        return selectedStageFilter === 'Production' || isStageDoneFast(pId, 'Production');
+      });
     }
 
     if (targetKeys.length === 0) {
-      setToast({ open: true, message: `No pending pieces for ${selectedStageFilter}!`, severity: 'success' });
+      if (selectedStageFilter !== 'Production' && (stagePendingMap.get(selectedStageFilter) || []).length > 0) {
+        setToast({ open: true, message: `Please complete Production first before approving ${selectedStageFilter.replace(' - Honed', '')}!`, severity: 'error' });
+      } else {
+        setToast({ open: true, message: `No pending pieces for ${selectedStageFilter}!`, severity: 'success' });
+      }
       return;
     }
 
@@ -719,7 +731,7 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
             👆 Step 1 me se kisi ek Stage par tap karein
           </Typography>
           <Typography variant="body1" sx={{ color: '#64748B', maxWidth: 480, mx: 'auto', fontWeight: 500 }}>
-            Upar diye gaye <b>Production</b>, <b>Polishing</b>, <b>Packing</b>, ya <b>Dispatch</b> card par click karke pieces load karein.
+            Upar diye gaye <b>Production</b> ya <b>Polishing</b> card par click karke pieces load karein.
           </Typography>
         </Paper>
       ) : (

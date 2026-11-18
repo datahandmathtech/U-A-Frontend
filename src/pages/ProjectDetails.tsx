@@ -247,19 +247,18 @@ const SlabRow = ({
         const isPending = p.status === 'pending' || p.status === 'not_started';
         const isCurrentStageCompleted = !isPending && pStage === normalizedStageName && (p.status === 'completed' || p.status === 'approved');
 
-        if (!isPending && pIdx > stageIdx) {
+        if (hasCompletedLog || hasApprovedPieceLog || isCurrentStageCompleted) {
           piecesCompleted++;
-        } else if (isCurrentStageCompleted) {
-          piecesCompleted++;
-        } else if (!isPending && (hasCompletedLog || hasApprovedPieceLog)) {
+        } else if ((!p.logs || p.logs.length === 0) && !isPending && pIdx > stageIdx) {
           piecesCompleted++;
         } else if (pIdx === stageIdx && (p.status === 'active' || p.status === 'in_progress')) {
           piecesActive++;
         }
       }
 
-      // Also account for slab-level production logs that don't have explicit pieceIds
-      if (piecesCompleted < slab.pieces.length && productionLogs) {
+      // Also account for slab-level production logs that don't have explicit pieceIds (only when pieces don't have individual logs)
+      const hasAnyPieceLogs = slab.pieces.some((p: any) => p.logs && p.logs.length > 0);
+      if (!hasAnyPieceLogs && piecesCompleted < slab.pieces.length && productionLogs) {
         const slabLevelLogs = productionLogs.filter((l: any) => {
           if (l.approvalStatus !== 'approved') return false;
           const lStage = (l.stage || '').split(' - ')[0].replace(' Work', '').trim();
@@ -374,24 +373,23 @@ const SlabRow = ({
   };
 
   const calculateOverallStatus = () => {
-    if (slab.status === 'completed') return 'Completed';
     const reqStages = requiredStages;
-    const activeReqStages = reqStages.filter((st: string) => st !== 'N/A');
-    if (activeReqStages.length === 0) return 'Not Started';
+    const stoneReqStages = reqStages.filter((st: string) => st !== 'N/A' && st !== 'Packing' && st !== 'Dispatch');
+    const activeReqStages = stoneReqStages.length > 0 ? stoneReqStages : ['Production'];
 
     const stageStatuses = activeReqStages.map((st: string) => ({
       stage: st,
       status: getStageStatus(st)
     }));
 
-    // If ALL required active stages are Completed, the slab is Completed!
+    // If ALL required stone stages (Production, Bridge Cutting, Polishing) are 100% Completed, the slab is Completed!
     if (stageStatuses.every(s => s.status === 'Completed' || s.status === 'N/A')) {
       return 'Completed';
     }
 
-    // If ANY required stage has started (In Progress or Completed), the slab is In Production
+    // If ANY required stone stage has started (In Progress or Completed), the slab is Work in Progress
     if (stageStatuses.some(s => s.status === 'In Progress' || s.status === 'Completed')) {
-      return 'In Production';
+      return 'Work in Progress';
     }
 
     return 'Not Started';
@@ -582,10 +580,10 @@ const SlabRow = ({
             fontWeight: 800, 
             fontSize: '0.72rem', 
             height: 24, 
-            bgcolor: overallStatus === 'In Production' ? '#ECFDF5' : (overallStatus === 'Completed' ? '#EFF6FF' : '#F1F5F9'), 
-            color: overallStatus === 'In Production' ? '#059669' : (overallStatus === 'Completed' ? '#1D4ED8' : '#64748B'), 
+            bgcolor: (overallStatus === 'Work in Progress' || overallStatus === 'In Production') ? '#ECFDF5' : (overallStatus === 'Completed' ? '#EFF6FF' : '#F1F5F9'), 
+            color: (overallStatus === 'Work in Progress' || overallStatus === 'In Production') ? '#059669' : (overallStatus === 'Completed' ? '#1D4ED8' : '#64748B'), 
             border: '1px solid',
-            borderColor: overallStatus === 'In Production' ? '#A7F3D0' : (overallStatus === 'Completed' ? '#DBEAFE' : '#E2E8F0')
+            borderColor: (overallStatus === 'Work in Progress' || overallStatus === 'In Production') ? '#A7F3D0' : (overallStatus === 'Completed' ? '#DBEAFE' : '#E2E8F0')
           }} 
         />
       </TableCell>
@@ -4767,59 +4765,33 @@ const ProjectDetails: React.FC = () => {
                               (projectSlabs || []).forEach((s: any) => {
                                 if (!Array.isArray(s.pieces)) return;
                                 const reqStages = (s.requiredStages || ['Production']).filter((st: string) => st !== 'Polishing');
+                                const requiresProduction = reqStages.includes('Production') || reqStages.length === 0;
                                 const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing'));
                                 const requiresBridgeCutting = reqStages.includes('Bridge Cutting');
 
-                                s.pieces.forEach((p: any) => {
-                                  const isAlreadyInPackingLog = (productionLogs || []).some((l: any) => 
-                                    (l.stage === 'Packing' || l.stage === 'Packing Work' || l.stage === 'Dispatch' || l.stage === 'Dispatch Work') &&
-                                    (l.approvalStatus === 'approved' || l.approvalStatus === 'completed') &&
+                                const checkPieceStageComplete = (p: any, stagePrefix: string) => {
+                                  const hasPieceLog = p.logs && p.logs.some((l: any) =>
+                                    l.stage?.startsWith(stagePrefix) &&
+                                    (l.status === 'completed' || l.status === 'approved')
+                                  );
+                                  const hasProdLog = (productionLogs || []).some((l: any) =>
+                                    l.approvalStatus === 'approved' &&
+                                    l.stage?.startsWith(stagePrefix) &&
                                     Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)
                                   );
-                                  const isPieceStagePackingOrDispatch = p.stage === 'Packing' || p.stage === 'Dispatch';
-                                  if (isAlreadyInPackingLog || isPieceStagePackingOrDispatch) {
+                                  const isDirectStageDone = (!p.logs || p.logs.length === 0) &&
+                                    p.stage?.startsWith(stagePrefix) &&
+                                    (p.status === 'completed' || p.status === 'approved');
+                                  return Boolean(hasPieceLog || hasProdLog || isDirectStageDone);
+                                };
+
+                                s.pieces.forEach((p: any) => {
+                                  const isProdDone = !requiresProduction || checkPieceStageComplete(p, 'Production');
+                                  const isBridgeDone = !requiresBridgeCutting || checkPieceStageComplete(p, 'Bridge Cutting');
+                                  const isPolishDone = !requiresPolishing || checkPieceStageComplete(p, 'Polish');
+                                  if (isProdDone && isBridgeDone && isPolishDone) {
                                     count++;
-                                    return;
                                   }
-                                  let isReady = false;
-                                  if (requiresPolishing) {
-                                    const hasPolishLog = p.logs && p.logs.some((l: any) => 
-                                      (l.stage?.startsWith('Polishing') || l.stage?.startsWith('Polish')) && 
-                                      (l.status === 'completed' || l.status === 'approved')
-                                    );
-                                    const hasApprovedPolishProdLog = (productionLogs || []).some((l: any) => 
-                                      l.approvalStatus === 'approved' &&
-                                      (l.stage?.startsWith('Polishing') || l.stage?.startsWith('Polish')) &&
-                                      ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
-                                    );
-                                    const isPiecePolishCompleted = (p.stage?.startsWith('Polishing') || p.stage?.startsWith('Polish')) && p.status === 'completed';
-                                    if (hasPolishLog || hasApprovedPolishProdLog || isPiecePolishCompleted) isReady = true;
-                                  } else if (requiresBridgeCutting) {
-                                    const hasBridgeLog = p.logs && p.logs.some((l: any) => 
-                                      l.stage?.startsWith('Bridge Cutting') && 
-                                      (l.status === 'completed' || l.status === 'approved')
-                                    );
-                                    const hasApprovedBridgeProdLog = (productionLogs || []).some((l: any) => 
-                                      l.approvalStatus === 'approved' &&
-                                      l.stage?.startsWith('Bridge Cutting') &&
-                                      ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
-                                    );
-                                    const isPieceBridgeCompleted = p.stage?.startsWith('Bridge Cutting') && p.status === 'completed';
-                                    if (hasBridgeLog || hasApprovedBridgeProdLog || isPieceBridgeCompleted) isReady = true;
-                                  } else {
-                                    const hasProdLog = p.logs && p.logs.some((l: any) => 
-                                      l.stage?.startsWith('Production') && 
-                                      (l.status === 'completed' || l.status === 'approved')
-                                    );
-                                    const hasApprovedProdLog = (productionLogs || []).some((l: any) => 
-                                      l.approvalStatus === 'approved' &&
-                                      l.stage?.startsWith('Production') &&
-                                      ((Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)) || (l.slabId === s.id && (!l.pieceIds || l.pieceIds.length === 0)))
-                                    );
-                                    const isPieceProdCompleted = p.stage?.startsWith('Production') && p.status === 'completed';
-                                    if (hasProdLog || hasApprovedProdLog || isPieceProdCompleted) isReady = true;
-                                  }
-                                  if (isReady) count++;
                                 });
                               });
                               return count;
@@ -6810,6 +6782,7 @@ const ProjectDetails: React.FC = () => {
         onSuccess={(msg) => {
           setSnackbarMessage(msg);
           refetchSlabs();
+          refetchProduction();
         }}
         onError={(err) => setSnackbarMessage(err)}
       />

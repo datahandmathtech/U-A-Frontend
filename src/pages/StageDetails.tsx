@@ -516,6 +516,32 @@ const StageDetails = () => {
       ? `${l}L x ${w}W ${unitLabel}${t ? ` | ${t}MM` : ''} (${calcSqFt} Sq.Ft)`
       : (editingPiece.size || '');
 
+    // Validate against slab area limit
+    const slabArea = calculateAreaFromSize(slab.size, rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+    if (slabArea > 0 && l > 0 && w > 0) {
+      let otherPiecesArea = 0;
+      (slab.pieces || []).forEach((p: any) => {
+        if (p.id === editingPiece.id) return;
+        if (p.size) {
+          otherPiecesArea += calculateAreaFromSize(p.size, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+        } else if (p.length && p.width) {
+          otherPiecesArea += calculateAreaFromSize(`${p.length}L x ${p.width}W`, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+        }
+      });
+      const newPieceArea = parseFloat(calcSqFt) || 0;
+      const totalArea = Math.round((otherPiecesArea + newPieceArea) * 100) / 100;
+      const roundedSlabArea = Math.round(slabArea * 100) / 100;
+      if (totalArea > roundedSlabArea + 0.01) {
+        alert(
+          `Total size exceeds allowed slab limit!\n` +
+          `Allowed: ${roundedSlabArea.toFixed(2)} Sq.Ft\n` +
+          `You are making: ${totalArea.toFixed(2)} Sq.Ft\n` +
+          `Please reduce: ${(totalArea - roundedSlabArea).toFixed(2)} Sq.Ft`
+        );
+        return;
+      }
+    }
+
     try {
       await updatePiece({
         id: editingPiece.id,
@@ -589,10 +615,18 @@ const StageDetails = () => {
       unit = u === 'mm' ? 'mm' : (u === 'feet' || u === 'ft' || u === 'sq_ft' || u === 'sqft') ? 'feet' : 'inch';
     }
 
-    const pieceMachineLog = machineLogs?.find((ml: any) => ml.productId === p.id);
-    const pieceLogsList = p.logs && Array.isArray(p.logs) ? p.logs : [];
+    const normCurStage = (stageFormatted || 'Production').toLowerCase();
+    const pieceMachineLog = stageFormatted === 'Production'
+      ? machineLogs?.find((ml: any) => ml.productId === p.id)
+      : null;
+    const pieceLogsList = (p.logs && Array.isArray(p.logs))
+      ? p.logs.filter((l: any) => String(l.stage || '').toLowerCase().startsWith(normCurStage))
+      : [];
     const latestPieceLog = pieceLogsList[0] || pieceLogsList[pieceLogsList.length - 1];
-    const pieceProdLog = productionLogs?.find((l: any) => l.pieceIds?.includes(p.id) || l.productId === p.id);
+    const pieceProdLog = productionLogs?.find((l: any) =>
+      (l.pieceIds?.includes(p.id) || l.productId === p.id) &&
+      String(l.stage || '').toLowerCase().startsWith(normCurStage)
+    );
 
     const savedMachineId = pieceMachineLog?.machineId || latestPieceLog?.machineId || pieceProdLog?.machineId || '';
     const savedPhotoUrl = latestPieceLog?.endPhotoUrl || latestPieceLog?.startPhotoUrl || pieceProdLog?.startPhotos?.unit || pieceProdLog?.startPhotos?.machine || pieceMachineLog?.unitPhotoUrl || pieceMachineLog?.machinePhotoUrl || '';
@@ -603,13 +637,18 @@ const StageDetails = () => {
       ? formatDateTimeLocal(new Date(latestPieceLog.startTime))
       : formatDateTimeLocal();
     const savedEndTime = formatDateTimeLocal(new Date());
+    const isStageAlreadyDone = Boolean(
+      latestPieceLog && (latestPieceLog.status === 'completed' || latestPieceLog.status === 'approved')
+    ) || Boolean(
+      pieceProdLog && (pieceProdLog.approvalStatus === 'approved' || pieceProdLog.approvalStatus === 'completed')
+    );
 
     setEditPieceDims({
       length,
       width,
       thickness,
       unit,
-      status: p.status || 'pending',
+      status: isStageAlreadyDone ? 'completed' : (stageFormatted === 'Production' ? (p.status || 'pending') : 'pending'),
       machineId: savedMachineId,
       startTime: savedStartTime,
       endTime: savedEndTime,
@@ -756,11 +795,18 @@ const StageDetails = () => {
         ? new Date(mLog.endTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(mLog.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) 
         : (mLog?.status === 'active' || p.status === 'in_progress' ? 'Running (ON)...' : (p.logs && p.logs[0]?.endTime ? new Date(p.logs[0].endTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + new Date(p.logs[0].endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'));
       
-      // Polishing/Packing/Dispatch Logs Extraction
+      // Polishing/Bridge Cutting/Packing/Dispatch Logs Extraction
       const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(p.id) || (!l.pieceIds?.length && (l.slabId === p.id || l.productId === p.id))) || [];
-      const stageLogs = pieceProductionLogs.filter((l: any) => l.stage === stageFormatted || l.stage === `${stageFormatted} Work`);
+      const stageLogs = pieceProductionLogs.filter((l: any) =>
+        l.stage === stageFormatted ||
+        l.stage === `${stageFormatted} Work` ||
+        String(l.stage || '').toLowerCase().startsWith(stageFormatted.toLowerCase())
+      );
       const outLog = stageLogs.find((l: any) => l.transactionType === 'OUT' && l.approvalStatus === 'approved');
       const inLog = stageLogs.find((l: any) => l.transactionType === 'IN' && l.approvalStatus === 'approved');
+      const stagePieceLog = (p.logs && Array.isArray(p.logs))
+        ? p.logs.find((l: any) => String(l.stage || '').toLowerCase().startsWith(stageFormatted.toLowerCase()) && (l.status === 'completed' || l.status === 'approved'))
+        : null;
 
       const formatDateTime = (dateString?: string) => {
         if (!dateString) return '-';
@@ -769,7 +815,7 @@ const StageDetails = () => {
       };
       
       const outDate = formatDateTime(outLog?.createdAt);
-      const inDate = formatDateTime(inLog?.createdAt);
+      const inDate = formatDateTime(inLog?.createdAt || stagePieceLog?.endTime || stagePieceLog?.createdAt);
 
       const stages = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
       const pieceStageNorm = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
@@ -2468,96 +2514,61 @@ const StageDetails = () => {
         </DialogTitle>
         <DialogContent dividers sx={{ p: 3.5, bgcolor: '#FAFAFA' }}>
           {(() => {
-            const pieceProductionLogs = productionLogs?.filter((l: any) => l.pieceIds?.includes(viewPiece?.id) || (!l.pieceIds?.length && (l.slabId === viewPiece?.id || l.productId === viewPiece?.id))) || [];
-            
-            const linkedMachineLogIds = pieceProductionLogs
-              .filter((l: any) => l.stage === 'Production Work' && l.parentLogId)
-              .map((l: any) => l.parentLogId);
-
-            const pieceMachineLogs = machineLogs?.filter((l: any) => 
-              l.productId === viewPiece?.id || linkedMachineLogIds.includes(l.id)
-            ) || [];
-            
-            const formattedMachineLogs = pieceMachineLogs.map((ml: any) => ({
-              ...ml,
-              id: `${ml.id}-start`,
-              stage: 'Production Work',
-              displayType: 'Machine Start',
-              transactionType: null,
-              vendorName: null,
-              worker: ml.operator,
-              startTime: ml.startTime,
-              createdAt: ml.createdAt,
-              startPhotos: {
-                machine: ml.machinePhotoUrl,
-                unit: ml.unitPhotoUrl,
-                software: ml.softwarePhotoUrl
-              }
-            }));
-
-            const formattedProductionLogs = pieceProductionLogs.map((l: any) => {
-              const photo = l.startPhotos?.unit || l.startPhotos?.machine || l.startPhotos?.software || l.photoUrl;
-              if (l.stage === 'Production Work') {
-                const parentMl = machineLogs?.find((ml: any) => ml.id === l.parentLogId);
-                return {
-                  ...l,
-                  displayType: 'Machine End',
-                  photoUrl: photo || parentMl?.endUnitPhotoUrl || parentMl?.endMachinePhotoUrl,
-                  startPhotos: {
-                    machine: parentMl?.endMachinePhotoUrl || l.startPhotos?.machine,
-                    unit: parentMl?.endUnitPhotoUrl || l.startPhotos?.unit,
-                    software: parentMl?.endSoftwarePhotoUrl || l.startPhotos?.software
-                  }
-                };
-              }
-              return {
-                ...l,
-                photoUrl: photo,
-                displayType: l.transactionType === 'OUT' ? 'Material OUT' : 'Material IN'
-              };
-            });
-
+            const normViewStage = (stageFormatted || 'Production').toLowerCase();
+            const pieceProductionLogs = (productionLogs || []).filter((l: any) =>
+              (l.pieceIds?.includes(viewPiece?.id) || (!l.pieceIds?.length && (l.slabId === viewPiece?.id || l.productId === viewPiece?.id))) &&
+              String(l.stage || '').toLowerCase().startsWith(normViewStage)
+            );
             const pieceDirectLogs = (viewPiece?.logs && Array.isArray(viewPiece.logs))
-              ? viewPiece.logs.map((pl: any) => ({
-                  ...pl,
-                  displayType: 'Piece Completion',
-                  stage: pl.stage || 'Production Work',
-                  approvalStatus: pl.status || 'approved',
-                  worker: pl.driverName || 'Operator',
-                  photoUrl: pl.endPhotoUrl || pl.startPhotoUrl,
-                  startTime: pl.createdAt || pl.endTime,
-                  createdAt: pl.createdAt || pl.endTime
-                }))
+              ? viewPiece.logs.filter((pl: any) => String(pl.stage || 'Production').toLowerCase().startsWith(normViewStage))
               : [];
 
-            let combinedLogs = [...formattedProductionLogs, ...formattedMachineLogs, ...pieceDirectLogs].filter((log: any) => {
-              if (stageFormatted === 'Production') {
-                return log.stage === 'Production Work' || log.stage === 'Production Work (Machine)' || log.stage === 'Production' || log.stage?.toLowerCase()?.includes('production');
-              }
-              return log.stage === stageFormatted || log.stage === `${stageFormatted} Work` || log.stage?.toLowerCase()?.includes(stageFormatted.toLowerCase());
-            });
+            // Build a single consolidated Piece Completion notification for the current stage
+            const latestPieceLog = pieceDirectLogs[0] || pieceDirectLogs[pieceDirectLogs.length - 1];
+            const latestProdLog = pieceProductionLogs[pieceProductionLogs.length - 1] || pieceProductionLogs[0];
+            const latestWithPhoto = pieceDirectLogs.find((pl: any) => pl.endPhotoUrl || pl.startPhotoUrl)
+              || pieceProductionLogs.find((l: any) => l.startPhotos?.unit || l.startPhotos?.machine || l.photoUrl);
 
-            // Deduplicate logs with same id or timestamp
-            const seenKeys = new Set();
-            combinedLogs = combinedLogs.filter((log: any) => {
-              const key = `${log.id}_${log.startTime || log.createdAt}_${log.stage}`;
-              if (seenKeys.has(key)) return false;
-              seenKeys.add(key);
-              return true;
-            });
+            let combinedLogs: any[] = [];
+            if (latestPieceLog || latestProdLog) {
+              const photoUrl = latestPieceLog?.endPhotoUrl ||
+                latestPieceLog?.startPhotoUrl ||
+                latestWithPhoto?.endPhotoUrl ||
+                latestWithPhoto?.startPhotoUrl ||
+                latestWithPhoto?.startPhotos?.unit ||
+                latestWithPhoto?.startPhotos?.machine ||
+                latestWithPhoto?.photoUrl ||
+                null;
+              const machineIdVal = latestPieceLog?.machineId || latestProdLog?.machineId || null;
+              const workerVal = latestPieceLog?.driverName ||
+                latestProdLog?.worker?.name ||
+                latestProdLog?.worker ||
+                latestProdLog?.vendorName ||
+                currentUser?.name ||
+                'Operator';
+              const remarksVal = latestPieceLog?.remarks || latestProdLog?.remarks || null;
+              const timeVal = latestPieceLog?.endTime || latestPieceLog?.createdAt || latestProdLog?.createdAt || new Date().toISOString();
 
-            combinedLogs.sort((a: any, b: any) => {
-              const dateA = new Date(a.startTime || a.createdAt).getTime();
-              const dateB = new Date(b.startTime || b.createdAt).getTime();
-              return dateA - dateB;
-            });
+              combinedLogs = [{
+                id: latestPieceLog?.id || latestProdLog?.id || 'completion_1',
+                displayType: 'Piece Completion',
+                stage: stageFormatted || 'Production',
+                approvalStatus: 'approved',
+                machineId: machineIdVal,
+                worker: workerVal,
+                remarks: remarksVal,
+                photoUrl,
+                startTime: timeVal,
+                createdAt: timeVal
+              }];
+            }
 
             if (combinedLogs.length === 0) {
               return (
                 <Box sx={{ p: 6, textAlign: 'center' }}>
                   <ScheduleRoundedIcon sx={{ fontSize: 44, color: '#CBD5E1', mb: 1.5, display: 'block', mx: 'auto' }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
-                    No audit logs or tracking history found for this item.
+                    No piece completion record found for this stage yet.
                   </Typography>
                 </Box>
               );
@@ -2565,91 +2576,69 @@ const StageDetails = () => {
 
             return (
               <Box sx={{ position: 'relative', ml: 2, borderLeft: '2px solid #E2E8F0', pl: 4, display: 'flex', flexDirection: 'column', gap: 3, py: 1 }}>
-                {combinedLogs.map((log: any, i: number) => {
-                  const isOut = log.displayType === 'Material OUT' || log.displayType === 'Machine Start';
-                  return (
-                    <Box key={i} sx={{ position: 'relative' }}>
-                      <Box sx={{ 
-                        position: 'absolute', 
-                        left: -41, 
-                        top: 20, 
-                        width: 16, 
-                        height: 16, 
-                        borderRadius: '50%', 
-                        bgcolor: isOut ? '#D97706' : '#0284C7',
-                        border: '3px solid #FFFFFF',
-                        boxShadow: '0 0 0 2px ' + (isOut ? '#FDE68A' : '#BAE6FD')
-                      }} />
-                      <Paper sx={{ 
-                        p: 3, 
-                        borderRadius: 3.5, 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'flex-start',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                        border: '1px solid #E2E8F0',
-                        bgcolor: '#FFFFFF',
-                        flexWrap: 'wrap',
-                        gap: 2
-                      }}>
-                        <Box sx={{ flex: 1, minWidth: 240 }}>
-                           <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 800, display: 'block', mb: 0.75, letterSpacing: '0.5px' }}>
-                             {new Date(log.startTime || log.createdAt).toLocaleString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
+                {combinedLogs.map((log: any, i: number) => (
+                  <Box key={i} sx={{ position: 'relative' }}>
+                    <Box sx={{ 
+                      position: 'absolute', 
+                      left: -41, 
+                      top: 20, 
+                      width: 16, 
+                      height: 16, 
+                      borderRadius: '50%', 
+                      bgcolor: '#0284C7',
+                      border: '3px solid #FFFFFF',
+                      boxShadow: '0 0 0 2px #BAE6FD'
+                    }} />
+                    <Paper sx={{ 
+                      p: 3, 
+                      borderRadius: 3.5, 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'flex-start',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                      border: '1px solid #E2E8F0',
+                      bgcolor: '#FFFFFF',
+                      flexWrap: 'wrap',
+                      gap: 2
+                    }}>
+                      <Box sx={{ flex: 1, minWidth: 240 }}>
+                         <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 800, display: 'block', mb: 0.75, letterSpacing: '0.5px' }}>
+                           {new Date(log.startTime || log.createdAt).toLocaleString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
+                         </Typography>
+                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                           <Typography variant="h6" sx={{ fontWeight: 800, color: '#0284C7' }}>
+                             Piece Completion
                            </Typography>
-                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                             <Typography variant="h6" sx={{ fontWeight: 800, color: isOut ? '#D97706' : '#0284C7' }}>
-                               {log.displayType || 'Piece Completion'}
-                             </Typography>
-                             {log.approvalStatus === 'approved' && <Chip size="small" label="Approved" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 800, fontSize: '0.7rem', height: 22, border: '1px solid #A7F3D0' }} />}
-                             {log.approvalStatus === 'pending' && <Chip size="small" label="Pending" sx={{ bgcolor: '#FFFBEB', color: '#D97706', fontWeight: 800, fontSize: '0.7rem', height: 22, border: '1px solid #FDE68A' }} />}
-                           </Box>
-                           <Typography variant="subtitle2" sx={{ color: '#1E293B', fontWeight: 700 }}>
-                             {log.stage}
-                           </Typography>
-                           {(log.machineId || log.machine?.name) && (
-                             <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
-                               Machine: <strong style={{ color: '#1E293B' }}>{log.machine?.name || machines.find((m: any) => (m.id || m._id) === log.machineId)?.name || 'Machine'}</strong>
-                             </Typography>
-                           )}
+                           <Chip size="small" label="Approved" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 800, fontSize: '0.7rem', height: 22, border: '1px solid #A7F3D0' }} />
+                         </Box>
+                         <Typography variant="subtitle2" sx={{ color: '#1E293B', fontWeight: 700 }}>
+                           {log.stage}
+                         </Typography>
+                         {(log.machineId || log.machine?.name) && (
                            <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
-                             Worker / Vendor: <strong style={{ color: '#1E293B' }}>{typeof log.worker === 'object' ? log.worker?.name : log.worker || log.driverName || log.vendorName || log.operator?.name || 'Admin'}</strong>
+                             Machine: <strong style={{ color: '#1E293B' }}>{log.machine?.name || machines.find((m: any) => (m.id || m._id) === log.machineId)?.name || 'Machine'}</strong>
                            </Typography>
-                           {log.remarks && (
-                             <Typography variant="body2" sx={{ color: '#475569', mt: 1, bgcolor: '#F8FAFC', p: 1, borderRadius: 1.5, border: '1px solid #E2E8F0', fontStyle: 'italic' }}>
-                               Remarks: {log.remarks}
-                             </Typography>
-                           )}
-                        </Box>
+                         )}
+                         <Typography variant="body2" sx={{ color: '#64748B', mt: 0.5 }}>
+                           Worker / Vendor: <strong style={{ color: '#1E293B' }}>{typeof log.worker === 'object' ? log.worker?.name : log.worker || 'Admin'}</strong>
+                         </Typography>
+                         {log.remarks && (
+                           <Typography variant="body2" sx={{ color: '#475569', mt: 1, bgcolor: '#F8FAFC', p: 1, borderRadius: 1.5, border: '1px solid #E2E8F0', fontStyle: 'italic' }}>
+                             Remarks: {log.remarks}
+                           </Typography>
+                         )}
+                      </Box>
+                      {log.photoUrl && (
                         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-                          {(log.photoUrl || log.endPhotoUrl || log.startPhotoUrl) && (
-                            <Box onClick={() => setPreviewPhotoUrl(log.photoUrl || log.endPhotoUrl || log.startPhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
-                               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#059669', mb: 0.5, fontWeight: 700 }}>Piece Photo</Typography>
-                               <img src={log.photoUrl || log.endPhotoUrl || log.startPhotoUrl} alt="Piece Completion Proof" style={{ width: 95, height: 95, borderRadius: 10, objectFit: 'cover', border: '2px solid #86EFAC', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} />
-                            </Box>
-                          )}
-                          {(log.startPhotos?.machine || log.machinePhotoUrl) && (
-                            <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.machine || log.machinePhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
-                               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#64748B', mb: 0.5, fontWeight: 700 }}>Machine</Typography>
-                               <img src={log.startPhotos?.machine || log.machinePhotoUrl} alt="Machine" style={{ width: 90, height: 90, borderRadius: 10, objectFit: 'cover', border: '1px solid #E2E8F0' }} />
-                            </Box>
-                          )}
-                          {(log.startPhotos?.unit || log.unitPhotoUrl) && (
-                            <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.unit || log.unitPhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
-                               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#64748B', mb: 0.5, fontWeight: 700 }}>Unit</Typography>
-                               <img src={log.startPhotos?.unit || log.unitPhotoUrl} alt="Unit" style={{ width: 90, height: 90, borderRadius: 10, objectFit: 'cover', border: '1px solid #E2E8F0' }} />
-                            </Box>
-                          )}
-                          {(log.startPhotos?.software || log.softwarePhotoUrl) && (
-                            <Box onClick={() => setPreviewPhotoUrl(log.startPhotos?.software || log.softwarePhotoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
-                               <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#64748B', mb: 0.5, fontWeight: 700 }}>Software</Typography>
-                               <img src={log.startPhotos?.software || log.softwarePhotoUrl} alt="Software" style={{ width: 90, height: 90, borderRadius: 10, objectFit: 'cover', border: '1px solid #E2E8F0' }} />
-                            </Box>
-                          )}
+                          <Box onClick={() => setPreviewPhotoUrl(log.photoUrl)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:hover': { transform: 'scale(1.05)' }}}>
+                             <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: '#059669', mb: 0.5, fontWeight: 700 }}>Piece Photo</Typography>
+                             <img src={log.photoUrl} alt="Piece Completion Proof" style={{ width: 95, height: 95, borderRadius: 10, objectFit: 'cover', border: '2px solid #86EFAC', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} />
+                          </Box>
                         </Box>
-                      </Paper>
-                    </Box>
-                  );
-                })}
+                      )}
+                    </Paper>
+                  </Box>
+                ))}
               </Box>
             );
           })()}
