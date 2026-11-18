@@ -153,20 +153,31 @@ const SlabRow = ({
   const parseDimensions = (sizeRaw: string) => {
     if (!sizeRaw) return '';
     const cleanSize = sizeRaw.replace(/ x (\d+MM)/i, ' | $1').replace(/ A- (\d+MM)/i, ' | $1');
-    if (/sq\.?ft/i.test(cleanSize)) {
-      return cleanSize;
-    }
     const lMatch = cleanSize.match(/(\d+(?:\.\d+)?)\s*L/i);
     const wMatch = cleanSize.match(/(\d+(?:\.\d+)?)\s*W/i);
     const tMatch = cleanSize.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || cleanSize.match(/(\d+(?:\.\d+)?)\s*MM/i);
+    const lVal = lMatch ? parseFloat(lMatch[1]) : 0;
+    const wVal = wMatch ? parseFloat(wMatch[1]) : 0;
+    const isLargeMM = lVal > 150 || wVal > 150;
+
+    if (/sq\.?ft/i.test(cleanSize) && !(isLargeMM && cleanSize.toLowerCase().includes('inch'))) {
+      return cleanSize;
+    }
     if (lMatch && wMatch) {
-      const l = parseFloat(lMatch[1]);
-      const w = parseFloat(wMatch[1]);
-      const t = tMatch ? tMatch[1] : '10';
+      const l = lVal;
+      const w = wVal;
+      const t = tMatch ? tMatch[1] : (matchedProduct?.breadth || matchedProduct?.thickness || '10');
       const dimsPart = cleanSize.split('|')[0].toLowerCase();
+      const prodUnit = (matchedProduct?.dimensionUnit || matchedProduct?.unit || defaultProjectUnit || '').toLowerCase();
+
       let u = 'inch';
-      if (dimsPart.includes('feet') || dimsPart.includes('ft')) u = 'feet';
-      else if (dimsPart.includes('mm')) u = 'mm';
+      if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq_ft') || dimsPart.includes('sqft') || prodUnit.includes('feet') || prodUnit.includes('ft') || prodUnit.includes('sq')) {
+        u = 'feet';
+      } else if (dimsPart.includes('mm') || prodUnit === 'mm' || prodUnit.includes('milli') || isLargeMM) {
+        u = 'mm';
+      } else if (dimsPart.includes('inch') || dimsPart.includes('"') || prodUnit.includes('inch')) {
+        u = 'inch';
+      }
 
       const area = u === 'feet' ? l * w : u === 'mm' ? (l * w) / 92903.04 : (l * w) / 144;
       const uLabel = u === 'feet' ? 'Feet' : u === 'mm' ? 'MM' : 'Inch';
@@ -1893,14 +1904,22 @@ const ProjectDetails: React.FC = () => {
 
   const handleSaveProducts = async () => {
     for (const ep of editingProducts) {
+      const l = parseFloat(ep.length as any) || 0;
+      const w = parseFloat(ep.width as any) || 0;
+      const u = (ep.unit || '').toLowerCase().trim();
+      const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
+      const dimU = (isPieces ? ((ep as any).dimensionUnit || 'inch') : u).toLowerCase().trim();
+      const isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft' || dimU.includes('sq');
+      const isMM = dimU === 'mm' || dimU.includes('millimeter');
+      const singleSlabSqFt = Math.round((isFt ? (l * w) : isMM ? ((l * w) / 92903.04) : ((l * w) / 144)) * 100) / 100;
+      ep.sqft = singleSlabSqFt;
+
       const matchedSlab = (projectSlabs || []).find((s: any) =>
         s.id === ep.id || s.id === (ep as any).slabId ||
         String(s.name || '').trim().toLowerCase() === String(ep.category || ep.productName || ep.name || '').trim().toLowerCase()
       );
       if (matchedSlab) {
         const existingPiecesArea = getExistingPiecesAreaForSlab(matchedSlab);
-        const qty = Math.max(1, Number(ep.qty) || 1);
-        const singleSlabSqFt = Math.round(((Number(ep.sqft) || 0) / qty) * 100) / 100;
         if (existingPiecesArea > 0 && singleSlabSqFt > 0 && singleSlabSqFt + 0.01 < existingPiecesArea) {
           alert(
             `Cannot reduce "${matchedSlab.name}" size to ${singleSlabSqFt.toFixed(2)} Sq.Ft!\n` +
@@ -4059,16 +4078,17 @@ const ProjectDetails: React.FC = () => {
 
             {/* STEP 5: PRODUCTION TRACKING (ALWAYS VISIBLE ACTIVE WORK ORDER) */}
             {stepToRender >= 5 && (() => {
-              const categories = Array.from(new Set(projectSlabs?.map((s: any) => {
-                const prod = products?.find(p => s.name.startsWith(p.category));
-                return prod?.category || s.name.split(' ')[0];
-              }).filter(Boolean))) as string[];
+              const getSlabCategory = (s: any) => {
+                const prod = products?.find(p => p.category && s.name.startsWith(p.category));
+                return prod?.category || s.name.replace(/\s+\d+(\s*\(\d+\))?$/, '').trim();
+              };
+              const categories = Array.from(new Set(projectSlabs?.map(getSlabCategory).filter(Boolean))) as string[];
 
               const filteredSlabs = projectSlabs?.filter((s: any) => {
                 const matchesSearch = !slabSearchQuery || 
                   s.name.toLowerCase().includes(slabSearchQuery.toLowerCase()) || 
                   (s.size && s.size.toLowerCase().includes(slabSearchQuery.toLowerCase()));
-                const slabCategory = products?.find(p => s.name.startsWith(p.category))?.category || s.name.split(' ')[0];
+                const slabCategory = getSlabCategory(s);
                 const matchesCategory = slabCategoryFilter === 'All' || slabCategory === slabCategoryFilter;
                 return matchesSearch && matchesCategory;
               }) || [];

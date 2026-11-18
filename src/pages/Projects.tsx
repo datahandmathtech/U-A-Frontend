@@ -467,6 +467,7 @@ const Projects: React.FC = () => {
             }
           }
         }
+        const totalPiecesCount = validProducts.reduce((sum: number, p: any) => sum + Math.max(1, parseInt(String(p.qty || 1), 10) || 1), 0);
         await updateProject({
           id: editingProjectId,
           data: {
@@ -475,7 +476,7 @@ const Projects: React.FC = () => {
             clientHandle: formData.clientHandle,
             description: formData.description,
             status: formData.status || existingProject.status || 'production',
-            totalPieces: validProducts.length || parseInt(formData.totalPieces) || 0,
+            totalPieces: totalPiecesCount || parseInt(formData.totalPieces) || 0,
             deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : null,
             startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
             deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
@@ -488,9 +489,10 @@ const Projects: React.FC = () => {
         return;
       } else {
         const validProducts = (formData.products || []).filter((prod: any) => prod.name && prod.name.trim());
+        const totalPiecesCount = validProducts.reduce((sum: number, p: any) => sum + Math.max(1, parseInt(String(p.qty || 1), 10) || 1), 0);
         const createdProject = await createProject({
           ...formData,
-          totalPieces: validProducts.length,
+          totalPieces: totalPiecesCount,
           projectId: `U-A-${Math.floor(100 + Math.random() * 900)}`,
           status: 'production',
           isDirectWorkOrder: true,
@@ -502,9 +504,13 @@ const Projects: React.FC = () => {
         // Create slabs and quotation for each product
         if (validProducts.length > 0) {
           const quotationProducts = [];
+          const nameCounters = new Map<string, number>();
 
           for (let i = 0; i < validProducts.length; i++) {
             const prod = validProducts[i];
+            const baseName = prod.name.trim();
+            const currentCount = nameCounters.get(baseName.toLowerCase()) || 0;
+
             const u = (prod.unit || 'pieces').toLowerCase().trim();
             const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
             let isFt = false;
@@ -527,7 +533,8 @@ const Projects: React.FC = () => {
             const qtyCount = isPieces ? Math.max(1, parseInt(String(prod.qty || 1), 10) || 1) : 1;
 
             for (let k = 1; k <= qtyCount; k++) {
-              const slabName = qtyCount > 1 ? `${prod.name.trim()} ${k}` : prod.name.trim();
+              const slabNum = currentCount + k;
+              const slabName = (qtyCount > 1 || currentCount > 0) ? `${baseName} ${slabNum}` : baseName;
               const createdSlab = await createSlab({
                 projectId: createdProject.id,
                 name: slabName,
@@ -554,6 +561,7 @@ const Projects: React.FC = () => {
                 sqft: Number(calcSqFt)
               });
             }
+            nameCounters.set(baseName.toLowerCase(), currentCount + qtyCount);
           }
 
           if (quotationProducts.length > 0) {

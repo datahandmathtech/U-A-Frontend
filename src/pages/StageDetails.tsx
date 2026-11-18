@@ -110,9 +110,17 @@ const StageDetails = () => {
     : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
 
   // Determine dimension unit for pieces
+  const rawLMatch = rawSizeStr.match(/(\d+(?:\.\d+)?)\s*L/i);
+  const rawWMatch = rawSizeStr.match(/(\d+(?:\.\d+)?)\s*W/i);
+  const rawL = rawLMatch ? parseFloat(rawLMatch[1]) : 0;
+  const rawW = rawWMatch ? parseFloat(rawWMatch[1]) : 0;
+  const isLargeMM = rawL > 150 || rawW > 150;
+
   let detectedDimUnit = (matchedProduct?.dimensionUnit || '').toLowerCase().trim();
   if (detectedDimUnit === 'sq_ft' || detectedDimUnit === 'sqft') detectedDimUnit = 'feet';
-  if (!detectedDimUnit) {
+  if (isLargeMM) {
+    detectedDimUnit = 'mm';
+  } else if (!detectedDimUnit) {
     if (rawBeforePipe.includes('feet') || rawBeforePipe.includes('ft') || rawBeforePipe.includes("'")) {
       detectedDimUnit = 'feet';
     } else if (rawBeforePipe.includes('inch') || rawBeforePipe.includes('"')) {
