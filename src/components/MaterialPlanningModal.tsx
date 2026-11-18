@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, 
   TableRow, Chip, IconButton, Button, TextField, Select, MenuItem, Dialog, 
@@ -11,12 +12,14 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import BoltIcon from '@mui/icons-material/Bolt';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
 import * as XLSX from 'xlsx';
 import { 
   useGetProjectsQuery, 
   useGetProjectMaterialsQuery, 
+  useGetInventoryQuery,
   useDeleteProjectMaterialMutation, 
   useReserveProjectMaterialMutation, 
   useCreateInventoryMutation 
@@ -43,7 +46,9 @@ function generateBlockNumbers(startBlock: string, count: number): string[] {
 }
 
 export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => void; initialProjectId?: string }> = ({ open, onClose, initialProjectId }) => {
+  const navigate = useNavigate();
   const { data: projects } = useGetProjectsQuery();
+  const { data: allInventory, refetch: refetchInventory } = useGetInventoryQuery();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId || null);
 
   React.useEffect(() => {
@@ -78,6 +83,42 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
   });
 
   const selectedProject = projects?.find((p: any) => p.id === selectedProjectId);
+
+  // Merge reserved projectMaterials with any available factory stock if none reserved yet
+  const displayedMaterials = useMemo(() => {
+    const reservedList = Array.isArray(projectMaterials) ? projectMaterials.filter((pm: any) => pm.inventory) : [];
+    if (reservedList.length > 0) return reservedList;
+
+    // Fallback: if this project has no explicit ProjectMaterial rows yet, show matching or available factory inventory items
+    if (!allInventory || !selectedProject) return [];
+    const pName = (selectedProject.name || '').trim().toLowerCase();
+    const pClient = (selectedProject.clientName || '').trim().toLowerCase();
+
+    const matchedInv = allInventory.filter((item: any) => {
+      const sup = (item.supplier || '').trim().toLowerCase();
+      if (pClient && sup === pClient) return true;
+      if (pName && sup === pName) return true;
+      if (Array.isArray(item.projectMaterials) && item.projectMaterials.some((pm: any) => pm.projectId === selectedProjectId || pm.project?.id === selectedProjectId)) return true;
+      if (Array.isArray(item.slabs) && item.slabs.some((s: any) => s.projectId === selectedProjectId || s.project?.id === selectedProjectId)) return true;
+      return false;
+    });
+
+    const sourceList = matchedInv.length > 0
+      ? matchedInv
+      : allInventory.filter((item: any) => item.jobWorkType === 'company' || (item.supplier || '').toLowerCase().includes('unnati'));
+
+    return sourceList.map((inv: any) => ({
+      id: `inv_${inv.id}`,
+      projectId: selectedProjectId,
+      inventoryId: inv.id,
+      quantity: inv.quantity,
+      procure: inv.procure || inv.quantity || 0,
+      used: inv.used || 0,
+      balance: inv.quantity || 0,
+      addedAt: inv.createdAt,
+      inventory: inv
+    }));
+  }, [projectMaterials, allInventory, selectedProject, selectedProjectId]);
 
   const handleApplyBulk = () => {
     const count = Math.max(1, Math.min(100, Number(bulkForm.count) || 1));
@@ -197,40 +238,63 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
 
         {selectedProjectId && (
           <Box>
-            {/* RESERVED MATERIALS SECTION */}
+            {/* RESERVED MATERIALS & STOCK LEDGER SECTION */}
             <Box sx={{ mb: 3.5 }}>
-              <Typography variant="subtitle1" fontWeight="800" color="#0F172A" mb={1.5} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                Currently Reserved Materials
-                {projectMaterials && projectMaterials.length > 0 && (
-                  <Chip label={`${projectMaterials.length} Items`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700 }} />
-                )}
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                <Typography variant="subtitle1" fontWeight="800" color="#0F172A" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  Currently Reserved Materials & Stock Ledger
+                  {displayedMaterials && displayedMaterials.length > 0 && (
+                    <Chip label={`${displayedMaterials.length} Items`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700 }} />
+                  )}
+                </Typography>
+
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<VisibilityIcon />}
+                  onClick={() => {
+                    const ledgerKey = selectedProject?.clientName || selectedProject?.name || 'Unnati Arts (Raw Stock)';
+                    onClose();
+                    navigate(`/inventory/ledger/${encodeURIComponent(ledgerKey)}`);
+                  }}
+                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 800, borderColor: '#0284C7', color: '#0284C7' }}
+                >
+                  Open Full Inventory Summary
+                </Button>
+              </Box>
               <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', border: '1px solid #E2E8F0', bgcolor: '#FFF', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
                 <TableContainer>
                   <Table size="small">
                     <TableHead sx={{ bgcolor: '#F8FAFC' }}>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>SOURCE</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>MATERIAL NAME</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>BLOCK NO.</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>UNIT</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>L x W x T</TableCell>
-                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>QTY (SQ.FT)</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem' }}>ACTIONS</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>DATE</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>SOURCE</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>MATERIAL NAME</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>BLOCK NO.</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>UNIT</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>L x W x T</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#0284C7', fontSize: '0.75rem' }}>PROCURE (+)</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#DC2626', fontSize: '0.75rem' }}>USED (-)</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: '#059669', fontSize: '0.75rem' }}>BALANCE</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>ACTIONS</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {materialsLoading ? (
-                        <TableRow><TableCell colSpan={7} align="center"><CircularProgress size={24} sx={{ my: 2 }} /></TableCell></TableRow>
-                      ) : projectMaterials && projectMaterials.length > 0 ? projectMaterials.map((pm: any) => {
+                        <TableRow><TableCell colSpan={10} align="center"><CircularProgress size={24} sx={{ my: 2 }} /></TableCell></TableRow>
+                      ) : displayedMaterials && displayedMaterials.length > 0 ? displayedMaterials.map((pm: any) => {
                         const inv = pm.inventory;
-                        const qtyNum = Number(pm.quantity || 0);
+                        const invId = inv?.id || pm.inventoryId;
+                        const procureNum = Number(pm.procure ?? inv?.procure ?? pm.quantity ?? inv?.quantity ?? 0);
+                        const usedNum = Number(pm.used ?? inv?.used ?? 0);
+                        const balanceNum = Number(pm.balance ?? inv?.balance ?? inv?.quantity ?? pm.quantity ?? 0);
+
                         let detectedUnit = 'Inches';
-                        if (inv?.length && inv?.width && qtyNum) {
+                        if (inv?.length && inv?.width && procureNum) {
                           const sqFtFromInches = (Number(inv.length) * Number(inv.width)) / 144;
-                          if (Math.abs(sqFtFromInches - qtyNum) < 0.05) {
+                          if (Math.abs(sqFtFromInches - procureNum) < 0.05) {
                             detectedUnit = 'Inches';
-                          } else if (Math.abs((Number(inv.length) * Number(inv.width)) - qtyNum) < 0.05) {
+                          } else if (Math.abs((Number(inv.length) * Number(inv.width)) - procureNum) < 0.05) {
                             detectedUnit = 'Sq. Feet';
                           } else if (inv.unit === 'sq_ft' || inv.unit === 'feet') {
                             detectedUnit = 'Sq. Feet';
@@ -240,7 +304,20 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                         }
 
                         return (
-                          <TableRow key={pm.id} hover>
+                          <TableRow
+                            key={pm.id}
+                            hover
+                            sx={{ cursor: 'pointer' }}
+                            onClick={() => {
+                              if (invId) {
+                                onClose();
+                                navigate(`/inventory/item/${invId}`);
+                              }
+                            }}
+                          >
+                            <TableCell sx={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>
+                              {new Date(pm.addedAt || inv?.createdAt || Date.now()).toLocaleDateString('en-GB')}
+                            </TableCell>
                             <TableCell>
                               {pm.inventory?.jobWorkType === 'client' ? (
                                 <Chip label="Client" size="small" color="info" variant="outlined" sx={{ fontWeight: 700 }} />
@@ -248,53 +325,86 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                                 <Chip label="Unnati Stock" size="small" color="success" variant="outlined" sx={{ fontWeight: 700 }} />
                               )}
                             </TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#0F172A' }}>{pm.inventory?.itemName}</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#0F172A' }}>{pm.inventory?.itemName}</TableCell>
                             <TableCell sx={{ fontWeight: 700 }}>{pm.inventory?.blockNumber || '-'}</TableCell>
                             <TableCell>
                               <Chip label={detectedUnit} size="small" sx={{ bgcolor: '#F1F5F9', color: '#334155', fontWeight: 600, fontSize: '0.72rem' }} />
                             </TableCell>
-                            <TableCell>{[pm.inventory?.length, pm.inventory?.width, pm.inventory?.thickness].filter(Boolean).join(' x ') || '-'}</TableCell>
-                            <TableCell sx={{ fontWeight: 800, color: '#059669' }}>{qtyNum.toFixed(2)} Sq.Ft</TableCell>
-                            <TableCell align="center">
-                              <Button 
-                                size="small" 
-                                variant="text"
-                                sx={{ mr: 1, textTransform: 'none', fontWeight: 700 }}
-                                onClick={async () => {
-                                  if (isEditingRef.current) return;
-                                  isEditingRef.current = true;
-                                  try {
-                                    setClientSlabs([{
-                                      materialName: pm.inventory?.itemName || '',
-                                      blockNo: pm.inventory?.blockNumber || '',
-                                      unit: detectedUnit === 'Inches' ? 'inch' : 'feet',
-                                      length: pm.inventory?.length || '',
-                                      width: pm.inventory?.width || '',
-                                      thickness: pm.inventory?.thickness || '',
-                                      isUnnati: pm.inventory?.jobWorkType !== 'client',
-                                      unnatiId: '',
-                                      unnatiQty: pm.quantity || ''
-                                    }]);
-                                    await deleteProjectMaterial({ projectId: selectedProjectId, materialId: pm.id }).unwrap();
-                                    refetchMaterials();
-                                  } finally {
-                                    isEditingRef.current = false;
-                                  }
-                                }}
-                              >
-                                Edit
-                              </Button>
-                              <IconButton color="error" size="small" onClick={async () => {
-                                await deleteProjectMaterial({ projectId: selectedProjectId, materialId: pm.id }).unwrap();
-                                refetchMaterials();
-                              }}>
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
+                            <TableCell sx={{ fontWeight: 600 }}>{[pm.inventory?.length, pm.inventory?.width, pm.inventory?.thickness].filter(Boolean).join(' x ') || '-'}</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: '#0284C7' }}>+{procureNum.toFixed(2)} Sq.Ft</TableCell>
+                            <TableCell sx={{ fontWeight: 800, color: usedNum > 0 ? '#DC2626' : '#94A3B8' }}>
+                              {usedNum > 0 ? `-${usedNum.toFixed(2)} Sq.Ft` : '0.00 Sq.Ft'}
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 900, color: '#059669' }}>{balanceNum.toFixed(2)} Sq.Ft</TableCell>
+                            <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+                                {invId && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<VisibilityIcon sx={{ fontSize: 15 }} />}
+                                    onClick={() => {
+                                      onClose();
+                                      navigate(`/inventory/item/${invId}`);
+                                    }}
+                                    sx={{
+                                      textTransform: 'none',
+                                      fontWeight: 800,
+                                      fontSize: '0.74rem',
+                                      borderRadius: 1.5,
+                                      py: 0.3,
+                                      px: 1.2,
+                                      borderColor: '#0284C7',
+                                      color: '#0284C7',
+                                      bgcolor: '#F0F9FF',
+                                      '&:hover': { bgcolor: '#E0F2FE' }
+                                    }}
+                                  >
+                                    View Ledger (+/-)
+                                  </Button>
+                                )}
+                                <Button 
+                                  size="small" 
+                                  variant="text"
+                                  sx={{ textTransform: 'none', fontWeight: 700, minWidth: 0, px: 1 }}
+                                  onClick={async () => {
+                                    if (isEditingRef.current) return;
+                                    isEditingRef.current = true;
+                                    try {
+                                      setClientSlabs([{
+                                        materialName: pm.inventory?.itemName || '',
+                                        blockNo: pm.inventory?.blockNumber || '',
+                                        unit: detectedUnit === 'Inches' ? 'inch' : 'feet',
+                                        length: pm.inventory?.length || '',
+                                        width: pm.inventory?.width || '',
+                                        thickness: pm.inventory?.thickness || '',
+                                        isUnnati: pm.inventory?.jobWorkType !== 'client',
+                                        unnatiId: '',
+                                        unnatiQty: pm.quantity || ''
+                                      }]);
+                                      await deleteProjectMaterial({ projectId: selectedProjectId, materialId: pm.id }).unwrap();
+                                      refetchMaterials();
+                                      refetchInventory();
+                                    } finally {
+                                      isEditingRef.current = false;
+                                    }
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                                <IconButton color="error" size="small" onClick={async () => {
+                                  await deleteProjectMaterial({ projectId: selectedProjectId, materialId: pm.id }).unwrap();
+                                  refetchMaterials();
+                                  refetchInventory();
+                                }}>
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
                             </TableCell>
                           </TableRow>
                         );
                       }) : (
-                        <TableRow><TableCell colSpan={7} align="center"><Typography color="textSecondary" sx={{ py: 3, fontWeight: 500 }}>No materials reserved yet for this project.</Typography></TableCell></TableRow>
+                        <TableRow><TableCell colSpan={10} align="center"><Typography color="textSecondary" sx={{ py: 3, fontWeight: 500 }}>No materials reserved yet for this project.</Typography></TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>

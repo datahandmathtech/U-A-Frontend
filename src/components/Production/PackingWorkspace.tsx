@@ -73,6 +73,10 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   const [hasBoxSize, setHasBoxSize] = useState<'yes' | 'no'>('no');
   const [boxLength, setBoxLength] = useState('');
   const [boxWidth, setBoxWidth] = useState('');
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
+  const [rangeQty, setRangeQty] = useState('');
+  const [boxRemarks, setBoxRemarks] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewBox, setViewBox] = useState<any>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -201,11 +205,15 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         const boxArea = boxPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || slab?.size), 0);
         const pieceCount = boxPieces.length;
 
+        const rawRemarks = (l.remarks || '').trim();
+        const isDefaultRemark = rawRemarks.startsWith(rawCode) || rawRemarks.startsWith(bName);
+
         return {
           logId: l.id,
           boxNumber: idx + 1,
           boxName: bName,
           boxSize: bSize,
+          remarks: isDefaultRemark ? '' : rawRemarks,
           pieceIds: boxPieces.map((p: any) => p.id),
           pieces: boxPieces,
           pieceCount,
@@ -347,17 +355,84 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     );
   };
 
-  // Open add box modal
+  // Open add box modal (Change 9: Always open modal directly and allow dynamic Piece Range / Count selection inside)
   const handleOpenAddBox = () => {
-    if (selectedPieceIds.length === 0) {
-      setToast({ open: true, message: 'Please select pieces from the left grid first to create a box', severity: 'error' });
-      return;
-    }
     setNewBoxName(`Box ${packedBoxes.length + 1}`);
     setHasBoxSize('no');
     setBoxLength('');
     setBoxWidth('');
+    setBoxRemarks('');
+
+    const unpackedReady = allPieces.filter((p: any) => !packedPieceIdMap.has(p.id));
+    if (selectedPieceIds.length > 0) {
+      const selObjs = allPieces.filter((p: any) => selectedPieceIds.includes(p.id));
+      const globals = selObjs.map((p: any) => Number(p.globalNumber) || 0).filter(Boolean);
+      if (globals.length > 0) {
+        setRangeFrom(String(Math.min(...globals)));
+        setRangeTo(String(Math.max(...globals)));
+      } else {
+        setRangeFrom('');
+        setRangeTo('');
+      }
+      setRangeQty(String(selectedPieceIds.length));
+    } else if (unpackedReady.length > 0) {
+      setRangeFrom(String(unpackedReady[0].globalNumber));
+      setRangeTo('');
+      setRangeQty('');
+    } else {
+      setRangeFrom('');
+      setRangeTo('');
+      setRangeQty('');
+    }
+
     setIsAddBoxOpen(true);
+  };
+
+  // Dynamic Range Selection inside Create Packing Box modal (e.g. From #1 To #50)
+  const handleApplyPieceRange = (fromVal: string, toVal: string) => {
+    setRangeFrom(fromVal);
+    setRangeTo(toVal);
+    const fNum = parseInt(fromVal, 10);
+    const tNum = parseInt(toVal, 10);
+    const unpackedReady = allPieces.filter((p: any) => !packedPieceIdMap.has(p.id));
+    if (!isNaN(fNum) && !isNaN(tNum) && tNum >= fNum) {
+      const matched = unpackedReady
+        .filter((p: any) => p.globalNumber >= fNum && p.globalNumber <= tNum)
+        .map((p: any) => p.id);
+      setSelectedPieceIds(matched);
+      setRangeQty(matched.length > 0 ? String(matched.length) : '');
+    } else if (!isNaN(fNum) && !toVal.trim()) {
+      const matched = unpackedReady
+        .filter((p: any) => p.globalNumber === fNum)
+        .map((p: any) => p.id);
+      setSelectedPieceIds(matched);
+      setRangeQty(matched.length > 0 ? String(matched.length) : '');
+    } else if (!fromVal.trim() && !toVal.trim()) {
+      setSelectedPieceIds([]);
+      setRangeQty('');
+    }
+  };
+
+  // Dynamic Count (Qty) Selection inside Create Packing Box modal (e.g. Enter 50 pieces -> auto-selects next 50 unpacked pieces)
+  const handleApplyPieceCount = (qtyVal: string) => {
+    setRangeQty(qtyVal);
+    const count = parseInt(qtyVal, 10);
+    const unpackedReady = allPieces.filter((p: any) => !packedPieceIdMap.has(p.id));
+    if (isNaN(count) || count <= 0) {
+      setSelectedPieceIds([]);
+      setRangeTo('');
+      return;
+    }
+    const fNum = parseInt(rangeFrom, 10);
+    const pool = !isNaN(fNum)
+      ? unpackedReady.filter((p: any) => p.globalNumber >= fNum)
+      : unpackedReady;
+    const picked = pool.slice(0, count);
+    setSelectedPieceIds(picked.map((p: any) => p.id));
+    if (picked.length > 0) {
+      setRangeFrom(String(picked[0].globalNumber));
+      setRangeTo(String(picked[picked.length - 1].globalNumber));
+    }
   };
 
   const handleSelectAllUnpacked = () => {
@@ -376,7 +451,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     const targetPieces = selectedPieceIds;
 
     if (targetPieces.length === 0) {
-      setToast({ open: true, message: 'Please select at least 1 piece to pack into the box', severity: 'error' });
+      setToast({ open: true, message: 'Please select a Piece Range (e.g. From #1 to #50) or Piece Count above to pack into the box', severity: 'error' });
       return;
     }
 
@@ -400,11 +475,13 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         boxes: [{
           boxName: bName,
           boxSize: bSize,
-          pieceIds: targetPieces
+          pieceIds: targetPieces,
+          remarks: boxRemarks.trim() || undefined
         }]
       }).unwrap();
 
       setSelectedPieceIds([]);
+      setBoxRemarks('');
       setIsAddBoxOpen(false);
       onRefresh();
       setToast({ open: true, message: `${bName} created with ${targetPieces.length} pieces!`, severity: 'success' });
@@ -935,6 +1012,11 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                               sx={{ mt: 0.5, height: 20, fontSize: '0.68rem', fontWeight: 700, bgcolor: '#F1F5F9', color: '#334155' }}
                             />
                           )}
+                          {b.remarks && (
+                            <Typography variant="caption" sx={{ color: '#0369A1', fontWeight: 700, display: 'block', mt: 0.5 }}>
+                              💬 Note: {b.remarks}
+                            </Typography>
+                          )}
                         </Box>
                       </Box>
 
@@ -1221,8 +1303,8 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         </Box>
       </Paper>
 
-      {/* CREATE BOX MODAL (Change 3: Removed Inch UI from Box Size inputs) */}
-      <Dialog open={isAddBoxOpen} onClose={() => setIsAddBoxOpen(false)} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}>
+      {/* CREATE BOX MODAL (Change 9: Dynamic Piece Range / Count Auto-Selector + Comment Box) */}
+      <Dialog open={isAddBoxOpen} onClose={() => setIsAddBoxOpen(false)} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}>
         <DialogTitle sx={{ fontWeight: 900, color: '#0F172A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
           Create Packing Box
           <IconButton onClick={() => setIsAddBoxOpen(false)} size="small"><CloseRoundedIcon fontSize="small" /></IconButton>
@@ -1232,11 +1314,116 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
             autoFocus
             fullWidth
             required
+            size="small"
             label="Box Name / Code *"
             value={newBoxName}
             onChange={(e) => setNewBoxName(e.target.value)}
-            sx={{ mb: 2.5, mt: 1 }}
+            sx={{ mb: 2, mt: 1 }}
           />
+
+          {/* Dynamic Piece Range & Count Selector (Change 9) */}
+          <Box sx={{ p: 2, mb: 2.5, bgcolor: '#F0F9FF', border: '1.5px solid #BAE6FD', borderRadius: 2.5 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25, flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0369A1' }}>
+                Select Pieces by Range or Count (Auto-Select) *
+              </Typography>
+              <Chip
+                label={`${pendingPiecesCount} Ready Unpacked Pieces`}
+                size="small"
+                sx={{ height: 20, fontSize: '0.68rem', fontWeight: 800, bgcolor: '#E0F2FE', color: '#0369A1' }}
+              />
+            </Box>
+
+            <Grid container spacing={1.5} alignItems="center">
+              <Grid item xs={4}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  type="number"
+                  label="From Piece #"
+                  placeholder="e.g. 1"
+                  value={rangeFrom}
+                  onChange={(e) => handleApplyPieceRange(e.target.value, rangeTo)}
+                  slotProps={{ input: { sx: { bgcolor: '#FFFFFF', borderRadius: 1.5, fontWeight: 800 } } }}
+                />
+              </Grid>
+              <Grid item xs={4}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  type="number"
+                  label="To Piece #"
+                  placeholder="e.g. 50"
+                  value={rangeTo}
+                  onChange={(e) => handleApplyPieceRange(rangeFrom, e.target.value)}
+                  slotProps={{ input: { sx: { bgcolor: '#FFFFFF', borderRadius: 1.5, fontWeight: 800 } } }}
+                />
+              </Grid>
+              <Grid item xs={4}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  type="number"
+                  label="Or Piece Count"
+                  placeholder="e.g. 50"
+                  value={rangeQty}
+                  onChange={(e) => handleApplyPieceCount(e.target.value)}
+                  slotProps={{ input: { sx: { bgcolor: '#FFFFFF', borderRadius: 1.5, fontWeight: 800 } } }}
+                />
+              </Grid>
+            </Grid>
+
+            {/* Quick Count Chips */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 1.25, flexWrap: 'wrap' }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', mr: 0.5 }}>
+                Quick Pick:
+              </Typography>
+              {[5, 10, 25, 50].map((cnt) => (
+                <Chip
+                  key={cnt}
+                  label={`Next ${cnt} Pcs`}
+                  size="small"
+                  onClick={() => handleApplyPieceCount(String(cnt))}
+                  sx={{
+                    cursor: 'pointer',
+                    fontWeight: 800,
+                    fontSize: '0.7rem',
+                    bgcolor: '#FFFFFF',
+                    border: '1px solid #BAE6FD',
+                    color: '#0284C7',
+                    '&:hover': { bgcolor: '#E0F2FE' }
+                  }}
+                />
+              ))}
+              <Chip
+                label={`All Ready (${pendingPiecesCount})`}
+                size="small"
+                onClick={() => handleApplyPieceCount(String(pendingPiecesCount))}
+                sx={{
+                  cursor: 'pointer',
+                  fontWeight: 800,
+                  fontSize: '0.7rem',
+                  bgcolor: '#0284C7',
+                  color: '#FFFFFF',
+                  '&:hover': { bgcolor: '#0369A1' }
+                }}
+              />
+            </Box>
+
+            {/* Selected Pieces Preview */}
+            <Box sx={{ mt: 1.5, pt: 1.25, borderTop: '1px dashed #BAE6FD' }}>
+              {selectedPieceIds.length > 0 ? (
+                <Typography variant="caption" sx={{ color: '#0F172A', fontWeight: 800, display: 'block' }}>
+                  ✓ {selectedPieceIds.length} Piece(s) Auto-Selected{' '}
+                  {rangeFrom && rangeTo ? `(Global #${rangeFrom} – #${rangeTo})` : ''}
+                </Typography>
+              ) : (
+                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+                  Enter a range (e.g. From #1 To #50) or Piece Count (e.g. 50) to auto-select pieces.
+                </Typography>
+              )}
+            </Box>
+          </Box>
 
           <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A', mb: 1 }}>
             Do you want to add Box Size? <Box component="span" sx={{ color: '#EF4444' }}>*</Box>
@@ -1246,7 +1433,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
             row
             value={hasBoxSize}
             onChange={(e) => setHasBoxSize(e.target.value as 'yes' | 'no')}
-            sx={{ mb: 2.5 }}
+            sx={{ mb: 2 }}
           >
             <FormControlLabel
               value="yes"
@@ -1314,21 +1501,28 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
             </Box>
           )}
 
-          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
-            {selectedPieceIds.length > 0
-              ? `${selectedPieceIds.length} piece(s) selected from grid will be assigned to this box.`
-              : 'Please select pieces from the left grid to pack into this box.'}
-          </Typography>
+          {/* Comment / Remarks Box (Change 9) */}
+          <TextField
+            fullWidth
+            multiline
+            rows={2}
+            size="small"
+            label="Comment / Box Notes (Optional)"
+            placeholder="e.g. Packed 50 pieces from Stone 1 to Stone 3, handle with care..."
+            value={boxRemarks}
+            onChange={(e) => setBoxRemarks(e.target.value)}
+            sx={{ mb: 1 }}
+          />
         </DialogContent>
         <DialogActions sx={{ p: 2, pt: 1 }}>
           <Button onClick={() => setIsAddBoxOpen(false)} color="inherit" sx={{ fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
           <Button 
             onClick={handleSaveBox} 
-            disabled={isPacking || isSubmitting}
+            disabled={isPacking || isSubmitting || selectedPieceIds.length === 0}
             variant="contained" 
             sx={{ bgcolor: '#0284C7', fontWeight: 800, textTransform: 'none', px: 3, borderRadius: 2, '&:hover': { bgcolor: '#0369A1' } }}
           >
-            {isPacking || isSubmitting ? 'Packing...' : 'Pack Box'}
+            {isPacking || isSubmitting ? 'Packing...' : `Pack Box (${selectedPieceIds.length} Pcs)`}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1340,9 +1534,16 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
           <IconButton onClick={() => setViewBox(null)} size="small"><CloseRoundedIcon fontSize="small" /></IconButton>
         </DialogTitle>
         <DialogContent>
-          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, mb: 2, display: 'block' }}>
+          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, mb: viewBox?.remarks ? 1 : 2, display: 'block' }}>
             {viewBox?.boxSize ? `Box Size: ${viewBox.boxSize} • ` : ''}Total {viewBox?.pieceCount} Pieces • {viewBox?.area} Sq.Ft • {viewBox?.packedOn}
           </Typography>
+          {viewBox?.remarks && (
+            <Box sx={{ p: 1.25, mb: 2, bgcolor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 2 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#0369A1', display: 'block' }}>
+                💬 Box Comment / Note: {viewBox.remarks}
+              </Typography>
+            </Box>
+          )}
           <Grid container spacing={1.5}>
             {(viewBox?.pieces || []).map((p: any) => {
               const pArea = parsePieceArea(p.size || p.slabSize || slab?.size);

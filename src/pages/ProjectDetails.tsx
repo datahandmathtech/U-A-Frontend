@@ -4829,25 +4829,74 @@ const ProjectDetails: React.FC = () => {
                         {hasPackingStage && hasDispatchStage && (
                           <ArrowForwardRoundedIcon sx={{ color: '#CBD5E1', display: { xs: 'none', sm: 'block' } }} />
                         )}
-                        {hasDispatchStage && (
-                          <Button
-                            variant="contained"
-                            startIcon={<LocalShippingRoundedIcon />}
-                            onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/dispatch`)}
-                            sx={{
-                              bgcolor: '#F1F5F9',
-                              color: '#64748B',
-                              fontWeight: 800,
-                              px: 3,
-                              py: 1.2,
-                              borderRadius: 2.5,
-                              textTransform: 'none',
-                              '&:hover': { bgcolor: '#E2E8F0' }
-                            }}
-                          >
-                            Dispatch (after packing)
-                          </Button>
-                        )}
+                        {hasDispatchStage && (() => {
+                          let readyPiecesCount = 0;
+                          let readyStonesCount = 0;
+                          (projectSlabs || []).forEach((s: any) => {
+                            const reqStages = (s.requiredStages || ['Production']).filter((st: string) => st !== 'Polishing');
+                            const requiresProduction = reqStages.includes('Production') || reqStages.length === 0;
+                            const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing'));
+                            const requiresBridgeCutting = reqStages.includes('Bridge Cutting');
+
+                            const checkPieceStageComplete = (p: any, stagePrefix: string) => {
+                              const hasPieceLog = p.logs && p.logs.some((l: any) =>
+                                l.stage?.startsWith(stagePrefix) &&
+                                (l.status === 'completed' || l.status === 'approved')
+                              );
+                              const hasProdLog = (productionLogs || []).some((l: any) =>
+                                l.approvalStatus === 'approved' &&
+                                l.stage?.startsWith(stagePrefix) &&
+                                Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)
+                              );
+                              const isDirectStageDone = (!p.logs || p.logs.length === 0) &&
+                                p.stage?.startsWith(stagePrefix) &&
+                                (p.status === 'completed' || p.status === 'approved');
+                              return Boolean(hasPieceLog || hasProdLog || isDirectStageDone);
+                            };
+
+                            if (Array.isArray(s.pieces) && s.pieces.length > 0) {
+                              let stoneReady = true;
+                              s.pieces.forEach((p: any) => {
+                                const isProdDone = !requiresProduction || checkPieceStageComplete(p, 'Production');
+                                const isBridgeDone = !requiresBridgeCutting || checkPieceStageComplete(p, 'Bridge Cutting');
+                                const isPolishDone = !requiresPolishing || checkPieceStageComplete(p, 'Polish');
+                                if (isProdDone && isBridgeDone && isPolishDone) {
+                                  readyPiecesCount++;
+                                } else {
+                                  stoneReady = false;
+                                }
+                              });
+                              if (stoneReady) readyStonesCount++;
+                            } else if (s.status === 'completed' || s.status === 'approved') {
+                              readyPiecesCount++;
+                              readyStonesCount++;
+                            }
+                          });
+
+                          const isDirectDispatchMode = !hasPackingStage;
+                          return (
+                            <Button
+                              variant="contained"
+                              startIcon={<LocalShippingRoundedIcon />}
+                              onClick={() => navigate(`/projects/${id}/slab/${projectSlabs?.[0]?.id || 'all'}/stage/dispatch`)}
+                              sx={{
+                                bgcolor: isDirectDispatchMode ? '#059669' : '#F1F5F9',
+                                color: isDirectDispatchMode ? '#FFFFFF' : '#64748B',
+                                fontWeight: 800,
+                                px: 3,
+                                py: 1.2,
+                                borderRadius: 2.5,
+                                textTransform: 'none',
+                                boxShadow: isDirectDispatchMode ? '0 2px 10px rgba(5, 150, 105, 0.25)' : 'none',
+                                '&:hover': { bgcolor: isDirectDispatchMode ? '#047857' : '#E2E8F0' }
+                              }}
+                            >
+                              {isDirectDispatchMode
+                                ? `Start Direct Dispatch (${readyStonesCount} Stones • ${readyPiecesCount} Pieces)`
+                                : 'Dispatch (after packing)'}
+                            </Button>
+                          );
+                        })()}
                       </Box>
                     </Paper>
                   )}

@@ -51,7 +51,7 @@ const InOutLedger: React.FC = () => {
   const [approveLog, { isLoading: isApproving }] = useApproveMaterialLogMutation();
   const [deleteProductionLog] = useDeleteProductionLogMutation();
 
-  const { data: vendorsData } = useGetVendorsQuery({});
+  const { data: vendorsData, refetch: refetchVendors } = useGetVendorsQuery({});
   const { data: staffData } = useGetStaffListQuery();
   const [createMaterialLog] = useCreateMaterialLogMutation();
   const [editProductionLog] = useEditProductionLogMutation();
@@ -69,7 +69,11 @@ const InOutLedger: React.FC = () => {
           ...data,
           source: 'admin_manual',
           startPhotos: { unit: data.photoUrl, machine: data.photoUrl, software: data.photoUrl },
-          vendors: data.transactionType === 'OUT' && data.assigneeType === 'vendor' ? [{ vendorId: data.vendorId, vendorName: data.vendorName, qty: data.quantityProduced }] : undefined,
+          vendors: (Array.isArray(data.vendors) && data.vendors.length > 0)
+            ? data.vendors
+            : (data.transactionType === 'OUT' && data.assigneeType === 'vendor'
+              ? [{ vendorId: data.vendorId, vendorName: data.vendorName, stage: data.stage || 'Production', qty: data.quantityProduced }]
+              : undefined),
         }).unwrap();
         setToast({ open: true, message: 'Log created successfully', severity: 'success' });
       }
@@ -77,6 +81,7 @@ const InOutLedger: React.FC = () => {
       setEditLogOpen(false);
       setSelectedEditLog(null);
       refetch();
+      refetchVendors();
     } catch (err: any) {
       setToast({ open: true, message: err?.data?.message || 'Failed to save log', severity: 'error' });
     }

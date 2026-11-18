@@ -478,19 +478,15 @@ export const apiSlice = createApi({
     }),
     updateMaterialLog: builder.mutation<any, { id: string; returnedQty: number; returnDate: string }>({
       query: ({ id, returnedQty, returnDate }) => ({ url: `/production/${id}/return`, method: 'PATCH', body: { returnedQty, returnDate } }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Vendor']
     }),
     editProductionLog: builder.mutation<any, { id: string; data: any }>({
       query: ({ id, data }) => ({ url: `/production/${id}`, method: 'PUT', body: data }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Vendor']
     }),
     deleteProductionLog: builder.mutation<any, string>({
       query: (id) => ({ url: `/production/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Production']
-    }),
-    editProductionLog: builder.mutation<any, { id: string; data: any }>({
-      query: ({ id, data }) => ({ url: `/production/${id}`, method: 'PUT', body: data }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Vendor']
     }),
     addManualAttendance: builder.mutation<any, { userId: string, checkIn: string, checkOut?: string, date?: string }>({
       query: (data) => ({
@@ -576,7 +572,7 @@ export const apiSlice = createApi({
     }),
     createMaterialLog: builder.mutation<any, Partial<any>>({
       query: (body) => ({ url: '/production/material-log', method: 'POST', body }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Vendor']
     }),
     getPendingApprovals: builder.query<any[], void>({
       query: () => '/production/pending-approvals',
@@ -584,7 +580,7 @@ export const apiSlice = createApi({
     }),
     approveMaterialLog: builder.mutation<any, { id: string, data: any }>({
       query: ({ id, data }) => ({ url: `/production/${id}/approve`, method: 'PATCH', body: data }),
-      invalidatesTags: ['Production', 'Inventory', 'Project']
+      invalidatesTags: ['Production', 'Inventory', 'Project', 'Vendor']
     }),
     getApprovedLogs: builder.query<any[], void>({
       query: () => '/production/approved-logs',
@@ -600,7 +596,7 @@ export const apiSlice = createApi({
     }),
     updateReturnQty: builder.mutation<any, { id: string, returnedQty: number, returnDate: string }>({
       query: ({ id, returnedQty, returnDate }) => ({ url: `/production/${id}/return`, method: 'PATCH', body: { returnedQty, returnDate } }),
-      invalidatesTags: ['Production']
+      invalidatesTags: ['Production', 'Vendor']
     }),
     // QUICK PRODUCT DIRECT ACTIONS
     quickCompletePiece: builder.mutation<any, { slabId: string; pieceId?: string; machineId?: string; driverName?: string; photoUrl?: string; stage?: string; remarks?: string }>({

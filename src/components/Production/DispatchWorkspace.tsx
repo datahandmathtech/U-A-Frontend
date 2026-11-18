@@ -80,18 +80,53 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
   const allPieces = useMemo(() => {
     const combined: any[] = [];
     (slabs || []).forEach((s: any) => {
-      if (Array.isArray(s.pieces)) {
+      if (Array.isArray(s.pieces) && s.pieces.length > 0) {
         s.pieces.forEach((p: any) => combined.push({ ...p, slabId: s.id, slabName: s.name }));
+      } else if (s?.id) {
+        combined.push({
+          id: s.id,
+          slabId: s.id,
+          slabName: s.name,
+          pieceNumber: 1,
+          productName: `${s.name}.1`,
+          size: s.size,
+          status: s.status,
+          stage: 'Production'
+        });
       }
     });
     if (combined.length > 0) return combined;
-    if (slab?.pieces && Array.isArray(slab.pieces)) return slab.pieces;
+    if (slab?.pieces && Array.isArray(slab.pieces) && slab.pieces.length > 0) return slab.pieces;
+    if (slab?.id) {
+      return [{
+        id: slab.id,
+        slabId: slab.id,
+        slabName: slab.name,
+        pieceNumber: 1,
+        productName: `${slab.name}.1`,
+        size: slab.size,
+        status: slab.status,
+        stage: 'Production'
+      }];
+    }
     return [];
   }, [slab, slabs]);
 
-  // Derive packed boxes from production logs with stage Packing (only for existing pieces)
-  const packedBoxes = useMemo(() => {
-    if (allPieces.length === 0) return [];
+  const sourceSlabs = useMemo(() => {
+    return (slabs && slabs.length > 0) ? slabs : (slab ? [slab] : []);
+  }, [slab, slabs]);
+
+  const hasPackingStage = useMemo(() => {
+    return sourceSlabs.some((s: any) => Array.isArray(s.requiredStages) && s.requiredStages.includes('Packing'));
+  }, [sourceSlabs]);
+
+  const hasPolishingStage = useMemo(() => {
+    return sourceSlabs.some((s: any) => Array.isArray(s.requiredStages) && s.requiredStages.some((st: string) => st.startsWith('Polishing')));
+  }, [sourceSlabs]);
+
+  // Derive packed boxes from production logs with stage Packing, OR Direct Main Stones when project has no Packing stage
+  const { packedBoxes, isDirectDispatchMode } = useMemo(() => {
+    if (allPieces.length === 0) return { packedBoxes: [], isDirectDispatchMode: !hasPackingStage };
     const logs = (productionLogs || []).filter((l: any) =>
       (l.stage === 'Packing' || l.stage === 'Packing Work') &&
       (l.approvalStatus === 'approved' || l.approvalStatus === 'completed')
@@ -130,13 +165,81 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
           pieces: boxPieces,
           pieceCount,
           area: boxArea.toFixed(2),
+          isDirectStone: false,
           packedOn: l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + new Date(l.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Packed'
         };
       })
       .filter(Boolean);
 
-    return validBoxes.map((b: any, i: number) => ({ ...b, boxNumber: i + 1 }));
-  }, [productionLogs, slab, allPieces]);
+    if (validBoxes.length > 0) {
+      return {
+        packedBoxes: validBoxes.map((b: any, i: number) => ({ ...b, boxNumber: i + 1 })),
+        isDirectDispatchMode: false
+      };
+    }
+
+    // Change 3: When project has Production -> Dispatch (no Packing stage, or 0 boxes packed), list Completed Main Stones directly for truck loading
+    if (!hasPackingStage || validBoxes.length === 0) {
+      const checkPieceStageComplete = (p: any, stagePrefix: string) => {
+        const hasPieceLog = p.logs && p.logs.some((l: any) =>
+          l.stage?.startsWith(stagePrefix) &&
+          (l.status === 'completed' || l.status === 'approved')
+        );
+        const hasProdLog = (productionLogs || []).some((l: any) =>
+          l.approvalStatus === 'approved' &&
+          l.stage?.startsWith(stagePrefix) &&
+          Array.isArray(l.pieceIds) && l.pieceIds.includes(p.id)
+        );
+        const isDirectStageDone = (!p.logs || p.logs.length === 0) &&
+          p.stage?.startsWith(stagePrefix) &&
+          (p.status === 'completed' || p.status === 'approved');
+        return Boolean(hasPieceLog || hasProdLog || isDirectStageDone);
+      };
+
+      const directStones = sourceSlabs
+        .map((s: any, idx: number) => {
+          const reqStages = (s.requiredStages || ['Production']).filter((st: string) => st !== 'Polishing');
+          const requiresProduction = reqStages.includes('Production') || reqStages.length === 0;
+          const requiresPolishing = reqStages.some((st: string) => st.startsWith('Polishing'));
+          const requiresBridgeCutting = reqStages.includes('Bridge Cutting');
+
+          const stonePieces = allPieces.filter((p: any) => p.slabId === s.id);
+          const readyPieces = stonePieces.filter((p: any) => {
+            if (s.status === 'completed' || s.status === 'approved' || p.stage === 'Dispatch') return true;
+            const isProdDone = !requiresProduction || checkPieceStageComplete(p, 'Production');
+            const isBridgeDone = !requiresBridgeCutting || checkPieceStageComplete(p, 'Bridge Cutting');
+            const isPolishDone = !requiresPolishing || checkPieceStageComplete(p, 'Polish');
+            return Boolean(isProdDone && isBridgeDone && isPolishDone);
+          });
+
+          if (readyPieces.length === 0) return null;
+          const stoneArea = readyPieces.reduce((sum: number, p: any) => sum + parsePieceArea(p.size || s.size), 0);
+          const cleanSpec = (s.size || 'Standard').split('(')[0].trim();
+
+          return {
+            logId: `stone_${s.id}`,
+            slabId: s.id,
+            boxNumber: idx + 1,
+            boxName: s.name || `Stone ${idx + 1}`,
+            boxSize: cleanSpec,
+            pieceIds: readyPieces.map((p: any) => p.id),
+            pieces: readyPieces,
+            pieceCount: readyPieces.length,
+            area: stoneArea.toFixed(2),
+            isDirectStone: true,
+            packedOn: 'Ready for Direct Truck Load'
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        packedBoxes: directStones.map((b: any, i: number) => ({ ...b, boxNumber: i + 1 })),
+        isDirectDispatchMode: true
+      };
+    }
+
+    return { packedBoxes: [], isDirectDispatchMode: false };
+  }, [productionLogs, slab, allPieces, hasPackingStage, sourceSlabs]);
 
   // Derive all dispatch batches (each represents a vehicle dispatch for existing pieces)
   const dispatchBatches = useMemo(() => {
@@ -407,10 +510,16 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, bgcolor: '#FFFDF5', border: '1px solid #FDE68A', px: 2, py: 1, borderRadius: 2.5 }}>
-              <Inventory2RoundedIcon sx={{ color: '#D97706', fontSize: 24 }} />
+              {isDirectDispatchMode ? (
+                <LayersRoundedIcon sx={{ color: '#D97706', fontSize: 24 }} />
+              ) : (
+                <Inventory2RoundedIcon sx={{ color: '#D97706', fontSize: 24 }} />
+              )}
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 900, color: '#B45309', lineHeight: 1 }}>{totalBoxesCount}</Typography>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: '#D97706', textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Boxes</Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#D97706', textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                  {isDirectDispatchMode ? 'Main Stones' : 'Total Boxes'}
+                </Typography>
               </Box>
             </Box>
 
@@ -434,40 +543,65 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
           </Box>
           <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
 
-          {/* Step 2: Polishing */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CheckCircleRoundedIcon sx={{ color: '#16A34A', fontSize: 20 }} />
-            <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem' }}>Polishing</Typography>
-          </Box>
-          <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
+          {/* Step 2: Polishing (only if required) */}
+          {hasPolishingStage && (
+            <>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CheckCircleRoundedIcon sx={{ color: '#16A34A', fontSize: 20 }} />
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem' }}>Polishing</Typography>
+              </Box>
+              <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
+            </>
+          )}
 
-          {/* Step 3: Packing */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CheckCircleRoundedIcon sx={{ color: '#16A34A', fontSize: 20 }} />
-            <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem' }}>Packing</Typography>
-          </Box>
-          <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
+          {/* Step 3: Packing (only if required) */}
+          {!isDirectDispatchMode && (
+            <>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CheckCircleRoundedIcon sx={{ color: '#16A34A', fontSize: 20 }} />
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem' }}>Packing</Typography>
+              </Box>
+              <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
+            </>
+          )}
 
-          {/* Step 4: Dispatch (Active) */}
+          {/* Final Step: Dispatch (Active) */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#059669', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.75rem' }}>
-              4
+              {isDirectDispatchMode ? (hasPolishingStage ? 3 : 2) : 4}
             </Box>
-            <Typography variant="body2" sx={{ fontWeight: 900, color: '#0F172A', fontSize: '0.85rem' }}>Dispatch</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 900, color: '#0F172A', fontSize: '0.85rem' }}>
+              {isDirectDispatchMode ? 'Direct Truck Dispatch' : 'Dispatch'}
+            </Typography>
           </Box>
         </Box>
       </Paper>
 
-      {/* 2. MAIN 2-COLUMN VIEW (Packed Boxes Table + Dispatch Vehicle Details) */}
+      {/* 2. MAIN 2-COLUMN VIEW (Packed Boxes / Direct Stones Table + Dispatch Vehicle Details) */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2.5, mb: 3, width: '100%', minWidth: 0 }}>
-        {/* LEFT COLUMN: PACKED BOXES TABLE */}
+        {/* LEFT COLUMN: PACKED BOXES OR DIRECT STONES TABLE */}
         <Box sx={{ minWidth: 0 }}>
           <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 460 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
-              <Inventory2RoundedIcon sx={{ color: '#0284C7', fontSize: 22 }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A' }}>
-                Packed Boxes ({packedBoxes.length})
-              </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.25, mb: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                {isDirectDispatchMode ? (
+                  <LayersRoundedIcon sx={{ color: '#059669', fontSize: 22 }} />
+                ) : (
+                  <Inventory2RoundedIcon sx={{ color: '#0284C7', fontSize: 22 }} />
+                )}
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A' }}>
+                  {isDirectDispatchMode
+                    ? `Main Stones for Direct Dispatch (${packedBoxes.length})`
+                    : `Packed Boxes (${packedBoxes.length})`}
+                </Typography>
+              </Box>
+              {isDirectDispatchMode && (
+                <Chip
+                  label="Direct Truck Load (No Box Packing)"
+                  size="small"
+                  sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 800, fontSize: '0.7rem', border: '1px solid #A7F3D0' }}
+                />
+              )}
             </Box>
 
             <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: 2.5, overflow: 'hidden' }}>
@@ -485,10 +619,10 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                       />
                     </TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
-                      Box No.
+                      {isDirectDispatchMode ? 'Main Stone Name' : 'Box No.'}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
-                      Box Size (L × W)
+                      {isDirectDispatchMode ? 'Stone Spec (L × W)' : 'Box Size (L × W)'}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
                       Pieces (Qty)
@@ -505,7 +639,9 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                   {packedBoxes.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} align="center" sx={{ py: 6, color: '#94A3B8' }}>
-                        No packed boxes found. Please pack pieces first in the Packing Workspace.
+                        {isDirectDispatchMode
+                          ? 'No completed main stones found yet. Complete Production first to load directly into the truck.'
+                          : 'No packed boxes found. Please pack pieces first in the Packing Workspace.'}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -534,7 +670,11 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                           </TableCell>
                           <TableCell sx={{ py: 1.5 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Inventory2RoundedIcon sx={{ color: isDispatched ? '#059669' : '#0284C7', fontSize: 18 }} />
+                              {b.isDirectStone ? (
+                                <LayersRoundedIcon sx={{ color: isDispatched ? '#059669' : '#0284C7', fontSize: 18 }} />
+                              ) : (
+                                <Inventory2RoundedIcon sx={{ color: isDispatched ? '#059669' : '#0284C7', fontSize: 18 }} />
+                              )}
                               <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.85rem' }}>
                                 {b.boxName}
                               </Typography>
@@ -549,7 +689,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                           </TableCell>
                           <TableCell sx={{ py: 1.5 }}>
                             <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.82rem' }}>
-                              {b.pieceCount} Pieces
+                              {b.pieceCount} {b.pieceCount === 1 ? 'Piece' : 'Pieces'}
                             </Typography>
                           </TableCell>
                           <TableCell sx={{ py: 1.5 }}>
@@ -561,7 +701,11 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                             {isDispatched ? (
                               <Chip label="Dispatched" size="small" sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 800, fontSize: '0.7rem' }} />
                             ) : (
-                              <Chip label="Packed" size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 800, fontSize: '0.7rem' }} />
+                              <Chip
+                                label={b.isDirectStone ? 'Ready for Truck' : 'Packed'}
+                                size="small"
+                                sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 800, fontSize: '0.7rem' }}
+                              />
                             )}
                           </TableCell>
                         </TableRow>
@@ -733,18 +877,25 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         </Box>
       </Box>
 
-      {/* 3. DISPATCH BOXES ACTION BAR (Under 2 Columns, exact match to Image 5) */}
+      {/* 3. DISPATCH BOXES / STONES ACTION BAR (Under 2 Columns, exact match to Image 5) */}
       <Box sx={{ mb: 3, p: 2, bgcolor: '#F0F9FF', border: '1.5px solid #BAE6FD', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <LocalShippingRoundedIcon sx={{ color: '#0284C7', fontSize: 24 }} />
           <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A' }}>
-            Dispatch Boxes <Typography component="span" variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>(Select packed boxes for this vehicle)</Typography>
+            {isDirectDispatchMode ? 'Direct Stone Dispatch' : 'Dispatch Boxes'}{' '}
+            <Typography component="span" variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+              ({isDirectDispatchMode ? 'Select main stones to load directly into this vehicle' : 'Select packed boxes for this vehicle'})
+            </Typography>
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Typography variant="body2" sx={{ fontWeight: 800, color: '#0369A1' }}>
-            Selected: <strong>{selectedBoxes.length} Box{selectedBoxes.length !== 1 ? 'es' : ''}</strong> | <strong>{selectedPiecesCount} Pieces</strong> | <strong>{selectedArea} Sq.Ft</strong>
+            Selected:{' '}
+            <strong>
+              {selectedBoxes.length} {isDirectDispatchMode ? (selectedBoxes.length !== 1 ? 'Stones' : 'Stone') : (selectedBoxes.length !== 1 ? 'Boxes' : 'Box')}
+            </strong>{' '}
+            | <strong>{selectedPiecesCount} Pieces</strong> | <strong>{selectedArea} Sq.Ft</strong>
           </Typography>
 
           <Button
@@ -803,7 +954,9 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                 <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>#</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Vehicle Number</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Driver Name</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Boxes Dispatched</TableCell>
+                <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
+                  {isDirectDispatchMode ? 'Stones Dispatched' : 'Boxes Dispatched'}
+                </TableCell>
                 <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Pieces</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Area (Sq.Ft)</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>Dispatch Time</TableCell>

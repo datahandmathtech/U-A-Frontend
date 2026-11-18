@@ -104,9 +104,30 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
   // Key format: "${pieceId}__${stageName}"
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
-  const { data: projectSlabs, isLoading: isSlabsLoading, refetch: refetchSlabs } = useGetSlabsQuery(selectedProjectId, { 
+  const { data: rawProjectSlabs, isLoading: isSlabsLoading, refetch: refetchSlabs } = useGetSlabsQuery(selectedProjectId, { 
     skip: !selectedProjectId
   });
+
+  // Changes 1 & 2: Ensure single slabs with 0 pieces always expose 1 inside piece for Manual Approval
+  const projectSlabs = useMemo(() => {
+    if (!rawProjectSlabs) return undefined;
+    return rawProjectSlabs.map((s: any) => {
+      if (Array.isArray(s.pieces) && s.pieces.length > 0) return s;
+      const isDone = s.status === 'completed' || s.status === 'approved';
+      return {
+        ...s,
+        pieces: [{
+          id: `__SLAB__${s.id}`,
+          pieceNumber: 1,
+          productName: `${s.name || 'Slab'}.1`,
+          size: s.size || '',
+          stage: 'Production',
+          status: isDone ? 'completed' : 'pending',
+          logs: isDone ? [{ stage: 'Production', status: 'approved' }] : []
+        }]
+      };
+    });
+  }, [rawProjectSlabs]);
 
   const [manualApprovePieces, { isLoading: isApproving }] = useManualApprovePiecesMutation();
 

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Box, TextField, MenuItem, Button, Typography, Switch, FormControlLabel, RadioGroup, Radio, FormControl, IconButton, Paper, Autocomplete, InputAdornment, Chip, Divider } from '@mui/material';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OutputIcon from '@mui/icons-material/Output';
 import InputIcon from '@mui/icons-material/Input';
@@ -74,6 +75,25 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
   ]);
 
   const [loading, setLoading] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const stopCameraStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraOpen(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (open && initialData) {
@@ -175,11 +195,13 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
     }
   };
 
-  const handlePhotoUpload = () => {
+  const handlePhotoUpload = (useCameraCapture = false) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    // Remove capture="environment" to allow both File Manager and Camera on all devices.
+    if (useCameraCapture) {
+      input.setAttribute('capture', 'environment');
+    }
     input.onchange = (e: any) => {
       const file = e.target.files[0];
       if (file) {
@@ -201,11 +223,57 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          setFormData({ ...formData, photoUrl: canvas.toDataURL('image/jpeg', 0.6) });
+          setFormData(prev => ({ ...prev, photoUrl: canvas.toDataURL('image/jpeg', 0.6) }));
         };
       }
     };
     input.click();
+  };
+
+  const handleOpenLiveCamera = async () => {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false
+        });
+        streamRef.current = stream;
+        setCameraOpen(true);
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(() => {});
+          }
+        }, 100);
+        return;
+      } catch (err) {
+        console.warn('Live camera access failed, falling back to capture input:', err);
+      }
+    }
+    handlePhotoUpload(true);
+  };
+
+  const handleCaptureSnapshot = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    let width = video.videoWidth || 640;
+    let height = video.videoHeight || 480;
+    const MAX = 800;
+    if (width > height && width > MAX) {
+      height *= MAX / width;
+      width = MAX;
+    } else if (height > MAX) {
+      width *= MAX / height;
+      height = MAX;
+    }
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(video, 0, 0, width, height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    setFormData(prev => ({ ...prev, photoUrl: dataUrl }));
+    stopCameraStream();
   };
 
   return (
@@ -303,7 +371,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
               </Box>
 
               {vendorRows.map((row, index) => {
-                const DEFAULT_STAGES = ['Production', 'Polishing - Honed', 'Polishing - Mirror', 'Polishing', 'Packing', 'Dispatch', 'Spare Parts', 'Fabrication', 'Grooving', 'CNC Cutting', 'Inlay Work', 'Carving'];
+                const DEFAULT_STAGES = ['Production', 'Spare Part', 'Spare Parts', 'Polishing - Honed', 'Polishing - Mirror', 'Polishing', 'Packing', 'Dispatch', 'Fabrication', 'Grooving', 'CNC Cutting', 'Inlay Work', 'Carving'];
                 const isCustomStage = !DEFAULT_STAGES.includes(row.stage);
 
                 return (
@@ -374,6 +442,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                         slotProps={{ input: { sx: { borderRadius: 2, bgcolor: '#F8FAFC' } } }}
                       >
                         <MenuItem value="Production">Production</MenuItem>
+                        <MenuItem value="Spare Part">Spare Part</MenuItem>
                         <MenuItem value="Polishing - Honed">Polishing - Honed</MenuItem>
                         <MenuItem value="Polishing - Mirror">Polishing - Mirror</MenuItem>
                         <MenuItem value="Polishing">Polishing</MenuItem>
@@ -465,6 +534,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 >
                   <MenuItem value="Production">Production</MenuItem>
+                  <MenuItem value="Spare Part">Spare Part</MenuItem>
                   <MenuItem value="Polishing">Polishing</MenuItem>
                   <MenuItem value="Packing">Packing</MenuItem>
                   <MenuItem value="Dispatch">Dispatch</MenuItem>
@@ -542,19 +612,81 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
           />
 
-          {/* Verification Photo Upload Section (Matching Image 1) */}
+          {/* Verification Photo Upload Section (Change 4: Both Click Photo (Camera) and Upload Photo options) */}
           <Box sx={{ pt: 1 }}>
             <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 1 }}>
-              Upload Verification Photos
+              Upload Verification Photos *
             </Typography>
+            <Box sx={{ display: 'flex', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
+              <Button
+                variant="outlined"
+                startIcon={<PhotoCameraIcon />}
+                onClick={handleOpenLiveCamera}
+                sx={{
+                  flex: 1,
+                  minWidth: 160,
+                  py: 1.2,
+                  borderRadius: 2.5,
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  borderColor: '#0284C7',
+                  color: '#0284C7',
+                  bgcolor: '#F0F9FF',
+                  '&:hover': { bgcolor: '#E0F2FE', borderColor: '#0369A1' }
+                }}
+              >
+                Click Photo (Camera)
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => handlePhotoUpload(false)}
+                sx={{
+                  flex: 1,
+                  minWidth: 160,
+                  py: 1.2,
+                  borderRadius: 2.5,
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  borderColor: '#64748B',
+                  color: '#334155',
+                  bgcolor: '#F8FAFC',
+                  '&:hover': { bgcolor: '#F1F5F9', borderColor: '#475569' }
+                }}
+              >
+                Upload Photo (Gallery)
+              </Button>
+            </Box>
             <Box sx={{ display: 'flex', justifyContent: 'center' }}>
               <ImageUploadBox 
-                label={formData.photoUrl ? "START PHOTO (TAP TO RETAKE)" : "START PHOTO *"} 
+                label={formData.photoUrl ? "START PHOTO ATTACHED (TAP TO CHANGE)" : "START PHOTO PREVIEW"} 
                 previewUrl={formData.photoUrl} 
-                onClick={handlePhotoUpload} 
+                onClick={() => handlePhotoUpload(false)} 
               />
             </Box>
           </Box>
+
+          {/* Live Camera Viewfinder Dialog */}
+          <Dialog open={cameraOpen} onClose={stopCameraStream} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+            <DialogTitle sx={{ fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              Click Verification Photo
+              <IconButton size="small" onClick={stopCameraStream}><CloseIcon fontSize="small" /></IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ p: 2, textAlign: 'center' }}>
+              <Box sx={{ width: '100%', borderRadius: 2.5, overflow: 'hidden', bgcolor: '#000', mb: 2 }}>
+                <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', maxHeight: 320, display: 'block', objectFit: 'cover' }} />
+              </Box>
+              <Button
+                variant="contained"
+                fullWidth
+                startIcon={<PhotoCameraIcon />}
+                onClick={handleCaptureSnapshot}
+                sx={{ py: 1.2, borderRadius: 2, fontWeight: 800, bgcolor: '#059669', '&:hover': { bgcolor: '#047857' } }}
+              >
+                Capture Photo Now
+              </Button>
+            </DialogContent>
+          </Dialog>
 
         </Box>
       </DialogContent>

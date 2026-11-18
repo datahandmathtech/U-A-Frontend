@@ -312,6 +312,7 @@ const Projects: React.FC = () => {
           thickness: thickness || (matchedQuoteProd?.breadth ? String(matchedQuoteProd.breadth) : (matchedQuoteProd?.thickness ? String(matchedQuoteProd.thickness) : '')),
           unit: resolvedUnit,
           dimensionUnit: dimensionUnit || matchedQuoteProd?.dimensionUnit || 'inch',
+          qty: matchedQuoteProd?.qty || 1,
           rate: matchedQuoteProd?.rate || 0,
           amount: matchedQuoteProd?.amount || 0,
           photo: matchedQuoteProd?.photo
@@ -339,6 +340,7 @@ const Projects: React.FC = () => {
           thickness: p.breadth ? String(p.breadth) : (p.thickness ? String(p.thickness) : ''),
           unit: p.unit || 'pieces',
           dimensionUnit: p.dimensionUnit || (isPieces ? 'inch' : u),
+          qty: p.qty || 1,
           rate: p.rate || 0,
           amount: p.amount || 0,
           photo: p.photo
@@ -347,7 +349,7 @@ const Projects: React.FC = () => {
     });
 
     if (loadedProducts.length === 0) {
-      loadedProducts = [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch' }];
+      loadedProducts = [{ name: '', length: '', width: '', thickness: '', unit: 'pieces', dimensionUnit: 'inch', qty: 1 }];
     }
 
     setFormData({
@@ -405,7 +407,20 @@ const Projects: React.FC = () => {
     try {
       const existingProject = freshEditingProject || projectsData?.find((p: any) => p.id === editingProjectId);
       if (editingProjectId && existingProject) {
-        const validProducts = (formData.products || []).filter((p: any) => p.name && p.name.trim());
+        const rawValidProducts = (formData.products || []).filter((p: any) => p.name && p.name.trim());
+        const validProducts: any[] = [];
+        for (const p of rawValidProducts) {
+          const u = (p.unit || 'pieces').toLowerCase().trim();
+          const isPcs = u === 'pieces' || u === 'piece' || u === 'pcs';
+          const count = isPcs ? Math.max(1, parseInt(String(p.qty || 1), 10) || 1) : 1;
+          if (!p.id && count > 1) {
+            for (let k = 1; k <= count; k++) {
+              validProducts.push({ ...p, name: `${p.name.trim()} ${k}`, qty: 1 });
+            }
+          } else {
+            validProducts.push({ ...p, qty: count });
+          }
+        }
         const existingSlabsList: any[] = Array.isArray(existingProject.slabs) ? existingProject.slabs : [];
         for (const prod of validProducts) {
           const matchedSlab = existingSlabsList.find((s: any) =>
@@ -509,32 +524,36 @@ const Projects: React.FC = () => {
             const sqft = isFt ? l * w : (isMM ? (l * w) / 92903.04 : (l * w) / 144);
             const calcSqFt = sqft.toFixed(2);
             const sizeFormatted = `${l}L x ${w}W ${unitLabel}${prod.thickness ? ` | ${prod.thickness}MM` : ''} (${calcSqFt} Sq.Ft)`;
+            const qtyCount = isPieces ? Math.max(1, parseInt(String(prod.qty || 1), 10) || 1) : 1;
 
-            const createdSlab = await createSlab({
-              projectId: createdProject.id,
-              name: prod.name.trim(),
-              size: sizeFormatted,
-              cost: 0,
-              requiredStages: ['Production']
-            }).unwrap();
+            for (let k = 1; k <= qtyCount; k++) {
+              const slabName = qtyCount > 1 ? `${prod.name.trim()} ${k}` : prod.name.trim();
+              const createdSlab = await createSlab({
+                projectId: createdProject.id,
+                name: slabName,
+                size: sizeFormatted,
+                cost: 0,
+                requiredStages: ['Production']
+              }).unwrap();
 
-            quotationProducts.push({
-              id: createdSlab?.id || `prod_${Date.now()}_${i}`,
-              slabId: createdSlab?.id,
-              category: prod.name.trim(),
-              productName: prod.name.trim(),
-              name: prod.name.trim(),
-              unit: (prod.unit && prod.unit.toLowerCase() !== 'pieces') ? prod.unit : (dimUnit === 'sq_ft' ? 'Sq. Ft' : dimUnit),
-              dimensionUnit: dimUnit,
-              length: l,
-              width: w,
-              breadth: parseFloat(prod.thickness) || 0,
-              thickness: parseFloat(prod.thickness) || 0,
-              qty: 1,
-              rate: 0,
-              amount: 0,
-              sqft: Number(calcSqFt)
-            });
+              quotationProducts.push({
+                id: createdSlab?.id || `prod_${Date.now()}_${i}_${k}`,
+                slabId: createdSlab?.id,
+                category: slabName,
+                productName: slabName,
+                name: slabName,
+                unit: (prod.unit && prod.unit.toLowerCase() !== 'pieces') ? prod.unit : (dimUnit === 'sq_ft' ? 'Sq. Ft' : dimUnit),
+                dimensionUnit: dimUnit,
+                length: l,
+                width: w,
+                breadth: parseFloat(prod.thickness) || 0,
+                thickness: parseFloat(prod.thickness) || 0,
+                qty: 1,
+                rate: 0,
+                amount: 0,
+                sqft: Number(calcSqFt)
+              });
+            }
           }
 
           if (quotationProducts.length > 0) {
@@ -1823,33 +1842,50 @@ const Projects: React.FC = () => {
                             </FormControl>
                           </Grid>
                           {isPieces && (
-                            <Grid size={{ xs: 6, sm: 2 }}>
-                              <FormControl fullWidth size="small">
-                                <InputLabel>Dimension In</InputLabel>
-                                <Select
-                                  label="Dimension In"
-                                  value={prod.dimensionUnit || 'inch'}
+                            <>
+                              <Grid size={{ xs: 6, sm: 1.5 }}>
+                                <TextField
+                                  label="No. of Pieces"
+                                  size="small"
+                                  fullWidth
+                                  type="number"
+                                  slotProps={{ htmlInput: { min: 1 } }}
+                                  value={prod.qty ?? 1}
                                   onChange={(e) => {
-                                    const newUnit = e.target.value;
                                     const newProds = [...formData.products];
-                                    const oldFirstUnit = newProds[0]?.dimensionUnit || 'inch';
-                                    newProds[index].dimensionUnit = newUnit;
-                                    if (index === 0) {
-                                      for (let i = 1; i < newProds.length; i++) {
-                                        if (!newProds[i].dimensionUnit || newProds[i].dimensionUnit === oldFirstUnit) {
-                                          newProds[i].dimensionUnit = newUnit;
-                                        }
-                                      }
-                                    }
+                                    newProds[index].qty = e.target.value;
                                     setFormData({ ...formData, products: newProds });
                                   }}
-                                >
-                                  <MenuItem value="inch">Inches</MenuItem>
-                                  <MenuItem value="mm">MM</MenuItem>
-                                  <MenuItem value="sq_ft">Sq. Feet</MenuItem>
-                                </Select>
-                              </FormControl>
-                            </Grid>
+                                />
+                              </Grid>
+                              <Grid size={{ xs: 6, sm: 1.5 }}>
+                                <FormControl fullWidth size="small">
+                                  <InputLabel>Dimension In</InputLabel>
+                                  <Select
+                                    label="Dimension In"
+                                    value={prod.dimensionUnit || 'inch'}
+                                    onChange={(e) => {
+                                      const newUnit = e.target.value;
+                                      const newProds = [...formData.products];
+                                      const oldFirstUnit = newProds[0]?.dimensionUnit || 'inch';
+                                      newProds[index].dimensionUnit = newUnit;
+                                      if (index === 0) {
+                                        for (let i = 1; i < newProds.length; i++) {
+                                          if (!newProds[i].dimensionUnit || newProds[i].dimensionUnit === oldFirstUnit) {
+                                            newProds[i].dimensionUnit = newUnit;
+                                          }
+                                        }
+                                      }
+                                      setFormData({ ...formData, products: newProds });
+                                    }}
+                                  >
+                                    <MenuItem value="inch">Inches</MenuItem>
+                                    <MenuItem value="mm">MM</MenuItem>
+                                    <MenuItem value="sq_ft">Sq. Feet</MenuItem>
+                                  </Select>
+                                </FormControl>
+                              </Grid>
+                            </>
                           )}
                           <Grid size={{ xs: 6, sm: isPieces ? 1.5 : 2 }}>
                             <TextField
@@ -1879,7 +1915,7 @@ const Projects: React.FC = () => {
                               }}
                             />
                           </Grid>
-                          <Grid size={{ xs: 6, sm: isPieces ? 2 : 2 }}>
+                          <Grid size={{ xs: 6, sm: isPieces ? 1.5 : 2 }}>
                             <TextField
                               label="Thickness (MM)"
                               size="small"
@@ -1899,7 +1935,11 @@ const Projects: React.FC = () => {
                           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
                             <Chip
                               size="small"
-                              label={`Calculated Area: ${area.toFixed(2)} Sq.Ft`}
+                              label={
+                                isPieces && (Number(prod.qty) || 1) > 1
+                                  ? `Calculated Area: ${(area * (Number(prod.qty) || 1)).toFixed(2)} Sq.Ft (${Number(prod.qty) || 1} Pcs × ${area.toFixed(2)} Sq.Ft)`
+                                  : `Calculated Area: ${area.toFixed(2)} Sq.Ft`
+                              }
                               sx={{
                                 bgcolor: '#FFF4E5',
                                 border: '1px solid #FFE0B2',
