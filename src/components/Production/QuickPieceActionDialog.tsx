@@ -668,23 +668,46 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
             {/* 2. PIECE & SLAB SPECIFICATION (DIRECT EDIT & MANUAL APPROVAL) */}
             {!isPolishing && selectedPieceId && (
               <Box sx={{ p: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                   <Typography variant="caption" sx={{ fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Piece Specification & Dimensions
                   </Typography>
-                  {parseFloat(length) > 0 && parseFloat(width) > 0 && (
-                    <Chip
-                      size="small"
-                      label={`Calculated Area: ${(
-                        unit === 'feet'
-                          ? parseFloat(length) * parseFloat(width)
-                          : unit === 'mm'
-                          ? (parseFloat(length) * parseFloat(width)) / 92903.04
-                          : (parseFloat(length) * parseFloat(width)) / 144
-                      ).toFixed(2)} Sq.Ft`}
-                      sx={{ bgcolor: '#FFF4E5', color: '#B38B36', fontWeight: 800, fontSize: '0.72rem' }}
-                    />
-                  )}
+                  {parseFloat(length) > 0 && parseFloat(width) > 0 && (() => {
+                    const calcArea = unit === 'feet'
+                      ? parseFloat(length) * parseFloat(width)
+                      : unit === 'mm'
+                      ? (parseFloat(length) * parseFloat(width)) / 92903.04
+                      : (parseFloat(length) * parseFloat(width)) / 144;
+                    const parseAreaSqFt = (str?: string): number => {
+                      if (!str) return 0;
+                      const expM = String(str).match(/([\d.]+)\s*Sq\.?Ft/i);
+                      if (expM && expM[1]) return parseFloat(expM[1]) || 0;
+                      const p = parseDims(str);
+                      const pl = parseFloat(p.l) || 0;
+                      const pw = parseFloat(p.w) || 0;
+                      if (pl <= 0 || pw <= 0) return 0;
+                      return p.u === 'feet' ? (pl * pw) : (p.u === 'mm' ? (pl * pw) / 92903.04 : (pl * pw) / 144);
+                    };
+                    const slabAreaLimit = parseAreaSqFt(slab?.size);
+                    const otherArea = (slab?.pieces || [])
+                      .filter((p: any) => getPieceId(p) !== selectedPieceId && !String(p.productName || '').includes('(Full Slab)'))
+                      .reduce((acc: number, p: any) => acc + parseAreaSqFt(p.size), 0);
+                    const isOverLimit = slabAreaLimit > 0 && (otherArea + calcArea) > (slabAreaLimit + 0.02);
+
+                    return (
+                      <Chip
+                        size="small"
+                        label={`Calculated Area: ${calcArea.toFixed(2)} Sq.Ft${slabAreaLimit > 0 ? ` / Max ${(Math.max(0, slabAreaLimit - otherArea)).toFixed(2)} Sq.Ft` : ''}`}
+                        sx={{
+                          bgcolor: isOverLimit ? '#FEF2F2' : '#FFF4E5',
+                          color: isOverLimit ? '#DC2626' : '#B38B36',
+                          border: isOverLimit ? '1px solid #FCA5A5' : 'none',
+                          fontWeight: 800,
+                          fontSize: '0.72rem'
+                        }}
+                      />
+                    );
+                  })()}
                 </Box>
 
                 <TextField
@@ -1047,33 +1070,56 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
         <Button onClick={onClose} color="inherit" disabled={isSubmitting} sx={{ fontWeight: 700 }}>
           Cancel
         </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={isSubmitting || isFetchingDetails || !selectedPieceId}
-          startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : <CheckCircleRoundedIcon />}
-          sx={{
-            bgcolor: pieceStatus === 'pending' ? '#475569' : mode === 'add' ? '#059669' : '#1E293B',
-            color: '#FFFFFF',
-            fontWeight: 800,
-            textTransform: 'none',
-            borderRadius: 2.5,
-            px: 3,
-            py: 1,
-            boxShadow: '0 4px 12px rgba(5, 150, 105, 0.2)',
-            '&:hover': {
-              bgcolor: pieceStatus === 'pending' ? '#334155' : mode === 'add' ? '#047857' : '#0F172A'
-            }
-          }}
-        >
-          {isSubmitting
-            ? 'Saving...'
-            : pieceStatus === 'pending'
-            ? 'Save as Not Started'
-            : mode === 'add'
-            ? (isPolishing ? 'Mark Polishing as Completed' : selectedStage ? `Mark ${selectedStage === 'Polishing - Honed' ? 'Polishing' : selectedStage} as Completed` : 'Save & Mark as Completed')
-            : 'Update Piece Details'}
-        </Button>
+        {(() => {
+          const lVal = parseFloat(length) || 0;
+          const wVal = parseFloat(width) || 0;
+          const calcArea = unit === 'feet' ? lVal * wVal : unit === 'mm' ? (lVal * wVal) / 92903.04 : (lVal * wVal) / 144;
+          const parseAreaSqFt = (str?: string): number => {
+            if (!str) return 0;
+            const expM = String(str).match(/([\d.]+)\s*Sq\.?Ft/i);
+            if (expM && expM[1]) return parseFloat(expM[1]) || 0;
+            const p = parseDims(str);
+            const pl = parseFloat(p.l) || 0;
+            const pw = parseFloat(p.w) || 0;
+            if (pl <= 0 || pw <= 0) return 0;
+            return p.u === 'feet' ? (pl * pw) : (p.u === 'mm' ? (pl * pw) / 92903.04 : (pl * pw) / 144);
+          };
+          const slabAreaLimit = parseAreaSqFt(slab?.size);
+          const otherArea = (slab?.pieces || [])
+            .filter((p: any) => getPieceId(p) !== selectedPieceId && !String(p.productName || '').includes('(Full Slab)'))
+            .reduce((acc: number, p: any) => acc + parseAreaSqFt(p.size), 0);
+          const isOverLimit = !isPolishing && slabAreaLimit > 0 && lVal > 0 && wVal > 0 && (otherArea + calcArea) > (slabAreaLimit + 0.02);
+
+          return (
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              disabled={isSubmitting || isFetchingDetails || !selectedPieceId || isOverLimit}
+              startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : <CheckCircleRoundedIcon />}
+              sx={{
+                bgcolor: pieceStatus === 'pending' ? '#475569' : mode === 'add' ? '#059669' : '#1E293B',
+                color: '#FFFFFF',
+                fontWeight: 800,
+                textTransform: 'none',
+                borderRadius: 2.5,
+                px: 3,
+                py: 1,
+                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.2)',
+                '&:hover': {
+                  bgcolor: pieceStatus === 'pending' ? '#334155' : mode === 'add' ? '#047857' : '#0F172A'
+                }
+              }}
+            >
+              {isSubmitting
+                ? 'Saving...'
+                : pieceStatus === 'pending'
+                ? 'Save as Not Started'
+                : mode === 'add'
+                ? (isPolishing ? 'Mark Polishing as Completed' : selectedStage ? `Mark ${selectedStage === 'Polishing - Honed' ? 'Polishing' : selectedStage} as Completed` : 'Save & Mark as Completed')
+                : 'Update Piece Details'}
+            </Button>
+          );
+        })()}
       </DialogActions>
     </Dialog>
 

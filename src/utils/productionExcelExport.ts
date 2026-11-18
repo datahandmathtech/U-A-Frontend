@@ -235,10 +235,11 @@ export const exportProjectProductionExcel = ({
   // ==========================================
   // WORKBOOK COMPILATION (Clean 4 Sheets)
   // ==========================================
-  const workbook = XLSX.utils.book_new();
+  const XlsxLib: any = (XLSX as any)?.utils ? XLSX : (XLSX as any)?.default || XLSX;
+  const workbook = XlsxLib.utils.book_new();
 
   // 1. Pieces Produced
-  const wsPieces = XLSX.utils.json_to_sheet(pieceRows.length > 0 ? pieceRows : [{ 'Notice': 'No pieces produced yet' }]);
+  const wsPieces = XlsxLib.utils.json_to_sheet(pieceRows.length > 0 ? pieceRows : [{ 'Notice': 'No pieces produced yet' }]);
   wsPieces['!cols'] = [
     { wch: 8 },  // S.No
     { wch: 14 }, // Piece No
@@ -251,10 +252,10 @@ export const exportProjectProductionExcel = ({
     { wch: 22 }, // Operator / Karigar
     { wch: 14 }  // Status
   ];
-  XLSX.utils.book_append_sheet(workbook, wsPieces, 'Pieces Produced');
+  XlsxLib.utils.book_append_sheet(workbook, wsPieces, 'Pieces Produced');
 
   // 2. Boxes Packed
-  const wsBoxes = XLSX.utils.json_to_sheet(boxRows.length > 0 ? boxRows : [{ 'Notice': 'No packing boxes created yet' }]);
+  const wsBoxes = XlsxLib.utils.json_to_sheet(boxRows.length > 0 ? boxRows : [{ 'Notice': 'No packing boxes created yet' }]);
   wsBoxes['!cols'] = [
     { wch: 8 },  // S.No
     { wch: 18 }, // Box No / Name
@@ -266,10 +267,10 @@ export const exportProjectProductionExcel = ({
     { wch: 14 }, // Packed Time
     { wch: 16 }  // Status
   ];
-  XLSX.utils.book_append_sheet(workbook, wsBoxes, 'Boxes Packed');
+  XlsxLib.utils.book_append_sheet(workbook, wsBoxes, 'Boxes Packed');
 
   // 3. Dispatch Details
-  const wsDispatch = XLSX.utils.json_to_sheet(dispatchRows.length > 0 ? dispatchRows : [{ 'Notice': 'No dispatch records created yet' }]);
+  const wsDispatch = XlsxLib.utils.json_to_sheet(dispatchRows.length > 0 ? dispatchRows : [{ 'Notice': 'No dispatch records created yet' }]);
   wsDispatch['!cols'] = [
     { wch: 8 },  // S.No
     { wch: 18 }, // Vehicle Number
@@ -282,19 +283,28 @@ export const exportProjectProductionExcel = ({
     { wch: 14 }, // Dispatch Time
     { wch: 30 }  // Remarks
   ];
-  XLSX.utils.book_append_sheet(workbook, wsDispatch, 'Dispatch Details');
+  XlsxLib.utils.book_append_sheet(workbook, wsDispatch, 'Dispatch Details');
 
   // 4. Order Summary
-  const wsSummary = XLSX.utils.json_to_sheet(orderSummaryRows);
+  const wsSummary = XlsxLib.utils.json_to_sheet(orderSummaryRows);
   wsSummary['!cols'] = [
     { wch: 30 },
     { wch: 45 }
   ];
-  XLSX.utils.book_append_sheet(workbook, wsSummary, 'Order Summary');
+  XlsxLib.utils.book_append_sheet(workbook, wsSummary, 'Order Summary');
 
-  // Generate File
-  const code = (project?.projectCode || project?.title || 'WorkOrder').replace(/[^a-zA-Z0-9_-]/g, '_');
+  // Generate File via Blob download for 100% browser compatibility
+  const code = (project?.projectCode || project?.projectId || project?.title || project?.name || 'WorkOrder').replace(/[^a-zA-Z0-9_-]/g, '_');
   const todayStr = new Date().toISOString().split('T')[0];
   const fileName = `Production_Summary_${code}_${todayStr}.xlsx`;
-  XLSX.writeFile(workbook, fileName);
+  const wbout = XlsxLib.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };

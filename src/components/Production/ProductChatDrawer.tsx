@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Drawer,
+  Dialog,
   Box,
   Typography,
   IconButton,
   TextField,
   Button,
   Avatar,
-  Divider,
   CircularProgress,
   Paper,
   Chip
@@ -122,18 +121,23 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
   const messages = chatData?.messages || [];
 
   return (
-    <Drawer
-      anchor="right"
+    <Dialog
       open={open}
       onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      sx={{ zIndex: 9999 }}
       slotProps={{
         paper: {
           sx: {
-            width: { xs: '100%', sm: 460 },
+            height: '80vh',
+            maxHeight: 680,
+            borderRadius: 3.5,
             display: 'flex',
             flexDirection: 'column',
             bgcolor: '#F8FAFC',
-            boxShadow: '0 0 40px rgba(0,0,0,0.15)'
+            overflow: 'hidden',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.22)'
           }
         }
       }}
@@ -380,7 +384,7 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
           {isSending ? <CircularProgress size={18} color="inherit" /> : <SendIcon sx={{ fontSize: 18 }} />}
         </Button>
       </Box>
-    </Drawer>
+    </Dialog>
   );
 };
 

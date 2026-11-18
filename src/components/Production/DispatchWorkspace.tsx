@@ -22,7 +22,7 @@ import PrintRoundedIcon from '@mui/icons-material/PrintRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
 import { useNavigate } from 'react-router-dom';
-import { useDispatchBoxesMutation, useDeleteProductionLogMutation } from '../../store/apiSlice';
+import { useDispatchBoxesMutation, useDeleteProductionLogMutation, useGetProjectByIdQuery } from '../../store/apiSlice';
 
 interface DispatchWorkspaceProps {
   projectId: string;
@@ -74,6 +74,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
   const navigate = useNavigate();
   const [dispatchBoxes, { isLoading: isDispatching }] = useDispatchBoxesMutation();
   const [deleteProductionLog] = useDeleteProductionLogMutation();
+  const { data: projectData } = useGetProjectByIdQuery(projectId, { skip: !projectId });
 
   // Consolidate pieces from all slabs in the project
   const allPieces = useMemo(() => {
@@ -395,18 +396,13 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         </Box>
       </Box>
 
-      {/* 1. TOP HEADER & METRICS (Exact layout from user mockup Image 5) */}
+      {/* 1. TOP HEADER & METRICS (Change 8: Cleaned up extra info) */}
       <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 4, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.3px', mb: 0.5 }}>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.3px' }}>
               Dispatch - {slab?.name || projectName}
             </Typography>
-            {slab?.size && (
-              <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600 }}>
-                Spec: {slab.size}
-              </Typography>
-            )}
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
@@ -425,15 +421,10 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                 <Typography variant="caption" sx={{ fontWeight: 700, color: '#0284C7', textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Pieces</Typography>
               </Box>
             </Box>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', px: 2, py: 1, borderRadius: 2.5 }}>
-              <Typography variant="h6" sx={{ fontWeight: 900, color: '#166534', lineHeight: 1 }}>{totalProjectArea}</Typography>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#16A34A', textTransform: 'uppercase', fontSize: '0.65rem' }}>Total Area (Sq.Ft)</Typography>
-            </Box>
           </Box>
         </Box>
 
-        {/* Workflow Stepper / Process Bar (Screenshot 5) */}
+        {/* Workflow Stepper / Process Bar */}
         <Divider sx={{ mb: 2.5, borderColor: '#F1F5F9' }} />
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: { xs: 1, sm: 2.5 }, flexWrap: 'wrap' }}>
           {/* Step 1: Production */}
@@ -453,12 +444,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
           {/* Step 3: Packing */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CheckCircleRoundedIcon sx={{ color: '#16A34A', fontSize: 20 }} />
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem', lineHeight: 1 }}>Packing</Typography>
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.68rem' }}>
-                ({packedBoxes.length} Boxes, {allPieces.length} Pieces)
-              </Typography>
-            </Box>
+            <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem' }}>Packing</Typography>
           </Box>
           <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
 
@@ -957,53 +943,64 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         </Box>
       </Paper>
 
-      {/* 6. VIEW DISPATCH SLIP MODAL */}
+      {/* 6. VIEW DISPATCH SLIP MODAL (Change 7: Uniform UI, Client Name auto-fetched, Pieces count only, Box count shown) */}
       <Dialog open={Boolean(viewSlipBatch)} onClose={() => setViewSlipBatch(null)} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}>
-        <DialogTitle sx={{ fontWeight: 900, color: '#0F172A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ fontWeight: 900, color: '#0F172A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1.5, borderBottom: '1px solid #F1F5F9' }}>
           Dispatch Challan / Gate Pass
           <IconButton onClick={() => setViewSlipBatch(null)} size="small"><CloseRoundedIcon fontSize="small" /></IconButton>
         </DialogTitle>
-        <DialogContent>
-          <Box sx={{ p: 2, border: '1.5px solid #E2E8F0', borderRadius: 2.5, bgcolor: '#F8FAFC', mb: 2 }}>
-            <Grid container spacing={1.5}>
-              <Grid item xs={6}>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>PROJECT</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800 }}>{projectName}</Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>VEHICLE NUMBER</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669' }}>{viewSlipBatch?.vehicleNumber}</Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>DRIVER NAME</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>{viewSlipBatch?.driverName}</Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>DISPATCH DATE & TIME</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>{viewSlipBatch?.dispatchTime}</Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>TRANSPORT / LR NO.</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>{viewSlipBatch?.lrNumber || '-'}</Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>TOTAL DISPATCHED</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800 }}>{viewSlipBatch?.boxCodes?.length} Boxes • {viewSlipBatch?.pieceCount} Pieces ({viewSlipBatch?.area} Sq.Ft)</Typography>
-              </Grid>
-              {viewSlipBatch?.remarks && (
-                <Grid item xs={12}>
-                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700 }}>REMARKS</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{viewSlipBatch.remarks}</Typography>
-                </Grid>
-              )}
-            </Grid>
+        <DialogContent sx={{ pt: 2.5 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5, mb: 2.5 }}>
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25, letterSpacing: '0.4px' }}>PROJECT</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{projectName || projectData?.name || '-'}</Typography>
+            </Box>
+
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25, letterSpacing: '0.4px' }}>CLIENT NAME</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{projectData?.clientName || '-'}</Typography>
+            </Box>
+
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25, letterSpacing: '0.4px' }}>VEHICLE NUMBER</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669', fontSize: '0.92rem' }}>{viewSlipBatch?.vehicleNumber || '-'}</Typography>
+            </Box>
+
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25, letterSpacing: '0.4px' }}>DRIVER NAME</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{viewSlipBatch?.driverName || '-'}</Typography>
+            </Box>
+
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25, letterSpacing: '0.4px' }}>DISPATCH DATE & TIME</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{viewSlipBatch?.dispatchTime || '-'}</Typography>
+            </Box>
+
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25, letterSpacing: '0.4px' }}>TRANSPORT / LR NO.</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '0.92rem' }}>{viewSlipBatch?.lrNumber || '-'}</Typography>
+            </Box>
+
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25, letterSpacing: '0.4px' }}>TOTAL DISPATCHED</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0284C7', fontSize: '0.92rem' }}>{viewSlipBatch?.pieceCount || 0} Pieces</Typography>
+            </Box>
+
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25, letterSpacing: '0.4px' }}>REMARKS</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: '#334155', fontSize: '0.9rem' }}>{viewSlipBatch?.remarks || '-'}</Typography>
+            </Box>
           </Box>
 
-          <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Boxes in this Vehicle:</Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {(viewSlipBatch?.boxCodes || []).map((bCode: string) => (
-              <Chip key={bCode} label={bCode} sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 800 }} />
-            ))}
+          <Box sx={{ p: 1.75, borderRadius: 2.5, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#166534', mb: 1 }}>
+              Boxes in this Vehicle ({(viewSlipBatch?.boxCodes || []).length}):
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {(viewSlipBatch?.boxCodes || []).map((bCode: string) => (
+                <Chip key={bCode} label={bCode} sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 800, border: '1px solid #86EFAC' }} />
+              ))}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

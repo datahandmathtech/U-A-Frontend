@@ -3,7 +3,8 @@ import {
   Box, Typography, Paper, Grid, Button, Chip, TextField,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   InputAdornment, Tooltip, Snackbar, Alert, Divider,
-  Radio, RadioGroup, FormControlLabel
+  Radio, RadioGroup, FormControlLabel, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Collapse
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -18,6 +19,11 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import { usePackBoxesMutation, useDeleteProductionLogMutation } from '../../store/apiSlice';
 
@@ -70,13 +76,20 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewBox, setViewBox] = useState<any>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [collapsedSlabIds, setCollapsedSlabIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  // Consolidate raw pieces from slabs whose manufacturing stages prior to Packing are 100% completed
-  const rawPieces = useMemo(() => {
-    const combined: any[] = [];
-    (slabs || []).forEach((s: any) => {
-      if (!Array.isArray(s.pieces)) return;
+  // Build global sequential numbering (1..N) across all Main Stones (slabs) in the project
+  const { slabGroups, allProjectPieces, rawPieces } = useMemo(() => {
+    const groups: any[] = [];
+    const allWithGlobal: any[] = [];
+    const readyCombined: any[] = [];
+    let globalCounter = 1;
+
+    const sourceSlabs = (slabs && slabs.length > 0) ? slabs : (slab ? [slab] : []);
+
+    sourceSlabs.forEach((s: any, sIdx: number) => {
+      if (!Array.isArray(s.pieces) || s.pieces.length === 0) return;
 
       const reqStages = (s.requiredStages || ['Production']).filter((st: string) => st !== 'Polishing');
       const requiresProduction = reqStages.includes('Production') || reqStages.length === 0;
@@ -99,19 +112,53 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         return Boolean(hasPieceLog || hasProdLog || isDirectStageDone);
       };
 
-      s.pieces.forEach((p: any) => {
-        // Every required stone stage (Production, Bridge Cutting, Polishing) must be 100% completed on this piece before it appears in Packing
+      const sortedPieces = [...s.pieces].sort((a: any, b: any) => (Number(a.pieceNumber) || 0) - (Number(b.pieceNumber) || 0));
+      const groupPieces: any[] = [];
+      const startGlobal = globalCounter;
+
+      sortedPieces.forEach((p: any, pIdx: number) => {
         const isProdDone = !requiresProduction || checkPieceStageComplete(p, 'Production');
         const isBridgeDone = !requiresBridgeCutting || checkPieceStageComplete(p, 'Bridge Cutting');
         const isPolishDone = !requiresPolishing || checkPieceStageComplete(p, 'Polish');
+        const isReadyForPacking = Boolean(isProdDone && isBridgeDone && isPolishDone);
 
-        if (isProdDone && isBridgeDone && isPolishDone) {
-          combined.push({ ...p, slabId: s.id, slabName: s.name });
+        const gNum = globalCounter++;
+        const localNum = p.pieceNumber || (pIdx + 1);
+        const enrichedPiece = {
+          ...p,
+          slabId: s.id,
+          slabName: s.name || `Main Stone ${sIdx + 1}`,
+          slabSize: s.size || '',
+          slabIndex: sIdx + 1,
+          localPieceNumber: localNum,
+          globalNumber: gNum,
+          isReadyForPacking
+        };
+
+        groupPieces.push(enrichedPiece);
+        allWithGlobal.push(enrichedPiece);
+        if (isReadyForPacking) {
+          readyCombined.push(enrichedPiece);
         }
+      });
+
+      const endGlobal = globalCounter - 1;
+      groups.push({
+        slabId: s.id,
+        slabName: s.name || `Main Stone ${sIdx + 1}`,
+        slabSize: s.size || '',
+        slabIndex: sIdx + 1,
+        startGlobal,
+        endGlobal,
+        pieces: groupPieces
       });
     });
 
-    return combined;
+    return {
+      slabGroups: groups,
+      allProjectPieces: allWithGlobal,
+      rawPieces: readyCombined
+    };
   }, [slab, slabs, productionLogs]);
 
   // All pieces of all slabs in the project are available in unified packing workspace
@@ -119,7 +166,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     return rawPieces;
   }, [rawPieces]);
 
-  const totalSlabPiecesCount = rawPieces.length;
+  const totalSlabPiecesCount = allProjectPieces.length;
 
   // Derive packed boxes from production logs with stage Packing (only for existing pieces)
   const packedBoxes = useMemo(() => {
@@ -197,16 +244,102 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     if (!searchQuery.trim()) return allPieces;
     const q = searchQuery.toLowerCase().trim();
     return allPieces.filter((p: any) => {
+      const gStr = `#${p.globalNumber}`;
+      const gTag = `g#${p.globalNumber}`;
       const numStr = `#${p.pieceNumber}`;
       const name = (p.productName || '').toLowerCase();
-      return numStr.includes(q) || name.includes(q) || String(p.pieceNumber).includes(q);
+      const sName = (p.slabName || '').toLowerCase();
+      return gStr.includes(q) || gTag.includes(q) || numStr.includes(q) || name.includes(q) || sName.includes(q) || String(p.globalNumber).includes(q);
     });
   }, [allPieces, searchQuery]);
+
+  // Filtered Main Stone groups for left grouped view
+  const filteredSlabGroups = useMemo(() => {
+    if (!searchQuery.trim()) return slabGroups;
+    const q = searchQuery.toLowerCase().trim();
+    return slabGroups.filter((g: any) => {
+      if ((g.slabName || '').toLowerCase().includes(q)) return true;
+      return g.pieces.some((p: any) => {
+        const gStr = `#${p.globalNumber}`;
+        const gTag = `g#${p.globalNumber}`;
+        const name = (p.productName || '').toLowerCase();
+        return gStr.includes(q) || gTag.includes(q) || name.includes(q) || String(p.globalNumber) === q || String(p.localPieceNumber) === q;
+      });
+    });
+  }, [slabGroups, searchQuery]);
+
+  const toggleCollapseSlabGroup = (slabId: string) => {
+    setCollapsedSlabIds(prev => {
+      const next = new Set(prev);
+      if (next.has(slabId)) next.delete(slabId);
+      else next.add(slabId);
+      return next;
+    });
+  };
+
+  // Export complete 1..N pieces list to Excel (Change 5)
+  const handleExportAllPiecesExcel = () => {
+    try {
+      const XlsxLib: any = (XLSX as any)?.utils ? XLSX : (XLSX as any)?.default || XLSX;
+      const rows = allProjectPieces.map((p: any) => {
+        const isPacked = packedPieceIdMap.has(p.id);
+        const boxName = packedPieceIdMap.get(p.id) || '-';
+        const areaSqFt = parsePieceArea(p.size || p.slabSize || slab?.size);
+        return {
+          'Global Piece #': `#${p.globalNumber}`,
+          'Main Stone / Slab': p.slabName || '-',
+          'Stone Sub-Piece #': `Piece #${p.localPieceNumber}`,
+          'Piece Name': p.productName || `${p.slabName}.${p.localPieceNumber}`,
+          'Dimensions / Size': p.size || p.slabSize || '-',
+          'Area (Sq.Ft)': areaSqFt.toFixed(2),
+          'Manufacturing Status': p.isReadyForPacking ? '100% Completed (Ready)' : 'Pending Stages',
+          'Packing Status': isPacked ? 'PACKED' : (p.isReadyForPacking ? 'READY TO PACK' : 'PENDING'),
+          'Assigned Box': boxName
+        };
+      });
+
+      const wb = XlsxLib.utils.book_new();
+      const ws = XlsxLib.utils.json_to_sheet(rows.length > 0 ? rows : [{ Notice: 'No pieces found' }]);
+      ws['!cols'] = [
+        { wch: 16 },
+        { wch: 24 },
+        { wch: 18 },
+        { wch: 24 },
+        { wch: 28 },
+        { wch: 14 },
+        { wch: 24 },
+        { wch: 18 },
+        { wch: 18 }
+      ];
+      XlsxLib.utils.book_append_sheet(wb, ws, 'All Pieces List');
+
+      const wbout = XlsxLib.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const cleanProj = (projectName || 'WorkOrder').replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.href = url;
+      a.download = `Packing_Pieces_List_${cleanProj}_${allProjectPieces.length}Pcs.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setToast({ open: true, message: `Exported ${allProjectPieces.length} pieces list to Excel!`, severity: 'success' });
+    } catch (err) {
+      console.error('Error exporting pieces list:', err);
+      setToast({ open: true, message: 'Failed to export pieces list', severity: 'error' });
+    }
+  };
 
   // Toggle selection for unpacked piece
   const handleTogglePiece = (pieceId: string) => {
     if (packedPieceIdMap.has(pieceId)) {
       setToast({ open: true, message: `This piece is already packed in ${packedPieceIdMap.get(pieceId)}`, severity: 'error' });
+      return;
+    }
+    const pieceObj = allProjectPieces.find((p: any) => p.id === pieceId);
+    if (pieceObj && !pieceObj.isReadyForPacking) {
+      setToast({ open: true, message: `Complete all stone stages (Production / Polishing) for ${pieceObj.slabName} #${pieceObj.localPieceNumber} first!`, severity: 'error' });
       return;
     }
     setSelectedPieceIds(prev => 
@@ -255,9 +388,9 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         const l = boxLength.trim();
         const w = boxWidth.trim();
         if (l && w) {
-          bSize = `${l} x ${w} Inch`;
+          bSize = `${l} x ${w}`;
         } else if (l) {
-          bSize = `${l} Inch`;
+          bSize = `${l}`;
         }
       }
 
@@ -424,17 +557,17 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         </Box>
       </Paper>
 
-      {/* 2. MAIN 2-COLUMN VIEW (Robust CSS Grid) */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 4, width: '100%', minWidth: 0 }}>
-        {/* LEFT COLUMN: PIECES GRID */}
+      {/* 2. MAIN 2-COLUMN VIEW (Pieces Grouped by Main Stone + Packing Boxes) */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.15fr 0.85fr' }, gap: 2.5, mb: 3, width: '100%', minWidth: 0 }}>
+        {/* LEFT COLUMN: PIECES GROUPED BY MAIN STONE (with Global #1..#N) */}
         <Box sx={{ minWidth: 0 }}>
-          <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 480 }}>
+          <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 420 }}>
             {/* Pieces Header with Search */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Inventory2RoundedIcon sx={{ color: '#0284C7', fontSize: 20 }} />
                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A' }}>
-                  Pieces ({allPieces.length})
+                  Pieces Grouped by Main Stone ({allPieces.length} Ready / {allProjectPieces.length} Total)
                 </Typography>
                 {selectedPieceIds.length > 0 && (
                   <Chip
@@ -447,7 +580,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
 
               <TextField
                 size="small"
-                placeholder="Search piece (e.g., #1, #5...)"
+                placeholder="Search main stone or #1, G#5..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 slotProps={{
@@ -460,7 +593,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                     sx: { borderRadius: 2, bgcolor: '#F8FAFC', fontSize: '0.82rem' }
                   }
                 }}
-                sx={{ width: { xs: '100%', sm: 240 } }}
+                sx={{ width: { xs: '100%', sm: 230 } }}
               />
             </Box>
 
@@ -477,7 +610,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                   onClick={handleSelectAllUnpacked}
                   sx={{ py: 0.35, px: 1.5, fontSize: '0.75rem', fontWeight: 700, textTransform: 'none', borderColor: '#CBD5E1', color: '#334155', '&:hover': { bgcolor: '#F1F5F9' } }}
                 >
-                  Select All
+                  Select All Ready
                 </Button>
                 <Button
                   size="small"
@@ -509,91 +642,180 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
               </Box>
             </Box>
 
-            {/* Pieces Grid */}
-            {filteredPieces.length === 0 ? (
+            {/* Grouped Main Stones List */}
+            {filteredSlabGroups.length === 0 ? (
               <Box sx={{ py: 8, textAlign: 'center', color: '#94A3B8' }}>
                 <Inventory2RoundedIcon sx={{ fontSize: 44, color: '#CBD5E1', mb: 1 }} />
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B' }}>
-                  No completed pieces ready for packing
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#94A3B8', display: 'block', mt: 0.5 }}>
-                  Only pieces that are completed in Production will appear here to be packed.
+                  No pieces found for packing
                 </Typography>
               </Box>
             ) : (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 1.5 }}>
-              {filteredPieces.map((p: any) => {
-                const isPacked = packedPieceIdMap.has(p.id);
-                const isSelected = selectedPieceIds.includes(p.id);
-                const areaSqFt = parsePieceArea(p.size || slab?.size);
-                const boxAssigned = packedPieceIdMap.get(p.id);
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                {filteredSlabGroups.map((group: any) => {
+                  const isCollapsed = collapsedSlabIds.has(group.slabId);
+                  const packedInStone = group.pieces.filter((p: any) => packedPieceIdMap.has(p.id)).length;
+                  const readyUnpackedInStone = group.pieces.filter((p: any) => p.isReadyForPacking && !packedPieceIdMap.has(p.id));
+                  const isAllStonePacked = group.pieces.length > 0 && packedInStone === group.pieces.length;
 
-                return (
-                  <Box key={p.id} sx={{ minWidth: 0 }}>
+                  return (
                     <Box
-                      onClick={() => handleTogglePiece(p.id)}
+                      key={group.slabId}
                       sx={{
                         p: 1.5,
                         borderRadius: 2.5,
                         border: '1.5px solid',
-                        borderColor: isPacked ? '#86EFAC' : (isSelected ? '#0284C7' : '#E2E8F0'),
-                        bgcolor: isPacked ? '#F0FDF4' : (isSelected ? '#F0F9FF' : '#FFFFFF'),
-                        cursor: isPacked ? 'default' : 'pointer',
-                        textAlign: 'center',
-                        position: 'relative',
-                        transition: 'all 0.15s ease',
-                        boxShadow: isSelected ? '0 0 0 2px #0284C7' : '0 1px 3px rgba(0,0,0,0.03)',
-                        '&:hover': {
-                          borderColor: isPacked ? '#86EFAC' : '#0284C7',
-                          transform: isPacked ? 'none' : 'translateY(-2px)'
-                        }
+                        borderColor: isAllStonePacked ? '#BBF7D0' : '#E2E8F0',
+                        bgcolor: isAllStonePacked ? '#F8FFF9' : '#FFFFFF'
                       }}
                     >
-                      {/* Status / Checkbox at top */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          {isPacked ? (
-                            <CheckCircleRoundedIcon sx={{ fontSize: 16, color: '#16A34A' }} />
-                          ) : (
-                            <Box sx={{
-                              width: 16, height: 16, borderRadius: '4px',
-                              border: isSelected ? '2px solid #0284C7' : '1.5px solid #CBD5E1',
-                              bgcolor: isSelected ? '#0284C7' : 'transparent',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}>
-                              {isSelected && <CheckRoundedIcon sx={{ fontSize: 12, color: '#FFFFFF' }} />}
-                            </Box>
-                          )}
-                          <Typography variant="body2" sx={{ fontWeight: 900, color: '#0F172A', fontSize: '0.85rem' }}>
-                            #{p.pieceNumber}
-                          </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.25 }}>
+                        {/* Left: Main Stone Title & Global Range */}
+                        <Box
+                          onClick={() => toggleCollapseSlabGroup(group.slabId)}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', minWidth: 150 }}
+                        >
+                          <IconButton size="small" sx={{ p: 0.25, color: '#64748B' }}>
+                            {isCollapsed ? <KeyboardArrowDownIcon fontSize="small" /> : <KeyboardArrowUpIcon fontSize="small" />}
+                          </IconButton>
+                          <LayersRoundedIcon sx={{ color: isAllStonePacked ? '#16A34A' : '#64748B', fontSize: 20 }} />
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.15 }}>
+                              {group.slabName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, fontSize: '0.7rem' }}>
+                              Global #{group.startGlobal} – #{group.endGlobal}
+                            </Typography>
+                          </Box>
                         </Box>
-                        {isPacked && (
-                          <Chip label={boxAssigned} size="small" sx={{ height: 18, fontSize: '0.62rem', fontWeight: 800, bgcolor: '#DCFCE7', color: '#166534' }} />
-                        )}
-                      </Box>
 
-                      {/* 3D Slab Graphic Icon */}
-                      <Box sx={{ my: 1, display: 'flex', justifyContent: 'center' }}>
-                        <LayersRoundedIcon sx={{ fontSize: 44, color: isPacked ? '#10B981' : (isSelected ? '#0284C7' : '#CBD5E1') }} />
-                      </Box>
+                        {/* Middle: Inline Sub-Piece Buttons (1, 2, 3, 4 with Global #) */}
+                        <Collapse in={!isCollapsed} sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            {group.pieces.map((p: any) => {
+                              const isPacked = packedPieceIdMap.has(p.id);
+                              const isSelected = selectedPieceIds.includes(p.id);
+                              const isReady = p.isReadyForPacking;
+                              const boxAssigned = packedPieceIdMap.get(p.id);
 
-                      {/* Dimensions & Area */}
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: isPacked ? '#166534' : '#64748B', fontSize: '0.75rem', display: 'block' }}>
-                        {areaSqFt.toFixed(2)} Sq.Ft
-                      </Typography>
+                              return (
+                                <Tooltip
+                                  key={p.id}
+                                  title={
+                                    isPacked
+                                      ? `Global #${p.globalNumber} (${group.slabName} #${p.localPieceNumber}) • Packed in ${boxAssigned}`
+                                      : isReady
+                                      ? `Global #${p.globalNumber} (${group.slabName} #${p.localPieceNumber}) • ${parsePieceArea(p.size || group.slabSize).toFixed(2)} Sq.Ft — Click to select`
+                                      : `Global #${p.globalNumber} (${group.slabName} #${p.localPieceNumber}) — Complete Production/Polishing first`
+                                  }
+                                >
+                                  <Box
+                                    onClick={() => handleTogglePiece(p.id)}
+                                    sx={{
+                                      px: 1.5,
+                                      py: 0.75,
+                                      minWidth: 74,
+                                      borderRadius: 2,
+                                      border: '1.5px solid',
+                                      borderColor: isPacked
+                                        ? '#86EFAC'
+                                        : isSelected
+                                        ? '#0284C7'
+                                        : isReady
+                                        ? '#BAE6FD'
+                                        : '#E2E8F0',
+                                      bgcolor: isPacked
+                                        ? '#DCFCE7'
+                                        : isSelected
+                                        ? '#0284C7'
+                                        : isReady
+                                        ? '#F0F9FF'
+                                        : '#F8FAFC',
+                                      color: isPacked
+                                        ? '#166534'
+                                        : isSelected
+                                        ? '#FFFFFF'
+                                        : isReady
+                                        ? '#0369A1'
+                                        : '#94A3B8',
+                                      cursor: isPacked ? 'default' : (isReady ? 'pointer' : 'not-allowed'),
+                                      opacity: (!isReady && !isPacked) ? 0.65 : 1,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: 0.6,
+                                      transition: 'all 0.15s ease',
+                                      '&:hover': {
+                                        transform: (isReady && !isPacked) ? 'translateY(-1px)' : 'none'
+                                      }
+                                    }}
+                                  >
+                                    {isPacked ? (
+                                      <CheckCircleRoundedIcon sx={{ fontSize: 15, color: '#16A34A' }} />
+                                    ) : isReady ? (
+                                      <Inventory2RoundedIcon sx={{ fontSize: 14, color: isSelected ? '#FFFFFF' : '#0284C7' }} />
+                                    ) : (
+                                      <LayersRoundedIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
+                                    )}
+                                    <Box sx={{ textAlign: 'left', lineHeight: 1 }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 900, fontSize: '0.78rem', display: 'block', lineHeight: 1.1 }}>
+                                        #{p.globalNumber}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.62rem', opacity: 0.85, display: 'block', lineHeight: 1 }}>
+                                        {isPacked ? boxAssigned : `Piece ${p.localPieceNumber}`}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </Tooltip>
+                              );
+                            })}
+                          </Box>
+                        </Collapse>
+
+                        {/* Right: Progress Chip & Select Stone action */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          {readyUnpackedInStone.length > 0 && (
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => {
+                                const ids = readyUnpackedInStone.map((p: any) => p.id);
+                                const allSel = ids.every((id: string) => selectedPieceIds.includes(id));
+                                if (allSel) {
+                                  setSelectedPieceIds(prev => prev.filter(id => !ids.includes(id)));
+                                } else {
+                                  setSelectedPieceIds(prev => Array.from(new Set([...prev, ...ids])));
+                                }
+                              }}
+                              sx={{ py: 0.2, px: 0.8, minWidth: 0, fontSize: '0.7rem', fontWeight: 800, textTransform: 'none', color: '#0284C7' }}
+                            >
+                              {readyUnpackedInStone.every((p: any) => selectedPieceIds.includes(p.id)) ? 'Deselect' : 'Select Stone'}
+                            </Button>
+                          )}
+                          <Chip
+                            label={`${packedInStone}/${group.pieces.length} Packed`}
+                            size="small"
+                            sx={{
+                              height: 22,
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              bgcolor: isAllStonePacked ? '#DCFCE7' : (packedInStone > 0 ? '#FEF3C7' : '#F1F5F9'),
+                              color: isAllStonePacked ? '#166534' : (packedInStone > 0 ? '#B45309' : '#64748B')
+                            }}
+                          />
+                        </Box>
+                      </Box>
                     </Box>
-                  </Box>
-                );
-              })}
-            </Box>
+                  );
+                })}
+              </Box>
             )}
           </Paper>
         </Box>
 
         {/* RIGHT COLUMN: PACKING BOXES */}
         <Box sx={{ minWidth: 0 }}>
-          <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 480 }}>
+          <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 420 }}>
             {/* Packing Boxes Header */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -656,76 +878,272 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
               </Box>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {packedBoxes.map((b: any) => (
-                  <Paper
-                    key={b.logId}
-                    elevation={0}
-                    sx={{
-                      p: 2,
-                      borderRadius: 3,
-                      border: '1.5px solid #E2E8F0',
-                      bgcolor: '#F8FAFC',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.15s ease',
-                      '&:hover': { bgcolor: '#FFFFFF', borderColor: '#CBD5E1', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Box sx={{ p: 1, bgcolor: '#EFF6FF', color: '#0284C7', borderRadius: 2 }}>
-                        <Inventory2RoundedIcon sx={{ fontSize: 26 }} />
-                      </Box>
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A' }}>
-                            {b.boxName}
+                {packedBoxes.map((b: any) => {
+                  // Group pieces inside this box by Main Stone name for quick badge summary
+                  const slabSummaryMap = new Map<string, string[]>();
+                  (b.pieces || []).forEach((p: any) => {
+                    const sName = p.slabName || 'Slab';
+                    if (!slabSummaryMap.has(sName)) slabSummaryMap.set(sName, []);
+                    slabSummaryMap.get(sName)!.push(`#${p.globalNumber || p.pieceNumber}`);
+                  });
+                  const slabSummaryText = Array.from(slabSummaryMap.entries())
+                    .map(([sName, nums]) => `${sName}: ${nums.join(', ')}`)
+                    .join(' • ');
+
+                  return (
+                    <Paper
+                      key={b.logId}
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        border: '1.5px solid #E2E8F0',
+                        bgcolor: '#F8FAFC',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 1.5,
+                        flexWrap: 'wrap',
+                        transition: 'all 0.15s ease',
+                        '&:hover': { bgcolor: '#FFFFFF', borderColor: '#CBD5E1', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{ p: 1, bgcolor: '#EFF6FF', color: '#0284C7', borderRadius: 2 }}>
+                          <Inventory2RoundedIcon sx={{ fontSize: 26 }} />
+                        </Box>
+                        <Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#0F172A' }}>
+                              {b.boxName}
+                            </Typography>
+                            {b.boxSize && (
+                              <Chip
+                                label={b.boxSize}
+                                size="small"
+                                sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700, bgcolor: '#F1F5F9', color: '#475569' }}
+                              />
+                            )}
+                          </Box>
+                          <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
+                            {b.pieceCount} Pieces • {b.area} Sq.Ft
                           </Typography>
-                          {b.boxSize && (
+                          {slabSummaryText && (
                             <Chip
-                              label={b.boxSize}
+                              label={slabSummaryText}
                               size="small"
-                              sx={{ height: 20, fontSize: '0.68rem', fontWeight: 700, bgcolor: '#F1F5F9', color: '#475569' }}
+                              sx={{ mt: 0.5, height: 20, fontSize: '0.68rem', fontWeight: 700, bgcolor: '#F1F5F9', color: '#334155' }}
                             />
                           )}
-                          <EditRoundedIcon sx={{ fontSize: 14, color: '#94A3B8', cursor: 'pointer' }} />
                         </Box>
-                        <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block' }}>
-                          {b.pieceCount} Pieces • {b.area} Sq.Ft
-                        </Typography>
                       </Box>
-                    </Box>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip
-                        label="Packed"
-                        size="small"
-                        sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 800, fontSize: '0.7rem', height: 24, borderRadius: 1.5 }}
-                      />
-                      <IconButton
-                        size="small"
-                        onClick={() => setViewBox(b)}
-                        sx={{ color: '#0284C7', bgcolor: '#F0F9FF', '&:hover': { bgcolor: '#E0F2FE' } }}
-                      >
-                        <VisibilityRoundedIcon sx={{ fontSize: 17 }} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteBox(b.logId, b.boxName)}
-                        sx={{ color: '#DC2626', bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } }}
-                      >
-                        <DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} />
-                      </IconButton>
-                    </Box>
-                  </Paper>
-                ))}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip
+                          label="Packed"
+                          size="small"
+                          sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 800, fontSize: '0.7rem', height: 24, borderRadius: 1.5 }}
+                        />
+                        <IconButton
+                          size="small"
+                          onClick={() => setViewBox(b)}
+                          sx={{ color: '#0284C7', bgcolor: '#F0F9FF', '&:hover': { bgcolor: '#E0F2FE' } }}
+                        >
+                          <VisibilityRoundedIcon sx={{ fontSize: 17 }} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteBox(b.logId, b.boxName)}
+                          sx={{ color: '#DC2626', bgcolor: '#FEF2F2', '&:hover': { bgcolor: '#FEE2E2' } }}
+                        >
+                          <DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} />
+                        </IconButton>
+                      </Box>
+                    </Paper>
+                  );
+                })}
               </Box>
             )}
           </Paper>
         </Box>
       </Box>
 
-      {/* 3. DOCKED BOTTOM BAR (Screenshot 4) */}
+      {/* 3. PACKING PROGRESS CHART (MASTER CALENDAR VIEW OF MAIN STONE VS SUB-PIECE PACKING STATUS — Image 5 & Change 4/5) */}
+      {slabGroups.length > 0 && (() => {
+        const maxPiecesInAnyStone = Math.max(1, ...slabGroups.map((g: any) => g.pieces.length));
+        const colCount = Math.min(12, maxPiecesInAnyStone);
+
+        return (
+          <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, mb: 4, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ p: 1, bgcolor: '#F0F9FF', color: '#0284C7', borderRadius: 2, display: 'flex' }}>
+                  <CalendarMonthRoundedIcon sx={{ fontSize: 24 }} />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0F172A', lineHeight: 1.2 }}>
+                    Packing Progress Chart
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                    Master calendar view of main stone vs sub-piece packing status (Global #1 – #{allProjectPieces.length})
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 1.5, py: 0.75, bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <CheckCircleRoundedIcon sx={{ fontSize: 16, color: '#16A34A' }} />
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#166534' }}>= Packed</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Inventory2RoundedIcon sx={{ fontSize: 16, color: '#0284C7' }} />
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#0369A1' }}>= Ready to Pack</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <LayersRoundedIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B' }}>= Pending</Typography>
+                  </Box>
+                </Box>
+
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<FileDownloadRoundedIcon />}
+                  onClick={handleExportAllPiecesExcel}
+                  sx={{
+                    borderRadius: 2,
+                    fontWeight: 800,
+                    textTransform: 'none',
+                    borderColor: '#059669',
+                    color: '#059669',
+                    px: 2,
+                    py: 0.75,
+                    '&:hover': { bgcolor: '#ECFDF5', borderColor: '#047857' }
+                  }}
+                >
+                  Export Pieces List ({allProjectPieces.length})
+                </Button>
+              </Box>
+            </Box>
+
+            <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: 2.5, overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase', py: 1.5, minWidth: 170 }}>
+                      Main Stone
+                    </TableCell>
+                    {Array.from({ length: colCount }, (_, i) => (
+                      <TableCell key={i} align="center" sx={{ fontWeight: 800, color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase', py: 1.5, minWidth: 110 }}>
+                        Piece {i + 1}
+                      </TableCell>
+                    ))}
+                    <TableCell align="right" sx={{ fontWeight: 800, color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase', py: 1.5, minWidth: 110 }}>
+                      Progress
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {slabGroups.map((group: any) => {
+                    const packedInStone = group.pieces.filter((p: any) => packedPieceIdMap.has(p.id)).length;
+                    const isAllStonePacked = group.pieces.length > 0 && packedInStone === group.pieces.length;
+
+                    return (
+                      <TableRow key={group.slabId} hover>
+                        <TableCell sx={{ py: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                            <LayersRoundedIcon sx={{ color: isAllStonePacked ? '#16A34A' : '#64748B', fontSize: 20 }} />
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
+                                {group.slabName}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, fontSize: '0.7rem' }}>
+                                Global #{group.startGlobal} – #{group.endGlobal}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+
+                        {Array.from({ length: colCount }, (_, colIdx) => {
+                          const p = group.pieces[colIdx];
+                          if (!p) {
+                            return <TableCell key={colIdx} align="center" sx={{ py: 1, color: '#CBD5E1' }}>—</TableCell>;
+                          }
+                          const isPacked = packedPieceIdMap.has(p.id);
+                          const isSelected = selectedPieceIds.includes(p.id);
+                          const isReady = p.isReadyForPacking;
+                          const boxName = packedPieceIdMap.get(p.id);
+
+                          return (
+                            <TableCell key={p.id} align="center" sx={{ py: 1, px: 0.75 }}>
+                              <Box
+                                onClick={() => handleTogglePiece(p.id)}
+                                sx={{
+                                  p: 0.85,
+                                  borderRadius: 2,
+                                  border: '1.5px solid',
+                                  borderColor: isPacked
+                                    ? '#86EFAC'
+                                    : isSelected
+                                    ? '#0284C7'
+                                    : isReady
+                                    ? '#BAE6FD'
+                                    : '#E2E8F0',
+                                  bgcolor: isPacked
+                                    ? '#F0FDF4'
+                                    : isSelected
+                                    ? '#E0F2FE'
+                                    : isReady
+                                    ? '#F0F9FF'
+                                    : '#F8FAFC',
+                                  cursor: isPacked ? 'default' : (isReady ? 'pointer' : 'not-allowed'),
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                  {isPacked ? (
+                                    <CheckCircleRoundedIcon sx={{ fontSize: 15, color: '#16A34A' }} />
+                                  ) : isReady ? (
+                                    <Inventory2RoundedIcon sx={{ fontSize: 14, color: '#0284C7' }} />
+                                  ) : (
+                                    <LayersRoundedIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
+                                  )}
+                                  <Typography variant="body2" sx={{ fontWeight: 900, color: '#0F172A', fontSize: '0.82rem' }}>
+                                    {p.localPieceNumber}
+                                  </Typography>
+                                </Box>
+                                <Typography variant="caption" sx={{ fontWeight: 800, color: isPacked ? '#166534' : (isReady ? '#0369A1' : '#64748B'), fontSize: '0.68rem', display: 'block' }}>
+                                  G#{p.globalNumber}{isPacked && boxName ? ` • ${boxName}` : ''}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                          );
+                        })}
+
+                        <TableCell align="right" sx={{ py: 1.5 }}>
+                          <Chip
+                            label={`${packedInStone}/${group.pieces.length} Packed`}
+                            size="small"
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: '0.72rem',
+                              bgcolor: isAllStonePacked ? '#DCFCE7' : (packedInStone > 0 ? '#FEF3C7' : '#F1F5F9'),
+                              color: isAllStonePacked ? '#166534' : (packedInStone > 0 ? '#B45309' : '#64748B')
+                            }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        );
+      })()}
+
+      {/* 4. DOCKED BOTTOM BAR (Screenshot 4) */}
       <Paper
         elevation={4}
         sx={{
@@ -803,7 +1221,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         </Box>
       </Paper>
 
-      {/* CREATE BOX MODAL (Exact design from user mockup) */}
+      {/* CREATE BOX MODAL (Change 3: Removed Inch UI from Box Size inputs) */}
       <Dialog open={isAddBoxOpen} onClose={() => setIsAddBoxOpen(false)} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}>
         <DialogTitle sx={{ fontWeight: 900, color: '#0F172A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
           Create Packing Box
@@ -873,7 +1291,6 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                   onChange={(e) => setBoxLength(e.target.value)}
                   slotProps={{
                     input: {
-                      endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>Inch</Typography></InputAdornment>,
                       sx: { bgcolor: '#FFFFFF', borderRadius: 1.5 }
                     }
                   }}
@@ -888,7 +1305,6 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                   onChange={(e) => setBoxWidth(e.target.value)}
                   slotProps={{
                     input: {
-                      endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>Inch</Typography></InputAdornment>,
                       sx: { bgcolor: '#FFFFFF', borderRadius: 1.5 }
                     }
                   }}
@@ -917,7 +1333,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
         </DialogActions>
       </Dialog>
 
-      {/* VIEW BOX PIECES MODAL */}
+      {/* VIEW BOX PIECES MODAL (Change 6: Show Connected Main Stone / Slab & Global # for each piece) */}
       <Dialog open={Boolean(viewBox)} onClose={() => setViewBox(null)} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
         <DialogTitle sx={{ fontWeight: 800, color: '#0F172A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {viewBox?.boxName} - Packed Pieces
@@ -928,14 +1344,34 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
             {viewBox?.boxSize ? `Box Size: ${viewBox.boxSize} • ` : ''}Total {viewBox?.pieceCount} Pieces • {viewBox?.area} Sq.Ft • {viewBox?.packedOn}
           </Typography>
           <Grid container spacing={1.5}>
-            {(viewBox?.pieces || []).map((p: any) => (
-              <Grid item xs={6} sm={4} key={p.id}>
-                <Box sx={{ p: 1.5, border: '1px solid #BBF7D0', bgcolor: '#F0FDF4', borderRadius: 2, textAlign: 'center' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#166534' }}>#{p.pieceNumber}</Typography>
-                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>{p.productName || 'Piece'}</Typography>
-                </Box>
-              </Grid>
-            ))}
+            {(viewBox?.pieces || []).map((p: any) => {
+              const pArea = parsePieceArea(p.size || p.slabSize || slab?.size);
+              return (
+                <Grid item xs={12} sm={6} key={p.id}>
+                  <Box sx={{ p: 1.5, border: '1.5px solid #BBF7D0', bgcolor: '#F0FDF4', borderRadius: 2.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                      <Chip
+                        label={`Global #${p.globalNumber || p.pieceNumber}`}
+                        size="small"
+                        sx={{ height: 20, fontSize: '0.7rem', fontWeight: 900, bgcolor: '#16A34A', color: '#FFFFFF' }}
+                      />
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#166534' }}>
+                        Sub-Piece #{p.localPieceNumber || p.pieceNumber}
+                      </Typography>
+                    </Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#0F172A', lineHeight: 1.25 }}>
+                      Main Stone: {p.slabName || slab?.name || 'Stone'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#334155', fontWeight: 700, display: 'block', mt: 0.25 }}>
+                      Piece: {p.productName || `${p.slabName}.${p.localPieceNumber || p.pieceNumber}`}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mt: 0.25 }}>
+                      {p.size || p.slabSize || `${pArea.toFixed(2)} Sq.Ft`}
+                    </Typography>
+                  </Box>
+                </Grid>
+              );
+            })}
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

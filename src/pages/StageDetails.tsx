@@ -2342,39 +2342,86 @@ const StageDetails = () => {
             </Box>
           )}
 
-          {parseFloat(editPieceDims.length) > 0 && parseFloat(editPieceDims.width) > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Chip
-                size="small"
-                label={`Calculated Area: ${(
-                  editPieceDims.unit === 'feet' || editPieceDims.unit === 'sq_ft'
-                    ? parseFloat(editPieceDims.length) * parseFloat(editPieceDims.width)
-                    : editPieceDims.unit === 'mm'
-                    ? (parseFloat(editPieceDims.length) * parseFloat(editPieceDims.width)) / 92903.04
-                    : (parseFloat(editPieceDims.length) * parseFloat(editPieceDims.width)) / 144
-                ).toFixed(2)} Sq.Ft`}
-                sx={{ bgcolor: '#FFF4E5', color: '#B38B36', fontWeight: 700 }}
-              />
-            </Box>
-          )}
+          {(() => {
+            const lVal = parseFloat(editPieceDims.length) || 0;
+            const wVal = parseFloat(editPieceDims.width) || 0;
+            if (lVal <= 0 || wVal <= 0) return null;
+            const calcArea = editPieceDims.unit === 'feet' || editPieceDims.unit === 'sq_ft'
+              ? lVal * wVal
+              : editPieceDims.unit === 'mm'
+              ? (lVal * wVal) / 92903.04
+              : (lVal * wVal) / 144;
+            const slabAreaLimit = calculateAreaFromSize(slab?.size, rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+            const otherPiecesSum = (slab?.pieces || [])
+              .filter((p: any) => p.id !== editingPiece?.id && !String(p.productName || '').includes('(Full Slab)'))
+              .reduce((sum: number, p: any) => sum + calculateAreaFromSize(p.size, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit }), 0);
+            const isOverLimit = slabAreaLimit > 0 && (otherPiecesSum + calcArea) > (slabAreaLimit + 0.02);
+
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                  {slabAreaLimit > 0 && (
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748B' }}>
+                      Main Stone Limit: <strong>{slabAreaLimit.toFixed(2)} Sq.Ft</strong> (Remaining: <strong>{Math.max(0, slabAreaLimit - otherPiecesSum).toFixed(2)} Sq.Ft</strong>)
+                    </Typography>
+                  )}
+                  <Chip
+                    size="small"
+                    label={`Calculated Area: ${calcArea.toFixed(2)} Sq.Ft`}
+                    sx={{
+                      bgcolor: isOverLimit ? '#FEF2F2' : '#FFF4E5',
+                      color: isOverLimit ? '#DC2626' : '#B38B36',
+                      border: isOverLimit ? '1px solid #FCA5A5' : 'none',
+                      fontWeight: 800
+                    }}
+                  />
+                </Box>
+                {isOverLimit && (
+                  <Box sx={{ p: 1.25, bgcolor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 2 }}>
+                    <Typography variant="caption" sx={{ color: '#DC2626', fontWeight: 800, display: 'block' }}>
+                      ⚠️ Size Exceeds Main Stone! Total pieces area ({(otherPiecesSum + calcArea).toFixed(2)} Sq.Ft) cannot be greater than main stone area ({slabAreaLimit.toFixed(2)} Sq.Ft).
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            );
+          })()}
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button onClick={() => setEditingPiece(null)} sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleEditPieceSave}
-            sx={{ 
-              borderRadius: 2, 
-              bgcolor: '#1E293B', 
-              color: '#FFFFFF', 
-              fontWeight: 800, 
-              textTransform: 'none',
-              px: 3,
-              '&:hover': { bgcolor: '#0F172A' }
-            }}
-          >
-            Save Changes
-          </Button>
+          {(() => {
+            const lVal = parseFloat(editPieceDims.length) || 0;
+            const wVal = parseFloat(editPieceDims.width) || 0;
+            const calcArea = editPieceDims.unit === 'feet' || editPieceDims.unit === 'sq_ft'
+              ? lVal * wVal
+              : editPieceDims.unit === 'mm'
+              ? (lVal * wVal) / 92903.04
+              : (lVal * wVal) / 144;
+            const slabAreaLimit = calculateAreaFromSize(slab?.size, rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+            const otherPiecesSum = (slab?.pieces || [])
+              .filter((p: any) => p.id !== editingPiece?.id && !String(p.productName || '').includes('(Full Slab)'))
+              .reduce((sum: number, p: any) => sum + calculateAreaFromSize(p.size, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit }), 0);
+            const isOverLimit = slabAreaLimit > 0 && lVal > 0 && wVal > 0 && (otherPiecesSum + calcArea) > (slabAreaLimit + 0.02);
+
+            return (
+              <Button 
+                variant="contained" 
+                disabled={isOverLimit}
+                onClick={handleEditPieceSave}
+                sx={{ 
+                  borderRadius: 2, 
+                  bgcolor: '#1E293B', 
+                  color: '#FFFFFF', 
+                  fontWeight: 800, 
+                  textTransform: 'none',
+                  px: 3,
+                  '&:hover': { bgcolor: '#0F172A' }
+                }}
+              >
+                Save Changes
+              </Button>
+            );
+          })()}
         </DialogActions>
       </Dialog>
 

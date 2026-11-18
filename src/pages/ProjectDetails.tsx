@@ -74,6 +74,8 @@ import RemoveCircleOutlineRoundedIcon from '@mui/icons-material/RemoveCircleOutl
 import QuickPieceActionDialog from '../components/Production/QuickPieceActionDialog';
 import RevertPieceDialog from '../components/Production/RevertPieceDialog';
 import ProductChatDrawer from '../components/Production/ProductChatDrawer';
+import { MaterialPlanningModal } from '../components/MaterialPlanningModal';
+import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
 import { generateReceiptPDF, generateWorkOrderPDF, generateQuotationPDF } from '../utils/pdfGenerator';
 import { exportProjectProductionExcel } from '../utils/productionExcelExport';
 import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded';
@@ -810,6 +812,7 @@ const ProjectDetails: React.FC = () => {
   const [syncSlabs] = useSyncSlabsMutation();
   const [addPieces, { isLoading: isAddingPieces }] = useAddPiecesMutation();
   const [manualApprovalOpen, setManualApprovalOpen] = useState(false);
+  const [materialPlanningOpen, setMaterialPlanningOpen] = useState(false);
 
   // Check if any slab in the work order requires Packing or Dispatch stages
   const hasPackingStage = useMemo(() => {
@@ -4196,6 +4199,23 @@ const ProjectDetails: React.FC = () => {
                           </Button>
 
                           <Button 
+                            variant="contained" 
+                            startIcon={<AssignmentRoundedIcon />} 
+                            onClick={() => setMaterialPlanningOpen(true)}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 800,
+                              bgcolor: '#059669',
+                              color: '#FFFFFF',
+                              boxShadow: '0 2px 10px rgba(5, 150, 105, 0.25)',
+                              '&:hover': { bgcolor: '#047857' }
+                            }}
+                          >
+                            Material Planning
+                          </Button>
+
+                          <Button 
                             variant="outlined" 
                             startIcon={<FlashOnRoundedIcon />} 
                             onClick={() => setManualApprovalOpen(true)}
@@ -4215,7 +4235,15 @@ const ProjectDetails: React.FC = () => {
                           <Button 
                             variant="outlined" 
                             startIcon={<TableChartRoundedIcon />} 
-                            onClick={() => exportProjectProductionExcel({ project, slabs: projectSlabs, machines, productionLogs })}
+                            onClick={() => {
+                              try {
+                                exportProjectProductionExcel({ project, slabs: projectSlabs, machines, productionLogs });
+                                setSnackbarMessage('Production Excel downloaded successfully!');
+                              } catch (e) {
+                                console.error(e);
+                                setSnackbarMessage('Failed to export Production Excel');
+                              }
+                            }}
                             sx={{
                               borderRadius: 2,
                               textTransform: 'none',
@@ -6836,6 +6864,19 @@ const ProjectDetails: React.FC = () => {
           }}
         />
       </Dialog>
+
+      {/* Project Material Planning Modal (Change 10: Right next to Master Maker) */}
+      {materialPlanningOpen && (
+        <MaterialPlanningModal
+          open={materialPlanningOpen}
+          onClose={() => {
+            setMaterialPlanningOpen(false);
+            refetchMaterials();
+            refetchSlabs();
+          }}
+          initialProjectId={id}
+        />
+      )}
 
       {/* Product Chat Drawer */}
       <ProductChatDrawer

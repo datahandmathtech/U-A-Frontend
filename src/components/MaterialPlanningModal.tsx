@@ -39,9 +39,15 @@ function generateBlockNumbers(startBlock: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `${trimmed} - ${i + 1}`);
 }
 
-export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => void; initialProjectId?: string }> = ({ open, onClose, initialProjectId }) => {
   const { data: projects } = useGetProjectsQuery();
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId || null);
+
+  React.useEffect(() => {
+    if (open && initialProjectId) {
+      setSelectedProjectId(initialProjectId);
+    }
+  }, [open, initialProjectId]);
 
   const { data: projectMaterials, refetch: refetchMaterials, isLoading: materialsLoading } = useGetProjectMaterialsQuery(selectedProjectId || '', { skip: !selectedProjectId });
   const [deleteProjectMaterial] = useDeleteProjectMaterialMutation();

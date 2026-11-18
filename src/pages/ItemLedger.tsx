@@ -15,7 +15,7 @@ import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import DeleteSweepRoundedIcon from '@mui/icons-material/DeleteSweepRounded';
-import { useDeductInventoryMutation, useUpdateInventoryLogMutation, useDeleteInventoryLogMutation, useGetAllSlabNamesQuery, useGetItemLogsQuery, useGetProjectHierarchyQuery } from '../store/apiSlice';
+import { useDeductInventoryMutation, useUpdateInventoryLogMutation, useDeleteInventoryLogMutation, useGetItemLogsQuery, useGetProjectHierarchyQuery } from '../store/apiSlice';
 
 const ItemLedger = () => {
   const { itemId } = useParams<{ itemId: string }>();
@@ -136,16 +136,15 @@ const ItemLedger = () => {
   const [openEdit, setOpenEdit] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
   
-  const { data: allSlabNames = [] } = useGetAllSlabNamesQuery();
-  const uniqueSlabNames = React.useMemo(() => Array.from(new Set(allSlabNames || [])), [allSlabNames]);
   const { data: projectHierarchy = [] } = useGetProjectHierarchyQuery();
   const [selectedProject, setSelectedProject] = useState<any>(undefined);
   const [selectedSlab, setSelectedSlab] = useState<any>(null);
   const [selectedPiece, setSelectedPiece] = useState<any>(null);
 
-  const [deductInventory] = useDeductInventoryMutation();
+  const [deductInventory, { isLoading: isDeducting }] = useDeductInventoryMutation();
   const [updateLog] = useUpdateInventoryLogMutation();
   const [deleteLog] = useDeleteInventoryLogMutation();
+  const isDeductingRef = React.useRef(false);
 
   const [deductError, setDeductError] = useState('');
   const [openWastage, setOpenWastage] = useState(false);
@@ -200,7 +199,9 @@ const ItemLedger = () => {
   }, [activeProject, selectedSlab, inventory]);
 
   const handleDeductSubmit = async () => {
+    if (isDeductingRef.current || isDeducting) return;
     try {
+      isDeductingRef.current = true;
       setDeductError('');
       const len = Number(deductForm.length) || 0;
       const wid = Number(deductForm.width) || 0;
@@ -307,6 +308,8 @@ const ItemLedger = () => {
     } catch (error: any) {
       console.error('Failed to deduct inventory:', error);
       setDeductError(error?.data?.message || error?.message || 'Failed to deduct stock');
+    } finally {
+      isDeductingRef.current = false;
     }
   };
 
@@ -932,7 +935,6 @@ const ItemLedger = () => {
                       {...params} 
                       label="Select Target Project (Unnati Stock)" 
                       placeholder="Choose project..." 
-                      helperText={activeProject ? `Selected Project: ${activeProject.name}` : 'Select which project this Unnati stock is being deducted for'}
                     />
                   )}
                 />
@@ -941,12 +943,6 @@ const ItemLedger = () => {
               <Box sx={{ p: 1.5, px: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography variant="body2" color="#166534" fontWeight="bold">
                   Project: <span style={{ fontSize: '1rem', color: '#15803D' }}>{activeProject.name}</span>
-                </Typography>
-                <Typography variant="caption" sx={{ bgcolor: '#DCFCE7', px: 1, py: 0.5, borderRadius: 1, color: '#166534', fontWeight: 'bold' }}>
-                  {(() => {
-                    const prodCount = (activeProject.slabs || []).filter((s: any) => s.hasProduction || (s.pieces || []).some((p: any) => p.hasProduction)).length;
-                    return prodCount > 0 ? `${prodCount} Slabs in Production` : `${(activeProject.slabs || []).length} Slabs Available`;
-                  })()}
                 </Typography>
               </Box>
             ) : (
@@ -964,7 +960,7 @@ const ItemLedger = () => {
               />
             )}
 
-            {/* 1. Select Slab / Stone (Pattar) */}
+            {/* 1. Select Slab / Stone (Pattar) — Clean name only (Change 11) */}
             {activeProject && (() => {
               const slabsWithPending = (activeProject.slabs || []).filter((s: any) => {
                 const pendingCount = (s.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false)).length;
@@ -975,10 +971,7 @@ const ItemLedger = () => {
                 <Autocomplete
                   options={slabsWithPending}
                   noOptionsText="No pending slabs/stones for this project!"
-                  getOptionLabel={(option: any) => {
-                    const pendingCount = (option.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false)).length;
-                    return `${option.name} ${option.size ? `(${option.size})` : ''} - ${pendingCount} Pieces Pending`;
-                  }}
+                  getOptionLabel={(option: any) => option?.name || 'Slab'}
                   value={selectedSlab}
                   onChange={(_, val: any) => {
                     setSelectedSlab(val);
@@ -989,14 +982,13 @@ const ItemLedger = () => {
                       {...params} 
                       label="Select Slab / Stone (Pattar)" 
                       placeholder="Choose slab / stone..." 
-                      helperText={slabsWithPending.length > 0 ? `Pending Slabs: ${slabsWithPending.length} of ${(activeProject.slabs || []).length}` : 'All slabs/stones are completed!'}
                     />
                   )}
                 />
               );
             })()}
 
-            {/* 2. Select Piece (Pic) */}
+            {/* 2. Select Piece (Pic) — Clean piece name only (Change 11) */}
             {selectedSlab && (() => {
               const piecesInProduction = (selectedSlab.pieces || []).filter((p: any) => !p.sourceMaterialId && (p.hasProduction !== false));
               const displayPieces = piecesInProduction.length > 0 ? piecesInProduction : (selectedSlab.pieces || []).filter((p: any) => !p.sourceMaterialId);
@@ -1004,12 +996,7 @@ const ItemLedger = () => {
                 <Autocomplete
                   options={displayPieces}
                   noOptionsText="No pending pieces in production for this slab!"
-                  getOptionLabel={(option: any) => {
-                    const parsed = parsePieceDimensions(option.size, option.unit || selectedSlab?.unit);
-                    const unitLabel = parsed.isMM ? 'MM' : (parsed.isFt ? 'Feet' : 'Inches');
-                    const sqFtText = parsed.sqft > 0 ? ` • ${unitLabel} • ${parsed.sqft.toFixed(2)} Sq.Ft` : '';
-                    return `${option.productName || `Piece ${option.pieceNumber}`} ${option.size ? `(${option.size})` : ''}${sqFtText}`;
-                  }}
+                  getOptionLabel={(option: any) => option?.productName || `Piece ${option?.pieceNumber}`}
                   value={selectedPiece}
                   onChange={(_, val: any) => {
                     setSelectedPiece(val);
@@ -1029,14 +1016,13 @@ const ItemLedger = () => {
                       {...params} 
                       label="Select Piece (Pic)" 
                       placeholder="Choose specific piece..." 
-                      helperText={displayPieces.length > 0 ? `Pending Pieces: ${displayPieces.length} of ${(selectedSlab.pieces || []).length}` : 'All pieces already deducted!'}
                     />
                   )}
                 />
               );
             })()}
 
-            {/* Display Original Size Banner with Converted Equivalents */}
+            {/* Display Original Size Banner (Change 12: Clean single block without extra clutter) */}
             {(selectedPiece?.size || selectedSlab?.size) && (() => {
               const targetSize = selectedPiece?.size || selectedSlab?.size;
               const targetUnit = selectedPiece?.unit || selectedSlab?.unit;
@@ -1056,23 +1042,6 @@ const ItemLedger = () => {
                       <Chip label={`${parsed.sqft.toFixed(2)} Sq.Ft`} size="small" sx={{ bgcolor: '#ECFDF5', color: '#059669', fontWeight: 900, fontSize: '0.75rem', border: '1px solid #A7F3D0' }} />
                     )}
                   </Box>
-                  {parsed.l > 0 && parsed.w > 0 && (
-                    <Box sx={{ mt: 1.5, pt: 1.2, borderTop: '1px dashed #FDE68A', display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                      {parsed.isMM ? (
-                        <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 700 }}>
-                          📐 MM: <strong>{parsed.lMM} mm L × {parsed.wMM} mm W</strong>
-                        </Typography>
-                      ) : parsed.isFt ? (
-                        <Typography variant="caption" sx={{ color: '#047857', fontWeight: 700 }}>
-                          📏 Feet: <strong>{parsed.lFeet.toFixed(2)} ft L × {parsed.wFeet.toFixed(2)} ft W</strong>
-                        </Typography>
-                      ) : (
-                        <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 700 }}>
-                          📐 Inches: <strong>{parsed.lInch.toFixed(1)}" L × {parsed.wInch.toFixed(1)}" W</strong>
-                        </Typography>
-                      )}
-                    </Box>
-                  )}
                 </Paper>
               );
             })()}
@@ -1204,7 +1173,7 @@ const ItemLedger = () => {
             if (deductForm.unit === 'feet') usedArea = l * w;
             else if (deductForm.unit === 'mm') usedArea = (l * w) / 92903.04;
             else usedArea = (l * w) / 144;
-            const isDisabled = !(l > 0 && w > 0) || (usedArea > (inventory?.quantity || 0));
+            const isDisabled = isDeducting || !(l > 0 && w > 0) || (usedArea > (inventory?.quantity || 0));
             return (
               <Button 
                 variant="contained" 
@@ -1213,14 +1182,14 @@ const ItemLedger = () => {
                 disabled={isDisabled}
                 sx={{ fontWeight: 800 }}
               >
-                Confirm Deduction
+                {isDeducting ? 'Deducting...' : 'Confirm Deduction'}
               </Button>
             );
           })()}
         </DialogActions>
       </Dialog>
 
-      {/* Edit Log Dialog */}
+      {/* Edit Log Dialog (Change 14: Removed Project / Product Name raw tag field) */}
       <Dialog open={openEdit} onClose={() => setOpenEdit(false)} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 3.5 } } }}>
         <DialogTitle sx={{ fontWeight: 'bold', bgcolor: '#f8f9fa' }}>Edit Deducted Stock</DialogTitle>
         <DialogContent sx={{ p: 3 }}>
@@ -1232,15 +1201,6 @@ const ItemLedger = () => {
               slotProps={{ inputLabel: { shrink: true } }}
               value={editForm?.date || ''}
               onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-            />
-            <Autocomplete
-              options={uniqueSlabNames}
-              value={editForm?.productName || ''}
-              onInputChange={(_, newInputValue) => {
-                setEditForm({ ...editForm, productName: newInputValue });
-              }}
-              freeSolo
-              renderInput={(params) => <TextField {...params} label="Project / Product Name" />}
             />
 
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1.2fr 1fr 1fr 1fr' }, gap: 1.5 }}>
