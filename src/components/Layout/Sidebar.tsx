@@ -32,6 +32,8 @@ import PendingActionsRoundedIcon from '@mui/icons-material/PendingActionsRounded
 import FolderSpecialRoundedIcon from '@mui/icons-material/FolderSpecialRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import FlashOnRoundedIcon from '@mui/icons-material/FlashOnRounded';
+import BuildCircleRoundedIcon from '@mui/icons-material/BuildCircleRounded';
+import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -56,6 +58,8 @@ const ALL_MENU_ITEMS: MenuItemDef[] = [
   { text: 'In/Out Ledger', icon: <FolderSpecialRoundedIcon />, path: '/in-out-ledger', category: 'Stock & Machines' },
   { text: 'Inventory', icon: <Inventory2RoundedIcon />, path: '/inventory', category: 'Stock & Machines' },
   { text: 'Machine Master', icon: <PrecisionManufacturingRoundedIcon />, path: '/machines', category: 'Stock & Machines' },
+  { text: 'Maintenance', icon: <BuildCircleRoundedIcon />, path: '/maintenance', category: 'Stock & Machines' },
+  { text: 'Cash Book', icon: <AccountBalanceWalletRoundedIcon />, path: '/cash-book', category: 'Operations' },
   { text: 'HR & Payroll', icon: <GroupsRoundedIcon />, path: '/hr', category: 'Management' },
   { text: 'Admin Console', icon: <ShieldRoundedIcon />, path: '/admin-console', category: 'Management' }
 ];

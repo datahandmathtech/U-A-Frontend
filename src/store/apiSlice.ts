@@ -29,7 +29,7 @@ export const apiSlice = createApi({
   refetchOnFocus: false,
   refetchOnReconnect: false,
   keepUnusedDataFor: 600,
-  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste', 'Machine', 'ProductChat'],
+  tagTypes: ['User', 'Project', 'Lead', 'Invoice', 'Inventory', 'Production', 'Dispatch', 'Attendance', 'Drawing', 'Category', 'Unit', 'Vendor', 'Waste', 'Machine', 'ProductChat', 'CashBook', 'Maintenance'],
   endpoints: (builder) => ({
     // VENDOR ENDPOINTS
     getVendors: builder.query<any[], { month?: string, fy?: string } | void>({
@@ -633,6 +633,67 @@ export const apiSlice = createApi({
       query: () => '/product-chat/unread/admin-alerts',
       providesTags: ['ProductChat']
     }),
+
+    // CASH BOOK ENDPOINTS
+    getCashBook: builder.query<{ summary: any; transactions: any[] }, { startDate?: string; endDate?: string; month?: number | ''; year?: number | ''; category?: string; type?: string } | void>({
+      query: (params) => {
+        if (!params) return '/cash-book';
+        const search = new URLSearchParams();
+        if (params.startDate) search.append('startDate', params.startDate);
+        if (params.endDate) search.append('endDate', params.endDate);
+        if (params.month !== undefined && params.month !== '') search.append('month', String(params.month));
+        if (params.year) search.append('year', String(params.year));
+        if (params.category) search.append('category', params.category);
+        if (params.type) search.append('type', params.type);
+        const q = search.toString();
+        return `/cash-book${q ? `?${q}` : ''}`;
+      },
+      providesTags: ['CashBook']
+    }),
+    createCashTransaction: builder.mutation<any, any>({
+      query: (body) => ({ url: '/cash-book', method: 'POST', body }),
+      invalidatesTags: ['CashBook']
+    }),
+    updateCashTransaction: builder.mutation<any, { id: string; [key: string]: any }>({
+      query: ({ id, ...body }) => ({ url: `/cash-book/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['CashBook']
+    }),
+    deleteCashTransaction: builder.mutation<any, string>({
+      query: (id) => ({ url: `/cash-book/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['CashBook', 'Maintenance']
+    }),
+
+    // MACHINE MAINTENANCE ENDPOINTS
+    getMaintenances: builder.query<{ stats: any; maintenances: any[] }, { machineId?: string; paymentStatus?: string; category?: string; startDate?: string; endDate?: string } | void>({
+      query: (params) => {
+        if (!params) return '/maintenance';
+        const search = new URLSearchParams();
+        if (params.machineId) search.append('machineId', params.machineId);
+        if (params.paymentStatus) search.append('paymentStatus', params.paymentStatus);
+        if (params.category) search.append('category', params.category);
+        if (params.startDate) search.append('startDate', params.startDate);
+        if (params.endDate) search.append('endDate', params.endDate);
+        const q = search.toString();
+        return `/maintenance${q ? `?${q}` : ''}`;
+      },
+      providesTags: ['Maintenance']
+    }),
+    createMaintenance: builder.mutation<any, any>({
+      query: (body) => ({ url: '/maintenance', method: 'POST', body }),
+      invalidatesTags: ['Maintenance', 'CashBook', 'Machine']
+    }),
+    updateMaintenance: builder.mutation<any, { id: string; [key: string]: any }>({
+      query: ({ id, ...body }) => ({ url: `/maintenance/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['Maintenance', 'CashBook']
+    }),
+    deleteMaintenance: builder.mutation<any, string>({
+      query: (id) => ({ url: `/maintenance/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Maintenance', 'CashBook']
+    }),
+    settleMaintenanceDue: builder.mutation<any, { id: string; paymentMode?: string; paymentDate?: string }>({
+      query: ({ id, ...body }) => ({ url: `/maintenance/${id}/settle-dues`, method: 'POST', body }),
+      invalidatesTags: ['Maintenance', 'CashBook']
+    }),
   }),
 });
 
@@ -748,5 +809,14 @@ export const {
   useMarkProductChatReadMutation,
   useGetAdminChatAlertsQuery,
   usePackBoxesMutation,
-  useDispatchBoxesMutation
+  useDispatchBoxesMutation,
+  useGetCashBookQuery,
+  useCreateCashTransactionMutation,
+  useUpdateCashTransactionMutation,
+  useDeleteCashTransactionMutation,
+  useGetMaintenancesQuery,
+  useCreateMaintenanceMutation,
+  useUpdateMaintenanceMutation,
+  useDeleteMaintenanceMutation,
+  useSettleMaintenanceDueMutation
 } = apiSlice;

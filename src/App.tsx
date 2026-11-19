@@ -29,6 +29,8 @@ import AdminConsole from './pages/AdminConsole';
 import Dispatch from './pages/Dispatch';
 import Machines from './pages/Machines';
 import HR from './pages/HR';
+import CashBook from './pages/CashBook';
+import Maintenance from './pages/Maintenance';
 import NotFound from './pages/NotFound';
 import Login from './pages/Login';
 import WorkerDashboard from './pages/WorkerDashboard';
@@ -147,6 +149,14 @@ const router = createBrowserRouter([
       {
         path: 'machines',
         element: <Machines />
+      },
+      {
+        path: 'maintenance',
+        element: <Maintenance />
+      },
+      {
+        path: 'cash-book',
+        element: <CashBook />
       },
       {
         path: 'hr',
