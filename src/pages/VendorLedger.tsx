@@ -7,7 +7,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   useGetVendorLedgerQuery, useGetVendorsQuery, useGetStaffListQuery,
   useGetProjectsQuery, useCreateMaterialLogMutation, useEditProductionLogMutation,
-  useDeleteProductionLogMutation
+  useDeleteProductionLogMutation, useGetActiveOutLogsQuery
 } from '../store/apiSlice';
 import AddIcon from '@mui/icons-material/Add';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
@@ -65,6 +65,7 @@ const VendorLedger: React.FC = () => {
   const { data: staff } = useGetStaffListQuery();
   const { data: projects } = useGetProjectsQuery();
   const { data: ledger, isLoading, refetch } = useGetVendorLedgerQuery(id || '', { skip: !id });
+  const { data: activeOutLogsData } = useGetActiveOutLogsQuery(undefined, { pollingInterval: 20000 });
 
   const [createMaterialLog] = useCreateMaterialLogMutation();
   const [editProductionLog] = useEditProductionLogMutation();
@@ -72,7 +73,7 @@ const VendorLedger: React.FC = () => {
 
   const [entryModalOpen, setEntryModalOpen] = useState(false);
   const [editLog, setEditLog] = useState<any>(null);
-  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<any>(null);
   const [activeStageTab, setActiveStageTab] = useState<string>('Production');
   const [trackBy, setTrackBy] = useState<string>('Work Stage');
   const [sortAsc, setSortAsc] = useState<boolean>(true); // Chronological by default matching image
@@ -639,7 +640,14 @@ const VendorLedger: React.FC = () => {
                         alt="Proof"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setPreviewPhoto(entry.photoUrl);
+                          setPreviewPhoto({
+                            url: entry.photoUrl,
+                            remarks: entry.remarks,
+                            title: `${vendor?.name || 'Vendor'} • ${entry.stage || activeStageTab}`,
+                            date: entry.date || entry.createdAt,
+                            qty: entry.piecesOut || entry.piecesIn || entry.quantityProduced,
+                            type: entry.transactionType || (entry.piecesOut ? 'OUT' : 'IN')
+                          });
                         }}
                         sx={{
                           width: 36,
@@ -658,7 +666,15 @@ const VendorLedger: React.FC = () => {
                     )}
                   </TableCell>
                   <TableCell sx={{ color: '#475569', fontWeight: 500, fontSize: '0.82rem', py: 1.1 }}>
-                    {entry.productName || entry.remarks || (isOut ? 'Material sent to vendor' : 'Received from vendor')}
+                    {entry.remarks ? (
+                      <Typography sx={{ color: '#0F172A', fontWeight: 600, fontSize: '0.82rem' }}>
+                        {entry.remarks}
+                      </Typography>
+                    ) : (
+                      <Typography sx={{ color: '#64748B', fontWeight: 500, fontSize: '0.82rem' }}>
+                        {entry.productName || (isOut ? 'Material sent to vendor' : 'Received from vendor')}
+                      </Typography>
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -689,66 +705,104 @@ const VendorLedger: React.FC = () => {
         projects={projects}
         defaultVendorId={id}
         isEditMode={!!editLog}
+        activeOutLogs={activeOutLogsData}
       />
       {/* Fullscreen Photo Preview Modal */}
       <Dialog
         open={Boolean(previewPhoto)}
         onClose={() => setPreviewPhoto(null)}
         maxWidth="md"
-        PaperProps={{
-          sx: {
-            bgcolor: 'transparent',
-            boxShadow: 'none',
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative'
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0F172A',
+              borderRadius: 3,
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)',
+              border: '1px solid #334155'
+            }
           }
         }}
       >
-        <Box sx={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+        <Box sx={{ position: 'relative', p: { xs: 2, sm: 2.5 } }}>
           <Box sx={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 1, zIndex: 10 }}>
             <IconButton
               component="a"
-              href={getFullQualityUrl(previewPhoto || '')}
+              href={getFullQualityUrl(typeof previewPhoto === 'string' ? previewPhoto : previewPhoto?.url || '')}
               download="vendor_verification_photo.jpg"
               target="_blank"
               rel="noopener noreferrer"
               sx={{
-                bgcolor: 'rgba(0,0,0,0.7)',
+                bgcolor: 'rgba(0,0,0,0.6)',
                 color: '#FFFFFF',
-                '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.85)' }
               }}
               title="Download Photo"
             >
-              <DownloadRoundedIcon />
+              <DownloadRoundedIcon fontSize="small" />
             </IconButton>
             <IconButton
               onClick={() => setPreviewPhoto(null)}
               sx={{
-                bgcolor: 'rgba(0,0,0,0.7)',
+                bgcolor: 'rgba(0,0,0,0.6)',
                 color: '#FFFFFF',
-                '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.85)' }
               }}
             >
-              <CloseIcon />
+              <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
           {previewPhoto && (
-            <Box
-              component="img"
-              src={getFullQualityUrl(previewPhoto)}
-              alt="Verification Proof"
-              sx={{
-                width: '100%',
-                maxHeight: '85vh',
-                objectFit: 'contain',
-                borderRadius: 2,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                bgcolor: '#0F172A'
-              }}
-            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Box sx={{ width: '100%', maxHeight: '68vh', display: 'flex', justifyContent: 'center', mb: 2, bgcolor: '#000', borderRadius: 2, overflow: 'hidden' }}>
+                <img
+                  src={getFullQualityUrl(typeof previewPhoto === 'string' ? previewPhoto : previewPhoto.url)}
+                  alt="Verification Proof"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '68vh',
+                    objectFit: 'contain'
+                  }}
+                />
+              </Box>
+
+              {/* Details & Remarks Box directly under the photo */}
+              <Box sx={{ width: '100%', bgcolor: '#1E293B', borderRadius: 2, p: 2, border: '1px solid #334155' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: previewPhoto?.remarks ? 1.5 : 0, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem' }}>
+                    {previewPhoto?.title || `${vendor?.name || 'Vendor'} Verification Proof`}
+                  </Typography>
+                  {previewPhoto?.qty && (
+                    <Chip 
+                      label={`${previewPhoto.type || ''} • ${previewPhoto.qty} Pcs`} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.2)' : 'rgba(2, 132, 199, 0.2)', 
+                        color: previewPhoto.type === 'OUT' ? '#FB923C' : '#38BDF8', 
+                        fontWeight: 800,
+                        border: '1px solid',
+                        borderColor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.4)' : 'rgba(2, 132, 199, 0.4)'
+                      }} 
+                    />
+                  )}
+                </Box>
+                {previewPhoto?.remarks ? (
+                  <Box sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 1.5, p: 1.5 }}>
+                    <Typography sx={{ color: '#FCD34D', fontWeight: 800, fontSize: '0.8rem', mb: 0.5 }}>
+                      📝 Remarks / Damage Notes:
+                    </Typography>
+                    <Typography sx={{ color: '#FFFFFF', fontSize: '0.92rem', fontWeight: 600 }}>
+                      {previewPhoto.remarks}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Typography sx={{ color: '#64748B', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                    No damage or special remarks noted for this entry.
+                  </Typography>
+                )}
+              </Box>
+            </Box>
           )}
         </Box>
       </Dialog>

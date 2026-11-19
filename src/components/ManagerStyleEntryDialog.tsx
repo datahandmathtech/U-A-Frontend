@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Box, TextField, MenuItem, Button, Typography, Switch, FormControlLabel, RadioGroup, Radio, FormControl, IconButton, Paper, Autocomplete, InputAdornment, Chip, Divider } from '@mui/material';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
@@ -8,6 +8,8 @@ import InputIcon from '@mui/icons-material/Input';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 
 const ImageUploadBox = ({ label, previewUrl, onClick }: { label: string, previewUrl: string, onClick: () => void }) => {
   return (
@@ -47,15 +49,17 @@ interface ManagerStyleEntryDialogProps {
   open: boolean;
   onClose: () => void;
   onSave: (data: any) => Promise<void>;
+  onDelete?: () => void;
   initialData?: any;
   vendors?: any[];
   staff?: any[];
   projects?: any[];
   defaultVendorId?: string;
   isEditMode?: boolean;
+  activeOutLogs?: any[];
 }
 
-const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open, onClose, onSave, initialData, vendors = [], staff = [], projects = [], defaultVendorId, isEditMode }) => {
+const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open, onClose, onSave, onDelete, initialData, vendors = [], staff = [], projects = [], defaultVendorId, isEditMode, activeOutLogs = [] }) => {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().substring(0, 10),
     transactionType: 'OUT',
@@ -66,6 +70,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
     vehicleNumber: '',
     productName: '',
     photoUrl: '',
+    remarks: '',
     projectId: '',
     productId: ''
   });
@@ -78,6 +83,61 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
   const [cameraOpen, setCameraOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Compute pending balance per vendor from activeOutLogs and vendor balances
+  const vendorPendingStats = useMemo(() => {
+    const stats: Record<string, { pendingQty: number; latestStage?: string }> = {};
+
+    // 1. First populate from activeOutLogs
+    (activeOutLogs || []).forEach((log: any) => {
+      const vId = log.vendorId;
+      const vName = (log.vendorName || '').trim().toLowerCase();
+      const remaining = Math.max(0, (Number(log.quantityProduced) || 0) - (Number(log.returnedQty) || 0));
+      if (remaining > 0) {
+        if (vId) {
+          if (!stats[vId]) stats[vId] = { pendingQty: 0, latestStage: log.stage };
+          stats[vId].pendingQty += remaining;
+          if (log.stage) stats[vId].latestStage = log.stage;
+        }
+        if (vName) {
+          if (!stats[vName]) stats[vName] = { pendingQty: 0, latestStage: log.stage };
+          stats[vName].pendingQty += remaining;
+          if (log.stage) stats[vName].latestStage = log.stage;
+        }
+      }
+    });
+
+    // 2. Also check vendor.balance if available and not yet captured
+    (vendors || []).forEach((v: any) => {
+      const vBalance = Number(v.balance) || 0;
+      if (vBalance > 0 && !stats[v.id]) {
+        stats[v.id] = { pendingQty: vBalance, latestStage: 'Production' };
+      }
+    });
+
+    return stats;
+  }, [activeOutLogs, vendors]);
+
+  // For IN transaction: sort vendors so that vendors with pending materials appear first
+  const sortedInVendors = useMemo(() => {
+    if (formData.transactionType !== 'IN') return vendors;
+    return [...vendors].sort((a: any, b: any) => {
+      const pendA = vendorPendingStats[a.id]?.pendingQty || (typeof a.balance === 'number' && a.balance > 0 ? a.balance : 0);
+      const pendB = vendorPendingStats[b.id]?.pendingQty || (typeof b.balance === 'number' && b.balance > 0 ? b.balance : 0);
+      if (pendA > 0 && pendB <= 0) return -1;
+      if (pendB > 0 && pendA <= 0) return 1;
+      if (pendA !== pendB) return pendB - pendA;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [vendors, formData.transactionType, vendorPendingStats]);
+
+  const selectedInVendor = vendors.find((v: any) => v.id === formData.assigneeId);
+  const selectedVendorPending = formData.assigneeId 
+    ? (vendorPendingStats[formData.assigneeId]?.pendingQty || (typeof selectedInVendor?.balance === 'number' && selectedInVendor.balance > 0 ? selectedInVendor.balance : 0)) 
+    : 0;
+  const selectedVendorStage = formData.assigneeId 
+    ? (vendorPendingStats[formData.assigneeId]?.latestStage || 'Production') 
+    : 'Production';
 
   const stopCameraStream = () => {
     if (streamRef.current) {
@@ -112,6 +172,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         vehicleNumber: initialData.vehicleNumber || '',
         productName: initialData.productName || '',
         photoUrl: initialData.photoUrl || initialData.startPhotos?.unit || initialData.startPhotos?.machine || '',
+        remarks: initialData.remarks || '',
         projectId: initialData.projectId || '',
         productId: initialData.productId || ''
       });
@@ -137,6 +198,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         vehicleNumber: '',
         productName: '',
         photoUrl: '',
+        remarks: '',
         projectId: '',
         productId: ''
       });
@@ -172,6 +234,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         vehicleNumber: formData.vehicleNumber,
         productName: formData.productName,
         photoUrl: formData.photoUrl,
+        remarks: formData.remarks?.trim() || undefined,
         startPhotos: formData.photoUrl ? { unit: formData.photoUrl, machine: formData.photoUrl } : undefined,
         assigneeType: formData.assigneeType,
         projectId: formData.projectId || undefined,
@@ -511,22 +574,117 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <TextField
                 select
-                label="Select Vendor / Staff"
+                label="Select Vendor / Staff *"
                 fullWidth
                 size="small"
                 value={formData.assigneeId}
-                onChange={(e) => setFormData({ ...formData, assigneeId: e.target.value })}
+                onChange={(e) => {
+                  const newVendorId = e.target.value;
+                  const stg = vendorPendingStats[newVendorId]?.latestStage;
+                  setFormData(prev => ({
+                    ...prev,
+                    assigneeId: newVendorId,
+                    stage: stg || prev.stage
+                  }));
+                }}
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
               >
-                {vendors.map((v: any) => (
-                  <MenuItem key={v.id} value={v.id}>{v.name} (Vendor)</MenuItem>
-                ))}
+                {sortedInVendors.map((v: any) => {
+                  const pend = vendorPendingStats[v.id]?.pendingQty || (typeof v.balance === 'number' && v.balance > 0 ? v.balance : 0);
+                  return (
+                    <MenuItem 
+                      key={v.id} 
+                      value={v.id}
+                      sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        py: 1,
+                        bgcolor: pend > 0 ? 'rgba(254, 242, 242, 0.4)' : 'inherit'
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: pend > 0 ? 700 : 500, fontSize: '0.88rem', color: '#0F172A' }}>
+                        {v.name} (Vendor)
+                      </Typography>
+                      {pend > 0 && (
+                        <Chip
+                          label={`Pending: ${pend} pcs`}
+                          size="small"
+                          sx={{
+                            fontWeight: 800,
+                            fontSize: '0.72rem',
+                            bgcolor: '#FEF2F2',
+                            color: '#DC2626',
+                            border: '1px solid #FECACA',
+                            height: 22,
+                            ml: 1
+                          }}
+                        />
+                      )}
+                    </MenuItem>
+                  );
+                })}
               </TextField>
+
+              {/* Pending Return Alert Banner with 1-Tap Auto Fill */}
+              {selectedVendorPending > 0 && (
+                <Box sx={{
+                  bgcolor: '#FFF7ED',
+                  border: '1.5px solid #FDBA74',
+                  borderRadius: 2.5,
+                  p: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1.5
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                    <Box sx={{ width: 34, height: 34, borderRadius: 2, bgcolor: '#FFEDD5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Inventory2OutlinedIcon sx={{ color: '#EA580C', fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#9A3412', lineHeight: 1.2 }}>
+                        Pending Return from {selectedInVendor?.name || 'Vendor'}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.95rem', fontWeight: 900, color: '#EA580C', lineHeight: 1.2 }}>
+                        {selectedVendorPending} Pcs Pending
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        quantity: String(selectedVendorPending),
+                        stage: selectedVendorStage || prev.stage
+                      }));
+                    }}
+                    sx={{
+                      bgcolor: '#EA580C',
+                      color: '#FFFFFF',
+                      fontWeight: 800,
+                      fontSize: '0.75rem',
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      px: 1.5,
+                      py: 0.6,
+                      boxShadow: 'none',
+                      whiteSpace: 'nowrap',
+                      '&:hover': { bgcolor: '#C2410C', boxShadow: 'none' }
+                    }}
+                  >
+                    Auto-fill ({selectedVendorPending} Pcs)
+                  </Button>
+                </Box>
+              )}
 
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextField
                   select
-                  label="Work Stage"
+                  label="Work Stage *"
                   fullWidth
                   size="small"
                   value={formData.stage}
@@ -535,18 +693,26 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                 >
                   <MenuItem value="Production">Production</MenuItem>
                   <MenuItem value="Spare Part">Spare Part</MenuItem>
+                  <MenuItem value="Polishing - Honed">Polishing - Honed</MenuItem>
+                  <MenuItem value="Polishing - Mirror">Polishing - Mirror</MenuItem>
                   <MenuItem value="Polishing">Polishing</MenuItem>
                   <MenuItem value="Packing">Packing</MenuItem>
                   <MenuItem value="Dispatch">Dispatch</MenuItem>
                 </TextField>
                 <TextField
-                  label="Quantity"
+                  label="Quantity *"
                   type="number"
                   fullWidth
                   size="small"
+                  placeholder="e.g. 5"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  slotProps={{
+                    input: {
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B' }}>Pcs</Typography></InputAdornment>,
+                      sx: { borderRadius: 2 }
+                    }
+                  }}
                 />
               </Box>
             </Box>
@@ -615,6 +781,32 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
             </Box>
           </Box>
 
+          {/* Remarks / Damage Notes Section (User Request: 5 pcs broken etc.) */}
+          <Box>
+            <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 0.8, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <EditNoteIcon sx={{ fontSize: 18, color: '#64748B' }} />
+              Remarks / Damage Notes (Optional)
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              placeholder="e.g. 5 pcs broken during cutting, polish scratches, extra pieces returned..."
+              value={formData.remarks}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              slotProps={{
+                input: {
+                  sx: {
+                    borderRadius: 2,
+                    bgcolor: '#F8FAFC',
+                    fontSize: '0.88rem',
+                    '&:hover': { bgcolor: '#F1F5F9' }
+                  }
+                }
+              }}
+            />
+          </Box>
+
           {/* Live Camera Viewfinder Dialog */}
           <Dialog open={cameraOpen} onClose={stopCameraStream} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
             <DialogTitle sx={{ fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -639,28 +831,43 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
 
         </Box>
       </DialogContent>
-      <DialogActions sx={{ p: 3, pt: 1, bgcolor: '#FFFFFF' }}>
-        <Button onClick={onClose} disabled={loading} color="inherit" sx={{ fontWeight: 700 }}>Cancel</Button>
-        <Button 
-          variant="contained" 
-          onClick={handleSubmit} 
-          disabled={loading || (formData.transactionType === 'OUT' ? vendorRows.some(r => !r.vendorId || !r.qty) : !formData.quantity)}
-          sx={{ 
-            borderRadius: 2.5, 
-            px: 4, 
-            py: 1.2,
-            fontWeight: 800, 
-            textTransform: 'none',
-            fontSize: '0.92rem',
-            background: formData.transactionType === 'OUT' 
-              ? 'linear-gradient(135deg, #EA580C 0%, #C2410C 100%)' 
-              : 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
-            color: '#FFFFFF',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.15)'
-          }}
-        >
-          {loading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Submit to Admin')}
-        </Button>
+      <DialogActions sx={{ p: 3, pt: 1, bgcolor: '#FFFFFF', justifyContent: 'space-between' }}>
+        <Box>
+          {isEditMode && onDelete && (
+            <Button 
+              onClick={onDelete} 
+              disabled={loading} 
+              color="error" 
+              startIcon={<DeleteIcon />}
+              sx={{ fontWeight: 700, textTransform: 'none' }}
+            >
+              Delete Entry
+            </Button>
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button onClick={onClose} disabled={loading} color="inherit" sx={{ fontWeight: 700 }}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSubmit} 
+            disabled={loading || (formData.transactionType === 'OUT' ? vendorRows.some(r => !r.vendorId || !r.qty) : !formData.quantity)}
+            sx={{ 
+              borderRadius: 2.5, 
+              px: 4, 
+              py: 1.2,
+              fontWeight: 800, 
+              textTransform: 'none',
+              fontSize: '0.92rem',
+              background: formData.transactionType === 'OUT' 
+                ? 'linear-gradient(135deg, #EA580C 0%, #C2410C 100%)' 
+                : 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.15)'
+            }}
+          >
+            {loading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Submit to Admin')}
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );

@@ -91,7 +91,7 @@ const InOutLedger: React.FC = () => {
   const pendingMaterialLogs = (pendingLogs || []).filter((log: any) => !!log.transactionType);
   const completedMaterialLogs = (approvedLogsData || []).filter((log: any) => !!log.transactionType);
 
-  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<any>(null);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [projectSplits, setProjectSplits] = useState<{projectId: string, qty: number, productId?: string, productName?: string, slabId?: string, pieceIds?: string[], stage?: string, directEntry?: boolean}>([{projectId: '', qty: 0, directEntry: false}]);
@@ -337,6 +337,11 @@ const InOutLedger: React.FC = () => {
                   <Typography sx={{ color: '#0F172A', fontWeight: 700, fontSize: '0.85rem' }}>
                     {log.vendorName || log.worker?.name || 'External Vendor'}
                   </Typography>
+                  {log.remarks && (
+                    <Typography sx={{ fontSize: '0.74rem', color: '#64748B', fontStyle: 'italic', mt: 0.3 }}>
+                      Note: {log.remarks}
+                    </Typography>
+                  )}
                 </TableCell>
                 
                 <TableCell sx={{ py: 2 }}>
@@ -359,7 +364,14 @@ const InOutLedger: React.FC = () => {
                 <TableCell sx={{ py: 2 }}>
                   {photoUrl ? (
                     <Box 
-                      onClick={() => setPreviewPhoto(photoUrl)}
+                      onClick={() => setPreviewPhoto({
+                        url: photoUrl,
+                        remarks: log.remarks,
+                        title: `${log.vendorName || log.worker?.name || 'External Vendor'} • ${log.stage || 'Production'}`,
+                        qty: log.quantityProduced,
+                        type: log.transactionType,
+                        date: log.createdAt || log.date
+                      })}
                       sx={{ 
                         width: 36, height: 36, borderRadius: 2, overflow: 'hidden', 
                         cursor: 'pointer', border: '1px solid #E2E8F0',
@@ -938,23 +950,75 @@ const InOutLedger: React.FC = () => {
       <Dialog 
         open={Boolean(previewPhoto)} 
         onClose={() => setPreviewPhoto(null)} 
-        maxWidth="lg" 
+        maxWidth="md" 
         fullWidth 
-        slotProps={{ paper: { sx: { bgcolor: 'transparent', boxShadow: 'none' } } }}
+        slotProps={{ 
+          paper: { 
+            sx: { 
+              bgcolor: '#0F172A', 
+              borderRadius: 3, 
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)',
+              border: '1px solid #334155'
+            } 
+          } 
+        }}
       >
-        <Box sx={{ position: 'relative', textAlign: 'center' }}>
+        <Box sx={{ position: 'relative', p: { xs: 2, sm: 2.5 } }}>
           <IconButton 
             onClick={() => setPreviewPhoto(null)} 
-            sx={{ position: 'absolute', top: -40, right: -40, color: '#fff', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' } }}
+            sx={{ position: 'absolute', top: 12, right: 12, color: '#94A3B8', bgcolor: 'rgba(0,0,0,0.4)', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)', color: '#FFF' }, zIndex: 10 }}
           >
-            <CloseIcon fontSize="large" />
+            <CloseIcon fontSize="medium" />
           </IconButton>
+          
           {previewPhoto && (
-            <img 
-              src={getFullQualityUrl(previewPhoto)} 
-              alt="Preview" 
-              style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }} 
-            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Box sx={{ width: '100%', maxHeight: '68vh', display: 'flex', justifyContent: 'center', mb: 2, bgcolor: '#000', borderRadius: 2, overflow: 'hidden' }}>
+                <img 
+                  src={getFullQualityUrl(typeof previewPhoto === 'string' ? previewPhoto : previewPhoto.url)} 
+                  alt="Proof" 
+                  style={{ maxWidth: '100%', maxHeight: '68vh', objectFit: 'contain' }} 
+                />
+              </Box>
+              
+              {/* Verification Details & Remarks directly under the photo */}
+              <Box sx={{ width: '100%', bgcolor: '#1E293B', borderRadius: 2, p: 2, border: '1px solid #334155' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: previewPhoto?.remarks ? 1.5 : 0, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem' }}>
+                    {previewPhoto?.title || 'Material Verification Photo'}
+                  </Typography>
+                  {previewPhoto?.qty && (
+                    <Chip 
+                      label={`${previewPhoto.type || ''} • ${previewPhoto.qty} Pcs`} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.2)' : 'rgba(2, 132, 199, 0.2)', 
+                        color: previewPhoto.type === 'OUT' ? '#FB923C' : '#38BDF8', 
+                        fontWeight: 800,
+                        border: '1px solid',
+                        borderColor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.4)' : 'rgba(2, 132, 199, 0.4)'
+                      }} 
+                    />
+                  )}
+                </Box>
+                
+                {previewPhoto?.remarks ? (
+                  <Box sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 1.5, p: 1.5 }}>
+                    <Typography sx={{ color: '#FCD34D', fontWeight: 800, fontSize: '0.8rem', mb: 0.5 }}>
+                      📝 Remarks / Damage Notes:
+                    </Typography>
+                    <Typography sx={{ color: '#FFFFFF', fontSize: '0.92rem', fontWeight: 600 }}>
+                      {previewPhoto.remarks}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Typography sx={{ color: '#64748B', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                    No damage or special remarks noted for this batch.
+                  </Typography>
+                )}
+              </Box>
+            </Box>
           )}
         </Box>
       </Dialog>
@@ -969,6 +1033,7 @@ const InOutLedger: React.FC = () => {
         staff={staffData}
         projects={projects}
         initialData={selectedEditLog}
+        activeOutLogs={activeOutLogs}
       />
 
       <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast({ ...toast, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
