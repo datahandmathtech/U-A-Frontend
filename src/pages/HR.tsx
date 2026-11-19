@@ -66,15 +66,34 @@ const HR: React.FC = () => {
     }
   };
 
+  const ALL_OPERATIONAL_MODULES = [
+    '/',
+    '/live-feed',
+    '/log-book',
+    '/pieces',
+    '/crm',
+    '/projects',
+    '/approvals',
+    '/in-out-ledger',
+    '/vendors',
+    '/vendor-ledger',
+    '/inventory',
+    '/waste-ledger',
+    '/machines',
+    '/maintenance',
+    '/cash-book',
+    '/dispatch',
+    '/hr'
+  ];
+
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       // Admin and Manager get full ERP access (empty modulesAccess array)
-      // Employee gets core operational modules by default
-      const defaultEmployeeModules = ['/', '/projects', '/crm', '/in-out-ledger', '/inventory', '/machines', '/maintenance', '/cash-book'];
+      // Employee gets all operational modules by default
       const finalModules = (staffData.role === 'admin' || staffData.role === 'manager') 
         ? [] 
-        : (staffData.role === 'employee' ? defaultEmployeeModules : []);
+        : (staffData.role === 'employee' ? ALL_OPERATIONAL_MODULES : []);
 
       await registerUser({
         ...staffData,
@@ -115,7 +134,7 @@ const HR: React.FC = () => {
         ? []
         : (editingStaffData.modulesAccess && editingStaffData.modulesAccess.length > 0 
             ? editingStaffData.modulesAccess 
-            : ['/', '/projects', '/crm', '/in-out-ledger', '/inventory', '/machines', '/maintenance', '/cash-book']);
+            : ALL_OPERATIONAL_MODULES);
 
       await editStaff({ id: editingStaffData.id, data: { ...editingStaffData, modulesAccess: finalModules } }).unwrap();
       setSuccessMsg(`Staff ${editingStaffData.name} updated successfully!`);

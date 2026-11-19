@@ -33,8 +33,8 @@ const Layout: React.FC = () => {
 
     // Route alias mapping so subroutes and complementary views are never blocked
     const ROUTE_ALIASES: Record<string, string[]> = {
-      '/': ['/live-feed'],
-      '/projects': ['/crm', '/projects', '/pieces', '/log-book', '/live-feed'],
+      '/': ['/live-feed', '/log-book', '/pieces'],
+      '/projects': ['/crm', '/projects', '/pieces', '/log-book', '/live-feed', '/approvals', '/in-out-ledger'],
       '/crm': ['/crm', '/projects', '/pieces'],
       '/in-out-ledger': ['/in-out-ledger', '/vendors', '/vendor-ledger'],
       '/inventory': ['/inventory', '/waste-ledger'],
@@ -51,7 +51,7 @@ const Layout: React.FC = () => {
     // Check if the current route is authorized
     const isAuthorized = user.modulesAccess.some((allowedPath: string) => {
       if (allowedPath === '/') {
-        return currentPath === '/';
+        if (currentPath === '/') return true;
       }
       if (currentPath === allowedPath || currentPath.startsWith(allowedPath + '/')) {
         return true;
