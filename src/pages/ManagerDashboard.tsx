@@ -1090,6 +1090,31 @@ const ManagerDashboard: React.FC = () => {
               />
             )}
 
+            {/* Switch to Admin ERP for Admins */}
+            {user?.role === 'admin' && (
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/')}
+                sx={{
+                  color: '#C89F5A',
+                  borderColor: 'rgba(200, 159, 90, 0.4)',
+                  bgcolor: 'rgba(200, 159, 90, 0.1)',
+                  borderRadius: 2.5,
+                  py: { xs: 0.6, sm: 0.8 },
+                  px: { xs: 1.2, sm: 2 },
+                  fontWeight: 700,
+                  fontSize: { xs: '0.76rem', sm: '0.82rem' },
+                  textTransform: 'none',
+                  '&:hover': {
+                    bgcolor: 'rgba(200, 159, 90, 0.2)',
+                    borderColor: '#C89F5A'
+                  }
+                }}
+              >
+                Admin ERP
+              </Button>
+            )}
+
             {/* Logout button */}
             <Button 
               variant="outlined" 

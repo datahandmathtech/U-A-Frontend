@@ -23,6 +23,11 @@ const Layout: React.FC = () => {
     return <Navigate to="/worker" replace />;
   }
 
+  // If manager lands on ERP layout without explicit modules, redirect to dedicated manager portal
+  if (user?.role === 'manager' && (!user?.modulesAccess || user.modulesAccess.length === 0)) {
+    return <Navigate to="/manager" replace />;
+  }
+
   // Admins & Managers have full unrestricted access to all ERP modules when modulesAccess is not restricted
   const isSuper = (user?.role === 'admin' || user?.role === 'manager') && (!user?.modulesAccess || user.modulesAccess.length === 0);
 
