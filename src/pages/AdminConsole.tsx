@@ -14,6 +14,8 @@ const MODULES = [
   { label: 'Active Work Orders', path: '/projects' },
   { label: 'Inventory', path: '/inventory' },
   { label: 'Machine Master', path: '/machines' },
+  { label: 'Maintenance', path: '/maintenance' },
+  { label: 'Cash Book', path: '/cash-book' },
   { label: 'Approvals', path: '/approvals' },
   { label: 'Dispatch & Packing', path: '/dispatch' },
   { label: 'In/Out Ledger', path: '/in-out-ledger' },
@@ -40,8 +42,8 @@ const AdminConsole: React.FC = () => {
     modulesAccess: [] as string[]
   });
 
-  // Filter out workers, keep admins and employees
-  const admins = staff?.filter((u: any) => u.role === 'admin' || u.role === 'employee') || [];
+  // Filter out workers, keep admins, managers and employees
+  const admins = staff?.filter((u: any) => u.role === 'admin' || u.role === 'employee' || u.role === 'manager') || [];
 
   const handleOpen = () => {
     setIsEditing(false);
@@ -130,7 +132,7 @@ const AdminConsole: React.FC = () => {
                 </TableCell>
                 <TableCell sx={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {user.role === 'admin' && (!user.modulesAccess || user.modulesAccess.length === 0) ? (
+                    {(user.role === 'admin' || user.role === 'manager') && (!user.modulesAccess || user.modulesAccess.length === 0) ? (
                       <Chip label="FULL ACCESS" size="small" sx={{ bgcolor: 'rgba(76, 175, 80, 0.2)', color: '#4caf50', fontWeight: 'bold', fontSize: '0.7rem' }} />
                     ) : (
                       user.modulesAccess?.map((path: string, i: number) => {
@@ -198,7 +200,25 @@ const AdminConsole: React.FC = () => {
                 helperText="They will use this to log in."
               />
             </Grid>
-            <Grid xs={12}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField 
+                label="Role" 
+                fullWidth 
+                select
+                variant="outlined" 
+                value={formData.role} 
+                onChange={e => setFormData({...formData, role: e.target.value})}
+                slotProps={{
+                  input: { sx: { color: 'text.primary', bgcolor: 'rgba(0,0,0,0.02)' } },
+                  inputLabel: { sx: { color: 'text.secondary' } }
+                }}
+              >
+                <MenuItem value="admin">Admin (Full System)</MenuItem>
+                <MenuItem value="manager">Manager (Management)</MenuItem>
+                <MenuItem value="employee">Employee (Staff)</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField 
                 label="Access Password" 
                 fullWidth 

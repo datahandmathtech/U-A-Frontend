@@ -1071,7 +1071,7 @@ const ProjectDetails: React.FC = () => {
   };
 
   const user = useSelector((state: any) => state.auth.user);
-  const isSuperAdmin = user?.role === 'admin' && (!user?.modulesAccess || user.modulesAccess.length === 0);
+  const isSuperAdmin = (user?.role === 'admin' || user?.role === 'manager') && (!user?.modulesAccess || user.modulesAccess.length === 0);
   const hasCrmAccess = isSuperAdmin || (Array.isArray(user?.modulesAccess) && user.modulesAccess.includes('/crm'));
   const isCrmView = location.pathname.includes('/crm') && hasCrmAccess;
 

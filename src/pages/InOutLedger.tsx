@@ -385,9 +385,11 @@ const InOutLedger: React.FC = () => {
                     )}
                     {log.approvalStatus === 'approved' && (
                       <Tooltip title="Approved">
-                        <IconButton size="small" disabled sx={{ bgcolor: '#ECFDF5', color: '#059669', '&.Mui-disabled': { bgcolor: '#ECFDF5', color: '#059669', opacity: 0.8 } }}>
-                          <CheckCircleIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
+                        <span>
+                          <IconButton size="small" disabled sx={{ bgcolor: '#ECFDF5', color: '#059669', '&.Mui-disabled': { bgcolor: '#ECFDF5', color: '#059669', opacity: 0.8 } }}>
+                            <CheckCircleIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </span>
                       </Tooltip>
                     )}
                     <Tooltip title="Edit Log">

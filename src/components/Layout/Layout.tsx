@@ -18,22 +18,34 @@ const Layout: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  // If worker or manager lands on ERP layout, redirect them to their dedicated dashboards
-  if (user?.role === 'worker') {
+  // If worker lands on ERP layout without explicit modules, redirect to dedicated worker portal
+  if (user?.role === 'worker' && (!user?.modulesAccess || user.modulesAccess.length === 0)) {
     return <Navigate to="/worker" replace />;
   }
-  if (user?.role === 'manager') {
-    return <Navigate to="/manager" replace />;
-  }
 
-  // Access Control: Check user modulesAccess
-  if (user?.modulesAccess && Array.isArray(user.modulesAccess) && user.modulesAccess.length > 0) {
+  // Admins & Managers have full unrestricted access to all ERP modules when modulesAccess is not restricted
+  const isSuper = (user?.role === 'admin' || user?.role === 'manager') && (!user?.modulesAccess || user.modulesAccess.length === 0);
+
+  // Access Control: Check user modulesAccess for restricted employees
+  if (!isSuper && user?.modulesAccess && Array.isArray(user.modulesAccess) && user.modulesAccess.length > 0) {
     const currentPath = location.pathname;
-    const firstAllowedPath = user.modulesAccess[0] || '/login';
+    const safePath = user.modulesAccess.includes('/') ? '/' : (user.modulesAccess[0] || '/');
+
+    // Route alias mapping so subroutes and complementary views are never blocked
+    const ROUTE_ALIASES: Record<string, string[]> = {
+      '/': ['/live-feed'],
+      '/projects': ['/crm', '/projects', '/pieces', '/log-book', '/live-feed'],
+      '/crm': ['/crm', '/projects', '/pieces'],
+      '/in-out-ledger': ['/in-out-ledger', '/vendors', '/vendor-ledger'],
+      '/inventory': ['/inventory', '/waste-ledger'],
+      '/machines': ['/machines', '/maintenance', '/log-book'],
+      '/maintenance': ['/maintenance', '/machines', '/cash-book'],
+      '/cash-book': ['/cash-book', '/maintenance']
+    };
 
     // If on Dashboard root '/' but '/' is not permitted in modulesAccess
     if (currentPath === '/' && !user.modulesAccess.includes('/')) {
-      return <Navigate to={firstAllowedPath} replace />;
+      return <Navigate to={safePath} replace />;
     }
 
     // Check if the current route is authorized
@@ -41,11 +53,18 @@ const Layout: React.FC = () => {
       if (allowedPath === '/') {
         return currentPath === '/';
       }
-      return currentPath === allowedPath || currentPath.startsWith(allowedPath + '/');
+      if (currentPath === allowedPath || currentPath.startsWith(allowedPath + '/')) {
+        return true;
+      }
+      const aliases = ROUTE_ALIASES[allowedPath];
+      if (aliases && aliases.some(a => currentPath === a || currentPath.startsWith(a + '/'))) {
+        return true;
+      }
+      return false;
     });
 
-    if (!isAuthorized) {
-      return <Navigate to={firstAllowedPath} replace />;
+    if (!isAuthorized && currentPath !== safePath) {
+      return <Navigate to={safePath} replace />;
     }
   }
 

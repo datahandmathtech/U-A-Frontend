@@ -45,9 +45,7 @@ const Login: React.FC = () => {
       dispatch(setCredentials({ user: response.user, token: response.token, rememberMe }));
       
       // Redirect based on role and modulesAccess
-      if (response.user.role === 'manager') {
-        navigate('/manager');
-      } else if (response.user.role === 'worker') {
+      if (response.user.role === 'worker' && (!response.user.modulesAccess || response.user.modulesAccess.length === 0)) {
         navigate('/worker');
       } else if (response.user.modulesAccess && Array.isArray(response.user.modulesAccess) && response.user.modulesAccess.length > 0) {
         if (response.user.modulesAccess.includes('/')) {

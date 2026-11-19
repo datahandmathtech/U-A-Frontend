@@ -69,7 +69,17 @@ const HR: React.FC = () => {
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await registerUser(staffData).unwrap();
+      // Admin and Manager get full ERP access (empty modulesAccess array)
+      // Employee gets core operational modules by default
+      const defaultEmployeeModules = ['/', '/projects', '/crm', '/in-out-ledger', '/inventory', '/machines', '/maintenance', '/cash-book'];
+      const finalModules = (staffData.role === 'admin' || staffData.role === 'manager') 
+        ? [] 
+        : (staffData.role === 'employee' ? defaultEmployeeModules : []);
+
+      await registerUser({
+        ...staffData,
+        modulesAccess: finalModules
+      }).unwrap();
       setSuccessMsg(`Staff ${staffData.name} created successfully! They can now login with Staff ID: ${staffData.staffId}`);
       setStaffData({ name: '', email: '', staffId: '', password: '', role: 'worker', department: '', allowedTabs: [] });
       refetchStaff();
@@ -95,13 +105,19 @@ const HR: React.FC = () => {
   };
 
   const handleEditClick = (staff: any) => {
-    setEditingStaffData({ id: staff.id, name: staff.name, staffId: staff.staffId || '', role: staff.role, department: staff.department || '', password: '', allowedTabs: staff.allowedTabs || [] });
+    setEditingStaffData({ id: staff.id, name: staff.name, staffId: staff.staffId || '', role: staff.role, department: staff.department || '', password: '', allowedTabs: staff.allowedTabs || [], modulesAccess: staff.modulesAccess || [] });
     setEditDialogOpen(true);
   };
 
   const handleUpdateStaff = async () => {
     try {
-      await editStaff({ id: editingStaffData.id, data: editingStaffData }).unwrap();
+      const finalModules = (editingStaffData.role === 'admin' || editingStaffData.role === 'manager')
+        ? []
+        : (editingStaffData.modulesAccess && editingStaffData.modulesAccess.length > 0 
+            ? editingStaffData.modulesAccess 
+            : ['/', '/projects', '/crm', '/in-out-ledger', '/inventory', '/machines', '/maintenance', '/cash-book']);
+
+      await editStaff({ id: editingStaffData.id, data: { ...editingStaffData, modulesAccess: finalModules } }).unwrap();
       setSuccessMsg(`Staff ${editingStaffData.name} updated successfully!`);
       setEditDialogOpen(false);
       refetchStaffList();
