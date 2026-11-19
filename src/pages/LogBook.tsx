@@ -4,7 +4,7 @@ import {
   TableRow, Paper, IconButton, Chip, Dialog, DialogTitle, DialogContent, 
   Button, Grid, TextField, Tooltip, Snackbar, Alert,
   DialogActions, MenuItem as MuiMenuItem, Select, FormControl, InputAdornment,
-  CircularProgress
+  CircularProgress, Autocomplete
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -269,9 +269,21 @@ const LogBook = () => {
   const [startDateTime, setStartDateTime] = useState(formatDateTimeLocal());
   const [selectedMachine, setSelectedMachine] = useState('');
   const [selectedOperatorId, setSelectedOperatorId] = useState('');
+  const [startClientName, setStartClientName] = useState('');
+  const [startSlabName, setStartSlabName] = useState('');
   const [estimatedHours, setEstimatedHours] = useState('');
   const [startRemarks, setStartRemarks] = useState('');
   const [photos, setPhotos] = useState({ machine: '', unit: '', software: '' });
+
+  const clientOptions = useMemo(() => {
+    if (!projectsData) return [];
+    const set = new Set<string>();
+    projectsData.forEach((p: any) => {
+      if (p.clientName?.trim()) set.add(p.clientName.trim());
+      else if (p.name?.trim()) set.add(p.name.trim());
+    });
+    return Array.from(set);
+  }, [projectsData]);
 
   const [endMachineDialogOpen, setEndMachineDialogOpen] = useState(false);
   const [endDateTime, setEndDateTime] = useState(formatDateTimeLocal());
@@ -333,6 +345,9 @@ const LogBook = () => {
         machineId: selectedMachine,
         startTime: startDateTime ? new Date(startDateTime).toISOString() : undefined,
         operatorId: selectedOperatorId || undefined,
+        clientName: startClientName || undefined,
+        slabName: startSlabName || undefined,
+        productName: startSlabName || undefined,
         estimatedHours: estimatedHours || undefined,
         remarks: startRemarks || undefined,
         machinePhotoUrl: photos.machine || undefined,
@@ -343,6 +358,8 @@ const LogBook = () => {
       setSnackbar({ open: true, message: 'Machine turned ON successfully!', severity: 'success' });
       setSelectedMachine('');
       setSelectedOperatorId('');
+      setStartClientName('');
+      setStartSlabName('');
       setEstimatedHours('');
       setStartRemarks('');
       setPhotos({ machine: '', unit: '', software: '' });
@@ -825,11 +842,11 @@ const LogBook = () => {
                       {/* CLIENT — separate bold row */}
                       <TableCell>
                         <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: 'text.primary' }}>
-                          {log.project?.clientName ? `${log.project.clientName} (${log.project.name})` : log.project?.name || 'Walk-in'}
+                          {log.clientName || (log.project?.clientName ? `${log.project.clientName} (${log.project.name})` : log.project?.name || 'Walk-in')}
                         </Typography>
-                        {log.project?.projectId && (
+                        {(log.slabName || log.productName || log.project?.projectId) && (
                           <Typography sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'primary.main' }}>
-                            {log.project.projectId}
+                            {log.slabName || log.productName || log.project?.projectId}
                           </Typography>
                         )}
                       </TableCell>
@@ -1294,6 +1311,61 @@ const LogBook = () => {
                 ))}
               </TextField>
             </Box>
+
+            {/* 4. Client Name & Slab Name (Daily Manual Machine Tracking) */}
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography sx={{ color: '#1E293B', fontWeight: 600, fontSize: '0.82rem', mb: 0.6 }}>
+                  4. Client Name (Optional)
+                </Typography>
+                <Autocomplete
+                  freeSolo
+                  options={clientOptions}
+                  value={startClientName}
+                  onChange={(_e, val) => setStartClientName(val || '')}
+                  onInputChange={(_e, val) => setStartClientName(val || '')}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      fullWidth
+                      placeholder="e.g. Rahul Gupta, Rajendra Ji"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2.5,
+                          bgcolor: '#F8FAFC',
+                          '& fieldset': { borderColor: '#E2E8F0' },
+                          '&:hover fieldset': { borderColor: '#CBD5E1' },
+                          '&.Mui-focused fieldset': { borderColor: '#16A34A', borderWidth: 2 }
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography sx={{ color: '#1E293B', fontWeight: 600, fontSize: '0.82rem', mb: 0.6 }}>
+                  Slab Name (Optional)
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={startSlabName}
+                  onChange={(e) => setStartSlabName(e.target.value)}
+                  placeholder="e.g. Partition Wall Panel 1, White Slab 12"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2.5,
+                      bgcolor: '#F8FAFC',
+                      '& fieldset': { borderColor: '#E2E8F0' },
+                      '&:hover fieldset': { borderColor: '#CBD5E1' },
+                      '&.Mui-focused fieldset': { borderColor: '#16A34A', borderWidth: 2 }
+                    }
+                  }}
+                />
+              </Grid>
+            </Grid>
 
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>

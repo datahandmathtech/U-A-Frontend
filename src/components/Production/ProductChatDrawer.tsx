@@ -17,6 +17,7 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 
 import {
   useGetProductChatQuery,
@@ -268,26 +269,43 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
                     {m.message}
                   </Typography>
 
-                  {/* Attached images */}
+                  {/* Attached images with Download Option */}
                   {m.attachments && m.attachments.length > 0 && (
                     <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                       {m.attachments.map((url: string, idx: number) => (
                         <Box
                           key={idx}
-                          component="a"
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
                           sx={{
-                            display: 'block',
-                            width: 120,
-                            height: 100,
-                            borderRadius: 1.5,
+                            position: 'relative',
+                            width: 130,
+                            height: 110,
+                            borderRadius: 2,
                             overflow: 'hidden',
-                            border: '1px solid rgba(0,0,0,0.1)'
+                            border: '1px solid rgba(0,0,0,0.1)',
+                            bgcolor: '#0F172A'
                           }}
                         >
                           <img src={url} alt="attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <IconButton
+                            component="a"
+                            href={url}
+                            download={`chat_photo_${idx + 1}.jpg`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            size="small"
+                            title="Download Photo"
+                            sx={{
+                              position: 'absolute',
+                              bottom: 4,
+                              right: 4,
+                              bgcolor: 'rgba(0,0,0,0.65)',
+                              color: '#FFFFFF',
+                              p: 0.4,
+                              '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }
+                            }}
+                          >
+                            <DownloadRoundedIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
                         </Box>
                       ))}
                     </Box>
@@ -325,7 +343,7 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
         </Box>
       )}
 
-      {/* Bottom Input Area */}
+      {/* Bottom Input Area: Both Upload Photo (Gallery) & Click Photo (Camera) */}
       <Box
         sx={{
           p: 1.5,
@@ -337,13 +355,27 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
           gap: 1
         }}
       >
+        {/* Gallery / File Upload */}
         <IconButton
           component="label"
           size="small"
           disabled={isUploading}
+          title="Upload Photo (Gallery)"
           sx={{ color: '#64748B', '&:hover': { color: '#C89F5A' } }}
         >
-          {isUploading ? <CircularProgress size={18} /> : <PhotoCameraIcon />}
+          {isUploading ? <CircularProgress size={18} /> : <AttachFileIcon />}
+          <input type="file" accept="image/*" multiple hidden onChange={handleAttachmentUpload} />
+        </IconButton>
+
+        {/* Camera Live Capture */}
+        <IconButton
+          component="label"
+          size="small"
+          disabled={isUploading}
+          title="Click Photo (Camera)"
+          sx={{ color: '#64748B', '&:hover': { color: '#C89F5A' } }}
+        >
+          <PhotoCameraIcon />
           <input type="file" accept="image/*" capture="environment" hidden onChange={handleAttachmentUpload} />
         </IconButton>
 

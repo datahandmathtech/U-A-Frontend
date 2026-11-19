@@ -2008,7 +2008,7 @@ const ManagerDashboard: React.FC = () => {
                     '&:hover': { bgcolor: '#F0F9FF', borderColor: '#0369A1' }
                   }}
                 >
-                  + Add Another Vendor Return
+                  Add Another Vendor Return
                 </Button>
               </Box>
             )}
@@ -2543,7 +2543,7 @@ const ManagerDashboard: React.FC = () => {
                           '&:hover': { bgcolor: '#FFEDD5' }
                         }}
                       >
-                        + Add Another Vendor Assignment
+                        Add Another Vendor Assignment
                       </Button>
                     </Box>
                   </>

@@ -20,6 +20,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
 import CloseIcon from '@mui/icons-material/Close';
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 
@@ -245,7 +246,7 @@ const VendorLedger: React.FC = () => {
               '&:hover': { bgcolor: '#A36E20' }
             }}
           >
-            + Add Manual Entry
+            Add Manual Entry
           </Button>
         </Box>
       </Box>
@@ -280,26 +281,6 @@ const VendorLedger: React.FC = () => {
           );
         })}
       </Box>
-
-      {/* 3. INFO ALERT BANNER (Exact Match to User UI) */}
-      <Paper
-        elevation={0}
-        sx={{
-          p: 1.5,
-          mb: 2.5,
-          borderRadius: 2,
-          border: '1px solid #BFDBFE',
-          bgcolor: '#EFF6FF',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.2
-        }}
-      >
-        <InfoOutlinedIcon sx={{ color: '#1D4ED8', fontSize: 20, flexShrink: 0 }} />
-        <Typography variant="body2" sx={{ color: '#1E3A8A', fontSize: '0.84rem' }}>
-          <strong style={{ fontWeight: 800 }}>Separate Ledger by Work Stage:</strong> Each tab (Production, Spare Part, Polishing, Packing, Dispatch) maintains its own independent ledger and running balance. Entries are <strong>not cumulatively mixed</strong> across tabs.
-        </Typography>
-      </Paper>
 
       {/* 4. 4 KPI CARDS IN A ROW WITH ICON SQUARES (Exact Match to User UI) */}
       <Grid container spacing={2} sx={{ mb: 2.5 }}>
@@ -691,57 +672,6 @@ const VendorLedger: React.FC = () => {
             )}
           </TableBody>
         </Table>
-
-        {/* 7. BOTTOM SNAPSHOT OF OTHER WORK STAGES (Exact Match to User UI) */}
-        <Box sx={{ px: 2, py: 1.3, bgcolor: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <InfoOutlinedIcon sx={{ fontSize: 18, color: '#1D4ED8' }} />
-            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
-              Other Work Stage Snapshot (for reference):
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            {stageTabs
-              .filter((t) => t !== activeStageTab)
-              .map((t) => {
-                const st = stageSummaryMap.get(t) || { out: 0, in: 0, pending: 0 };
-                return (
-                  <Box
-                    key={t}
-                    onClick={() => setActiveStageTab(t)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      bgcolor: '#FFFFFF',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: 1.5,
-                      px: 1.2,
-                      py: 0.35,
-                      cursor: 'pointer',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      color: '#334155',
-                      '&:hover': { bgcolor: '#F1F5F9' }
-                    }}
-                  >
-                    <span>📦</span>
-                    <strong>{t}:</strong>
-                    <span>Out: <strong style={{ color: '#DC2626' }}>{st.out} pcs</strong></span>
-                    <span>|</span>
-                    <span>In: <strong style={{ color: '#16A34A' }}>{st.in} pcs</strong></span>
-                    <span>|</span>
-                    <Chip
-                      label={`Pending: ${st.pending} pcs`}
-                      size="small"
-                      sx={{ height: 20, fontSize: '0.7rem', fontWeight: 800, bgcolor: '#DBEAFE', color: '#1D4ED8', borderRadius: 1 }}
-                    />
-                  </Box>
-                );
-              })}
-          </Box>
-        </Box>
       </TableContainer>
 
       {/* Manual Entry / Edit Dialog */}
@@ -778,20 +708,33 @@ const VendorLedger: React.FC = () => {
         }}
       >
         <Box sx={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
-          <IconButton
-            onClick={() => setPreviewPhoto(null)}
-            sx={{
-              position: 'absolute',
-              top: 12,
-              right: 12,
-              bgcolor: 'rgba(0,0,0,0.7)',
-              color: '#FFFFFF',
-              zIndex: 10,
-              '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
+          <Box sx={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 1, zIndex: 10 }}>
+            <IconButton
+              component="a"
+              href={getFullQualityUrl(previewPhoto || '')}
+              download="vendor_verification_photo.jpg"
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                bgcolor: 'rgba(0,0,0,0.7)',
+                color: '#FFFFFF',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }
+              }}
+              title="Download Photo"
+            >
+              <DownloadRoundedIcon />
+            </IconButton>
+            <IconButton
+              onClick={() => setPreviewPhoto(null)}
+              sx={{
+                bgcolor: 'rgba(0,0,0,0.7)',
+                color: '#FFFFFF',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
           {previewPhoto && (
             <Box
               component="img"

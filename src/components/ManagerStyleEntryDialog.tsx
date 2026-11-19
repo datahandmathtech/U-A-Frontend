@@ -503,7 +503,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                   '&:hover': { bgcolor: '#FFEDD5' }
                 }}
               >
-                + Add Another Vendor Assignment
+                Add Another Vendor Assignment
               </Button>
             </Box>
           ) : (
@@ -558,57 +558,6 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
             size="small"
             value={formData.vehicleNumber}
             onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-          />
-
-          <TextField
-            select
-            label="Select Project / Client (Optional)"
-            fullWidth
-            size="small"
-            value={formData.projectId}
-            onChange={(e) => {
-              setFormData({ ...formData, projectId: e.target.value, productId: '' });
-            }}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-          >
-            <MenuItem value="">-- Select Project / Client --</MenuItem>
-            {projects.map((p: any) => (
-              <MenuItem key={p.id} value={p.id}>{p.clientName ? `${p.clientName} ` : ''}{p.projectId ? `[${p.projectId}] ` : ''}({p.name})</MenuItem>
-            ))}
-          </TextField>
-
-          {formData.projectId && (
-            <TextField
-              select
-              label="Select Stone / Product (Optional)"
-              fullWidth
-              size="small"
-              value={formData.productId}
-              onChange={(e) => {
-                const proj = projects.find(p => p.id === formData.projectId);
-                const prod = proj?.quotations?.[0]?.products?.find((x: any) => x.id === e.target.value);
-                setFormData({ 
-                  ...formData, 
-                  productId: e.target.value, 
-                  productName: prod ? prod.name : formData.productName 
-                });
-              }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-            >
-              <MenuItem value="">-- Select Stone --</MenuItem>
-              {projects.find(p => p.id === formData.projectId)?.quotations?.[0]?.products?.map((prod: any) => (
-                <MenuItem key={prod.id} value={prod.id}>{prod.name}</MenuItem>
-              ))}
-            </TextField>
-          )}
-
-          <TextField
-            label="Product Name / Notes (Optional)"
-            fullWidth
-            size="small"
-            value={formData.productName}
-            onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
           />
 

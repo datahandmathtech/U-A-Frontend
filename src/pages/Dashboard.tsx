@@ -26,9 +26,13 @@ import LiveTvRoundedIcon from '@mui/icons-material/LiveTvRounded';
 import FilterAltRoundedIcon from '@mui/icons-material/FilterAltRounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 
-import { useGetDashboardSummaryQuery } from '../store/apiSlice';
+import { useGetDashboardSummaryQuery, useGetProjectsQuery } from '../store/apiSlice';
 import ProductChatAlerts from '../components/Dashboard/ProductChatAlerts';
+import { ProductChatDrawer } from '../components/Production/ProductChatDrawer';
 
 interface DashboardCardProps {
   icon: any;
@@ -114,6 +118,8 @@ const Dashboard: React.FC = () => {
     { fy: selectedFY, month: selectedMonth },
     { refetchOnFocus: false }
   );
+  const { data: projects = [], isLoading: isProjectsLoading } = useGetProjectsQuery();
+  const [selectedChatProject, setSelectedChatProject] = useState<any>(null);
   const navigate = useNavigate();
 
   return (
@@ -336,7 +342,7 @@ const Dashboard: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* 4. Factory Module Information Overview */}
+      {/* 4. Chat Rooms Section (Replaced Factory Modules Overview as per user requirement) */}
       <Paper
         elevation={0}
         sx={{
@@ -347,54 +353,202 @@ const Dashboard: React.FC = () => {
           boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 2 }}>
-          Factory Modules Overview
-        </Typography>
-        <Grid container spacing={2}>
-          {[
-            { title: 'Enquiries Pipeline', desc: 'CRM leads & quotations', icon: FilterAltRoundedIcon, color: '#6366F1', bg: '#EEF2FF' },
-            { title: 'Active Work Orders', desc: 'Slab tracking & pieces', icon: DashboardRoundedIcon, color: '#C89F5A', bg: '#FFF4E5' },
-            { title: 'Approval Queue', desc: 'Outward pieces verification', icon: PrecisionManufacturingRoundedIcon, color: '#0284C7', bg: '#F0F9FF' },
-            { title: 'Material Log Book', desc: 'Machine in/out logs', icon: ReceiptLongRoundedIcon, color: '#059669', bg: '#ECFDF5' },
-            { title: 'Stock & Inventory', desc: 'Raw marble & consumables', icon: LocalShippingRoundedIcon, color: '#D97706', bg: '#FFFBEB' },
-            { title: 'Live Factory Feed', desc: 'Camera & active sessions', icon: LiveTvRoundedIcon, color: '#DC2626', bg: '#FEF2F2' }
-          ].map((item) => {
-            const ItemIcon = item.icon;
-            return (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.title}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    borderRadius: 3,
-                    bgcolor: '#F8FAFC',
-                    border: '1px solid #E2E8F0',
-                    cursor: 'default',
-                    userSelect: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Avatar sx={{ bgcolor: item.bg, color: item.color, width: 38, height: 38 }}>
-                      <ItemIcon sx={{ fontSize: 20 }} />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E293B' }}>
-                        {item.title}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#64748B' }}>
-                        {item.desc}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Paper>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: '50%',
+                bgcolor: '#FFF4E5',
+                color: '#C89F5A',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid #FFE0B2'
+              }}
+            >
+              <ForumRoundedIcon sx={{ fontSize: 20 }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.2 }}>
+                Chat Rooms
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B' }}>
+                Client-wise live discussion channels for project orders & enquiries
+              </Typography>
+            </Box>
+          </Box>
+          <Chip
+            icon={<FiberManualRecordIcon sx={{ fontSize: 10, color: '#10B981 !important' }} />}
+            label={`${projects.filter((p: any) => p.hasChatRoom !== false).length} Active Client Rooms`}
+            size="small"
+            sx={{
+              bgcolor: '#ECFDF5',
+              color: '#065F46',
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              border: '1px solid #A7F3D0'
+            }}
+          />
+        </Box>
+
+        {isProjectsLoading ? (
+          <Grid container spacing={2}>
+            {[1, 2, 3, 4, 5, 6].map((k) => (
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={k}>
+                <Skeleton variant="rounded" height={130} sx={{ borderRadius: 3 }} />
               </Grid>
-            );
-          })}
-        </Grid>
+            ))}
+          </Grid>
+        ) : projects.length === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center', color: '#64748B' }}>
+            <Typography variant="body2">No client projects found yet. Create an enquiry to start a chat room.</Typography>
+          </Box>
+        ) : (
+          <Grid container spacing={2}>
+            {projects
+              .filter((p: any) => p.hasChatRoom !== false)
+              .map((project: any) => {
+                const displayName = project.clientName || project.name || 'Unnamed Client';
+                const initial = displayName.charAt(0).toUpperCase();
+                const isWorkOrder = project.status === 'work_order' || project.isDirectWorkOrder;
+                return (
+                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={project.id}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor: '#F8FAFC',
+                        border: '1.5px solid #E2E8F0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        height: '100%',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          bgcolor: '#FFFFFF',
+                          borderColor: '#C89F5A',
+                          boxShadow: '0 4px 14px rgba(200, 159, 90, 0.15)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      <Box>
+                        {/* Top row: Avatar + Client Name */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 1 }}>
+                          <Avatar
+                            sx={{
+                              width: 36,
+                              height: 36,
+                              fontSize: '0.95rem',
+                              fontWeight: 800,
+                              bgcolor: isWorkOrder ? '#C89F5A' : '#3B82F6',
+                              color: '#FFFFFF'
+                            }}
+                          >
+                            {initial}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography
+                              sx={{
+                                fontWeight: 800,
+                                fontSize: '0.9rem',
+                                color: '#0F172A',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              {displayName}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: '#64748B',
+                                fontSize: '0.72rem',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: 'block'
+                              }}
+                            >
+                              {project.projectId ? `[${project.projectId}] ` : ''}{project.name}
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        {/* Status chip */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                          <Chip
+                            label={project.status || 'Active'}
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              textTransform: 'capitalize',
+                              bgcolor: isWorkOrder ? '#FEF3C7' : '#EFF6FF',
+                              color: isWorkOrder ? '#92400E' : '#1D4ED8',
+                              borderRadius: 1
+                            }}
+                          />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <FiberManualRecordIcon sx={{ fontSize: 8, color: '#10B981' }} />
+                            <Typography sx={{ fontSize: '0.7rem', color: '#10B981', fontWeight: 700 }}>
+                              Ready
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {/* Open Chat Action */}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<ForumRoundedIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => setSelectedChatProject(project)}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          borderRadius: 2,
+                          py: 0.6,
+                          bgcolor: '#C89F5A',
+                          color: '#FFFFFF',
+                          boxShadow: 'none',
+                          '&:hover': {
+                            bgcolor: '#B38B36',
+                            boxShadow: '0 2px 8px rgba(179, 139, 54, 0.3)'
+                          }
+                        }}
+                      >
+                        Open Chat
+                      </Button>
+                    </Paper>
+                  </Grid>
+                );
+              })}
+          </Grid>
+        )}
       </Paper>
+
+      {/* Live Product / Client Chat Drawer */}
+      {selectedChatProject && (
+        <ProductChatDrawer
+          open={Boolean(selectedChatProject)}
+          onClose={() => setSelectedChatProject(null)}
+          slab={{
+            id: selectedChatProject.id,
+            projectId: selectedChatProject.id,
+            name: selectedChatProject.name,
+            clientName: selectedChatProject.clientName
+          }}
+          projectId={selectedChatProject.id}
+          projectName={selectedChatProject.name}
+        />
+      )}
     </Box>
   );
 };

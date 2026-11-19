@@ -456,7 +456,7 @@ const InOutLedger: React.FC = () => {
               '&:hover': { bgcolor: '#1E293B' }
             }}
           >
-            + New Gate Pass
+            New Gate Pass
           </Button>
 
           <FormControl size="small" sx={{ minWidth: 140, bgcolor: '#FFF' }}>

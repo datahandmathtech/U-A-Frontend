@@ -930,10 +930,9 @@ const StageDetails = () => {
             ) : (
               (() => {
                 const hasAllocatedMaterial = Boolean(
-                  p.vendorName ||
-                  p.sourceMaterialId ||
-                  (p.sourceMaterial && ((p.sourceMaterial.usedQuantity !== undefined && p.sourceMaterial.usedQuantity > 0) || (p.sourceMaterial.quantity && p.sourceMaterial.quantity > 0))) ||
-                  (p.sourceMaterial?.inventory)
+                  (p.sourceMaterialId && p.sourceMaterial) ||
+                  (p.sourceMaterial?.inventory) ||
+                  (p.vendorName && p.sourceMaterial)
                 );
                 
                 if (!hasAllocatedMaterial) {
@@ -1030,6 +1029,21 @@ const StageDetails = () => {
                           }} 
                         />
                       )}
+                      <Tooltip title="Remove / Unlink Raw Block">
+                        <IconButton
+                          size="small"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Unlink raw block from ${cleanPieceName}?`)) {
+                              await updatePiece({ id: p.id, vendorName: null, sourceMaterialId: null });
+                              refetchSlabs();
+                            }
+                          }}
+                          sx={{ p: 0.2, color: '#94A3B8', '&:hover': { color: '#EF4444' } }}
+                        >
+                          <CloseIcon sx={{ fontSize: 13 }} />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                     {matName && (
                       <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.72rem' }}>
@@ -2724,8 +2738,21 @@ const StageDetails = () => {
         slotProps={{ paper: { sx: { borderRadius: 4, overflow: 'hidden' } } }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800, color: '#1E293B' }}>
-          Photo Preview
-          <IconButton onClick={() => setPreviewPhotoUrl(null)}><CloseIcon /></IconButton>
+          <span>Photo Preview</span>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton
+              component="a"
+              href={previewPhotoUrl || ''}
+              download="work_order_photo.jpg"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Download Photo"
+              sx={{ color: '#C89F5A' }}
+            >
+              <FileDownloadIcon />
+            </IconButton>
+            <IconButton onClick={() => setPreviewPhotoUrl(null)}><CloseIcon /></IconButton>
+          </Box>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center', p: 3, bgcolor: '#F8FAFC' }}>
           {previewPhotoUrl && (

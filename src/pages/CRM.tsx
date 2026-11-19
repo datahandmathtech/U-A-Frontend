@@ -28,7 +28,9 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Card,
-  CircularProgress
+  CircularProgress,
+  FormControlLabel,
+  Switch
 } from '@mui/material';
 
 // Icons
@@ -59,6 +61,8 @@ import PeopleIcon from '@mui/icons-material/People';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import LayersIcon from '@mui/icons-material/Layers';
 import PersonIcon from '@mui/icons-material/Person';
+import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 
 import {
   useGetProjectsQuery,
@@ -150,7 +154,8 @@ const CRM: React.FC = () => {
     status: 'enquiry',
     createdAt: new Date().toISOString().split('T')[0],
     deadline: '',
-    customerPhoto: ''
+    customerPhoto: '',
+    hasChatRoom: true
   });
 
   React.useEffect(() => {
@@ -306,7 +311,8 @@ const CRM: React.FC = () => {
       status: 'enquiry',
       createdAt: new Date().toISOString().split('T')[0],
       deadline: '',
-      customerPhoto: ''
+      customerPhoto: '',
+      hasChatRoom: true
     });
     setEditingId(null);
     setOpen(true);
@@ -325,7 +331,8 @@ const CRM: React.FC = () => {
       status: enq.status || 'enquiry',
       createdAt: enq.createdAt ? new Date(enq.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       deadline: enq.deadline ? new Date(enq.deadline).toISOString().split('T')[0] : '',
-      customerPhoto: enq.customerPhoto || ''
+      customerPhoto: enq.customerPhoto || '',
+      hasChatRoom: enq.hasChatRoom !== false
     });
     setOpen(true);
   };
@@ -1564,6 +1571,26 @@ const CRM: React.FC = () => {
                       >
                         <CloseIcon sx={{ fontSize: 13 }} />
                       </IconButton>
+                      <IconButton
+                        component="a"
+                        href={photoUrl}
+                        download={`ref_photo_${idx + 1}.jpg`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        size="small"
+                        title="Download Reference Photo"
+                        sx={{
+                          position: 'absolute',
+                          bottom: 3,
+                          right: 3,
+                          bgcolor: 'rgba(0, 0, 0, 0.65)',
+                          color: '#FFF',
+                          p: 0.3,
+                          '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.9)' }
+                        }}
+                      >
+                        <DownloadRoundedIcon sx={{ fontSize: 13 }} />
+                      </IconButton>
                     </Box>
                   ))}
                 </Box>
@@ -1653,6 +1680,62 @@ const CRM: React.FC = () => {
                   Take Live Photo
                 </Button>
               </Box>
+            </Box>
+
+            {/* Section 5: Client Chat Room */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#B38B36', mb: 1.5, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.75rem' }}>
+                5. Add Chat Room
+              </Typography>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: 2.5,
+                  border: formData.hasChatRoom ? '1.5px solid #86EFAC' : '1px solid #E2E8F0',
+                  bgcolor: formData.hasChatRoom ? '#F0FDF4' : '#F8FAFC',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box
+                    sx={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: '50%',
+                      bgcolor: formData.hasChatRoom ? '#DCFCE7' : '#E2E8F0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: formData.hasChatRoom ? '#16A34A' : '#64748B'
+                    }}
+                  >
+                    <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 22 }} />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#1E293B' }}>
+                      Add Project Chat Room
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.78rem', color: '#64748B' }}>
+                      Yes karte hi Dashboard aur Active Orders me is client ka direct chat room ban jayega.
+                    </Typography>
+                  </Box>
+                </Box>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.hasChatRoom}
+                      onChange={(e) => setFormData({ ...formData, hasChatRoom: e.target.checked })}
+                      color="success"
+                    />
+                  }
+                  label={formData.hasChatRoom ? <strong style={{ color: '#16A34A', fontSize: '0.85rem' }}>Yes (Active)</strong> : <span style={{ color: '#64748B', fontSize: '0.85rem' }}>No</span>}
+                  sx={{ m: 0 }}
+                />
+              </Paper>
             </Box>
           </Box>
         </DialogContent>
