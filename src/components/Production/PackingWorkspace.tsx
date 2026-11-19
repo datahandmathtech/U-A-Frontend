@@ -288,7 +288,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   // Export complete 1..N pieces list to Excel (Change 5)
   const handleExportAllPiecesExcel = () => {
     try {
-      const XlsxLib: any = (XLSX as any)?.utils ? XLSX : (XLSX as any)?.default || XLSX;
+      const XlsxLib: any = XLSX;
       const rows = allProjectPieces.map((p: any) => {
         const isPacked = packedPieceIdMap.has(p.id);
         const boxName = packedPieceIdMap.get(p.id) || '-';

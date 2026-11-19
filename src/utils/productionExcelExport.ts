@@ -235,7 +235,7 @@ export const exportProjectProductionExcel = ({
   // ==========================================
   // WORKBOOK COMPILATION (Clean 4 Sheets)
   // ==========================================
-  const XlsxLib: any = (XLSX as any)?.utils ? XLSX : (XLSX as any)?.default || XLSX;
+  const XlsxLib: any = XLSX;
   const workbook = XlsxLib.utils.book_new();
 
   // 1. Pieces Produced
