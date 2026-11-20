@@ -47,15 +47,12 @@ const Login: React.FC = () => {
       // Redirect based on role and modulesAccess
       if (response.user.role === 'worker') {
         navigate('/worker');
-      } else if (response.user.role === 'manager' || response.user.role === 'employee') {
-        navigate('/manager');
       } else if (response.user.modulesAccess && Array.isArray(response.user.modulesAccess) && response.user.modulesAccess.length > 0) {
-        if (response.user.modulesAccess.includes('/manager') && !response.user.modulesAccess.includes('/')) {
-          navigate('/manager');
-        } else if (response.user.modulesAccess.includes('/')) {
+        if (response.user.modulesAccess.includes('/')) {
           navigate('/');
         } else {
-          navigate(response.user.modulesAccess[0] || '/');
+          const firstAllowed = response.user.modulesAccess.find((p: string) => p !== '/manager') || '/';
+          navigate(firstAllowed);
         }
       } else {
         navigate('/');

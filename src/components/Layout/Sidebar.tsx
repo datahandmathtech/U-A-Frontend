@@ -60,7 +60,6 @@ const ALL_MENU_ITEMS: MenuItemDef[] = [
   { text: 'Machine Master', icon: <PrecisionManufacturingRoundedIcon />, path: '/machines', category: 'Stock & Machines' },
   { text: 'Maintenance', icon: <BuildCircleRoundedIcon />, path: '/maintenance', category: 'Stock & Machines' },
   { text: 'Cash Book', icon: <AccountBalanceWalletRoundedIcon />, path: '/cash-book', category: 'Operations' },
-  { text: 'Floor Desk', icon: <LiveTvRoundedIcon />, path: '/manager', category: 'Operations' },
   { text: 'HR & Payroll', icon: <GroupsRoundedIcon />, path: '/hr', category: 'Management' },
   { text: 'Admin Console', icon: <ShieldRoundedIcon />, path: '/admin-console', category: 'Management' }
 ];

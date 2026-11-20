@@ -257,14 +257,20 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         vendors: formData.transactionType === 'OUT' ? vendorRows : undefined
       };
 
-      if (formData.assigneeType === 'vendor' || formData.transactionType === 'OUT') {
-        const v = vendors.find(x => x.id === finalVendorId);
-        payload.vendorId = v?.id || finalVendorId;
-        payload.vendorName = v?.name || finalVendorName;
-      } else if (formData.assigneeType === 'staff') {
-        const s = staff.find(x => x.id === formData.assigneeId);
-        payload.workerId = s?.id;
-        payload.workerName = s?.name;
+      const matchedVendor = vendors.find(x => x.id === finalVendorId || x.id === formData.assigneeId);
+      const matchedStaff = staff.find(x => x.id === formData.assigneeId);
+
+      if (matchedVendor || formData.transactionType === 'OUT') {
+        payload.vendorId = matchedVendor?.id || finalVendorId;
+        payload.vendorName = matchedVendor?.name || finalVendorName;
+        payload.assigneeType = 'vendor';
+      } else if (matchedStaff) {
+        payload.workerId = matchedStaff.id;
+        payload.workerName = matchedStaff.name;
+        payload.assigneeType = 'staff';
+      } else if (formData.assigneeId) {
+        payload.vendorId = formData.assigneeId;
+        payload.vendorName = finalVendorName;
       }
       
       await onSave(payload);
@@ -634,9 +640,11 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                 onChange={(e) => {
                   const newVendorId = e.target.value;
                   const stg = vendorPendingStats[newVendorId]?.latestStage;
+                  const isVendor = vendors.some((v: any) => v.id === newVendorId);
                   setFormData(prev => ({
                     ...prev,
                     assigneeId: newVendorId,
+                    assigneeType: isVendor ? 'vendor' : 'staff',
                     stage: stg || prev.stage
                   }));
                 }}

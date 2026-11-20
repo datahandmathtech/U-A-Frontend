@@ -572,7 +572,7 @@ export const apiSlice = createApi({
     }),
     createMaterialLog: builder.mutation<any, Partial<any>>({
       query: (body) => ({ url: '/production/material-log', method: 'POST', body }),
-      invalidatesTags: ['Production', 'Vendor']
+      invalidatesTags: ['Production', 'Vendor', 'Project', 'Inventory', 'Stats']
     }),
     getPendingApprovals: builder.query<any[], void>({
       query: () => '/production/pending-approvals',

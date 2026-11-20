@@ -85,7 +85,7 @@ const InOutLedger: React.FC = () => {
       refetch();
       refetchVendors();
     } catch (err: any) {
-      setToast({ open: true, message: err?.data?.message || 'Failed to save log', severity: 'error' });
+      setToast({ open: true, message: err?.data?.error || err?.data?.message || err?.message || 'Failed to save log', severity: 'error' });
     }
   };
 

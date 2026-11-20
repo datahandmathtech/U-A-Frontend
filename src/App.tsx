@@ -186,11 +186,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/manager',
-    element: (
-      <Suspense fallback={<PageLoader isFullPage message="Loading Manager Portal..." />}>
-        <ManagerDashboard />
-      </Suspense>
-    )
+    element: <Navigate to="/in-out-ledger" replace />
   }
 ]);
 

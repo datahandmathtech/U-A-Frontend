@@ -560,31 +560,6 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
               </>
             )}
 
-            {/* Quick Switch to Floor Desk / Manager Portal */}
-            <MenuItem
-              onClick={() => {
-                handleMenuClose();
-                navigate('/manager');
-              }}
-              sx={{
-                mx: 1,
-                my: 0.5,
-                borderRadius: 2,
-                bgcolor: '#FFF7ED',
-                color: '#EA580C',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                border: '1px solid #FFEDD5',
-                '&:hover': { bgcolor: '#FFEDD5' }
-              }}
-            >
-              <PrecisionManufacturingRoundedIcon sx={{ fontSize: 18, color: '#EA580C' }} />
-              Open Manager Portal (Floor Desk)
-            </MenuItem>
-
             {/* Logout Action */}
             <MenuItem
               onClick={handleLogout}
