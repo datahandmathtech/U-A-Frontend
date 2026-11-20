@@ -302,7 +302,7 @@ const Dashboard: React.FC = () => {
           <DashboardCard
             icon={AccountBalanceWalletRoundedIcon}
             title="PETTY BOOK CASH IN HAND"
-            value={`₹${(summary?.pettyCashInHand ?? 124500).toLocaleString('en-IN')}`}
+            value={`₹${(Number(summary?.pettyCashInHand) || 0).toLocaleString('en-IN')}`}
             subtitle="Available petty cash balance"
             colorHint="#10B981"
             bgHint="#ECFDF5"
@@ -316,8 +316,8 @@ const Dashboard: React.FC = () => {
           <DashboardCard
             icon={LocalShippingRoundedIcon}
             title="MATERIAL OUTWARD FOR MONTH"
-            value={typeof summary?.materialOutwardMonth === 'string' && summary.materialOutwardMonth.includes('m²') ? summary.materialOutwardMonth : `${summary?.materialOutwardMonth ?? '286.40'} m²`}
-            subtitle="Material issued to production (this month)"
+            value={`${(Number(summary?.materialOutwardMonth) || 0).toLocaleString('en-IN')} Pcs`}
+            subtitle="Material pieces issued to production (this month)"
             colorHint="#EA580C"
             bgHint="#FFF7ED"
             borderHint="#FFEDD5"
@@ -344,8 +344,8 @@ const Dashboard: React.FC = () => {
           <DashboardCard
             icon={Inventory2RoundedIcon}
             title="MATERIAL INWARD FOR MONTH"
-            value={typeof summary?.materialInwardMonth === 'string' && summary.materialInwardMonth.includes('m²') ? summary.materialInwardMonth : `${summary?.materialInwardMonth ?? '362.75'} m²`}
-            subtitle="Material received in factory (this month)"
+            value={`${(Number(summary?.materialInwardMonth) || 0).toLocaleString('en-IN')} Pcs`}
+            subtitle="Material pieces received in factory (this month)"
             colorHint="#D97706"
             bgHint="#FFFBEB"
             borderHint="#FDE68A"
