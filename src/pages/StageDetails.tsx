@@ -259,6 +259,10 @@ const StageDetails = () => {
     if (slabArea > 0) {
       let existingArea = 0;
       (slab.pieces || []).forEach((p: any) => {
+        // If user is breaking slab into pieces, previous unstarted pieces are being replaced by the broken pieces!
+        if (cutPiecesOption === 'yes' && (!p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started')) {
+          return;
+        }
         if (p.size) {
            existingArea += calculateAreaFromSize(p.size, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
         } else if (p.length && p.width) {
@@ -272,7 +276,8 @@ const StageDetails = () => {
       const totalArea = Math.round((existingArea + newArea) * 100) / 100;
       const roundedSlabArea = Math.round(slabArea * 100) / 100;
 
-      if (totalArea > roundedSlabArea) {
+      // Allow 1 Sq.Ft margin for rounding and manual piece entries
+      if (totalArea > roundedSlabArea + 1) {
         alert(`Total size exceeds allowed slab limit!\nAllowed: ${roundedSlabArea.toFixed(2)} Sq.Ft\nYou are making: ${totalArea.toFixed(2)} Sq.Ft\nPlease reduce: ${(totalArea - roundedSlabArea).toFixed(2)} Sq.Ft`);
         setIsSaving(false);
         return;
@@ -281,6 +286,19 @@ const StageDetails = () => {
     // --- END VALIDATION ---
 
     try {
+      // If user is breaking into pieces, automatically remove the unstarted full slab piece(s)
+      if (cutPiecesOption === 'yes') {
+        const unstartedPieces = (slab.pieces || []).filter((p: any) => 
+          !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started'
+        );
+        for (const up of unstartedPieces) {
+          try {
+            await deletePiece(up.id).unwrap();
+          } catch (dErr) {
+            console.warn("Could not delete unstarted piece:", dErr);
+          }
+        }
+      }
       const formattedPieces = piecesData.map(p => {
         const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
         const finalName = p.pieceNumber ? `${base}.${p.pieceNumber}` : (p.name || base);
@@ -1365,27 +1383,37 @@ const StageDetails = () => {
                <ToggleButtonGroup
                   value={cutPiecesOption}
                   exclusive
-                  onChange={(e, val) => {
+                  onChange={async (e, val) => {
                     const nextVal = val !== null ? val : null;
                     setCutPiecesOption(nextVal);
-                    if (nextVal === 'yes' && piecesData.length === 0) {
-                      const existingPieces = slab.pieces || [];
-                      const maxNum = existingPieces.length > 0
-                        ? Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0))
-                        : 0;
-                      const nextNum = maxNum + 1;
-                      const defaultUnit = (effectiveDimUnit === 'feet' || effectiveDimUnit === 'ft' || effectiveDimUnit === 'sq_ft' || effectiveDimUnit === 'sqft')
-                        ? 'feet'
-                        : (effectiveDimUnit === 'mm' ? 'mm' : 'inch');
-                      setPiecesData([{
-                        pieceNumber: nextNum,
-                        baseName: slab.name,
-                        name: `${slab.name}.${nextNum}`,
-                        l: 0,
-                        w: 0,
-                        t: 0,
-                        unit: defaultUnit
-                      }]);
+                    if (nextVal === 'yes') {
+                      // Automatically clean up previous unstarted full slab piece(s) so table is clean for new pieces
+                      const unstartedPieces = (slab.pieces || []).filter((p: any) => 
+                        !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started'
+                      );
+                      if (unstartedPieces.length > 0) {
+                        try {
+                          await Promise.all(unstartedPieces.map((p: any) => deletePiece(p.id).unwrap()));
+                          refetchSlabs();
+                        } catch (err) {
+                          console.warn("Error deleting unstarted pieces:", err);
+                        }
+                      }
+
+                      if (piecesData.length === 0) {
+                        const defaultUnit = (effectiveDimUnit === 'feet' || effectiveDimUnit === 'ft' || effectiveDimUnit === 'sq_ft' || effectiveDimUnit === 'sqft')
+                          ? 'feet'
+                          : (effectiveDimUnit === 'mm' ? 'mm' : 'inch');
+                        setPiecesData([{
+                          pieceNumber: 1,
+                          baseName: slab.name,
+                          name: `${slab.name}.1`,
+                          l: 0,
+                          w: 0,
+                          t: 0,
+                          unit: defaultUnit
+                        }]);
+                      }
                     }
                   }}
                   sx={{ 
