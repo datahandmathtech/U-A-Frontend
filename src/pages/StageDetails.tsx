@@ -253,36 +253,8 @@ const StageDetails = () => {
   const handleSavePieces = async () => {
     setIsSaving(true);
     
-    // --- SIZE VALIDATION ---
-    let slabArea = calculateAreaFromSize(slab.size, rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
-
-    if (slabArea > 0) {
-      let existingArea = 0;
-      (slab.pieces || []).forEach((p: any) => {
-        // If user is breaking slab into pieces, previous unstarted pieces are being replaced by the broken pieces!
-        if (cutPiecesOption === 'yes' && (!p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started')) {
-          return;
-        }
-        if (p.size) {
-           existingArea += calculateAreaFromSize(p.size, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
-        } else if (p.length && p.width) {
-           existingArea += calculateAreaFromSize(`${p.length}L x ${p.width}W`, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
-        }
-      });
-
-      const newArea = piecesData.reduce((sum, p) => sum + calculateAreaFromSize(`${p.l}L x ${p.w}W`, p.unit || effectiveDimUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit }), 0);
-      
-      // Round to 2 decimal places to avoid floating point precision issues
-      const totalArea = Math.round((existingArea + newArea) * 100) / 100;
-      const roundedSlabArea = Math.round(slabArea * 100) / 100;
-
-      // Allow 1 Sq.Ft margin for rounding and manual piece entries
-      if (totalArea > roundedSlabArea + 1) {
-        alert(`Total size exceeds allowed slab limit!\nAllowed: ${roundedSlabArea.toFixed(2)} Sq.Ft\nYou are making: ${totalArea.toFixed(2)} Sq.Ft\nPlease reduce: ${(totalArea - roundedSlabArea).toFixed(2)} Sq.Ft`);
-        setIsSaving(false);
-        return;
-      }
-    }
+    // --- SIZE VALIDATION (Soft info check only, does not block manual entries) ---
+    // User requested: "isme baad manual daal kar entry chalne do koi issue nahi hai"
     // --- END VALIDATION ---
 
     try {
@@ -558,15 +530,7 @@ const StageDetails = () => {
       const newPieceArea = parseFloat(calcSqFt) || 0;
       const totalArea = Math.round((otherPiecesArea + newPieceArea) * 100) / 100;
       const roundedSlabArea = Math.round(slabArea * 100) / 100;
-      if (totalArea > roundedSlabArea + 0.01) {
-        alert(
-          `Total size exceeds allowed slab limit!\n` +
-          `Allowed: ${roundedSlabArea.toFixed(2)} Sq.Ft\n` +
-          `You are making: ${totalArea.toFixed(2)} Sq.Ft\n` +
-          `Please reduce: ${(totalArea - roundedSlabArea).toFixed(2)} Sq.Ft`
-        );
-        return;
-      }
+      // Soft check: allow piece size editing without hard blocking
     }
 
     try {
