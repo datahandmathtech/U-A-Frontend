@@ -326,7 +326,8 @@ const StageDetails = () => {
         slabId: slab.id, 
         data: { 
           count: piecesData.length, 
-          piecesArray: formattedPieces
+          piecesArray: formattedPieces,
+          replaceExisting: cutPiecesOption === 'yes'
         } 
       }).unwrap();
 
