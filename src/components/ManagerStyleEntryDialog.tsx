@@ -70,6 +70,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
     vehicleNumber: '',
     productName: '',
     photoUrl: '',
+    photoUrls: [] as string[],
     remarks: '',
     projectId: '',
     productId: ''
@@ -162,6 +163,14 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
       const initialQty = initialData.quantityProduced || initialData.piecesOut || initialData.piecesIn || initialData.vendors?.[0]?.qty || '';
       const initialStage = initialData.stage || 'Production';
 
+      const initialPhotos: string[] = (Array.isArray(initialData.photoUrls) && initialData.photoUrls.length > 0)
+        ? initialData.photoUrls
+        : (Array.isArray(initialData.startPhotos?.photos) && initialData.startPhotos.photos.length > 0)
+          ? initialData.startPhotos.photos
+          : (Array.isArray(initialData.photos) && initialData.photos.length > 0)
+            ? initialData.photos
+            : (initialData.photoUrl ? [initialData.photoUrl] : (initialData.startPhotos?.unit ? [initialData.startPhotos.unit] : []));
+
       setFormData({
         date: initialData.date ? new Date(initialData.date).toISOString().substring(0, 10) : new Date(initialData.createdAt || Date.now()).toISOString().substring(0, 10),
         transactionType: initialData.transactionType || 'OUT',
@@ -171,7 +180,8 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         quantity: String(initialQty),
         vehicleNumber: initialData.vehicleNumber || '',
         productName: initialData.productName || '',
-        photoUrl: initialData.photoUrl || initialData.startPhotos?.unit || initialData.startPhotos?.machine || '',
+        photoUrl: initialPhotos[0] || initialData.photoUrl || '',
+        photoUrls: initialPhotos,
         remarks: initialData.remarks || '',
         projectId: initialData.projectId || '',
         productId: initialData.productId || ''
@@ -198,6 +208,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         vehicleNumber: '',
         productName: '',
         photoUrl: '',
+        photoUrls: [],
         remarks: '',
         projectId: '',
         productId: ''
@@ -226,6 +237,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
     
     setLoading(true);
     try {
+      const primaryPhoto = formData.photoUrls[0] || formData.photoUrl || '';
       const payload: any = {
         date: formData.date,
         transactionType: formData.transactionType,
@@ -233,9 +245,12 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
         quantityProduced: Number(finalQty),
         vehicleNumber: formData.vehicleNumber,
         productName: formData.productName,
-        photoUrl: formData.photoUrl,
+        photoUrl: primaryPhoto || undefined,
+        photoUrls: formData.photoUrls,
         remarks: formData.remarks?.trim() || undefined,
-        startPhotos: formData.photoUrl ? { unit: formData.photoUrl, machine: formData.photoUrl } : undefined,
+        startPhotos: formData.photoUrls.length > 0 
+          ? { unit: primaryPhoto, machine: primaryPhoto, photos: formData.photoUrls } 
+          : (primaryPhoto ? { unit: primaryPhoto, machine: primaryPhoto } : undefined),
         assigneeType: formData.assigneeType,
         projectId: formData.projectId || undefined,
         productId: formData.productId || undefined,
@@ -258,36 +273,56 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
     }
   };
 
+  const compressImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX = 800; // Compress down to max 800px
+        if (width > height && width > MAX) {
+          height *= MAX / width;
+          width = MAX;
+        } else if (height > MAX) {
+          width *= MAX / height;
+          height = MAX;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = () => resolve('');
+    });
+  };
+
   const handlePhotoUpload = (useCameraCapture = false) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     if (useCameraCapture) {
       input.setAttribute('capture', 'environment');
+    } else {
+      input.multiple = true;
     }
-    input.onchange = (e: any) => {
-      const file = e.target.files[0];
-      if (file) {
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const MAX = 800; // Compress down to max 800px
-          if (width > height && width > MAX) {
-            height *= MAX / width;
-            width = MAX;
-          } else if (height > MAX) {
-            width *= MAX / height;
-            height = MAX;
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          setFormData(prev => ({ ...prev, photoUrl: canvas.toDataURL('image/jpeg', 0.6) }));
-        };
+    input.onchange = async (e: any) => {
+      const files = Array.from(e.target.files || []) as File[];
+      if (files.length > 0) {
+        const compressedList = await Promise.all(files.map(compressImageFile));
+        const validPhotos = compressedList.filter(Boolean);
+        if (validPhotos.length > 0) {
+          setFormData(prev => {
+            const updated = [...prev.photoUrls, ...validPhotos];
+            return {
+              ...prev,
+              photoUrls: updated,
+              photoUrl: updated[0] || ''
+            };
+          });
+        }
       }
     };
     input.click();
@@ -335,8 +370,26 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
     const ctx = canvas.getContext('2d');
     ctx?.drawImage(video, 0, 0, width, height);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-    setFormData(prev => ({ ...prev, photoUrl: dataUrl }));
+    setFormData(prev => {
+      const updated = [...prev.photoUrls, dataUrl];
+      return {
+        ...prev,
+        photoUrls: updated,
+        photoUrl: updated[0] || ''
+      };
+    });
     stopCameraStream();
+  };
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setFormData(prev => {
+      const updated = prev.photoUrls.filter((_, i) => i !== indexToRemove);
+      return {
+        ...prev,
+        photoUrls: updated,
+        photoUrl: updated[0] || ''
+      };
+    });
   };
 
   return (
@@ -727,11 +780,29 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
           />
 
-          {/* Verification Photo Upload Section (Change 4: Both Click Photo (Camera) and Upload Photo options) */}
+          {/* Verification Photo Upload Section (Multiple Photos Support) */}
           <Box sx={{ pt: 1 }}>
-            <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 1 }}>
-              Upload Verification Photos *
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem' }}>
+                Upload Verification Photos *
+              </Typography>
+              {formData.photoUrls.length > 0 && (
+                <Chip
+                  icon={<CheckCircleIcon sx={{ fontSize: '14px !important', color: '#059669 !important' }} />}
+                  label={`${formData.photoUrls.length} Photo${formData.photoUrls.length > 1 ? 's' : ''} Attached`}
+                  size="small"
+                  sx={{
+                    bgcolor: '#ECFDF5',
+                    color: '#059669',
+                    fontWeight: 800,
+                    fontSize: '0.72rem',
+                    border: '1px solid #A7F3D0',
+                    height: 22
+                  }}
+                />
+              )}
+            </Box>
+
             <Box sx={{ display: 'flex', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
               <Button
                 variant="outlined"
@@ -739,7 +810,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                 onClick={handleOpenLiveCamera}
                 sx={{
                   flex: 1,
-                  minWidth: 160,
+                  minWidth: 150,
                   py: 1.2,
                   borderRadius: 2.5,
                   fontWeight: 800,
@@ -758,7 +829,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                 onClick={() => handlePhotoUpload(false)}
                 sx={{
                   flex: 1,
-                  minWidth: 160,
+                  minWidth: 150,
                   py: 1.2,
                   borderRadius: 2.5,
                   fontWeight: 800,
@@ -772,13 +843,101 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
                 Upload Photo (Gallery)
               </Button>
             </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-              <ImageUploadBox 
-                label={formData.photoUrl ? "START PHOTO ATTACHED (TAP TO CHANGE)" : "START PHOTO PREVIEW"} 
-                previewUrl={formData.photoUrl} 
-                onClick={() => handlePhotoUpload(false)} 
-              />
-            </Box>
+
+            {/* Photos Display: If no photos attached yet */}
+            {formData.photoUrls.length === 0 ? (
+              <Box 
+                onClick={() => handlePhotoUpload(false)}
+                sx={{ 
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  height: 120, border: '2px dashed #CBD5E1', borderRadius: 3, bgcolor: 'rgba(0,0,0,0.02)',
+                  cursor: 'pointer', transition: 'all 0.2s', '&:hover': { bgcolor: 'rgba(0,0,0,0.05)', borderColor: '#94A3B8' }
+                }}
+              >
+                <PhotoCameraIcon sx={{ fontSize: 32, color: '#64748B', mb: 0.5 }} />
+                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800 }}>TAP TO CAPTURE OR SELECT</Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>You can attach multiple photos (Bill, Stone, Damage)</Typography>
+              </Box>
+            ) : (
+              /* Grid of all attached photos */
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: 1.5, mt: 1 }}>
+                {formData.photoUrls.map((url, idx) => (
+                  <Box
+                    key={idx}
+                    sx={{
+                      position: 'relative',
+                      height: 95,
+                      borderRadius: 2.5,
+                      overflow: 'hidden',
+                      border: '2px solid #10B981',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                      bgcolor: '#0F172A'
+                    }}
+                  >
+                    <img src={url} alt={`Photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 4,
+                        left: 4,
+                        bgcolor: 'rgba(15, 23, 42, 0.75)',
+                        color: '#FFF',
+                        borderRadius: 1,
+                        px: 0.6,
+                        py: 0.1,
+                        fontSize: '0.65rem',
+                        fontWeight: 900
+                      }}
+                    >
+                      #{idx + 1}
+                    </Box>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemovePhoto(idx);
+                      }}
+                      sx={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        bgcolor: 'rgba(239, 68, 68, 0.95)',
+                        color: '#FFFFFF',
+                        width: 22,
+                        height: 22,
+                        p: 0,
+                        '&:hover': { bgcolor: '#DC2626' }
+                      }}
+                    >
+                      <CloseIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Box>
+                ))}
+
+                {/* + Add More Tile */}
+                <Box
+                  onClick={() => handlePhotoUpload(false)}
+                  sx={{
+                    height: 95,
+                    border: '2px dashed #C89F5A',
+                    borderRadius: 2.5,
+                    bgcolor: '#FFFDF5',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    '&:hover': { bgcolor: '#FFF4E5', borderColor: '#B38B36' }
+                  }}
+                >
+                  <AddIcon sx={{ color: '#C89F5A', fontSize: 24, mb: 0.2 }} />
+                  <Typography sx={{ color: '#B38B36', fontWeight: 800, fontSize: '0.72rem' }}>
+                    + Add More
+                  </Typography>
+                </Box>
+              </Box>
+            )}
           </Box>
 
           {/* Remarks / Damage Notes Section (User Request: 5 pcs broken etc.) */}

@@ -21,6 +21,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ManagerStyleEntryDialog from '../components/ManagerStyleEntryDialog';
 import { getOptimizedUrl, getFullQualityUrl } from '../utils/cloudinary';
 
@@ -633,37 +635,70 @@ const VendorLedger: React.FC = () => {
                     )}
                   </TableCell>
                   <TableCell sx={{ py: 1.1 }}>
-                    {entry.photoUrl ? (
-                      <Box
-                        component="img"
-                        src={getOptimizedUrl(entry.photoUrl)}
-                        alt="Proof"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewPhoto({
-                            url: entry.photoUrl,
-                            remarks: entry.remarks,
-                            title: `${vendor?.name || 'Vendor'} • ${entry.stage || activeStageTab}`,
-                            date: entry.date || entry.createdAt,
-                            qty: entry.piecesOut || entry.piecesIn || entry.quantityProduced,
-                            type: entry.transactionType || (entry.piecesOut ? 'OUT' : 'IN')
-                          });
-                        }}
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 1.5,
-                          objectFit: 'cover',
-                          border: '1.5px solid #CBD5E1',
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-                          transition: 'transform 0.15s ease',
-                          '&:hover': { transform: 'scale(1.15)', borderColor: '#1976D2' }
-                        }}
-                      />
-                    ) : (
-                      <Typography variant="caption" sx={{ color: '#CBD5E1', fontWeight: 600 }}>-</Typography>
-                    )}
+                    {(() => {
+                      const entryPhotos: string[] = (Array.isArray(entry.photoUrls) && entry.photoUrls.length > 0)
+                        ? entry.photoUrls
+                        : (Array.isArray(entry.startPhotos?.photos) && entry.startPhotos.photos.length > 0)
+                          ? entry.startPhotos.photos
+                          : (entry.photoUrl ? [entry.photoUrl] : []);
+                      const primaryEntryPhoto = entryPhotos[0];
+
+                      return primaryEntryPhoto ? (
+                        <Box
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewPhoto({
+                              url: primaryEntryPhoto,
+                              urls: entryPhotos,
+                              activeIndex: 0,
+                              remarks: entry.remarks,
+                              title: `${vendor?.name || 'Vendor'} • ${entry.stage || activeStageTab}`,
+                              date: entry.date || entry.createdAt,
+                              qty: entry.piecesOut || entry.piecesIn || entry.quantityProduced,
+                              type: entry.transactionType || (entry.piecesOut ? 'OUT' : 'IN')
+                            });
+                          }}
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 1.5,
+                            overflow: 'hidden',
+                            border: '1.5px solid #CBD5E1',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                            transition: 'all 0.15s ease',
+                            '&:hover': { transform: 'scale(1.12)', borderColor: '#0284C7' }
+                          }}
+                        >
+                          <img
+                            src={getOptimizedUrl(primaryEntryPhoto)}
+                            alt="Proof"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                          {entryPhotos.length > 1 && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                bottom: 0,
+                                right: 0,
+                                bgcolor: 'rgba(15, 23, 42, 0.9)',
+                                color: '#FFFFFF',
+                                fontSize: '0.58rem',
+                                fontWeight: 900,
+                                px: 0.4,
+                                py: 0.05,
+                                borderTopLeftRadius: 4
+                              }}
+                            >
+                              +{entryPhotos.length - 1}
+                            </Box>
+                          )}
+                        </Box>
+                      ) : (
+                        <Typography variant="caption" sx={{ color: '#CBD5E1', fontWeight: 600 }}>-</Typography>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell sx={{ color: '#475569', fontWeight: 500, fontSize: '0.82rem', py: 1.1 }}>
                     {entry.remarks ? (
@@ -753,57 +788,122 @@ const VendorLedger: React.FC = () => {
               <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
-          {previewPhoto && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Box sx={{ width: '100%', maxHeight: '68vh', display: 'flex', justifyContent: 'center', mb: 2, bgcolor: '#000', borderRadius: 2, overflow: 'hidden' }}>
-                <img
-                  src={getFullQualityUrl(typeof previewPhoto === 'string' ? previewPhoto : previewPhoto.url)}
-                  alt="Verification Proof"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '68vh',
-                    objectFit: 'contain'
-                  }}
-                />
-              </Box>
+          {previewPhoto && (() => {
+            const photosList: string[] = (Array.isArray(previewPhoto.urls) && previewPhoto.urls.length > 0)
+              ? previewPhoto.urls
+              : (previewPhoto.url ? [previewPhoto.url] : (typeof previewPhoto === 'string' ? [previewPhoto] : []));
+            const activeIdx = previewPhoto.activeIndex || 0;
+            const currentImgUrl = photosList[activeIdx] || photosList[0] || '';
 
-              {/* Details & Remarks Box directly under the photo */}
-              <Box sx={{ width: '100%', bgcolor: '#1E293B', borderRadius: 2, p: 2, border: '1px solid #334155' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: previewPhoto?.remarks ? 1.5 : 0, flexWrap: 'wrap', gap: 1 }}>
-                  <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem' }}>
-                    {previewPhoto?.title || `${vendor?.name || 'Vendor'} Verification Proof`}
-                  </Typography>
-                  {previewPhoto?.qty && (
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {photosList.length > 1 && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 1, pr: 10 }}>
                     <Chip 
-                      label={`${previewPhoto.type || ''} • ${previewPhoto.qty} Pcs`} 
+                      label={`Photo ${activeIdx + 1} of ${photosList.length}`} 
                       size="small" 
-                      sx={{ 
-                        bgcolor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.2)' : 'rgba(2, 132, 199, 0.2)', 
-                        color: previewPhoto.type === 'OUT' ? '#FB923C' : '#38BDF8', 
-                        fontWeight: 800,
-                        border: '1px solid',
-                        borderColor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.4)' : 'rgba(2, 132, 199, 0.4)'
-                      }} 
+                      sx={{ bgcolor: '#38BDF8', color: '#0F172A', fontWeight: 800, fontSize: '0.75rem' }} 
                     />
-                  )}
-                </Box>
-                {previewPhoto?.remarks ? (
-                  <Box sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 1.5, p: 1.5 }}>
-                    <Typography sx={{ color: '#FCD34D', fontWeight: 800, fontSize: '0.8rem', mb: 0.5 }}>
-                      📝 Remarks / Damage Notes:
-                    </Typography>
-                    <Typography sx={{ color: '#FFFFFF', fontSize: '0.92rem', fontWeight: 600 }}>
-                      {previewPhoto.remarks}
+                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                      Click thumbnails or arrows to navigate
                     </Typography>
                   </Box>
-                ) : (
-                  <Typography sx={{ color: '#64748B', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                    No damage or special remarks noted for this entry.
-                  </Typography>
                 )}
+
+                <Box sx={{ position: 'relative', width: '100%', maxHeight: '65vh', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 1.5, bgcolor: '#000', borderRadius: 2, overflow: 'hidden' }}>
+                  {photosList.length > 1 && activeIdx > 0 && (
+                    <IconButton
+                      onClick={() => setPreviewPhoto((prev: any) => ({ ...prev, activeIndex: activeIdx - 1 }))}
+                      sx={{ position: 'absolute', left: 10, bgcolor: 'rgba(0,0,0,0.6)', color: '#FFF', '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }, zIndex: 5 }}
+                    >
+                      <ArrowBackIosNewIcon fontSize="small" />
+                    </IconButton>
+                  )}
+
+                  <img
+                    src={getFullQualityUrl(currentImgUrl)}
+                    alt={`Verification Proof ${activeIdx + 1}`}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '65vh',
+                      objectFit: 'contain'
+                    }}
+                  />
+
+                  {photosList.length > 1 && activeIdx < photosList.length - 1 && (
+                    <IconButton
+                      onClick={() => setPreviewPhoto((prev: any) => ({ ...prev, activeIndex: activeIdx + 1 }))}
+                      sx={{ position: 'absolute', right: 10, bgcolor: 'rgba(0,0,0,0.6)', color: '#FFF', '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }, zIndex: 5 }}
+                    >
+                      <ArrowForwardIosIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </Box>
+
+                {/* Multiple Photo Thumbnails Bar */}
+                {photosList.length > 1 && (
+                  <Box sx={{ display: 'flex', gap: 1, mb: 1.5, overflowX: 'auto', maxWidth: '100%', py: 0.5, px: 0.5 }}>
+                    {photosList.map((thumbUrl: string, tIdx: number) => (
+                      <Box
+                        key={tIdx}
+                        onClick={() => setPreviewPhoto((prev: any) => ({ ...prev, activeIndex: tIdx }))}
+                        sx={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          border: tIdx === activeIdx ? '2.5px solid #38BDF8' : '1.5px solid rgba(255,255,255,0.2)',
+                          opacity: tIdx === activeIdx ? 1 : 0.6,
+                          transition: 'all 0.15s ease',
+                          '&:hover': { opacity: 1, borderColor: '#38BDF8' }
+                        }}
+                      >
+                        <img src={getOptimizedUrl(thumbUrl)} alt={`Thumb ${tIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+
+                {/* Details & Remarks Box directly under the photo */}
+                <Box sx={{ width: '100%', bgcolor: '#1E293B', borderRadius: 2, p: 2, border: '1px solid #334155' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: previewPhoto?.remarks ? 1.5 : 0, flexWrap: 'wrap', gap: 1 }}>
+                    <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem' }}>
+                      {previewPhoto?.title || `${vendor?.name || 'Vendor'} Verification Proof`}
+                    </Typography>
+                    {previewPhoto?.qty && (
+                      <Chip 
+                        label={`${previewPhoto.type || ''} • ${previewPhoto.qty} Pcs`} 
+                        size="small" 
+                        sx={{ 
+                          bgcolor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.2)' : 'rgba(2, 132, 199, 0.2)', 
+                          color: previewPhoto.type === 'OUT' ? '#FB923C' : '#38BDF8', 
+                          fontWeight: 800,
+                          border: '1px solid',
+                          borderColor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.4)' : 'rgba(2, 132, 199, 0.4)'
+                        }} 
+                      />
+                    )}
+                  </Box>
+                  {previewPhoto?.remarks ? (
+                    <Box sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 1.5, p: 1.5 }}>
+                      <Typography sx={{ color: '#FCD34D', fontWeight: 800, fontSize: '0.8rem', mb: 0.5 }}>
+                        📝 Remarks / Damage Notes:
+                      </Typography>
+                      <Typography sx={{ color: '#FFFFFF', fontSize: '0.92rem', fontWeight: 600 }}>
+                        {previewPhoto.remarks}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Typography sx={{ color: '#64748B', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                      No damage or special remarks noted for this entry.
+                    </Typography>
+                  )}
+                </Box>
               </Box>
-            </Box>
-          )}
+            );
+          })()}
         </Box>
       </Dialog>
     </Box>

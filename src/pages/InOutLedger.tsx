@@ -24,6 +24,8 @@ import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
 import DirectionsCarRoundedIcon from '@mui/icons-material/DirectionsCarRounded';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import { 
   useGetActiveOutLogsQuery, useGetPendingApprovalsQuery, useGetApprovedLogsQuery, 
   useApproveMaterialLogMutation, useGetProjectsQuery, useGetSlabsQuery, 
@@ -250,7 +252,12 @@ const InOutLedger: React.FC = () => {
         <TableBody>
           {logsToRender.map((log: any, idx: number) => {
             const isOut = log.transactionType === 'OUT';
-            const photoUrl = log.photoUrl || log.startPhotos?.machine || log.startPhotos?.unit;
+            const photos: string[] = (Array.isArray(log.photoUrls) && log.photoUrls.length > 0)
+              ? log.photoUrls
+              : (Array.isArray(log.startPhotos?.photos) && log.startPhotos.photos.length > 0)
+                ? log.startPhotos.photos
+                : (log.photoUrl || log.startPhotos?.machine || log.startPhotos?.unit ? [log.photoUrl || log.startPhotos?.machine || log.startPhotos?.unit] : []);
+            const photoUrl = photos[0];
             return (
               <TableRow 
                 key={log.id} 
@@ -366,6 +373,8 @@ const InOutLedger: React.FC = () => {
                     <Box 
                       onClick={() => setPreviewPhoto({
                         url: photoUrl,
+                        urls: photos,
+                        activeIndex: 0,
                         remarks: log.remarks,
                         title: `${log.vendorName || log.worker?.name || 'External Vendor'} • ${log.stage || 'Production'}`,
                         qty: log.quantityProduced,
@@ -373,13 +382,31 @@ const InOutLedger: React.FC = () => {
                         date: log.createdAt || log.date
                       })}
                       sx={{ 
-                        width: 36, height: 36, borderRadius: 2, overflow: 'hidden', 
-                        cursor: 'pointer', border: '1px solid #E2E8F0',
-                        '&:hover': { transform: 'scale(1.08)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
+                        width: 38, height: 38, borderRadius: 2, overflow: 'hidden', 
+                        cursor: 'pointer', border: '1.5px solid #CBD5E1', position: 'relative',
+                        '&:hover': { transform: 'scale(1.08)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', borderColor: '#0284C7' },
                         transition: 'all 0.15s ease'
                       }}
                     >
                       <img src={getOptimizedUrl(photoUrl)} alt="Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      {photos.length > 1 && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 0,
+                            right: 0,
+                            bgcolor: 'rgba(15, 23, 42, 0.9)',
+                            color: '#FFFFFF',
+                            fontSize: '0.6rem',
+                            fontWeight: 900,
+                            px: 0.5,
+                            py: 0.1,
+                            borderTopLeftRadius: 4
+                          }}
+                        >
+                          +{photos.length - 1}
+                        </Box>
+                      )}
                     </Box>
                   ) : (
                     <Typography variant="caption" sx={{ color: '#CBD5E1' }}>No photo</Typography>
@@ -972,54 +999,119 @@ const InOutLedger: React.FC = () => {
             <CloseIcon fontSize="medium" />
           </IconButton>
           
-          {previewPhoto && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Box sx={{ width: '100%', maxHeight: '68vh', display: 'flex', justifyContent: 'center', mb: 2, bgcolor: '#000', borderRadius: 2, overflow: 'hidden' }}>
-                <img 
-                  src={getFullQualityUrl(typeof previewPhoto === 'string' ? previewPhoto : previewPhoto.url)} 
-                  alt="Proof" 
-                  style={{ maxWidth: '100%', maxHeight: '68vh', objectFit: 'contain' }} 
-                />
-              </Box>
-              
-              {/* Verification Details & Remarks directly under the photo */}
-              <Box sx={{ width: '100%', bgcolor: '#1E293B', borderRadius: 2, p: 2, border: '1px solid #334155' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: previewPhoto?.remarks ? 1.5 : 0, flexWrap: 'wrap', gap: 1 }}>
-                  <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem' }}>
-                    {previewPhoto?.title || 'Material Verification Photo'}
-                  </Typography>
-                  {previewPhoto?.qty && (
+          {previewPhoto && (() => {
+            const photosList: string[] = (Array.isArray(previewPhoto.urls) && previewPhoto.urls.length > 0)
+              ? previewPhoto.urls
+              : (previewPhoto.url ? [previewPhoto.url] : (typeof previewPhoto === 'string' ? [previewPhoto] : []));
+            const activeIdx = previewPhoto.activeIndex || 0;
+            const currentImgUrl = photosList[activeIdx] || photosList[0] || '';
+
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {photosList.length > 1 && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 1, pr: 6 }}>
                     <Chip 
-                      label={`${previewPhoto.type || ''} • ${previewPhoto.qty} Pcs`} 
+                      label={`Photo ${activeIdx + 1} of ${photosList.length}`} 
                       size="small" 
-                      sx={{ 
-                        bgcolor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.2)' : 'rgba(2, 132, 199, 0.2)', 
-                        color: previewPhoto.type === 'OUT' ? '#FB923C' : '#38BDF8', 
-                        fontWeight: 800,
-                        border: '1px solid',
-                        borderColor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.4)' : 'rgba(2, 132, 199, 0.4)'
-                      }} 
+                      sx={{ bgcolor: '#38BDF8', color: '#0F172A', fontWeight: 800, fontSize: '0.75rem' }} 
                     />
-                  )}
-                </Box>
-                
-                {previewPhoto?.remarks ? (
-                  <Box sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 1.5, p: 1.5 }}>
-                    <Typography sx={{ color: '#FCD34D', fontWeight: 800, fontSize: '0.8rem', mb: 0.5 }}>
-                      📝 Remarks / Damage Notes:
-                    </Typography>
-                    <Typography sx={{ color: '#FFFFFF', fontSize: '0.92rem', fontWeight: 600 }}>
-                      {previewPhoto.remarks}
+                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>
+                      Click thumbnails or arrows to navigate
                     </Typography>
                   </Box>
-                ) : (
-                  <Typography sx={{ color: '#64748B', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                    No damage or special remarks noted for this batch.
-                  </Typography>
                 )}
+
+                <Box sx={{ position: 'relative', width: '100%', maxHeight: '65vh', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 1.5, bgcolor: '#000', borderRadius: 2, overflow: 'hidden' }}>
+                  {photosList.length > 1 && activeIdx > 0 && (
+                    <IconButton
+                      onClick={() => setPreviewPhoto((prev: any) => ({ ...prev, activeIndex: activeIdx - 1 }))}
+                      sx={{ position: 'absolute', left: 10, bgcolor: 'rgba(0,0,0,0.6)', color: '#FFF', '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }, zIndex: 5 }}
+                    >
+                      <ArrowBackIosNewIcon fontSize="small" />
+                    </IconButton>
+                  )}
+
+                  <img 
+                    src={getFullQualityUrl(currentImgUrl)} 
+                    alt={`Proof ${activeIdx + 1}`} 
+                    style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain' }} 
+                  />
+
+                  {photosList.length > 1 && activeIdx < photosList.length - 1 && (
+                    <IconButton
+                      onClick={() => setPreviewPhoto((prev: any) => ({ ...prev, activeIndex: activeIdx + 1 }))}
+                      sx={{ position: 'absolute', right: 10, bgcolor: 'rgba(0,0,0,0.6)', color: '#FFF', '&:hover': { bgcolor: 'rgba(0,0,0,0.9)' }, zIndex: 5 }}
+                    >
+                      <ArrowForwardIosIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </Box>
+
+                {/* Multiple Photo Thumbnails Bar */}
+                {photosList.length > 1 && (
+                  <Box sx={{ display: 'flex', gap: 1, mb: 1.5, overflowX: 'auto', maxWidth: '100%', py: 0.5, px: 0.5 }}>
+                    {photosList.map((thumbUrl: string, tIdx: number) => (
+                      <Box
+                        key={tIdx}
+                        onClick={() => setPreviewPhoto((prev: any) => ({ ...prev, activeIndex: tIdx }))}
+                        sx={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          border: tIdx === activeIdx ? '2.5px solid #38BDF8' : '1.5px solid rgba(255,255,255,0.2)',
+                          opacity: tIdx === activeIdx ? 1 : 0.6,
+                          transition: 'all 0.15s ease',
+                          '&:hover': { opacity: 1, borderColor: '#38BDF8' }
+                        }}
+                      >
+                        <img src={getOptimizedUrl(thumbUrl)} alt={`Thumb ${tIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+                
+                {/* Verification Details & Remarks directly under the photo */}
+                <Box sx={{ width: '100%', bgcolor: '#1E293B', borderRadius: 2, p: 2, border: '1px solid #334155' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: previewPhoto?.remarks ? 1.5 : 0, flexWrap: 'wrap', gap: 1 }}>
+                    <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: '0.95rem' }}>
+                      {previewPhoto?.title || 'Material Verification Photo'}
+                    </Typography>
+                    {previewPhoto?.qty && (
+                      <Chip 
+                        label={`${previewPhoto.type || ''} • ${previewPhoto.qty} Pcs`} 
+                        size="small" 
+                        sx={{ 
+                          bgcolor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.2)' : 'rgba(2, 132, 199, 0.2)', 
+                          color: previewPhoto.type === 'OUT' ? '#FB923C' : '#38BDF8', 
+                          fontWeight: 800,
+                          border: '1px solid',
+                          borderColor: previewPhoto.type === 'OUT' ? 'rgba(234, 88, 12, 0.4)' : 'rgba(2, 132, 199, 0.4)'
+                        }} 
+                      />
+                    )}
+                  </Box>
+                  
+                  {previewPhoto?.remarks ? (
+                    <Box sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 1.5, p: 1.5 }}>
+                      <Typography sx={{ color: '#FCD34D', fontWeight: 800, fontSize: '0.8rem', mb: 0.5 }}>
+                        📝 Remarks / Damage Notes:
+                      </Typography>
+                      <Typography sx={{ color: '#FFFFFF', fontSize: '0.92rem', fontWeight: 600 }}>
+                        {previewPhoto.remarks}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Typography sx={{ color: '#64748B', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                      No damage or special remarks noted for this batch.
+                    </Typography>
+                  )}
+                </Box>
               </Box>
-            </Box>
-          )}
+            );
+          })()}
         </Box>
       </Dialog>
 
