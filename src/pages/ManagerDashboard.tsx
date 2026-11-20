@@ -38,6 +38,8 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import PersonIcon from '@mui/icons-material/Person';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 
 // Responsive Luxury Image Upload Tile
 const ImageUploadBox = ({ 
@@ -302,6 +304,8 @@ const ManagerDashboard: React.FC = () => {
   const [materialStage, setMaterialStage] = useState('Pending Assignment');
   const [materialQuantity, setMaterialQuantity] = useState('');
   const [materialPhotos, setMaterialPhotos] = useState({ machine: '', unit: '', software: '', endPhoto: '' });
+  const [materialPhotoUrls, setMaterialPhotoUrls] = useState<string[]>([]);
+  const [materialRemarks, setMaterialRemarks] = useState('');
   const [requiresMachine, setRequiresMachine] = useState(true);
   const [assigneeType, setAssigneeType] = useState<'self'|'worker'|'vendor'>('vendor');
   const [simpleAssigneeType, setSimpleAssigneeType] = useState<'client'|'vendor'>('client');
@@ -712,12 +716,78 @@ const ManagerDashboard: React.FC = () => {
       }
       else if (cameraTarget.startsWith('mat_')) {
         const key = cameraTarget.replace('mat_', '');
-        setMaterialPhotos(prev => ({ ...prev, [key]: dataUrl }));
+        setMaterialPhotos(prev => ({ ...prev, [key]: dataUrl, machine: prev.machine || dataUrl }));
+        setMaterialPhotoUrls(prev => [...prev, dataUrl]);
       }
       else setPhotos(prev => ({ ...prev, [cameraTarget]: dataUrl }));
       
       stopCamera();
     }
+  };
+
+  const compressMaterialFile = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX = 800;
+        if (width > height && width > MAX) {
+          height *= MAX / width;
+          width = MAX;
+        } else if (height > MAX) {
+          width *= MAX / height;
+          height = MAX;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = () => resolve('');
+    });
+  };
+
+  const handleMaterialPhotoUpload = (useCameraCapture = false) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    if (useCameraCapture) {
+      input.setAttribute('capture', 'environment');
+    } else {
+      input.multiple = true;
+    }
+    input.onchange = async (e: any) => {
+      const files = Array.from(e.target.files || []) as File[];
+      if (files.length > 0) {
+        const compressedList = await Promise.all(files.map(compressMaterialFile));
+        const validPhotos = compressedList.filter(Boolean);
+        if (validPhotos.length > 0) {
+          setMaterialPhotoUrls(prev => [...prev, ...validPhotos]);
+          setMaterialPhotos(prev => ({
+            ...prev,
+            machine: prev.machine || validPhotos[0],
+            unit: prev.unit || validPhotos[0]
+          }));
+        }
+      }
+    };
+    input.click();
+  };
+
+  const handleRemoveMaterialPhoto = (indexToRemove: number) => {
+    setMaterialPhotoUrls(prev => {
+      const updated = prev.filter((_, i) => i !== indexToRemove);
+      setMaterialPhotos(p => ({
+        ...p,
+        machine: updated[0] || '',
+        unit: updated[0] || ''
+      }));
+      return updated;
+    });
   };
 
   const showToast = (message: string, severity: 'success'|'error' = 'success') => {
@@ -814,6 +884,8 @@ const ManagerDashboard: React.FC = () => {
     setMaterialStage(stageName);
     setMaterialQuantity('');
     setMaterialPhotos({ machine: '', unit: '', software: '', endPhoto: '' });
+    setMaterialPhotoUrls([]);
+    setMaterialRemarks('');
     setAssigneeType(isStageCompletion ? 'self' : 'vendor');
     setSimpleAssigneeType('client');
     setCustomClientName('');
@@ -938,11 +1010,17 @@ const ManagerDashboard: React.FC = () => {
 
       const isStageCompletion = dialogOrigin !== 'Material Tracking';
 
+      const primaryPhoto = materialPhotoUrls[0] || materialPhotos.machine || materialPhotos.unit || '';
       await createMaterialLog({
         stage: materialStage,
         quantityProduced: materialQuantity || vendorRows[0]?.qty || 1,
         transactionType: materialType,
-        startPhotos: materialPhotos,
+        photoUrl: primaryPhoto || undefined,
+        photoUrls: materialPhotoUrls.length > 0 ? materialPhotoUrls : (primaryPhoto ? [primaryPhoto] : []),
+        startPhotos: materialPhotoUrls.length > 0 
+          ? { ...materialPhotos, machine: primaryPhoto, unit: primaryPhoto, photos: materialPhotoUrls }
+          : materialPhotos,
+        remarks: materialRemarks?.trim() || undefined,
         workerId: isStageCompletion ? (user?.id || user?._id) : undefined,
         vendors: !isStageCompletion ? vendorRows : [],
         vendorName: undefined,
@@ -2622,25 +2700,192 @@ const ManagerDashboard: React.FC = () => {
               />
             )}
 
-            {/* Photo Verification Upload Tile */}
+            {/* Photo Verification Upload Section (Multiple Photos Support) */}
             <Box>
-              <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 1.2 }}>
-                Upload Verification Photos
-              </Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: dialogOrigin !== 'Material Tracking' ? '1fr' : (materialType === 'OUT' && !requiresMachine ? '1fr 1fr' : '1fr'), gap: 1.5 }}>
-                {dialogOrigin !== 'Material Tracking' ? (
-                  <ImageUploadBox label="VERIFICATION PHOTO *" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
-                ) : (
-                  <>
-                    <ImageUploadBox label="START PHOTO *" previewUrl={materialPhotos.machine} onClick={() => startCamera('mat_machine')} />
-                    {materialType === 'OUT' && !requiresMachine && (
-                      <ImageUploadBox label="COMPLETION PHOTO *" previewUrl={materialPhotos.endPhoto} onClick={() => startCamera('mat_endPhoto')} />
-                    )}
-                  </>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.2 }}>
+                <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem' }}>
+                  Upload Verification Photos *
+                </Typography>
+                {materialPhotoUrls.length > 0 && (
+                  <Chip
+                    icon={<CheckCircleIcon sx={{ fontSize: '14px !important', color: '#059669 !important' }} />}
+                    label={`${materialPhotoUrls.length} Photo${materialPhotoUrls.length > 1 ? 's' : ''} Attached`}
+                    size="small"
+                    sx={{
+                      bgcolor: '#ECFDF5',
+                      color: '#059669',
+                      fontWeight: 800,
+                      fontSize: '0.72rem',
+                      border: '1px solid #A7F3D0',
+                      height: 22
+                    }}
+                  />
                 )}
               </Box>
+
+              {/* Action Buttons: Click Photo (Camera) + Upload Photo (Gallery) */}
+              <Box sx={{ display: 'flex', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<PhotoCameraIcon />}
+                  onClick={() => startCamera('mat_machine')}
+                  sx={{
+                    flex: 1,
+                    minWidth: 150,
+                    py: 1.2,
+                    borderRadius: 2.5,
+                    fontWeight: 800,
+                    textTransform: 'none',
+                    borderColor: '#0284C7',
+                    color: '#0284C7',
+                    bgcolor: '#F0F9FF',
+                    '&:hover': { bgcolor: '#E0F2FE', borderColor: '#0369A1' }
+                  }}
+                >
+                  Click Photo (Camera)
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileRoundedIcon />}
+                  onClick={() => handleMaterialPhotoUpload(false)}
+                  sx={{
+                    flex: 1,
+                    minWidth: 150,
+                    py: 1.2,
+                    borderRadius: 2.5,
+                    fontWeight: 800,
+                    textTransform: 'none',
+                    borderColor: '#64748B',
+                    color: '#334155',
+                    bgcolor: '#F8FAFC',
+                    '&:hover': { bgcolor: '#F1F5F9', borderColor: '#475569' }
+                  }}
+                >
+                  Upload Photo (Gallery)
+                </Button>
+              </Box>
+
+              {/* Photos Display: If no photos attached yet */}
+              {materialPhotoUrls.length === 0 ? (
+                <Box 
+                  onClick={() => handleMaterialPhotoUpload(false)}
+                  sx={{ 
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    height: 120, border: '2px dashed #CBD5E1', borderRadius: 3, bgcolor: 'rgba(0,0,0,0.02)',
+                    cursor: 'pointer', transition: 'all 0.2s', '&:hover': { bgcolor: 'rgba(0,0,0,0.05)', borderColor: '#94A3B8' }
+                  }}
+                >
+                  <PhotoCameraIcon sx={{ fontSize: 32, color: '#64748B', mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ color: '#475569', fontWeight: 800 }}>TAP TO CAPTURE OR SELECT</Typography>
+                  <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>You can attach multiple photos (Bill, Physical Slab, Damage)</Typography>
+                </Box>
+              ) : (
+                /* Grid of all attached photos */
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: 1.5, mt: 1 }}>
+                  {materialPhotoUrls.map((url, idx) => (
+                    <Box
+                      key={idx}
+                      sx={{
+                        position: 'relative',
+                        height: 95,
+                        borderRadius: 2.5,
+                        overflow: 'hidden',
+                        border: '2px solid #10B981',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                        bgcolor: '#0F172A'
+                      }}
+                    >
+                      <img src={url} alt={`Photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 4,
+                          left: 4,
+                          bgcolor: 'rgba(15, 23, 42, 0.75)',
+                          color: '#FFF',
+                          borderRadius: 1,
+                          px: 0.6,
+                          py: 0.1,
+                          fontSize: '0.65rem',
+                          fontWeight: 900
+                        }}
+                      >
+                        #{idx + 1}
+                      </Box>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveMaterialPhoto(idx);
+                        }}
+                        sx={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          bgcolor: 'rgba(239, 68, 68, 0.95)',
+                          color: '#FFFFFF',
+                          width: 22,
+                          height: 22,
+                          p: 0,
+                          '&:hover': { bgcolor: '#DC2626' }
+                        }}
+                      >
+                        <CloseIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Box>
+                  ))}
+
+                  {/* + Add More Tile */}
+                  <Box
+                    onClick={() => handleMaterialPhotoUpload(false)}
+                    sx={{
+                      height: 95,
+                      border: '2px dashed #C89F5A',
+                      borderRadius: 2.5,
+                      bgcolor: '#FFFDF5',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      '&:hover': { bgcolor: '#FFF4E5', borderColor: '#B38B36' }
+                    }}
+                  >
+                    <AddIcon sx={{ color: '#C89F5A', fontSize: 24, mb: 0.2 }} />
+                    <Typography sx={{ color: '#B38B36', fontWeight: 800, fontSize: '0.72rem' }}>
+                      + Add More
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
             </Box>
 
+            {/* Remarks / Damage Notes Section */}
+            <Box>
+              <Typography sx={{ color: '#1E293B', fontWeight: 700, fontSize: '0.82rem', mb: 0.8, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <EditNoteIcon sx={{ fontSize: 18, color: '#64748B' }} />
+                Remarks / Damage Notes (Optional)
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                placeholder="e.g. 5 pcs broken during cutting, polish scratches, extra pieces returned..."
+                value={materialRemarks}
+                onChange={(e) => setMaterialRemarks(e.target.value)}
+                slotProps={{
+                  input: {
+                    sx: {
+                      borderRadius: 2,
+                      bgcolor: '#F8FAFC',
+                      fontSize: '0.88rem',
+                      '&:hover': { bgcolor: '#F1F5F9' }
+                    }
+                  }
+                }}
+              />
+            </Box>
           </Box>
         </DialogContent>
 
@@ -2658,13 +2903,12 @@ const ManagerDashboard: React.FC = () => {
               ? (
                 !selectedProjectId ||
                 !materialQuantity ||
-                !materialPhotos.machine || 
+                (!materialPhotos.machine && materialPhotoUrls.length === 0) || 
                 creatingMaterial
               )
               : (
                 vendorRows.some(r => !r.vendorId || !r.qty) ||
-                !materialPhotos.machine ||
-                (materialType === 'OUT' && !requiresMachine && !materialPhotos.endPhoto) ||
+                (!materialPhotos.machine && materialPhotoUrls.length === 0) ||
                 creatingMaterial
               )
             }
