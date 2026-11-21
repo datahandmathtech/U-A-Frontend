@@ -622,7 +622,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                       {isDirectDispatchMode ? 'Main Stone Name' : 'Box No.'}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
-                      {isDirectDispatchMode ? 'Stone Spec (L × W)' : 'Box Size (L × W)'}
+                      {isDirectDispatchMode ? 'Stone Spec (L × W)' : 'Box Size (L × B × H)'}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>
                       Pieces (Qty)

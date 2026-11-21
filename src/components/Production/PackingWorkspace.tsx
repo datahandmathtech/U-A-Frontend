@@ -73,6 +73,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
   const [hasBoxSize, setHasBoxSize] = useState<'yes' | 'no'>('no');
   const [boxLength, setBoxLength] = useState('');
   const [boxWidth, setBoxWidth] = useState('');
+  const [boxHeight, setBoxHeight] = useState('');
   const [rangeFrom, setRangeFrom] = useState('');
   const [rangeTo, setRangeTo] = useState('');
   const [rangeQty, setRangeQty] = useState('');
@@ -361,6 +362,7 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
     setHasBoxSize('no');
     setBoxLength('');
     setBoxWidth('');
+    setBoxHeight('');
     setBoxRemarks('');
 
     const unpackedReady = allPieces.filter((p: any) => !packedPieceIdMap.has(p.id));
@@ -461,9 +463,12 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
       let bSize = 'Standard';
       if (hasBoxSize === 'yes') {
         const l = boxLength.trim();
-        const w = boxWidth.trim();
-        if (l && w) {
-          bSize = `${l} x ${w}`;
+        const b = boxWidth.trim();
+        const h = boxHeight.trim();
+        if (l && b && h) {
+          bSize = `${l} x ${b} x ${h}`;
+        } else if (l && b) {
+          bSize = `${l} x ${b}`;
         } else if (l) {
           bSize = `${l}`;
         }
@@ -1467,9 +1472,9 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
           {hasBoxSize === 'yes' && (
             <Box sx={{ p: 2, bgcolor: '#F0F9FF', border: '1.5px solid #BAE6FD', borderRadius: 2.5, mb: 2 }}>
               <Typography variant="caption" sx={{ fontWeight: 800, color: '#0369A1', textTransform: 'uppercase', display: 'block', mb: 1.5, letterSpacing: '0.5px' }}>
-                Box Size (L × W)
+                Box Size (L × B × H)
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <TextField
                   size="small"
                   label="Length (L) *"
@@ -1486,10 +1491,24 @@ const PackingWorkspace: React.FC<PackingWorkspaceProps> = ({
                 <Typography variant="body1" sx={{ fontWeight: 800, color: '#64748B' }}>×</Typography>
                 <TextField
                   size="small"
-                  label="Width (W) *"
+                  label="Breadth (B) *"
                   placeholder="24"
                   value={boxWidth}
                   onChange={(e) => setBoxWidth(e.target.value)}
+                  slotProps={{
+                    input: {
+                      sx: { bgcolor: '#FFFFFF', borderRadius: 1.5 }
+                    }
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <Typography variant="body1" sx={{ fontWeight: 800, color: '#64748B' }}>×</Typography>
+                <TextField
+                  size="small"
+                  label="Height (H) *"
+                  placeholder="12"
+                  value={boxHeight}
+                  onChange={(e) => setBoxHeight(e.target.value)}
                   slotProps={{
                     input: {
                       sx: { bgcolor: '#FFFFFF', borderRadius: 1.5 }

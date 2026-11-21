@@ -169,7 +169,7 @@ export const exportProjectProductionExcel = ({
     return {
       'S.No': boxCounter++,
       'Box No / Name': bName,
-      'Box Size (L × W)': bSize,
+      'Box Size (L × B × H)': bSize,
       'Total Pieces': pieceCount,
       'Pieces Included': piecesList,
       'Total Area (Sq.Ft)': boxArea > 0 ? boxArea.toFixed(2) : (pieceCount * 2.08).toFixed(2),
