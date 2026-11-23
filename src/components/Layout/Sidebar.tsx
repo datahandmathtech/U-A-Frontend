@@ -104,11 +104,21 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
   };
 
   const menuItems = ALL_MENU_ITEMS.filter((item) => {
-    if ((user?.role === 'admin' || user?.role === 'manager') && (!user?.modulesAccess || user.modulesAccess.length === 0)) {
+    // Admin always has full access to all menu items
+    if (user?.role === 'admin') {
+      return true;
+    }
+    if (user?.role === 'manager' && (!user?.modulesAccess || user.modulesAccess.length === 0)) {
       return true;
     }
     if (user?.modulesAccess && user.modulesAccess.length > 0) {
-      return user.modulesAccess.includes(item.path);
+      const slug = item.path.replace(/^\//, '') || 'dashboard';
+      return (
+        user.modulesAccess.includes(item.path) ||
+        user.modulesAccess.includes(slug) ||
+        (slug === 'crm' && user.modulesAccess.includes('enquiries')) ||
+        (slug === 'projects' && (user.modulesAccess.includes('work_orders') || user.modulesAccess.includes('production')))
+      );
     }
     return true;
   });
