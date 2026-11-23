@@ -243,7 +243,7 @@ const Dashboard: React.FC = () => {
           <DashboardCard
             icon={FilterAltRoundedIcon}
             title="TOTAL ENQUIRIES"
-            value={summary?.totalLeads ?? 3}
+            value={summary?.totalLeads ?? 0}
             subtitle="Active pipeline leads"
             colorHint="#6366F1"
             bgHint="#EEF2FF"
@@ -257,7 +257,7 @@ const Dashboard: React.FC = () => {
           <DashboardCard
             icon={DashboardRoundedIcon}
             title="ACTIVE WORK ORDERS"
-            value={summary?.activeProjects ?? 15}
+            value={summary?.activeProjects ?? 0}
             subtitle="Live production orders"
             colorHint="#C89F5A"
             bgHint="#FFF4E5"
@@ -271,7 +271,7 @@ const Dashboard: React.FC = () => {
           <DashboardCard
             icon={CheckCircleRoundedIcon}
             title="COMPLETED ORDERS"
-            value={summary?.completedProjects ?? 8}
+            value={summary?.completedProjects ?? 0}
             subtitle="Orders fully processed & closed"
             colorHint="#0284C7"
             bgHint="#F0F9FF"
@@ -285,7 +285,7 @@ const Dashboard: React.FC = () => {
           <DashboardCard
             icon={LayersRoundedIcon}
             title="TOTAL ORDERS"
-            value={summary?.totalOrders ?? summary?.totalProjects ?? 23}
+            value={summary?.totalOrders ?? summary?.totalProjects ?? 0}
             subtitle="All orders for selected period"
             colorHint="#059669"
             bgHint="#ECFDF5"
@@ -330,7 +330,7 @@ const Dashboard: React.FC = () => {
           <DashboardCard
             icon={BuildCircleRoundedIcon}
             title="FACTORY EXPENSES"
-            value={`₹${(summary?.factoryExpenses && summary.factoryExpenses > 0 ? summary.factoryExpenses : 118950).toLocaleString('en-IN')}`}
+            value={`₹${(Number(summary?.factoryExpenses) || 0).toLocaleString('en-IN')}`}
             subtitle="Operational & maintenance costs"
             colorHint="#EF4444"
             bgHint="#FEF2F2"
