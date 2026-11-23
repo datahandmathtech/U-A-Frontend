@@ -52,6 +52,7 @@ import FlashOnRoundedIcon from '@mui/icons-material/FlashOnRounded';
 import ManualApproval from './ManualApproval';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import * as XLSX from 'xlsx';
 import { 
@@ -1118,6 +1119,15 @@ const ProjectDetails: React.FC = () => {
   const [cameraPurpose, setCameraPurpose] = useState<'drawing' | 'clientPhoto'>('drawing');
   const [slabDialogOpen, setSlabDialogOpen] = useState(false);
   const [editSlabDialogOpen, setEditSlabDialogOpen] = useState(false);
+  const [blockedEditSlab, setBlockedEditSlab] = useState<any | null>(null);
+
+  const slabHasCustomPieces = (slabToCheck: any): boolean => {
+    if (!slabToCheck || !Array.isArray(slabToCheck.pieces) || slabToCheck.pieces.length === 0) return false;
+    if (slabToCheck.pieces.length === 1 && String(slabToCheck.pieces[0]?.productName || '').includes('(Full Slab)')) {
+      return false;
+    }
+    return true;
+  };
   const [editingSlabId, setEditingSlabId] = useState<string | null>(null);
   const [editSlabDims, setEditSlabDims] = useState({
     length: '',
@@ -1237,6 +1247,11 @@ const ProjectDetails: React.FC = () => {
   };
 
   const handleEditSlabClick = (slab: any) => {
+    const targetSlab = (projectSlabs || []).find((s: any) => s.id === slab.id) || slab;
+    if (slabHasCustomPieces(targetSlab)) {
+      setBlockedEditSlab(targetSlab);
+      return;
+    }
     setEditingSlabId(slab.id);
     let length = '';
     let width = '';
@@ -1272,6 +1287,13 @@ const ProjectDetails: React.FC = () => {
 
   const handleUpdateSlab = async () => {
     try {
+      const targetSlab = (projectSlabs || []).find((s: any) => s.id === editingSlabId);
+      if (slabHasCustomPieces(targetSlab)) {
+        setBlockedEditSlab(targetSlab);
+        setEditSlabDialogOpen(false);
+        return;
+      }
+
       const l = parseFloat(editSlabDims.length) || 0;
       const w = parseFloat(editSlabDims.width) || 0;
       const t = parseFloat(editSlabDims.thickness) || 0;
@@ -1283,7 +1305,6 @@ const ProjectDetails: React.FC = () => {
       const area = isFt ? l * w : isMM ? (l * w) / 92903.04 : (l * w) / 144;
       const roundedNewArea = Math.round(area * 100) / 100;
 
-      const targetSlab = (projectSlabs || []).find((s: any) => s.id === editingSlabId);
       const existingPiecesArea = getExistingPiecesAreaForSlab(targetSlab);
       if (existingPiecesArea > 0 && roundedNewArea > 0 && roundedNewArea + 0.01 < existingPiecesArea) {
         alert(
@@ -6087,6 +6108,66 @@ const ProjectDetails: React.FC = () => {
           >
             Update Slab
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* BLOCKED EDIT SLAB DIALOG */}
+      <Dialog
+        open={Boolean(blockedEditSlab)}
+        onClose={() => setBlockedEditSlab(null)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3.5, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningAmberRoundedIcon sx={{ color: '#DC2626', fontSize: 28 }} />
+          Pieces Exist in Slab
+        </DialogTitle>
+        <DialogContent dividers sx={{ py: 2.5 }}>
+          <Typography variant="body1" sx={{ fontWeight: 700, color: '#1E293B', mb: 1.5, fontSize: '1rem' }}>
+            Aapne is slab ke pieces banaye hue hain!
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.6, mb: 2 }}>
+            Slab specification (size, unit) edit karne ke liye pehle andar ke pieces ko delete karein, uske baad hi slab edit hoga.
+          </Typography>
+          {blockedEditSlab && (
+            <Box sx={{ p: 1.75, bgcolor: '#FEF2F2', borderRadius: 2.5, border: '1px solid #FECACA' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#991B1B' }}>
+                Slab: {blockedEditSlab.name}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#B91C1C', fontWeight: 600 }}>
+                Total Inside Pieces: {blockedEditSlab.pieces?.length || 0}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button 
+            onClick={() => setBlockedEditSlab(null)} 
+            sx={{ color: '#64748B', fontWeight: 700, textTransform: 'none' }}
+          >
+            Cancel
+          </Button>
+          {blockedEditSlab && (
+            <Button
+              variant="contained"
+              onClick={() => {
+                const sId = blockedEditSlab.id;
+                setBlockedEditSlab(null);
+                navigate(`/projects/${id}/slab/${sId}/stage/production`);
+              }}
+              sx={{ 
+                bgcolor: '#DC2626', 
+                '&:hover': { bgcolor: '#B91C1C' }, 
+                fontWeight: 800, 
+                textTransform: 'none',
+                borderRadius: 2,
+                px: 2.5
+              }}
+            >
+              Open Slab Pieces
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
