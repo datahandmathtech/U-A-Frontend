@@ -6125,10 +6125,10 @@ const ProjectDetails: React.FC = () => {
         </DialogTitle>
         <DialogContent dividers sx={{ py: 2.5 }}>
           <Typography variant="body1" sx={{ fontWeight: 700, color: '#1E293B', mb: 1.5, fontSize: '1rem' }}>
-            Aapne is slab ke pieces banaye hue hain!
+            Cannot Edit Slab Specification
           </Typography>
           <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.6, mb: 2 }}>
-            Slab specification (size, unit) edit karne ke liye pehle andar ke pieces ko delete karein, uske baad hi slab edit hoga.
+            This slab already has custom pieces created inside it. To change the slab size, unit, or dimensions, please delete the inside pieces first.
           </Typography>
           {blockedEditSlab && (
             <Box sx={{ p: 1.75, bgcolor: '#FEF2F2', borderRadius: 2.5, border: '1px solid #FECACA' }}>
