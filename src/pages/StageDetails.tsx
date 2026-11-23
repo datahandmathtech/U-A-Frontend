@@ -114,25 +114,25 @@ const StageDetails = () => {
   const rawWMatch = rawSizeStr.match(/(\d+(?:\.\d+)?)\s*W/i);
   const rawL = rawLMatch ? parseFloat(rawLMatch[1]) : 0;
   const rawW = rawWMatch ? parseFloat(rawWMatch[1]) : 0;
-  const isLargeMM = rawL > 150 || rawW > 150;
 
-  let detectedDimUnit = (matchedProduct?.dimensionUnit || '').toLowerCase().trim();
-  if (detectedDimUnit === 'sq_ft' || detectedDimUnit === 'sqft') detectedDimUnit = 'feet';
-  if (isLargeMM) {
+  let detectedDimUnit = '';
+  if (rawBeforePipe.includes('inch') || rawBeforePipe.includes('"')) {
+    detectedDimUnit = 'inch';
+  } else if (rawBeforePipe.includes('feet') || rawBeforePipe.includes('ft') || rawBeforePipe.includes("'")) {
+    detectedDimUnit = 'feet';
+  } else if (rawBeforePipe.includes('mm')) {
     detectedDimUnit = 'mm';
-  } else if (!detectedDimUnit) {
-    if (rawBeforePipe.includes('feet') || rawBeforePipe.includes('ft') || rawBeforePipe.includes("'")) {
-      detectedDimUnit = 'feet';
-    } else if (rawBeforePipe.includes('inch') || rawBeforePipe.includes('"')) {
-      detectedDimUnit = 'inch';
-    } else if (rawBeforePipe.includes('mm')) {
-      detectedDimUnit = 'mm';
-    } else if (rawUnit === 'sq_ft' || rawUnit === 'feet') {
-      detectedDimUnit = 'feet';
-    } else if (rawUnit === 'mm') {
-      detectedDimUnit = 'mm';
-    } else {
-      detectedDimUnit = 'inch';
+  } else {
+    detectedDimUnit = (matchedProduct?.dimensionUnit || '').toLowerCase().trim();
+    if (detectedDimUnit === 'sq_ft' || detectedDimUnit === 'sqft') detectedDimUnit = 'feet';
+    if (!detectedDimUnit) {
+      if (rawUnit === 'sq_ft' || rawUnit === 'feet') {
+        detectedDimUnit = 'feet';
+      } else if (rawUnit === 'mm') {
+        detectedDimUnit = 'mm';
+      } else {
+        detectedDimUnit = 'inch';
+      }
     }
   }
 

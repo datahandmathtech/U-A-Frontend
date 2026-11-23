@@ -167,34 +167,31 @@ const SlabRow = ({
     const tMatch = cleanSize.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || cleanSize.match(/(\d+(?:\.\d+)?)\s*MM/i);
     const lVal = lMatch ? parseFloat(lMatch[1]) : 0;
     const wVal = wMatch ? parseFloat(wMatch[1]) : 0;
-    const isLargeMM = lVal > 150 || wVal > 150;
-    const prodUnit = (matchedProduct?.dimensionUnit || matchedProduct?.unit || defaultProjectUnit || '').toLowerCase();
-    const isUnitMM = prodUnit === 'mm' || prodUnit.includes('milli') || isLargeMM;
+    const dimsPart = cleanSize.split('|')[0].toLowerCase();
 
-    if (/sq\.?ft/i.test(cleanSize)) {
-      const explicitSqFtMatch = cleanSize.match(/([\d.]+)\s*Sq\.?Ft/i);
-      const explicitSqFt = explicitSqFtMatch ? parseFloat(explicitSqFtMatch[1]) : 0;
-      if (isUnitMM && explicitSqFt > 100) {
-        // Fall through to recalculate with MM instead of inflated Inch area!
-      } else if (!cleanSize.toLowerCase().includes('inch') || !isUnitMM) {
-        return cleanSize;
+    // Explicit unit in string ALWAYS takes precedence!
+    let u = 'inch';
+    if (dimsPart.includes('inch') || dimsPart.includes('"')) {
+      u = 'inch';
+    } else if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) {
+      u = 'feet';
+    } else if (dimsPart.includes('mm')) {
+      u = 'mm';
+    } else {
+      const prodUnit = (matchedProduct?.dimensionUnit || matchedProduct?.unit || defaultProjectUnit || '').toLowerCase();
+      if (prodUnit.includes('feet') || prodUnit.includes('ft') || prodUnit.includes('sq')) {
+        u = 'feet';
+      } else if (prodUnit === 'mm' || prodUnit.includes('milli')) {
+        u = 'mm';
+      } else {
+        u = 'inch';
       }
     }
+
     if (lMatch && wMatch) {
       const l = lVal;
       const w = wVal;
       const t = tMatch ? tMatch[1] : (matchedProduct?.breadth || matchedProduct?.thickness || '10');
-      const dimsPart = cleanSize.split('|')[0].toLowerCase();
-
-      let u = 'inch';
-      if (isUnitMM || dimsPart.includes('mm')) {
-        u = 'mm';
-      } else if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq_ft') || dimsPart.includes('sqft') || prodUnit.includes('feet') || prodUnit.includes('ft') || prodUnit.includes('sq')) {
-        u = 'feet';
-      } else if (dimsPart.includes('inch') || dimsPart.includes('"') || prodUnit.includes('inch')) {
-        u = 'inch';
-      }
-
       const area = u === 'feet' ? l * w : u === 'mm' ? (l * w) / 92903.04 : (l * w) / 144;
       const uLabel = u === 'feet' ? 'Feet' : u === 'mm' ? 'MM' : 'Inch';
       return `${l}L x ${w}W ${uLabel} | ${t}MM (${area.toFixed(2)} Sq.Ft)`;
@@ -209,11 +206,11 @@ const SlabRow = ({
       : (slab.pieces?.[0]?.size ? parseDimensions(slab.pieces[0].size) : ''));
 
   const sizeLower = (dimensionStr || slab?.size || '').toLowerCase();
-  const rawUnit = matchedProduct?.unit || (
-    sizeLower.includes('sq. ft') || sizeLower.includes('sq_ft') || sizeLower.includes('sq.ft') || sizeLower.includes('sqft') ? 'sq_ft' :
-    sizeLower.includes('feet') || sizeLower.includes('ft') ? 'feet' :
+  const rawUnit = (
+    sizeLower.includes('inch') || sizeLower.includes('"') ? 'inch' :
+    sizeLower.includes('feet') || sizeLower.includes('ft') || sizeLower.includes('sq_ft') || sizeLower.includes('sqft') ? 'feet' :
     sizeLower.includes('mm') ? 'mm' :
-    'inch'
+    matchedProduct?.unit || 'inch'
   );
   const unitLabel = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inch'
     : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet'
@@ -1253,10 +1250,10 @@ const ProjectDetails: React.FC = () => {
       if (lMatch) length = lMatch[1];
       if (wMatch) width = wMatch[1];
       if (tMatch) thickness = tMatch[1];
-      if (/feet|ft/i.test(dimsPart)) unit = 'feet';
-      else if (/sq_ft|sqft/i.test(dimsPart)) unit = 'sq_ft';
+      if (/inch|"/i.test(dimsPart)) unit = 'inch';
+      else if (/feet|ft|sq_ft|sqft/i.test(dimsPart)) unit = 'feet';
       else if (/mm/i.test(dimsPart)) unit = 'mm';
-      else unit = 'inch';
+      else unit = defaultProjectUnit || 'inch';
     }
     setEditSlabDims({ length, width, thickness, unit });
     setDefaultProjectUnit(unit);
