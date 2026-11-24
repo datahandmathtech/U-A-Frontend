@@ -206,11 +206,11 @@ const SlabRow = ({
       ? `${matchedProduct.length || 0}L A- ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
       : (slab.pieces?.[0]?.size ? parseDimensions(slab.pieces[0].size) : ''));
 
-  const dimsPartOnly = (dimensionStr || slab?.size || '').split('|')[0].toLowerCase();
+  const dimsOnlyLower = ((dimensionStr || slab?.size || '').split('|')[0].split('(')[0] || '').toLowerCase();
   const rawUnit = (
-    dimsPartOnly.includes('inch') || dimsPartOnly.includes('"') ? 'inch' :
-    dimsPartOnly.includes('feet') || dimsPartOnly.includes('ft') || dimsPartOnly.includes('sq_ft') || dimsPartOnly.includes('sqft') ? 'feet' :
-    dimsPartOnly.includes('mm') ? 'mm' :
+    dimsOnlyLower.includes('inch') || dimsOnlyLower.includes('"') ? 'inch' :
+    dimsOnlyLower.includes('feet') || /\bft\b/.test(dimsOnlyLower) || dimsOnlyLower.includes("'") || dimsOnlyLower.includes('sq_ft') || dimsOnlyLower.includes('sqft') ? 'feet' :
+    /\bmm\b/.test(dimsOnlyLower) ? 'mm' :
     matchedProduct?.unit || 'inch'
   );
   const unitLabel = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inch'
@@ -881,11 +881,11 @@ const ProjectDetails: React.FC = () => {
         const u = qProd.dimensionUnit.toLowerCase();
         setDefaultProjectUnit(u === 'sq_ft' ? 'feet' : u);
       } else if (project.slabs?.[0]?.size) {
-        const dimsPart = (String(project.slabs[0].size).split('|')[0] || '').toLowerCase();
-        if (dimsPart.includes('feet') || dimsPart.includes('ft')) setDefaultProjectUnit('feet');
+        const dimsPart = (String(project.slabs[0].size).split('|')[0].split('(')[0] || '').toLowerCase();
+        if (dimsPart.includes('inch') || dimsPart.includes('"')) setDefaultProjectUnit('inch');
+        else if (dimsPart.includes('feet') || /\bft\b/.test(dimsPart)) setDefaultProjectUnit('feet');
         else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) setDefaultProjectUnit('sq_ft');
-        else if (dimsPart.includes('mm')) setDefaultProjectUnit('mm');
-        else if (dimsPart.includes('inch')) setDefaultProjectUnit('inch');
+        else if (/\bmm\b/.test(dimsPart)) setDefaultProjectUnit('mm');
       }
     }
   }, [project?.id]);
@@ -984,10 +984,11 @@ const ProjectDetails: React.FC = () => {
 
     if (slab.size) {
       const raw = String(slab.size);
-      const dimsPart = (raw.split('|')[0] || '').toLowerCase();
-      if (dimsPart.includes('feet') || dimsPart.includes('ft')) unit = 'feet';
+      const dimsPart = (raw.split('|')[0].split('(')[0] || '').toLowerCase();
+      if (dimsPart.includes('inch') || dimsPart.includes('"')) unit = 'inch';
+      else if (dimsPart.includes('feet') || /\bft\b/.test(dimsPart)) unit = 'feet';
       else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) unit = 'sq_ft';
-      else if (dimsPart.includes('mm')) unit = 'mm';
+      else if (/\bmm\b/.test(dimsPart)) unit = 'mm';
       else unit = 'inch';
 
       const matchL = raw.match(/([0-9.]+)\s*L/i);
@@ -1123,8 +1124,14 @@ const ProjectDetails: React.FC = () => {
 
   const slabHasCustomPieces = (slabToCheck: any): boolean => {
     if (!slabToCheck || !Array.isArray(slabToCheck.pieces) || slabToCheck.pieces.length === 0) return false;
-    if (slabToCheck.pieces.length === 1 && String(slabToCheck.pieces[0]?.productName || '').includes('(Full Slab)')) {
-      return false;
+    if (slabToCheck.pieces.length === 1) {
+      const p0 = slabToCheck.pieces[0];
+      if (String(p0?.productName || '').includes('(Full Slab)')) return false;
+      const isPending = !p0?.status || p0.status === 'pending' || p0.status === 'not_started';
+      const hasNoLogs = !p0?.logs || p0.logs.length === 0;
+      if (isPending && hasNoLogs && (String(p0?.productName || '').trim() === `${slabToCheck.name}.1` || p0?.size === slabToCheck.size)) {
+        return false;
+      }
     }
     return true;
   };
@@ -1258,16 +1265,16 @@ const ProjectDetails: React.FC = () => {
     let thickness = '';
     let unit = defaultProjectUnit || 'inch';
     if (slab.size) {
-      const dimsPart = (slab.size.split('|')[0] || '').toLowerCase();
+      const dimsPart = (slab.size.split('|')[0].split('(')[0] || '').toLowerCase();
       const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/i);
       const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/i);
       const tMatch = slab.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || slab.size.match(/(\d+(?:\.\d+)?)\s*MM/i);
       if (lMatch) length = lMatch[1];
       if (wMatch) width = wMatch[1];
       if (tMatch) thickness = tMatch[1];
-      if (/inch|"/i.test(dimsPart)) unit = 'inch';
-      else if (/feet|ft|sq_ft|sqft/i.test(dimsPart)) unit = 'feet';
-      else if (/mm/i.test(dimsPart)) unit = 'mm';
+      if (dimsPart.includes('inch') || dimsPart.includes('"')) unit = 'inch';
+      else if (dimsPart.includes('feet') || /\bft\b/.test(dimsPart) || dimsPart.includes("'") || dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) unit = 'feet';
+      else if (/\bmm\b/.test(dimsPart)) unit = 'mm';
       else unit = defaultProjectUnit || 'inch';
     }
     setEditSlabDims({ length, width, thickness, unit });
@@ -1604,15 +1611,16 @@ const ProjectDetails: React.FC = () => {
           let dimUnit = 'inch';
           if (slab.size) {
             const rawSize = String(slab.size);
-            const dimsPart = (rawSize.split('|')[0] || '').toLowerCase();
+            const dimsPart = (rawSize.split('|')[0].split('(')[0] || '').toLowerCase();
             const lMatch = rawSize.match(/(\d+(?:\.\d+)?)\s*L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
             const wMatch = rawSize.match(/(\d+(?:\.\d+)?)\s*W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
             const tMatch = rawSize.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || rawSize.match(/(\d+(?:\.\d+)?)\s*MM/i);
             if (lMatch) l = parseFloat(lMatch[1]) || 0;
             if (wMatch) w = parseFloat(wMatch[1]) || 0;
             if (tMatch) t = parseFloat(tMatch[1]) || 0;
-            if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes('sq')) dimUnit = 'sq_ft';
-            else if (dimsPart.includes('mm')) dimUnit = 'mm';
+            if (dimsPart.includes('inch') || dimsPart.includes('"')) dimUnit = 'inch';
+            else if (dimsPart.includes('feet') || /\bft\b/.test(dimsPart) || dimsPart.includes('sq')) dimUnit = 'sq_ft';
+            else if (/\bmm\b/.test(dimsPart)) dimUnit = 'mm';
             else dimUnit = 'inch';
           }
 
@@ -1945,7 +1953,7 @@ const ProjectDetails: React.FC = () => {
       const isPieces = u === 'pieces' || u === 'piece' || u === 'pcs' || !u;
       const dimU = (isPieces ? ((ep as any).dimensionUnit || 'inch') : u).toLowerCase().trim();
       const isFt = dimU === 'sq_ft' || dimU === 'feet' || dimU === 'ft' || dimU.includes('sq');
-      const isMM = dimU === 'mm' || dimU.includes('millimeter') || (l > 150 || w > 150);
+      const isMM = dimU === 'mm' || dimU.includes('millimeter');
       const singleSlabSqFt = Math.round((isFt ? (l * w) : isMM ? ((l * w) / 92903.04) : ((l * w) / 144)) * 100) / 100;
       ep.sqft = singleSlabSqFt;
 

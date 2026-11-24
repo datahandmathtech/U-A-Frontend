@@ -30,8 +30,6 @@ import {
   InputAdornment,
   Card,
   Skeleton,
-  Autocomplete,
-  createFilterOptions,
   Tabs,
   Tab
 } from '@mui/material';
@@ -40,7 +38,6 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import RemoveIcon from '@mui/icons-material/Remove';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import WorkIcon from '@mui/icons-material/Work';
@@ -135,14 +132,17 @@ export const calculateProjectWorkSize = (project: any): string => {
       const qty = Number(prod.qty || prod.quantity) || 1;
       const u = (prod.unit || 'inch').toLowerCase().trim();
       let sqftPerUnit = 0;
-      if (u.includes('inch')) {
+      if (u.includes('pieces') || u.includes('piece') || u.includes('pcs')) {
+        const dimU = (prod.dimensionUnit || 'inch').toLowerCase().trim();
+        if (dimU === 'mm' || dimU.includes('milli')) sqftPerUnit = (l * w) / 92903.04;
+        else if (dimU.includes('sq') || dimU.includes('ft') || dimU.includes('feet')) sqftPerUnit = l * w;
+        else sqftPerUnit = (l * w) > 0 ? (l * w) / 144 : 1;
+      } else if (u.includes('inch')) {
         sqftPerUnit = (l * w) / 144;
-      } else if (u === 'mm') {
+      } else if (u === 'mm' || u.includes('millimeter')) {
         sqftPerUnit = (l * w) / 92903.04;
       } else if (u.includes('sq_ft') || u.includes('sqft') || u.includes('ft') || u.includes('feet')) {
         sqftPerUnit = l * w;
-      } else if (u.includes('pieces') || u.includes('piece') || u.includes('pcs')) {
-        sqftPerUnit = (l * w) > 0 ? (l * w) / 144 : 1;
       } else {
         sqftPerUnit = (l * w) / 144;
       }
@@ -164,14 +164,17 @@ export const calculateProjectWorkSize = (project: any): string => {
         const qty = Number(prod.qty || prod.quantity) || 1;
         const u = (prod.unit || 'inch').toLowerCase().trim();
         let sqftPerUnit = 0;
-        if (u.includes('inch')) {
+        if (u.includes('pieces') || u.includes('piece') || u.includes('pcs')) {
+          const dimU = (prod.dimensionUnit || 'inch').toLowerCase().trim();
+          if (dimU === 'mm' || dimU.includes('milli')) sqftPerUnit = (l * w) / 92903.04;
+          else if (dimU.includes('sq') || dimU.includes('ft') || dimU.includes('feet')) sqftPerUnit = l * w;
+          else sqftPerUnit = (l * w) > 0 ? (l * w) / 144 : 1;
+        } else if (u.includes('inch')) {
           sqftPerUnit = (l * w) / 144;
-        } else if (u === 'mm') {
+        } else if (u === 'mm' || u.includes('millimeter')) {
           sqftPerUnit = (l * w) / 92903.04;
         } else if (u.includes('sq_ft') || u.includes('sqft') || u.includes('ft') || u.includes('feet')) {
           sqftPerUnit = l * w;
-        } else if (u.includes('pieces') || u.includes('piece') || u.includes('pcs')) {
-          sqftPerUnit = (l * w) > 0 ? (l * w) / 144 : 1;
         } else {
           sqftPerUnit = (l * w) / 144;
         }
@@ -193,13 +196,8 @@ import {
   useUpdateProjectMutation,
   useDeleteProjectMutation,
   useCreateSlabMutation,
-  useCreateQuotationMutation,
-  useGetUnitsQuery,
-  useCreateUnitMutation,
-  useDeleteUnitMutation
+  useCreateQuotationMutation
 } from '../store/apiSlice';
-
-const filter = createFilterOptions<any>();
 
 export const parseSafeDate = (dInput: any): Date | null => {
   if (!dInput) return null;
@@ -221,9 +219,6 @@ const Projects: React.FC = () => {
   const [deleteProject] = useDeleteProjectMutation();
   const [createSlab] = useCreateSlabMutation();
   const [createQuotation] = useCreateQuotationMutation();
-  const { data: units = [] } = useGetUnitsQuery();
-  const [createUnit] = useCreateUnitMutation();
-  const [deleteUnit] = useDeleteUnitMutation();
 
   const [open, setOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -276,17 +271,16 @@ const Projects: React.FC = () => {
         let thickness = '';
         let dimensionUnit = 'inch';
         if (s.size) {
-          const dimsPart = (s.size.split('|')[0] || '').toLowerCase();
+          const dimsPart = (s.size.split('|')[0].split('(')[0] || '').toLowerCase();
           const lMatch = s.size.match(/(\d+(?:\.\d+)?)\s*L/i) || dimsPart.match(/(\d+(?:\.\d+)?)/);
           const wMatch = s.size.match(/(\d+(?:\.\d+)?)\s*W/i) || dimsPart.match(/[xX*×]\s*(\d+(?:\.\d+)?)/);
           const tMatch = s.size.match(/\|\s*(\d+(?:\.\d+)?)\s*MM/i) || s.size.match(/(\d+(?:\.\d+)?)\s*MM/i);
           if (lMatch) length = lMatch[1];
           if (wMatch) width = wMatch[1];
           if (tMatch) thickness = tMatch[1];
-          if (dimsPart.includes('feet') || dimsPart.includes('ft') || dimsPart.includes("'")) dimensionUnit = 'sq_ft';
-          else if (dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) dimensionUnit = 'sq_ft';
-          else if (dimsPart.includes('mm')) dimensionUnit = 'mm';
-          else if (dimsPart.includes('inch') || dimsPart.includes('"')) dimensionUnit = 'inch';
+          if (dimsPart.includes('inch') || dimsPart.includes('"')) dimensionUnit = 'inch';
+          else if (dimsPart.includes('feet') || /\bft\b/.test(dimsPart) || dimsPart.includes("'") || dimsPart.includes('sq_ft') || dimsPart.includes('sqft')) dimensionUnit = 'sq_ft';
+          else if (/\bmm\b/.test(dimsPart)) dimensionUnit = 'mm';
           else if (s.dimensionUnit) dimensionUnit = s.dimensionUnit;
         }
 
@@ -302,7 +296,7 @@ const Projects: React.FC = () => {
         const existingUnit = (matchedQuoteProd?.unit || '').trim();
         const resolvedUnit = (existingUnit && existingUnit.toLowerCase() !== 'pieces' && existingUnit.toLowerCase() !== 'piece' && existingUnit.toLowerCase() !== 'pcs')
           ? existingUnit
-          : (dimensionUnit === 'sq_ft' ? 'Sq. Ft' : dimensionUnit);
+          : (dimensionUnit === 'sq_ft' ? 'Sq. Ft' : (dimensionUnit === 'mm' ? 'MM' : dimensionUnit));
 
         return {
           id: s.id,
@@ -428,11 +422,9 @@ const Projects: React.FC = () => {
             String(s.name || '').trim().toLowerCase() === String(prod.name || '').trim().toLowerCase()
           );
           if (matchedSlab && Array.isArray(matchedSlab.pieces) && matchedSlab.pieces.length > 0) {
-            const activePieces = matchedSlab.pieces.filter((p: any) =>
-              p.status === 'completed' || p.status === 'active' || p.hasProduction
-            );
-            if (activePieces.length > 0) {
-              const piecesArea = Math.round(activePieces.reduce((acc: number, p: any) => {
+            const isSingleFullSlab = matchedSlab.pieces.length === 1 && String(matchedSlab.pieces[0]?.productName || '').includes('(Full Slab)');
+            if (!isSingleFullSlab) {
+              const piecesArea = Math.round(matchedSlab.pieces.reduce((acc: number, p: any) => {
                 const str = String(p.size || '');
                 const expMatch = str.match(/([\d.]+)\s*Sq\.?Ft/i);
                 if (expMatch) return acc + (parseFloat(expMatch[1]) || 0);
@@ -461,8 +453,8 @@ const Projects: React.FC = () => {
               if (piecesArea > 0 && newSlabArea > 0 && newSlabArea + 0.01 < piecesArea) {
                 alert(
                   `Cannot reduce "${prod.name}" size to ${newSlabArea.toFixed(2)} Sq.Ft!\n` +
-                  `Pieces already in production total ${piecesArea.toFixed(2)} Sq.Ft.\n` +
-                  `You can keep it at least ${piecesArea.toFixed(2)} Sq.Ft.`
+                  `Inside pieces already have a total area of ${piecesArea.toFixed(2)} Sq.Ft.\n` +
+                  `You can increase the size or keep it at least ${piecesArea.toFixed(2)} Sq.Ft.`
                 );
                 return;
               }
@@ -1812,32 +1804,27 @@ const Projects: React.FC = () => {
                           </Grid>
                           <Grid size={{ xs: 6, sm: isPieces ? 2 : 3 }}>
                             <FormControl fullWidth size="small">
-                              <InputLabel id={`unit-select-label-${index}`}>Unit</InputLabel>
+                              <InputLabel>Unit</InputLabel>
                               <Select
-                                labelId={`unit-select-label-${index}`}
                                 label="Unit"
-                                value={
-                                  prod.unit?.toLowerCase() === 'mm' ? 'mm' :
-                                  (prod.unit?.toLowerCase() === 'sq_ft' || prod.unit?.toLowerCase() === 'sq. ft' || prod.unit?.toLowerCase() === 'sqft' || prod.unit?.toLowerCase() === 'feet' || prod.unit?.toLowerCase() === 'ft') ? 'sq_ft' :
-                                  (prod.unit?.toLowerCase() === 'inch' || prod.unit?.toLowerCase() === 'inches') ? 'inch' :
-                                  'pieces'
-                                }
+                                value={(() => {
+                                  const s = String(prod.unit || '').toLowerCase().trim();
+                                  if (!s || s === 'pieces' || s === 'piece' || s === 'pcs') return 'pieces';
+                                  if (s === 'mm' || s.includes('millimeter')) return 'MM';
+                                  if (s.includes('sq') || s.includes('ft') || s.includes('feet')) return 'Sq. Ft';
+                                  if (s.includes('inch') || s === 'in' || s === '"') return 'inch';
+                                  return 'pieces';
+                                })()}
                                 onChange={(e) => {
-                                  const selected = e.target.value;
                                   const newProds = [...formData.products];
-                                  newProds[index].unit = selected;
-                                  if (selected !== 'pieces') {
-                                    newProds[index].dimensionUnit = selected;
-                                  } else if (!newProds[index].dimensionUnit) {
-                                    newProds[index].dimensionUnit = 'inch';
-                                  }
+                                  newProds[index].unit = e.target.value;
                                   setFormData({ ...formData, products: newProds });
                                 }}
                               >
-                                <MenuItem value="inch">Inch</MenuItem>
-                                <MenuItem value="mm">MM</MenuItem>
-                                <MenuItem value="sq_ft">Sq. Ft</MenuItem>
-                                <MenuItem value="pieces">Pieces</MenuItem>
+                                <MenuItem value="inch">inch</MenuItem>
+                                <MenuItem value="MM">MM</MenuItem>
+                                <MenuItem value="Sq. Ft">Sq. Ft</MenuItem>
+                                <MenuItem value="pieces">pieces</MenuItem>
                               </Select>
                             </FormControl>
                           </Grid>

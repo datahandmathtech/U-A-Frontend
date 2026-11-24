@@ -75,37 +75,46 @@ const StageDetails = () => {
     ? 'Bridge Cutting'
     : (stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : '');
   
-  let matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => 
-    p.category === slab?.name || 
-    (p.category && slab?.name?.startsWith(p.category)) || 
-    p.productName === slab?.name
-  );
+  const slabNameLower = (slab?.name || '').trim().toLowerCase();
+  let matchedProduct = project?.quotations?.[0]?.products?.find((p: any) => {
+    const pCat = (p.category || '').trim().toLowerCase();
+    const pName = (p.productName || p.name || '').trim().toLowerCase();
+    return pCat === slabNameLower || pName === slabNameLower || (pCat && slabNameLower.startsWith(pCat));
+  });
   if (!matchedProduct && projectId) {
     try {
       const savedProductsStr = localStorage.getItem(`quoteProducts_${projectId}`);
       if (savedProductsStr) {
         const localProducts = JSON.parse(savedProductsStr);
-        matchedProduct = localProducts.find((p: any) => 
-          p.category === slab?.name || 
-          (p.category && slab?.name?.startsWith(p.category)) || 
-          p.productName === slab?.name
-        );
+        matchedProduct = localProducts.find((p: any) => {
+          const pCat = (p.category || '').trim().toLowerCase();
+          const pName = (p.productName || p.name || '').trim().toLowerCase();
+          return pCat === slabNameLower || pName === slabNameLower || (pCat && slabNameLower.startsWith(pCat));
+        });
       }
     } catch (e) {}
   }
   
   const rawSizeStr = slab?.size || '';
-  const rawBeforePipe = (rawSizeStr.split('|')[0] || '').toLowerCase().replace(/\s*x\s*\d+\s*mm/gi, '');
-  const rawUnit = (matchedProduct?.unit || '').trim() || (
-    rawBeforePipe.includes('sq. ft') || rawBeforePipe.includes('sq_ft') || rawBeforePipe.includes('sq.ft') || rawBeforePipe.includes('sqft') ? 'sq_ft' :
-    rawBeforePipe.includes('inch') || rawBeforePipe.includes('"') ? 'inch' :
-    rawBeforePipe.includes('feet') || rawBeforePipe.includes('ft') || rawBeforePipe.includes("'") ? 'feet' :
-    rawBeforePipe.includes('mm') ? 'mm' : 'inch'
-  );
+  const rawBeforePipe = (rawSizeStr.split('|')[0].split('(')[0] || '').toLowerCase().replace(/\s*x\s*\d+\s*mm/gi, '');
+  let explicitDimFromSize = '';
+  if (rawBeforePipe.includes('inch') || rawBeforePipe.includes('"')) {
+    explicitDimFromSize = 'inch';
+  } else if (rawBeforePipe.includes('sq. ft') || rawBeforePipe.includes('sq ft') || rawBeforePipe.includes('sq_ft') || rawBeforePipe.includes('sq.ft') || rawBeforePipe.includes('sqft') || rawBeforePipe.includes('feet') || /\bft\b/.test(rawBeforePipe) || rawBeforePipe.includes("'")) {
+    explicitDimFromSize = 'feet';
+  } else if (/\bmm\b/.test(rawBeforePipe)) {
+    explicitDimFromSize = 'mm';
+  }
+
+  const matchedUnitLower = (matchedProduct?.unit || '').toLowerCase().trim();
+  const isMatchedPieces = matchedUnitLower.startsWith('piece') || matchedUnitLower === 'pcs';
+  const rawUnit = isMatchedPieces
+    ? (matchedProduct?.unit || 'pieces').trim()
+    : (explicitDimFromSize || (matchedProduct?.unit || '').trim() || 'inch');
   
   const unitDisplayName = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inches' 
     : rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft' ? 'Feet' 
-    : rawUnit.toLowerCase() === 'sq_ft' || rawUnit.toLowerCase() === 'sqft' ? 'Sq.Ft' 
+    : rawUnit.toLowerCase().replace(/[\s_.]+/g, '') === 'sqft' ? 'Sq.Ft' 
     : rawUnit.toLowerCase() === 'mm' ? 'MM' 
     : (rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1));
 
@@ -115,20 +124,14 @@ const StageDetails = () => {
   const rawL = rawLMatch ? parseFloat(rawLMatch[1]) : 0;
   const rawW = rawWMatch ? parseFloat(rawWMatch[1]) : 0;
 
-  let detectedDimUnit = '';
-  if (rawBeforePipe.includes('inch') || rawBeforePipe.includes('"')) {
-    detectedDimUnit = 'inch';
-  } else if (rawBeforePipe.includes('feet') || rawBeforePipe.includes('ft') || rawBeforePipe.includes("'")) {
-    detectedDimUnit = 'feet';
-  } else if (rawBeforePipe.includes('mm')) {
-    detectedDimUnit = 'mm';
-  } else {
+  let detectedDimUnit = explicitDimFromSize;
+  if (!detectedDimUnit) {
     detectedDimUnit = (matchedProduct?.dimensionUnit || '').toLowerCase().trim();
-    if (detectedDimUnit === 'sq_ft' || detectedDimUnit === 'sqft') detectedDimUnit = 'feet';
+    if (detectedDimUnit === 'sq_ft' || detectedDimUnit === 'sqft' || detectedDimUnit === 'sq. ft') detectedDimUnit = 'feet';
     if (!detectedDimUnit) {
-      if (rawUnit === 'sq_ft' || rawUnit === 'feet') {
+      if (rawUnit.toLowerCase().replace(/[\s_.]+/g, '') === 'sqft' || rawUnit.toLowerCase() === 'feet' || rawUnit.toLowerCase() === 'ft') {
         detectedDimUnit = 'feet';
-      } else if (rawUnit === 'mm') {
+      } else if (rawUnit.toLowerCase() === 'mm') {
         detectedDimUnit = 'mm';
       } else {
         detectedDimUnit = 'inch';
@@ -152,18 +155,16 @@ const StageDetails = () => {
   const calculateAreaFromSize = (sizeStr: string, unitStr: string, productContext?: any) => {
     if (!sizeStr) return 0;
     
-    // Override unit if explicit in size string (e.g. "10L x 10W (inch)")
+    // Override unit if explicit in size string BEFORE thickness/area (e.g. "100L x 200W Inch | 20MM")
     let overrideUnit = unitStr;
     const sLower = sizeStr.toLowerCase();
-    const sBeforePipe = (sLower.split('|')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
+    const sBeforePipe = (sLower.split('|')[0].split('(')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
     if (sBeforePipe.includes('(inch)') || sBeforePipe.includes('(inches)') || sBeforePipe.includes('inch') || sBeforePipe.includes('"')) {
       overrideUnit = 'inch';
-    } else if (sBeforePipe.includes('(mm)') || sBeforePipe.includes('mm')) {
-      overrideUnit = 'mm';
-    } else if (sBeforePipe.includes('(sq.ft)') || sBeforePipe.includes('(sq_ft)') || sBeforePipe.includes('sq.ft') || sBeforePipe.includes('sq_ft') || sBeforePipe.includes('sqft')) {
-      overrideUnit = 'sq_ft';
-    } else if (sBeforePipe.includes('(ft)') || sBeforePipe.includes('(feet)') || sBeforePipe.includes('feet') || /\bft\b/.test(sBeforePipe) || sBeforePipe.includes("'")) {
+    } else if (sBeforePipe.includes('(sq.ft)') || sBeforePipe.includes('(sq_ft)') || sBeforePipe.includes('sq.ft') || sBeforePipe.includes('sq. ft') || sBeforePipe.includes('sq ft') || sBeforePipe.includes('sq_ft') || sBeforePipe.includes('sqft') || sBeforePipe.includes('(ft)') || sBeforePipe.includes('(feet)') || sBeforePipe.includes('feet') || /\bft\b/.test(sBeforePipe) || sBeforePipe.includes("'")) {
       overrideUnit = 'feet';
+    } else if (sBeforePipe.includes('(mm)') || /\bmm\b/.test(sBeforePipe)) {
+      overrideUnit = 'mm';
     }
     
     // Explicit Area override?
@@ -185,19 +186,21 @@ const StageDetails = () => {
     }
 
     const u = (overrideUnit || '').toLowerCase().trim();
+    const uCompact = u.replace(/[\s_.]+/g, '');
     let sqft = 0;
     if (u === 'pieces' || u === 'piece' || u === 'pcs') {
-      const activeDimUnit = (productContext?.dimensionUnit || effectiveDimUnit || 'mm').toLowerCase();
+      const activeDimUnit = (productContext?.dimensionUnit || effectiveDimUnit || 'inch').toLowerCase();
+      const activeCompact = activeDimUnit.replace(/[\s_.]+/g, '');
       if (activeDimUnit === 'inch' || activeDimUnit === 'inches') sqft = ((l * w) / 144);
       else if (activeDimUnit === 'mm') sqft = ((l * w) / 92903.04);
-      else if (activeDimUnit === 'sq_ft' || activeDimUnit === 'sqft' || activeDimUnit === 'sq.ft' || activeDimUnit === 'feet' || activeDimUnit === 'ft') sqft = l * w;
-      else sqft = 1;
+      else if (activeCompact === 'sqft' || activeDimUnit === 'feet' || activeDimUnit === 'ft') sqft = l * w;
+      else sqft = (l * w) / 144;
     } else if (u === 'mm') {
       sqft = ((l * w) / 92903.04);
-    } else if (u === 'feet' || u === 'ft' || u === 'sq_ft' || u === 'sqft' || u === 'sq.ft') {
+    } else if (u === 'feet' || u === 'ft' || uCompact === 'sqft') {
       sqft = (l * w);
     } else {
-      sqft = u.includes('inch') ? ((l * w) / 144) : (l * w);
+      sqft = u.includes('inch') ? ((l * w) / 144) : ((l * w) / 144);
     }
     return Number(sqft.toFixed(2));
   };
@@ -211,9 +214,52 @@ const StageDetails = () => {
 
   const [cutPiecesOption, setCutPiecesOption] = useState<'yes' | 'no' | null>(null);
   const [piecesData, setPiecesData] = useState<any[]>([]);
+  const [hiddenDefaultPieceIds, setHiddenDefaultPieceIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    setHiddenDefaultPieceIds([]);
+  }, [slabId]);
+
+  const slabAreaLimit = slab?.size
+    ? calculateAreaFromSize(slab.size, rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit })
+    : 0;
+
+  const isDefaultFullSlabPiece = (p: any, allSlabPieces: any[]) => {
+    if (!p) return false;
+    const isPending = !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started';
+    if (!isPending || (p.logs && p.logs.length > 0)) return false;
+    if (String(p.productName || '').includes('(Full Slab)')) return true;
+    if (allSlabPieces.length === 1) {
+      const pArea = p.size ? calculateAreaFromSize(p.size, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit }) : 0;
+      const isDefaultName = slab?.name ? String(p.productName || '').trim() === `${slab.name}.1` : false;
+      const matchesSlabArea = slabAreaLimit > 0 && Math.abs(pArea - slabAreaLimit) <= 0.15;
+      return isDefaultName || matchesSlabArea;
+    }
+    return false;
+  };
+
+  const rawSlabPieces = slab?.pieces || [];
+  const visibleSlabPieces = rawSlabPieces.filter((p: any) => !hiddenDefaultPieceIds.includes(p.id));
+  const nonDefaultExistingPieces = visibleSlabPieces.filter((p: any) => !isDefaultFullSlabPiece(p, visibleSlabPieces));
+  const existingCustomPiecesArea = Math.round(
+    nonDefaultExistingPieces.reduce((sum: number, p: any) => {
+      if (p.size) return sum + calculateAreaFromSize(p.size, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+      if (p.length && p.width) return sum + calculateAreaFromSize(`${p.length}L x ${p.width}W`, (p as any).unit || rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+      return sum;
+    }, 0) * 100
+  ) / 100;
+
+  const matrixNewArea = Math.round(
+    piecesData.reduce((sum: number, p: any) => {
+      return sum + calculateAreaFromSize(`${p.l || 0}L x ${p.w || 0}W`, p.unit || effectiveDimUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit });
+    }, 0) * 100
+  ) / 100;
+  const totalMatrixPlannedArea = Math.round((existingCustomPiecesArea + matrixNewArea) * 100) / 100;
+  const remainingMatrixLimit = Math.max(0, Math.round((slabAreaLimit - existingCustomPiecesArea) * 100) / 100);
+  const isMatrixOverLimit = slabAreaLimit > 0 && totalMatrixPlannedArea > (slabAreaLimit + 0.05);
 
   const renderPhoto = (url?: string, label?: string) => {
     if (!url) return <span style={{ color: '#ccc', fontSize: '0.75rem', marginRight: 4 }}>-</span>;
@@ -251,47 +297,24 @@ const StageDetails = () => {
   };
 
   const handleSavePieces = async () => {
-    setIsSaving(true);
-    
-    // --- SIZE VALIDATION: Block if total pieces area exceeds slab area limit ---
-    const totalPiecesArea = piecesData.reduce((acc, p) => {
-      const pieceUnit = String(p.unit || effectiveDimUnit || 'inch').toLowerCase();
-      const isFt = pieceUnit === 'feet' || pieceUnit === 'sq_ft' || pieceUnit === 'sqft' || pieceUnit === 'sq.ft' || pieceUnit === 'ft';
-      const isMM = pieceUnit === 'mm';
-      const lNum = Number(p.l) || 0;
-      const wNum = Number(p.w) || 0;
-      const a = isFt ? (lNum * wNum) : isMM ? ((lNum * wNum) / 92903.04) : ((lNum * wNum) / 144);
-      return acc + a;
-    }, 0);
+    if (!slab || piecesData.length === 0) return;
 
-    const slabLimit = Number(slabAreaLimit) || 0;
-    if (slabLimit > 0 && totalPiecesArea > (slabLimit + 0.05)) {
-      alert(
-        `Cannot save pieces!\n` +
-        `Total pieces area (${totalPiecesArea.toFixed(2)} Sq.Ft) exceeds Main Stone Limit (${slabLimit.toFixed(2)} Sq.Ft).\n` +
-        `Please reduce piece dimensions so the total fits within ${slabLimit.toFixed(2)} Sq.Ft.`
-      );
-      setIsSaving(false);
+    const hasInvalidDims = piecesData.some((p: any) => !(Number(p.l) > 0 && Number(p.w) > 0));
+    if (hasInvalidDims) {
+      alert('Please enter valid Length (L) and Width (W) greater than 0 for all pieces.');
       return;
     }
 
+    if (slabAreaLimit > 0 && totalMatrixPlannedArea > (slabAreaLimit + 0.05)) {
+      alert(
+        `Total pieces area (${totalMatrixPlannedArea.toFixed(2)} Sq.Ft) exceeds Main Stone Limit (${slabAreaLimit.toFixed(2)} Sq.Ft)!\n` +
+        `Remaining available area is ${remainingMatrixLimit.toFixed(2)} Sq.Ft. Please adjust piece dimensions.`
+      );
+      return;
+    }
+
+    setIsSaving(true);
     try {
-      // If user is breaking into pieces, automatically remove the unstarted full slab piece(s)
-      if (cutPiecesOption === 'yes') {
-        const unstartedPieces = (slab.pieces || []).filter((p: any) => 
-          !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started' || String(p.productName || '').includes('(Full Slab)')
-        );
-        for (const up of unstartedPieces) {
-          const upId = up.id || up._id;
-          if (upId) {
-            try {
-              await deletePiece(String(upId)).unwrap();
-            } catch (dErr) {
-              console.warn("Could not delete unstarted piece:", dErr);
-            }
-          }
-        }
-      }
       const formattedPieces = piecesData.map(p => {
         const base = p.baseName !== undefined ? p.baseName : (p.name ? p.name.substring(0, p.name.lastIndexOf('.')) || p.name : slab.name);
         const finalName = p.pieceNumber ? `${base}.${p.pieceNumber}` : (p.name || base);
@@ -320,16 +343,18 @@ const StageDetails = () => {
         data: { 
           count: piecesData.length, 
           piecesArray: formattedPieces,
-          replaceExisting: cutPiecesOption === 'yes'
+          replaceExisting: cutPiecesOption === 'yes',
+          replaceDefaultOnly: cutPiecesOption === 'yes'
         } 
       }).unwrap();
 
-      refetchSlabs();
+      setHiddenDefaultPieceIds([]);
+      await refetchSlabs();
       setPiecesData([]);
       setCutPiecesOption(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('Failed to save pieces');
+      alert(error?.data?.message || error?.message || 'Failed to save pieces');
     } finally {
       setIsSaving(false);
     }
@@ -551,7 +576,13 @@ const StageDetails = () => {
       const newPieceArea = parseFloat(calcSqFt) || 0;
       const totalArea = Math.round((otherPiecesArea + newPieceArea) * 100) / 100;
       const roundedSlabArea = Math.round(slabArea * 100) / 100;
-      // Soft check: allow piece size editing without hard blocking
+      if (roundedSlabArea > 0 && totalArea > roundedSlabArea + 0.05) {
+        alert(
+          `Total piece area (${totalArea.toFixed(2)} Sq.Ft) exceeds Main Stone Limit (${roundedSlabArea.toFixed(2)} Sq.Ft)!\n` +
+          `Please reduce the length/width so total pieces do not exceed ${roundedSlabArea.toFixed(2)} Sq.Ft.`
+        );
+        return;
+      }
     }
 
     try {
@@ -608,12 +639,12 @@ const StageDetails = () => {
       if (tMatch) thickness = tMatch[1];
       
       const pStr = String(p.size).toLowerCase();
-      const pBeforePipe = (pStr.split('|')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
-      if (pBeforePipe.includes('feet') || pBeforePipe.includes('ft') || pBeforePipe.includes('sq_ft') || pBeforePipe.includes('sqft') || pBeforePipe.includes("'") || pBeforePipe.includes('(feet)') || pBeforePipe.includes('(ft)')) {
-        unit = 'feet';
-      } else if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pBeforePipe.includes('(inch)') || pBeforePipe.includes('inches')) {
+      const pBeforePipe = (pStr.split('|')[0].split('(')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
+      if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pBeforePipe.includes('(inch)') || pBeforePipe.includes('inches')) {
         unit = 'inch';
-      } else if (pBeforePipe.includes('mm') || pBeforePipe.includes('(mm)')) {
+      } else if (pBeforePipe.includes('feet') || /\bft\b/.test(pBeforePipe) || pBeforePipe.includes('sq_ft') || pBeforePipe.includes('sqft') || pBeforePipe.includes("'") || pBeforePipe.includes('(feet)') || pBeforePipe.includes('(ft)')) {
+        unit = 'feet';
+      } else if (/\bmm\b/.test(pBeforePipe) || pBeforePipe.includes('(mm)')) {
         unit = 'mm';
       } else if ((p as any).unit) {
         const u = String((p as any).unit).toLowerCase();
@@ -757,7 +788,7 @@ const StageDetails = () => {
   const qtyToProcess = matchedProductForUI?.qty ? Number(matchedProductForUI.qty) : 1;
 
   const renderTableRows = () => {
-    const piecesList = slab.pieces || [];
+    const piecesList = visibleSlabPieces;
     const filteredPieces = piecesList.filter((p: any) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
@@ -991,8 +1022,10 @@ const StageDetails = () => {
                       w = wMatch ? parseFloat(wMatch[1]) : 0;
                     }
                     if (l > 0 && w > 0) {
-                      const isMM = cleanMain.toLowerCase().includes('mm') || rawDimStr.toLowerCase().includes('mm') || (l > 120 || w > 120) || (l > 100 && w > 100);
-                      const isFt = /\b(?:ft|feet)\b/i.test(cleanMain) || cleanMain.toLowerCase().includes('(ft)');
+                      const rawDimMainLower = (cleanMain.split('(')[0] || '').toLowerCase();
+                      const hasExplicitInch = rawDimMainLower.includes('inch') || rawDimMainLower.includes('"');
+                      const isFt = !hasExplicitInch && (/\b(?:ft|feet)\b/i.test(rawDimMainLower) || rawDimMainLower.includes('(ft)'));
+                      const isMM = !hasExplicitInch && !isFt && (/\bmm\b/i.test(rawDimMainLower) || ((l > 120 || w > 120) && !rawDimStr.toLowerCase().includes('inch')));
 
                       if (isMM) {
                         rawSqFt = (l * w) / 92903.04;
@@ -1069,13 +1102,13 @@ const StageDetails = () => {
                   .replace(/ × (\d+MM)/i, ' | $1')
                   .trim();
                 const sizeLower = (p.size || '').toLowerCase();
-                const pDimsPart = (sizeLower.split('|')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
+                const pDimsPart = (sizeLower.split('|')[0].split('(')[0] || '').replace(/\s*x\s*\d+\s*mm/gi, '');
                 let pUnit = dimensionUnitName;
                 if (pDimsPart.includes('(inch)') || pDimsPart.includes('(inches)') || pDimsPart.includes('inch') || pDimsPart.includes('"')) {
                   pUnit = 'Inches';
-                } else if (pDimsPart.includes('(ft)') || pDimsPart.includes('(feet)') || pDimsPart.includes('feet') || pDimsPart.includes('sq_ft') || pDimsPart.includes('sqft') || pDimsPart.includes("'")) {
+                } else if (pDimsPart.includes('(ft)') || pDimsPart.includes('(feet)') || pDimsPart.includes('feet') || /\bft\b/.test(pDimsPart) || pDimsPart.includes('sq_ft') || pDimsPart.includes('sqft') || pDimsPart.includes("'")) {
                   pUnit = 'Feet';
-                } else if (pDimsPart.includes('(mm)') || pDimsPart.includes('mm')) {
+                } else if (pDimsPart.includes('(mm)') || /\bmm\b/.test(pDimsPart)) {
                   pUnit = 'MM';
                 } else if ((p as any).unit) {
                   const u = String((p as any).unit).toLowerCase();
@@ -1215,7 +1248,7 @@ const StageDetails = () => {
   const BASE_STAGES = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
   const stageIdx = BASE_STAGES.indexOf(stageFormatted);
   
-  const totalPieces = slab.pieces?.length || 0;
+  const totalPieces = visibleSlabPieces.length;
   
   let completedPieces = 0;
   if (stageFormatted === 'Dispatch') {
@@ -1260,7 +1293,7 @@ const StageDetails = () => {
 
     completedPieces = Math.max(directLogsQty, pieceCompletedCount);
   } else {
-    completedPieces = (slab.pieces || []).filter((p: any) => {
+    completedPieces = visibleSlabPieces.filter((p: any) => {
       const stages = ['Production', 'Bridge Cutting', 'Polishing', 'Packing', 'Dispatch'];
       const pieceStageNormalized = (p.stage || 'Production').split(' - ')[0].replace(' Work', '').trim();
       const pieceIdx = stages.indexOf(pieceStageNormalized);
@@ -1355,8 +1388,8 @@ const StageDetails = () => {
                   ) : (
                     <Chip label={combinedUnitDisplay} size="small" sx={{ bgcolor: '#F1F5F9', color: '#475569', fontWeight: 700, fontSize: '0.75rem', height: 28, borderRadius: 1.5 }} />
                   )}
-                  {matchedProduct && (
-                    <Chip label={`${calculateAreaFromSize(slab?.size as string, rawUnit, { ...matchedProduct, dimensionUnit: effectiveDimUnit })} Sq.Ft`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #BFDBFE', borderRadius: 1.5 }} />
+                  {(matchedProduct || slabAreaLimit > 0) && (
+                    <Chip label={`${slabAreaLimit} Sq.Ft`} size="small" sx={{ bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: '0.75rem', height: 28, border: '1px solid #BFDBFE', borderRadius: 1.5 }} />
                   )}
                 </Box>
             )}
@@ -1373,19 +1406,17 @@ const StageDetails = () => {
                     const nextVal = val !== null ? val : null;
                     setCutPiecesOption(nextVal);
                     if (nextVal === 'yes') {
-                      // Automatically clean up previous unstarted full slab piece(s) so table is clean for new pieces
-                      const unstartedPieces = (slab.pieces || []).filter((p: any) => 
-                        !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started' || String(p.productName || '').includes('(Full Slab)')
-                      );
-                      if (unstartedPieces.length > 0) {
+                      // Delete untouched default single full-slab piece so admin gets a clean table without ghost full-slab area eating the limit
+                      const defaultPiecesToRemove = visibleSlabPieces.filter((p: any) => isDefaultFullSlabPiece(p, visibleSlabPieces));
+                      const remainingAfterDelete = visibleSlabPieces.filter((p: any) => !defaultPiecesToRemove.some((d: any) => d.id === p.id));
+
+                      if (defaultPiecesToRemove.length > 0) {
+                        setHiddenDefaultPieceIds((prev) => Array.from(new Set([...prev, ...defaultPiecesToRemove.map((p: any) => p.id)])));
                         try {
-                          await Promise.all(unstartedPieces.map((p: any) => {
-                            const pid = p.id || p._id;
-                            return pid ? deletePiece(String(pid)).unwrap() : Promise.resolve();
-                          }));
+                          await Promise.all(defaultPiecesToRemove.map((p: any) => deletePiece(p.id).unwrap()));
                           await refetchSlabs();
                         } catch (err) {
-                          console.warn("Error deleting unstarted pieces:", err);
+                          console.warn("Error deleting default full-slab piece:", err);
                         }
                       }
 
@@ -1393,10 +1424,13 @@ const StageDetails = () => {
                         const defaultUnit = (effectiveDimUnit === 'feet' || effectiveDimUnit === 'ft' || effectiveDimUnit === 'sq_ft' || effectiveDimUnit === 'sqft')
                           ? 'feet'
                           : (effectiveDimUnit === 'mm' ? 'mm' : 'inch');
+                        const nextPieceNum = remainingAfterDelete.length > 0
+                          ? Math.max(...remainingAfterDelete.map((p: any) => Number(p.pieceNumber) || 0)) + 1
+                          : 1;
                         setPiecesData([{
-                          pieceNumber: 1,
+                          pieceNumber: nextPieceNum,
                           baseName: slab.name,
-                          name: `${slab.name}.1`,
+                          name: `${slab.name}.${nextPieceNum}`,
                           l: 0,
                           w: 0,
                           t: 0,
@@ -1677,7 +1711,7 @@ const StageDetails = () => {
                 variant="outlined" 
                 startIcon={<AddIcon />}
                 onClick={() => {
-                  const existingPieces = slab.pieces || [];
+                  const existingPieces = nonDefaultExistingPieces;
                   let maxNum = 0;
                   if (existingPieces.length > 0) {
                     maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
@@ -1715,7 +1749,7 @@ const StageDetails = () => {
                     const qtyInput = document.getElementById('bulk-add-qty') as HTMLInputElement;
                     const count = parseInt(qtyInput?.value || '0');
                     if (count > 0) {
-                      const existingPieces = slab.pieces || [];
+                      const existingPieces = nonDefaultExistingPieces;
                       let maxNum = 0;
                       if (existingPieces.length > 0) {
                         maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
@@ -1762,21 +1796,53 @@ const StageDetails = () => {
             <Button 
               variant="contained" 
               onClick={handleSavePieces} 
-              disabled={isSaving || piecesData.length === 0}
+              disabled={isSaving || piecesData.length === 0 || isMatrixOverLimit}
               sx={{ 
                 borderRadius: 2.5, 
-                bgcolor: '#059669', 
+                bgcolor: isMatrixOverLimit ? '#94A3B8' : '#059669', 
                 color: '#FFFFFF', 
                 fontWeight: 800, 
                 textTransform: 'none',
                 px: 3.5,
-                boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
-                '&:hover': { bgcolor: '#047857' }
+                boxShadow: isMatrixOverLimit ? 'none' : '0 4px 14px rgba(5, 150, 105, 0.25)',
+                '&:hover': { bgcolor: isMatrixOverLimit ? '#94A3B8' : '#047857' }
               }}
             >
               {isSaving ? 'Saving...' : 'Save Pieces to Table'}
             </Button>
           </Box>
+
+          {/* Main Stone Limit & Area Tracker Banner */}
+          {slabAreaLimit > 0 && (
+            <Box sx={{ mt: 2.5, pt: 2, borderTop: '1px solid #FDE68A', display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#78350F', fontSize: '0.8rem' }}>
+                  Main Stone Limit: <strong>{slabAreaLimit.toFixed(2)} Sq.Ft</strong>
+                  {existingCustomPiecesArea > 0 && (
+                    <> &nbsp;|&nbsp; Existing Pieces: <strong>{existingCustomPiecesArea.toFixed(2)} Sq.Ft</strong></>
+                  )}
+                  &nbsp;|&nbsp; Remaining Available: <strong>{remainingMatrixLimit.toFixed(2)} Sq.Ft</strong>
+                </Typography>
+                <Chip
+                  size="small"
+                  label={`New Pieces Total: ${matrixNewArea.toFixed(2)} Sq.Ft (Combined: ${totalMatrixPlannedArea.toFixed(2)} / ${slabAreaLimit.toFixed(2)} Sq.Ft)`}
+                  sx={{
+                    bgcolor: isMatrixOverLimit ? '#FEF2F2' : '#ECFDF5',
+                    color: isMatrixOverLimit ? '#DC2626' : '#059669',
+                    border: isMatrixOverLimit ? '1px solid #FCA5A5' : '1px solid #A7F3D0',
+                    fontWeight: 800
+                  }}
+                />
+              </Box>
+              {isMatrixOverLimit && (
+                <Box sx={{ p: 1.5, bgcolor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: '#DC2626', fontWeight: 800, display: 'block', fontSize: '0.8rem' }}>
+                    ⚠️ Size Exceeds Main Stone Limit! Total pieces area ({totalMatrixPlannedArea.toFixed(2)} Sq.Ft) cannot be greater than main stone area ({slabAreaLimit.toFixed(2)} Sq.Ft). Please reduce dimensions before saving.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
         </Paper>
       )}
 

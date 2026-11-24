@@ -262,12 +262,12 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
       if (tMatch) t = tMatch[1];
 
       const pStr = str.toLowerCase();
-      const pBeforePipe = (pStr.split('|')[0] || '');
-      if (pBeforePipe.includes('feet') || pBeforePipe.includes('ft') || pBeforePipe.includes("'") || pStr.includes('(feet)') || pStr.includes('(ft)')) {
-        u = 'feet';
-      } else if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pStr.includes('(inch)') || pStr.includes('inches')) {
+      const pBeforePipe = (pStr.split('|')[0].split('(')[0] || '');
+      if (pBeforePipe.includes('inch') || pBeforePipe.includes('"') || pStr.includes('(inch)') || pStr.includes('inches')) {
         u = 'inch';
-      } else if (pBeforePipe.includes('mm') || pStr.includes('(mm)')) {
+      } else if (pBeforePipe.includes('feet') || /\bft\b/.test(pBeforePipe) || pBeforePipe.includes("'") || pStr.includes('(feet)') || pStr.includes('(ft)')) {
+        u = 'feet';
+      } else if (/\bmm\b/.test(pBeforePipe) || pStr.includes('(mm)')) {
         u = 'mm';
       }
     }
