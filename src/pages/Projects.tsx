@@ -467,6 +467,19 @@ const Projects: React.FC = () => {
             }
           }
         }
+        const parseDateSafe = (val: any) => {
+          if (!val) return null;
+          const str = String(val).trim();
+          if (!str) return null;
+          const parts = str.split(/[-/]/);
+          if (parts.length === 3 && parts[2].length === 4) {
+            const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            return isNaN(d.getTime()) ? null : d.toISOString();
+          }
+          const d = new Date(str);
+          return isNaN(d.getTime()) ? null : d.toISOString();
+        };
+
         const totalPiecesCount = validProducts.reduce((sum: number, p: any) => sum + Math.max(1, parseInt(String(p.qty || 1), 10) || 1), 0);
         await updateProject({
           id: editingProjectId,
@@ -477,9 +490,9 @@ const Projects: React.FC = () => {
             description: formData.description,
             status: formData.status || existingProject.status || 'production',
             totalPieces: totalPiecesCount || parseInt(formData.totalPieces) || 0,
-            deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : null,
-            startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
-            deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+            deliveryDate: parseDateSafe(formData.deliveryDate),
+            startDate: parseDateSafe(formData.startDate),
+            deadline: parseDateSafe(formData.deadline),
             products: validProducts
           }
         }).unwrap();
@@ -488,6 +501,19 @@ const Projects: React.FC = () => {
         handleClose();
         return;
       } else {
+        const parseDateSafe = (val: any) => {
+          if (!val) return undefined;
+          const str = String(val).trim();
+          if (!str) return undefined;
+          const parts = str.split(/[-/]/);
+          if (parts.length === 3 && parts[2].length === 4) {
+            const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            return isNaN(d.getTime()) ? undefined : d.toISOString();
+          }
+          const d = new Date(str);
+          return isNaN(d.getTime()) ? undefined : d.toISOString();
+        };
+
         const validProducts = (formData.products || []).filter((prod: any) => prod.name && prod.name.trim());
         const totalPiecesCount = validProducts.reduce((sum: number, p: any) => sum + Math.max(1, parseInt(String(p.qty || 1), 10) || 1), 0);
         const createdProject = await createProject({
@@ -496,9 +522,9 @@ const Projects: React.FC = () => {
           projectId: `U-A-${Math.floor(100 + Math.random() * 900)}`,
           status: 'production',
           isDirectWorkOrder: true,
-          deliveryDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : undefined,
-          startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
-          deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined
+          deliveryDate: parseDateSafe(formData.deliveryDate),
+          startDate: parseDateSafe(formData.startDate),
+          deadline: parseDateSafe(formData.deadline)
         }).unwrap();
 
         // Create slabs and quotation for each product
@@ -580,9 +606,10 @@ const Projects: React.FC = () => {
       }
       refetch();
       handleClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save work order', err);
-      alert('Failed to save work order. Please try again.');
+      const msg = err?.data?.message || err?.message || 'Failed to save work order. Please try again.';
+      alert(msg);
     }
   };
 
