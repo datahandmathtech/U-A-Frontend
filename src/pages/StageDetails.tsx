@@ -361,9 +361,10 @@ const StageDetails = () => {
   };
 
   const handleProcessSingleFullSlab = async () => {
+    if (!slab?.id) return;
     setIsSaving(true);
     try {
-      const existingPieces = slab.pieces || [];
+      const existingPieces = visibleSlabPieces;
       let maxNum = 0;
       if (existingPieces.length > 0) {
         maxNum = Math.max(...existingPieces.map((p: any) => p.pieceNumber || 0));
@@ -372,17 +373,21 @@ const StageDetails = () => {
       let parsedL = 0;
       let parsedW = 0;
       if (slab.size) {
-        const lMatch = slab.size.match(/(\d+(?:\.\d+)?)L/);
-        const wMatch = slab.size.match(/(\d+(?:\.\d+)?)W/);
+        const lMatch = slab.size.match(/(\d+(?:\.\d+)?)\s*L/i);
+        const wMatch = slab.size.match(/(\d+(?:\.\d+)?)\s*W/i);
         if (lMatch) parsedL = parseFloat(lMatch[1]);
         if (wMatch) parsedW = parseFloat(wMatch[1]);
       }
 
+      const nextNum = existingPieces.length === 0 ? 1 : (maxNum + 1);
+      const pieceUnit = effectiveDimUnit === 'feet' || effectiveDimUnit === 'sq_ft' ? 'sq_ft' : (effectiveDimUnit === 'mm' ? 'mm' : 'inch');
       const formattedPieces = [{
-        name: `${slab.name}.${maxNum + 1} (Full Slab)`,
+        name: existingPieces.length === 0 ? `${slab.name}.1` : `${slab.name}.${nextNum} (Full Slab)`,
+        pieceNumber: nextNum,
         size: slab.size || 'Full Slab',
         length: parsedL,
         width: parsedW,
+        unit: pieceUnit
       }];
       
       await addPieces({ 
@@ -393,11 +398,11 @@ const StageDetails = () => {
         } 
       }).unwrap();
 
-      refetchSlabs();
-      setCutPiecesOption(null);
+      setHiddenDefaultPieceIds([]);
+      await refetchSlabs();
     } catch (error) {
       console.error(error);
-      alert('Failed to process slab');
+      alert('Failed to restore default slab piece');
     } finally {
       setIsSaving(false);
     }
@@ -1437,6 +1442,12 @@ const StageDetails = () => {
                           unit: defaultUnit
                         }]);
                       }
+                    } else if (nextVal === 'no') {
+                      setPiecesData([]);
+                      // If the slab currently has 0 pieces (e.g. default piece was removed on YES), immediately restore the default full-slab entry
+                      if (visibleSlabPieces.length === 0) {
+                        await handleProcessSingleFullSlab();
+                      }
                     }
                   }}
                   sx={{ 
@@ -1537,8 +1548,8 @@ const StageDetails = () => {
         </Box>
       </Paper>
 
-      {/* PROCESS FULL SLAB PROMPT */}
-      {cutPiecesOption === 'no' && stageFormatted === 'Production' && (
+      {/* PROCESS FULL SLAB PROMPT (fallback only if table is still empty) */}
+      {cutPiecesOption === 'no' && stageFormatted === 'Production' && visibleSlabPieces.length === 0 && !isSaving && (
         <Paper elevation={0} sx={{ p: 3.5, mb: 4, borderRadius: 3.5, border: '2px dashed #CBD5E1', bgcolor: '#FFFFFF' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box>
