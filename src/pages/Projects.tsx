@@ -428,9 +428,11 @@ const Projects: React.FC = () => {
             String(s.name || '').trim().toLowerCase() === String(prod.name || '').trim().toLowerCase()
           );
           if (matchedSlab && Array.isArray(matchedSlab.pieces) && matchedSlab.pieces.length > 0) {
-            const isSingleFullSlab = matchedSlab.pieces.length === 1 && String(matchedSlab.pieces[0]?.productName || '').includes('(Full Slab)');
-            if (!isSingleFullSlab) {
-              const piecesArea = Math.round(matchedSlab.pieces.reduce((acc: number, p: any) => {
+            const activePieces = matchedSlab.pieces.filter((p: any) =>
+              p.status === 'completed' || p.status === 'active' || p.hasProduction
+            );
+            if (activePieces.length > 0) {
+              const piecesArea = Math.round(activePieces.reduce((acc: number, p: any) => {
                 const str = String(p.size || '');
                 const expMatch = str.match(/([\d.]+)\s*Sq\.?Ft/i);
                 if (expMatch) return acc + (parseFloat(expMatch[1]) || 0);
@@ -459,8 +461,8 @@ const Projects: React.FC = () => {
               if (piecesArea > 0 && newSlabArea > 0 && newSlabArea + 0.01 < piecesArea) {
                 alert(
                   `Cannot reduce "${prod.name}" size to ${newSlabArea.toFixed(2)} Sq.Ft!\n` +
-                  `Inside pieces already have a total area of ${piecesArea.toFixed(2)} Sq.Ft.\n` +
-                  `You can increase the size or keep it at least ${piecesArea.toFixed(2)} Sq.Ft.`
+                  `Pieces already in production total ${piecesArea.toFixed(2)} Sq.Ft.\n` +
+                  `You can keep it at least ${piecesArea.toFixed(2)} Sq.Ft.`
                 );
                 return;
               }
