@@ -206,11 +206,11 @@ const SlabRow = ({
       ? `${matchedProduct.length || 0}L A- ${matchedProduct.width || 0}W ${matchedProduct.breadth ? `| ${matchedProduct.breadth}MM` : ''}` 
       : (slab.pieces?.[0]?.size ? parseDimensions(slab.pieces[0].size) : ''));
 
-  const sizeLower = (dimensionStr || slab?.size || '').toLowerCase();
+  const dimsPartOnly = (dimensionStr || slab?.size || '').split('|')[0].toLowerCase();
   const rawUnit = (
-    sizeLower.includes('inch') || sizeLower.includes('"') ? 'inch' :
-    sizeLower.includes('feet') || sizeLower.includes('ft') || sizeLower.includes('sq_ft') || sizeLower.includes('sqft') ? 'feet' :
-    sizeLower.includes('mm') ? 'mm' :
+    dimsPartOnly.includes('inch') || dimsPartOnly.includes('"') ? 'inch' :
+    dimsPartOnly.includes('feet') || dimsPartOnly.includes('ft') || dimsPartOnly.includes('sq_ft') || dimsPartOnly.includes('sqft') ? 'feet' :
+    dimsPartOnly.includes('mm') ? 'mm' :
     matchedProduct?.unit || 'inch'
   );
   const unitLabel = rawUnit.toLowerCase() === 'inch' || rawUnit.toLowerCase() === 'inches' ? 'Inch'

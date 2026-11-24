@@ -1810,81 +1810,33 @@ const Projects: React.FC = () => {
                           </Grid>
                           <Grid size={{ xs: 6, sm: isPieces ? 2 : 3 }}>
                             <FormControl fullWidth size="small">
-                              <Autocomplete
-                                freeSolo
-                                selectOnFocus
-                                clearOnBlur
-                                handleHomeEndKeys
-                                options={units}
-                                getOptionLabel={(option) => {
-                                  if (typeof option === 'string') return option;
-                                  if (option.inputValue) return option.inputValue;
-                                  return option.name;
-                                }}
-                                filterOptions={(options, params) => {
-                                  const filtered = filter(options, params);
-                                  const { inputValue } = params;
-                                  const isExisting = options.some((option) => inputValue === option.name);
-                                  if (inputValue !== '' && !isExisting) {
-                                    filtered.push({
-                                      inputValue,
-                                      name: `Add "${inputValue}"`,
-                                      isNew: true,
-                                    });
-                                  }
-                                  return filtered;
-                                }}
-                                value={units.find((item: any) => item.name === prod.unit) || prod.unit || 'pieces'}
-                                onChange={(e, newValue) => {
+                              <InputLabel id={`unit-select-label-${index}`}>Unit</InputLabel>
+                              <Select
+                                labelId={`unit-select-label-${index}`}
+                                label="Unit"
+                                value={
+                                  prod.unit?.toLowerCase() === 'mm' ? 'mm' :
+                                  (prod.unit?.toLowerCase() === 'sq_ft' || prod.unit?.toLowerCase() === 'sq. ft' || prod.unit?.toLowerCase() === 'sqft' || prod.unit?.toLowerCase() === 'feet' || prod.unit?.toLowerCase() === 'ft') ? 'sq_ft' :
+                                  (prod.unit?.toLowerCase() === 'inch' || prod.unit?.toLowerCase() === 'inches') ? 'inch' :
+                                  'pieces'
+                                }
+                                onChange={(e) => {
+                                  const selected = e.target.value;
                                   const newProds = [...formData.products];
-                                  if (typeof newValue === 'string') {
-                                    newProds[index].unit = newValue;
-                                  } else if (newValue && newValue.inputValue) {
-                                    newProds[index].unit = newValue.inputValue;
-                                    createUnit({ name: newValue.inputValue });
-                                  } else if (newValue && newValue.name) {
-                                    newProds[index].unit = newValue.name;
-                                  } else {
-                                    newProds[index].unit = '';
+                                  newProds[index].unit = selected;
+                                  if (selected !== 'pieces') {
+                                    newProds[index].dimensionUnit = selected;
+                                  } else if (!newProds[index].dimensionUnit) {
+                                    newProds[index].dimensionUnit = 'inch';
                                   }
                                   setFormData({ ...formData, products: newProds });
                                 }}
-                                onInputChange={(e, newInputValue) => {
-                                  const newProds = [...formData.products];
-                                  newProds[index].unit = newInputValue;
-                                  setFormData({ ...formData, products: newProds });
-                                }}
-                                renderInput={(params) => <TextField {...params} label="Unit" size="small" />}
-                                renderOption={(props, option) => {
-                                  const { key, ...restProps } = props as any;
-                                  if (option.isNew) {
-                                    return (
-                                      <li key={key} {...restProps} style={{ color: '#B38B36', fontWeight: 'bold' }}>
-                                        {option.name}
-                                      </li>
-                                    );
-                                  }
-                                  return (
-                                    <li key={key} {...restProps} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                      <span>{option.name}</span>
-                                      <IconButton 
-                                        size="small" 
-                                        color="error"
-                                        onMouseDown={(e) => {
-                                          e.stopPropagation();
-                                          e.preventDefault();
-                                          if (window.confirm(`Are you sure you want to remove "${option.name}" from the unit list?`)) {
-                                            deleteUnit(option.id);
-                                          }
-                                        }}
-                                      >
-                                        <RemoveIcon fontSize="small" />
-                                      </IconButton>
-                                    </li>
-                                  );
-                                }}
-                                fullWidth
-                              />
+                              >
+                                <MenuItem value="inch">Inch</MenuItem>
+                                <MenuItem value="mm">MM</MenuItem>
+                                <MenuItem value="sq_ft">Sq. Ft</MenuItem>
+                                <MenuItem value="pieces">Pieces</MenuItem>
+                              </Select>
                             </FormControl>
                           </Grid>
                           {isPieces && (

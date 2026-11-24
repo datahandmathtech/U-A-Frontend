@@ -253,21 +253,42 @@ const StageDetails = () => {
   const handleSavePieces = async () => {
     setIsSaving(true);
     
-    // --- SIZE VALIDATION (Soft info check only, does not block manual entries) ---
-    // User requested: "isme baad manual daal kar entry chalne do koi issue nahi hai"
-    // --- END VALIDATION ---
+    // --- SIZE VALIDATION: Block if total pieces area exceeds slab area limit ---
+    const totalPiecesArea = piecesData.reduce((acc, p) => {
+      const pieceUnit = String(p.unit || effectiveDimUnit || 'inch').toLowerCase();
+      const isFt = pieceUnit === 'feet' || pieceUnit === 'sq_ft' || pieceUnit === 'sqft' || pieceUnit === 'sq.ft' || pieceUnit === 'ft';
+      const isMM = pieceUnit === 'mm';
+      const lNum = Number(p.l) || 0;
+      const wNum = Number(p.w) || 0;
+      const a = isFt ? (lNum * wNum) : isMM ? ((lNum * wNum) / 92903.04) : ((lNum * wNum) / 144);
+      return acc + a;
+    }, 0);
+
+    const slabLimit = Number(slabAreaLimit) || 0;
+    if (slabLimit > 0 && totalPiecesArea > (slabLimit + 0.05)) {
+      alert(
+        `Cannot save pieces!\n` +
+        `Total pieces area (${totalPiecesArea.toFixed(2)} Sq.Ft) exceeds Main Stone Limit (${slabLimit.toFixed(2)} Sq.Ft).\n` +
+        `Please reduce piece dimensions so the total fits within ${slabLimit.toFixed(2)} Sq.Ft.`
+      );
+      setIsSaving(false);
+      return;
+    }
 
     try {
       // If user is breaking into pieces, automatically remove the unstarted full slab piece(s)
       if (cutPiecesOption === 'yes') {
         const unstartedPieces = (slab.pieces || []).filter((p: any) => 
-          !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started'
+          !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started' || String(p.productName || '').includes('(Full Slab)')
         );
         for (const up of unstartedPieces) {
-          try {
-            await deletePiece(up.id).unwrap();
-          } catch (dErr) {
-            console.warn("Could not delete unstarted piece:", dErr);
+          const upId = up.id || up._id;
+          if (upId) {
+            try {
+              await deletePiece(String(upId)).unwrap();
+            } catch (dErr) {
+              console.warn("Could not delete unstarted piece:", dErr);
+            }
           }
         }
       }
@@ -1354,12 +1375,15 @@ const StageDetails = () => {
                     if (nextVal === 'yes') {
                       // Automatically clean up previous unstarted full slab piece(s) so table is clean for new pieces
                       const unstartedPieces = (slab.pieces || []).filter((p: any) => 
-                        !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started'
+                        !p.status || p.status === 'pending' || p.status === 'not_started' || p.status === 'Not Started' || String(p.productName || '').includes('(Full Slab)')
                       );
                       if (unstartedPieces.length > 0) {
                         try {
-                          await Promise.all(unstartedPieces.map((p: any) => deletePiece(p.id).unwrap()));
-                          refetchSlabs();
+                          await Promise.all(unstartedPieces.map((p: any) => {
+                            const pid = p.id || p._id;
+                            return pid ? deletePiece(String(pid)).unwrap() : Promise.resolve();
+                          }));
+                          await refetchSlabs();
                         } catch (err) {
                           console.warn("Error deleting unstarted pieces:", err);
                         }
