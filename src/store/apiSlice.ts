@@ -633,7 +633,7 @@ export const apiSlice = createApi({
       query: () => '/product-chat/unread/admin-alerts',
       providesTags: ['ProductChat']
     }),
-    getChatRoomsSummary: builder.query<{ totalUnread: number; roomsCount: number; rooms: any[] }, void>({
+    getChatRoomsSummary: builder.query<{ totalUnread: number; roomsCount: number; completedCount?: number; rooms: any[]; completedRooms?: any[] }, void>({
       query: () => '/product-chat/rooms/summary',
       providesTags: ['ProductChat']
     }),

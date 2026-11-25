@@ -27,7 +27,6 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import GetAppRoundedIcon from '@mui/icons-material/GetAppRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import FilterAltRoundedIcon from '@mui/icons-material/FilterAltRounded';
-import PendingActionsRoundedIcon from '@mui/icons-material/PendingActionsRounded';
 import FolderSpecialRoundedIcon from '@mui/icons-material/FolderSpecialRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import FlashOnRoundedIcon from '@mui/icons-material/FlashOnRounded';
@@ -52,7 +51,6 @@ const ALL_MENU_ITEMS: MenuItemDef[] = [
   { text: 'Log Book', icon: <MenuBookRoundedIcon />, path: '/log-book', category: 'Operations' },
   { text: 'Enquiries Pipeline', icon: <FilterAltRoundedIcon />, path: '/crm', category: 'Operations' },
   { text: 'Active Work Orders', icon: <WorkRoundedIcon />, path: '/projects', category: 'Operations' },
-  { text: 'Approvals Queue', icon: <PendingActionsRoundedIcon />, path: '/approvals', category: 'Stock & Machines' },
   { text: 'In/Out Ledger', icon: <FolderSpecialRoundedIcon />, path: '/in-out-ledger', category: 'Stock & Machines' },
   { text: 'Inventory', icon: <Inventory2RoundedIcon />, path: '/inventory', category: 'Stock & Machines' },
   { text: 'Machine Master', icon: <PrecisionManufacturingRoundedIcon />, path: '/machines', category: 'Stock & Machines' },

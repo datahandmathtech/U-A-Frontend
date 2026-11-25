@@ -16,7 +16,6 @@ import Projects from './pages/Projects';
 import ProjectDetails from './pages/ProjectDetails';
 import SlabPieceTracker from './pages/SlabPieceTracker';
 import StageDetails from './pages/StageDetails';
-import Approvals from './pages/Approvals';
 import ManualApproval from './pages/ManualApproval';
 import InOutLedger from './pages/InOutLedger';
 import VendorsList from './pages/VendorsList';
@@ -100,7 +99,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'approvals',
-        element: <Approvals />
+        element: <Navigate to="/" replace />
       },
       {
         path: 'manual-approval',

@@ -16,7 +16,6 @@ const MODULES = [
   { label: 'Machine Master', path: '/machines' },
   { label: 'Maintenance', path: '/maintenance' },
   { label: 'Cash Book', path: '/cash-book' },
-  { label: 'Approvals', path: '/approvals' },
   { label: 'Dispatch & Packing', path: '/dispatch' },
   { label: 'In/Out Ledger', path: '/in-out-ledger' },
   { label: 'Waste Ledger', path: '/waste-ledger' },

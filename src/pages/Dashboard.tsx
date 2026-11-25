@@ -166,7 +166,7 @@ const Dashboard: React.FC = () => {
   // Default automatically to the current calendar month (updates dynamically across months & financial years)
   const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
   const [chatSearch, setChatSearch] = useState('');
-  const [chatFilter, setChatFilter] = useState<'all' | 'unread'>('all');
+  const [chatFilter, setChatFilter] = useState<'active' | 'unread' | 'completed'>('active');
   const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
   const [isUnnatiChatOpen, setIsUnnatiChatOpen] = useState(false);
 
@@ -182,14 +182,9 @@ const Dashboard: React.FC = () => {
 
   const selectedMonthLabel = MONTH_NAME_MAP[Number(selectedMonth)] || 'Current Month';
 
-  // Hide completed / closed / 100%-done / non-active orders from active Chat Rooms & unread popups while preserving DB history
+  // Restrict Unnati Chat strictly to Work Orders (exclude CRM enquiries) and separate completed orders cleanly
   const completedProjectIds = useMemo(() => {
     const activeStatuses = new Set([
-      'pending',
-      'enquiry',
-      'design_sharing',
-      'quotation',
-      'advance_payment',
       'shop_drawing',
       'material_planning',
       'production',
@@ -216,19 +211,34 @@ const Dashboard: React.FC = () => {
     return rooms.filter((r: any) => !completedProjectIds.has(String(r.projectId)));
   }, [chatRoomsData, completedProjectIds]);
 
+  const completedChatRooms = useMemo(() => {
+    return chatRoomsData?.completedRooms || [];
+  }, [chatRoomsData]);
+
+  const matchesRoomSearch = (room: any, q: string) => {
+    if (!q) return true;
+    return (
+      (room.clientName || '').toLowerCase().includes(q) ||
+      (room.projectName || '').toLowerCase().includes(q) ||
+      (room.workOrderId || '').toLowerCase().includes(q) ||
+      (room.lastMessage || '').toLowerCase().includes(q)
+    );
+  };
+
   const filteredChatRooms = useMemo(() => {
     const q = chatSearch.trim().toLowerCase();
-    return activeChatRooms.filter((room: any) => {
+    const sourceRooms = chatFilter === 'completed' ? completedChatRooms : activeChatRooms;
+    return sourceRooms.filter((room: any) => {
       if (chatFilter === 'unread' && !(room.unreadCount > 0)) return false;
-      if (!q) return true;
-      return (
-        (room.clientName || '').toLowerCase().includes(q) ||
-        (room.projectName || '').toLowerCase().includes(q) ||
-        (room.workOrderId || '').toLowerCase().includes(q) ||
-        (room.lastMessage || '').toLowerCase().includes(q)
-      );
+      return matchesRoomSearch(room, q);
     });
-  }, [activeChatRooms, chatSearch, chatFilter]);
+  }, [activeChatRooms, completedChatRooms, chatSearch, chatFilter]);
+
+  const completedSearchMatches = useMemo(() => {
+    const q = chatSearch.trim().toLowerCase();
+    if (!q) return completedChatRooms.length;
+    return completedChatRooms.filter((room: any) => matchesRoomSearch(room, q)).length;
+  }, [completedChatRooms, chatSearch]);
 
   const unreadRoomsCount = useMemo(
     () => activeChatRooms.filter((r: any) => r.unreadCount > 0).length,
@@ -245,9 +255,10 @@ const Dashboard: React.FC = () => {
     if (!selectedRoom) return null;
     return (
       activeChatRooms.find((r: any) => String(r.projectId) === String(selectedRoom.projectId)) ||
+      completedChatRooms.find((r: any) => String(r.projectId) === String(selectedRoom.projectId)) ||
       selectedRoom
     );
-  }, [selectedRoom, activeChatRooms]);
+  }, [selectedRoom, activeChatRooms, completedChatRooms]);
 
   return (
     <Box sx={{ pb: 6 }}>
@@ -547,7 +558,7 @@ const Dashboard: React.FC = () => {
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
                 {totalUnreadMessages > 0
                   ? `${unreadRoomsCount} ${unreadRoomsCount === 1 ? 'room has' : 'rooms have'} unread messages`
-                  : 'Active client & team chat rooms'}
+                  : `Active work orders${completedChatRooms.length > 0 ? ` • ${completedChatRooms.length} completed saved` : ''}`}
               </Typography>
             </Box>
 
@@ -609,17 +620,63 @@ const Dashboard: React.FC = () => {
                 Unnati Chat
               </Typography>
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500 }}>
-                Live team coordination with read receipts • Completed orders hidden automatically (chats stay saved)
+                Live Work Orders & saved Completed Order chats • Blue-tick read receipts
               </Typography>
             </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              flexWrap: 'wrap',
+              flex: { xs: '1 1 100%', md: '0 1 auto' },
+              justifyContent: 'flex-end'
+            }}
+          >
+            <TextField
+              size="small"
+              placeholder="Search client, order code, or message..."
+              value={chatSearch}
+              onChange={(e) => setChatSearch(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon sx={{ fontSize: 18, color: '#64748B' }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: chatSearch ? (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setChatSearch('')}>
+                        <ClearRoundedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </InputAdornment>
+                  ) : undefined
+                }
+              }}
+              sx={{
+                width: { xs: '100%', sm: 250, md: 280 },
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: '#FFFFFF',
+                  borderRadius: 2.5,
+                  fontSize: '0.82rem',
+                  height: 36,
+                  '& fieldset': { borderColor: '#CBD5E1' },
+                  '&:hover fieldset': { borderColor: '#94A3B8' },
+                  '&.Mui-focused fieldset': { borderColor: '#075E54' }
+                }
+              }}
+            />
+
             {totalUnreadMessages > 0 && (
               <Chip
                 icon={<MarkChatUnreadRoundedIcon sx={{ fontSize: '15px !important', color: '#FFFFFF !important' }} />}
                 label={`${totalUnreadMessages} Unread`}
                 size="small"
+                clickable
+                onClick={() => setChatFilter('unread')}
                 sx={{
                   bgcolor: '#25D366',
                   color: '#FFFFFF',
@@ -630,14 +687,29 @@ const Dashboard: React.FC = () => {
             )}
             <Chip
               icon={<FiberManualRecordIcon sx={{ fontSize: 10, color: '#10B981 !important' }} />}
-              label={`${activeChatRooms.length} Active Rooms`}
+              label={`${activeChatRooms.length} Active`}
               size="small"
+              clickable
+              onClick={() => setChatFilter('active')}
               sx={{
-                bgcolor: '#ECFDF5',
+                bgcolor: chatFilter === 'active' ? '#D1FAE5' : '#ECFDF5',
                 color: '#065F46',
                 fontWeight: 700,
                 fontSize: '0.75rem',
-                border: '1px solid #A7F3D0'
+                border: chatFilter === 'active' ? '1.5px solid #059669' : '1px solid #A7F3D0'
+              }}
+            />
+            <Chip
+              label={`${completedChatRooms.length} Completed`}
+              size="small"
+              clickable
+              onClick={() => setChatFilter('completed')}
+              sx={{
+                bgcolor: chatFilter === 'completed' ? '#334155' : '#F1F5F9',
+                color: chatFilter === 'completed' ? '#FFFFFF' : '#475569',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                border: chatFilter === 'completed' ? '1.5px solid #1E293B' : '1px solid #CBD5E1'
               }}
             />
             <Tooltip title="Close Unnati Chat">
@@ -682,53 +754,19 @@ const Dashboard: React.FC = () => {
               bgcolor: '#FFFFFF'
             }}
           >
-            {/* Search & Unread Filter */}
-            <Box sx={{ p: 1.35, borderBottom: '1px solid #F1F5F9', bgcolor: '#FFFFFF' }}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search client or order ID..."
-                value={chatSearch}
-                onChange={(e) => setChatSearch(e.target.value)}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchRoundedIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: chatSearch ? (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setChatSearch('')}>
-                          <ClearRoundedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </InputAdornment>
-                    ) : undefined
-                  }
-                }}
-                sx={{
-                  mb: 1,
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: '#F0F2F5',
-                    borderRadius: 2.5,
-                    fontSize: '0.84rem',
-                    '& fieldset': { borderColor: 'transparent' },
-                    '&.Mui-focused fieldset': { borderColor: '#128C7E' }
-                  }
-                }}
-              />
-
-              <Box sx={{ display: 'flex', gap: 0.75 }}>
+            {/* Filter Tabs: Active / Unread / Completed */}
+            <Box sx={{ px: 1.35, py: 1.1, borderBottom: '1px solid #F1F5F9', bgcolor: '#FFFFFF' }}>
+              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
                 <Chip
-                  label={`All (${activeChatRooms.length})`}
+                  label={`Active (${activeChatRooms.length})`}
                   size="small"
                   clickable
-                  onClick={() => setChatFilter('all')}
+                  onClick={() => setChatFilter('active')}
                   sx={{
                     fontWeight: 700,
                     fontSize: '0.72rem',
-                    bgcolor: chatFilter === 'all' ? '#075E54' : '#F1F5F9',
-                    color: chatFilter === 'all' ? '#FFFFFF' : '#475569'
+                    bgcolor: chatFilter === 'active' ? '#075E54' : '#F1F5F9',
+                    color: chatFilter === 'active' ? '#FFFFFF' : '#475569'
                   }}
                 />
                 <Chip
@@ -741,6 +779,18 @@ const Dashboard: React.FC = () => {
                     fontSize: '0.72rem',
                     bgcolor: chatFilter === 'unread' ? '#25D366' : '#F1F5F9',
                     color: chatFilter === 'unread' ? '#FFFFFF' : '#475569'
+                  }}
+                />
+                <Chip
+                  label={`Completed (${completedChatRooms.length})`}
+                  size="small"
+                  clickable
+                  onClick={() => setChatFilter('completed')}
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '0.72rem',
+                    bgcolor: chatFilter === 'completed' ? '#334155' : '#F1F5F9',
+                    color: chatFilter === 'completed' ? '#FFFFFF' : '#475569'
                   }}
                 />
               </Box>
@@ -758,11 +808,31 @@ const Dashboard: React.FC = () => {
                 <Box sx={{ p: 4, textAlign: 'center', color: '#64748B' }}>
                   <ForumRoundedIcon sx={{ fontSize: 34, color: '#CBD5E1', mb: 1 }} />
                   <Typography variant="body2" sx={{ fontWeight: 700, color: '#475569' }}>
-                    {chatFilter === 'unread' ? 'No unread client chats' : 'No matching active rooms'}
+                    {chatFilter === 'unread'
+                      ? 'No unread client chats'
+                      : chatFilter === 'completed'
+                      ? 'No matching completed orders'
+                      : 'No matching active rooms'}
                   </Typography>
                   <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                    Completed orders are automatically archived out of active chat rooms.
+                    {chatFilter === 'completed'
+                      ? 'All completed order chats stay permanently saved here.'
+                      : 'Completed orders can be viewed anytime from the Completed tab.'}
                   </Typography>
+                  {chatFilter !== 'completed' && chatSearch.trim() && completedSearchMatches > 0 && (
+                    <Chip
+                      label={`View ${completedSearchMatches} in Completed`}
+                      size="small"
+                      clickable
+                      onClick={() => setChatFilter('completed')}
+                      sx={{
+                        mt: 1.5,
+                        fontWeight: 700,
+                        bgcolor: '#334155',
+                        color: '#FFFFFF'
+                      }}
+                    />
+                  )}
                 </Box>
               ) : (
                 filteredChatRooms.map((room: any) => {
@@ -812,7 +882,7 @@ const Dashboard: React.FC = () => {
                           height: 44,
                           fontWeight: 800,
                           fontSize: '0.95rem',
-                          bgcolor: room.unreadCount > 0 ? '#075E54' : '#C89F5A',
+                          bgcolor: room.isCompleted ? '#64748B' : room.unreadCount > 0 ? '#075E54' : '#C89F5A',
                           color: '#FFFFFF',
                           flexShrink: 0
                         }}
@@ -822,17 +892,33 @@ const Dashboard: React.FC = () => {
 
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                          <Typography
-                            variant="subtitle2"
-                            noWrap
-                            sx={{
-                              fontWeight: room.unreadCount > 0 ? 900 : 700,
-                              color: '#111B21',
-                              fontSize: '0.89rem'
-                            }}
-                          >
-                            {displayName}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.65, minWidth: 0 }}>
+                            <Typography
+                              variant="subtitle2"
+                              noWrap
+                              sx={{
+                                fontWeight: room.unreadCount > 0 ? 900 : 700,
+                                color: '#111B21',
+                                fontSize: '0.89rem'
+                              }}
+                            >
+                              {displayName}
+                            </Typography>
+                            {room.isCompleted && (
+                              <Chip
+                                label="Completed"
+                                size="small"
+                                sx={{
+                                  height: 17,
+                                  fontSize: '0.6rem',
+                                  fontWeight: 700,
+                                  bgcolor: '#E2E8F0',
+                                  color: '#475569',
+                                  flexShrink: 0
+                                }}
+                              />
+                            )}
+                          </Box>
                           <Typography
                             variant="caption"
                             sx={{
@@ -934,7 +1020,7 @@ const Dashboard: React.FC = () => {
                 slabId={currentSelectedRoom.slabId || currentSelectedRoom.projectId}
                 projectId={currentSelectedRoom.projectId}
                 title={currentSelectedRoom.clientName || currentSelectedRoom.projectName}
-                subtitle={`${currentSelectedRoom.workOrderId ? `[${currentSelectedRoom.workOrderId}] ` : ''}${currentSelectedRoom.projectName || ''}`}
+                subtitle={`${currentSelectedRoom.workOrderId ? `[${currentSelectedRoom.workOrderId}] ` : ''}${currentSelectedRoom.projectName || ''}${currentSelectedRoom.isCompleted ? ' • Completed Order (Saved Chat)' : ''}`}
                 avatarPhoto={currentSelectedRoom.customerPhoto}
                 isActive={isUnnatiChatOpen && Boolean(currentSelectedRoom)}
                 onClose={() => setSelectedRoom(null)}

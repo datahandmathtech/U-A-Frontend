@@ -34,7 +34,7 @@ const Layout: React.FC = () => {
     // Route alias mapping so subroutes and complementary views are never blocked
     const ROUTE_ALIASES: Record<string, string[]> = {
       '/': ['/live-feed', '/log-book', '/pieces'],
-      '/projects': ['/crm', '/projects', '/pieces', '/log-book', '/live-feed', '/approvals', '/in-out-ledger'],
+      '/projects': ['/crm', '/projects', '/pieces', '/log-book', '/live-feed', '/in-out-ledger'],
       '/crm': ['/crm', '/projects', '/pieces'],
       '/in-out-ledger': ['/in-out-ledger', '/vendors', '/vendor-ledger'],
       '/inventory': ['/inventory', '/waste-ledger'],

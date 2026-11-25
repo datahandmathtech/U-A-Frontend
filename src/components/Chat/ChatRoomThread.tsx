@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   IconButton,
+  InputAdornment,
   Paper,
   TextField,
   Tooltip,
@@ -22,6 +23,7 @@ import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import { useSelector } from 'react-redux';
 import {
   useGetProductChatQuery,
@@ -114,6 +116,8 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
   const [messageText, setMessageText] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [messageSearch, setMessageSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -142,9 +146,11 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
     }
   }, [messages.length, isActive, slabId]);
 
-  // Reset mark-read key when switching rooms
+  // Reset mark-read key and message search when switching rooms
   useEffect(() => {
     lastMarkedRef.current = '';
+    setIsSearchOpen(false);
+    setMessageSearch('');
   }, [slabId]);
 
   // Mark room messages as read ONLY when actively viewed by current user
@@ -214,16 +220,26 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
     }
   };
 
-  // Group messages with date divider tags
+  const normalizedMessageSearch = messageSearch.trim().toLowerCase();
+  const visibleMessages = useMemo(() => {
+    if (!normalizedMessageSearch) return messages;
+    return messages.filter((msg: any) => {
+      const text = String(msg.message || '').toLowerCase();
+      const sender = String(msg.senderName || '').toLowerCase();
+      return text.includes(normalizedMessageSearch) || sender.includes(normalizedMessageSearch);
+    });
+  }, [messages, normalizedMessageSearch]);
+
+  // Group visible messages with date divider tags
   const renderedTimeline = useMemo(() => {
     let lastDateStr = '';
-    return messages.map((msg: any) => {
+    return visibleMessages.map((msg: any) => {
       const dayLabel = formatDateSeparator(msg.createdAt);
       const showDayDivider = dayLabel && dayLabel !== lastDateStr;
       if (dayLabel) lastDateStr = dayLabel;
       return { msg, showDayDivider, dayLabel };
     });
-  }, [messages]);
+  }, [visibleMessages]);
 
   return (
     <Box
@@ -287,6 +303,24 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+          <Tooltip title={isSearchOpen ? 'Hide Message Search' : 'Search Messages'}>
+            <IconButton
+              size="small"
+              onClick={() => {
+                setIsSearchOpen((prev) => {
+                  if (prev) setMessageSearch('');
+                  return !prev;
+                });
+              }}
+              sx={{
+                color: '#FFFFFF',
+                bgcolor: isSearchOpen ? 'rgba(255,255,255,0.22)' : 'transparent',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.16)' }
+              }}
+            >
+              <SearchRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           {onOpenOrder && (
             <Tooltip title="Open Order Workspace">
               <Button
@@ -318,6 +352,69 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
         </Box>
       </Box>
 
+      {/* Optional In-Conversation Message Search Strip */}
+      {isSearchOpen && (
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            bgcolor: '#F8FAFC',
+            borderBottom: '1px solid #E2E8F0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            flexShrink: 0
+          }}
+        >
+          <TextField
+            fullWidth
+            size="small"
+            autoFocus
+            placeholder="Search messages or sender name in this chat..."
+            value={messageSearch}
+            onChange={(e) => setMessageSearch(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchRoundedIcon sx={{ fontSize: 17, color: '#64748B' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: messageSearch ? (
+                  <InputAdornment position="end">
+                    <Typography variant="caption" sx={{ color: '#075E54', fontWeight: 700, mr: 0.75 }}>
+                      {visibleMessages.length} found
+                    </Typography>
+                    <IconButton size="small" onClick={() => setMessageSearch('')}>
+                      <CloseRoundedIcon sx={{ fontSize: 15 }} />
+                    </IconButton>
+                  </InputAdornment>
+                ) : undefined
+              }
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                bgcolor: '#FFFFFF',
+                borderRadius: 2,
+                fontSize: '0.82rem',
+                '& fieldset': { borderColor: '#CBD5E1' },
+                '&.Mui-focused fieldset': { borderColor: '#075E54' }
+              }
+            }}
+          />
+          <IconButton
+            size="small"
+            onClick={() => {
+              setIsSearchOpen(false);
+              setMessageSearch('');
+            }}
+            sx={{ color: '#64748B' }}
+          >
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      )}
+
       {/* Scrollable WhatsApp Chat Wallpaper Body */}
       <Box
         sx={{
@@ -339,7 +436,7 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
             <CircularProgress size={30} sx={{ color: '#075E54' }} />
           </Box>
-        ) : messages.length === 0 ? (
+        ) : visibleMessages.length === 0 ? (
           <Box
             sx={{
               m: 'auto',
@@ -353,10 +450,12 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
           >
             <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 38, color: '#128C7E', mb: 1 }} />
             <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B', mb: 0.5 }}>
-              No messages yet
+              {normalizedMessageSearch ? 'No matching messages' : 'No messages yet'}
             </Typography>
             <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
-              Start the conversation below. Messages stay permanently saved and notify every active team member until seen.
+              {normalizedMessageSearch
+                ? `No messages or senders matched "${messageSearch.trim()}" in this order.`
+                : 'Start the conversation below. Messages stay permanently saved and notify every active team member until seen.'}
             </Typography>
           </Box>
         ) : (
