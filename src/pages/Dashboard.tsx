@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
   Typography,
@@ -11,32 +11,70 @@ import {
   Card,
   Avatar,
   CircularProgress,
-  Skeleton
+  Skeleton,
+  TextField,
+  InputAdornment,
+  IconButton,
+  Tooltip,
+  Dialog,
+  Badge
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
 // Icons
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
-import MonetizationOnRoundedIcon from '@mui/icons-material/MonetizationOnRounded';
 import LocalShippingRoundedIcon from '@mui/icons-material/LocalShippingRounded';
-import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
-import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
-import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
-import LiveTvRoundedIcon from '@mui/icons-material/LiveTvRounded';
 import FilterAltRoundedIcon from '@mui/icons-material/FilterAltRounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import LayersRoundedIcon from '@mui/icons-material/LayersRounded';
 import BuildCircleRoundedIcon from '@mui/icons-material/BuildCircleRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded';
+import MarkChatUnreadRoundedIcon from '@mui/icons-material/MarkChatUnreadRounded';
+import LockRoundedIcon from '@mui/icons-material/LockRounded';
+import ClearRoundedIcon from '@mui/icons-material/ClearRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 
-import { useGetDashboardSummaryQuery, useGetProjectsQuery } from '../store/apiSlice';
-import ProductChatAlerts from '../components/Dashboard/ProductChatAlerts';
-import { ProductChatDrawer } from '../components/Production/ProductChatDrawer';
+import {
+  useGetChatRoomsSummaryQuery,
+  useGetDashboardSummaryQuery,
+  useGetProjectsQuery
+} from '../store/apiSlice';
+import ChatRoomThread from '../components/Chat/ChatRoomThread';
+import { calculateOrderProgress } from '../utils/progressCalculator';
+
+const MONTH_NAME_MAP: Record<number, string> = {
+  0: 'January',
+  1: 'February',
+  2: 'March',
+  3: 'April',
+  4: 'May',
+  5: 'June',
+  6: 'July',
+  7: 'August',
+  8: 'September',
+  9: 'October',
+  10: 'November',
+  11: 'December'
+};
+
+const formatRoomTimestamp = (dt?: string | null) => {
+  if (!dt) return '';
+  const d = new Date(dt);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+};
 
 interface DashboardCardProps {
   icon: any;
@@ -111,20 +149,105 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
 );
 
 const Dashboard: React.FC = () => {
+  const currentUser = useSelector((state: any) => state.auth.user);
+  const currentUserId = currentUser?.id ? String(currentUser.id) : '';
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
-  const currentFY = currentMonth >= 3 ? `${currentYear}-${currentYear + 1}` : `${currentYear - 1}-${currentYear}`;
+  const currentFyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+  const currentFY = `${currentFyStartYear}-${currentFyStartYear + 1}`;
+  const fyOptions = [
+    `${currentFyStartYear - 2}-${currentFyStartYear - 1}`,
+    `${currentFyStartYear - 1}-${currentFyStartYear}`,
+    currentFY,
+    `${currentFyStartYear + 1}-${currentFyStartYear + 2}`
+  ];
 
   const [selectedFY, setSelectedFY] = useState<string>(currentFY);
-  const [selectedMonth, setSelectedMonth] = useState<number | ''>('');
+  // Default automatically to the current calendar month (updates dynamically across months & financial years)
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
+  const [chatSearch, setChatSearch] = useState('');
+  const [chatFilter, setChatFilter] = useState<'all' | 'unread'>('all');
+  const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
+  const [isUnnatiChatOpen, setIsUnnatiChatOpen] = useState(false);
 
   const { data: summary, isLoading, isFetching } = useGetDashboardSummaryQuery(
     { fy: selectedFY, month: selectedMonth },
     { refetchOnFocus: false }
   );
   const { data: projects = [], isLoading: isProjectsLoading } = useGetProjectsQuery();
-  const [selectedChatProject, setSelectedChatProject] = useState<any>(null);
+  const { data: chatRoomsData, isLoading: isChatRoomsLoading } = useGetChatRoomsSummaryQuery(undefined, {
+    pollingInterval: 10000
+  });
   const navigate = useNavigate();
+
+  const selectedMonthLabel = MONTH_NAME_MAP[Number(selectedMonth)] || 'Current Month';
+
+  // Hide completed / closed / 100%-done / non-active orders from active Chat Rooms & unread popups while preserving DB history
+  const completedProjectIds = useMemo(() => {
+    const activeStatuses = new Set([
+      'pending',
+      'enquiry',
+      'design_sharing',
+      'quotation',
+      'advance_payment',
+      'shop_drawing',
+      'material_planning',
+      'production',
+      'work_order'
+    ]);
+    const completedSet = new Set<string>();
+    for (const p of projects as any[]) {
+      const { overallProgressPercent, totalProductRows } = calculateOrderProgress(p);
+      const st = String(p.status || '').trim().toLowerCase();
+      const isDone =
+        !activeStatuses.has(st) ||
+        p.hasChatRoom === false ||
+        p.isClosed === true ||
+        Boolean(p.projectClosure) ||
+        Number(p.progressPercentage) >= 100 ||
+        (totalProductRows > 0 && overallProgressPercent >= 100);
+      if (isDone) completedSet.add(String(p.id));
+    }
+    return completedSet;
+  }, [projects]);
+
+  const activeChatRooms = useMemo(() => {
+    const rooms = chatRoomsData?.rooms || [];
+    return rooms.filter((r: any) => !completedProjectIds.has(String(r.projectId)));
+  }, [chatRoomsData, completedProjectIds]);
+
+  const filteredChatRooms = useMemo(() => {
+    const q = chatSearch.trim().toLowerCase();
+    return activeChatRooms.filter((room: any) => {
+      if (chatFilter === 'unread' && !(room.unreadCount > 0)) return false;
+      if (!q) return true;
+      return (
+        (room.clientName || '').toLowerCase().includes(q) ||
+        (room.projectName || '').toLowerCase().includes(q) ||
+        (room.workOrderId || '').toLowerCase().includes(q) ||
+        (room.lastMessage || '').toLowerCase().includes(q)
+      );
+    });
+  }, [activeChatRooms, chatSearch, chatFilter]);
+
+  const unreadRoomsCount = useMemo(
+    () => activeChatRooms.filter((r: any) => r.unreadCount > 0).length,
+    [activeChatRooms]
+  );
+
+  const totalUnreadMessages = useMemo(
+    () => activeChatRooms.reduce((sum: number, r: any) => sum + (Number(r.unreadCount) || 0), 0),
+    [activeChatRooms]
+  );
+
+  // Keep selectedRoom metadata synchronized with live room updates without auto-selecting on initial load
+  const currentSelectedRoom = useMemo(() => {
+    if (!selectedRoom) return null;
+    return (
+      activeChatRooms.find((r: any) => String(r.projectId) === String(selectedRoom.projectId)) ||
+      selectedRoom
+    );
+  }, [selectedRoom, activeChatRooms]);
 
   return (
     <Box sx={{ pb: 6 }}>
@@ -178,27 +301,27 @@ const Dashboard: React.FC = () => {
               '& .MuiSelect-select': { py: 1, px: 1.5 }
             }}
           >
-            <MenuItem value="2024-2025">FY 2024-2025</MenuItem>
-            <MenuItem value="2025-2026">FY 2025-2026</MenuItem>
-            <MenuItem value="2026-2027">FY 2026-2027</MenuItem>
-            <MenuItem value="2027-2028">FY 2027-2028</MenuItem>
+            {fyOptions.map((fyOpt) => (
+              <MenuItem key={fyOpt} value={fyOpt}>
+                FY {fyOpt}
+              </MenuItem>
+            ))}
           </Select>
 
           <Select
             size="small"
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value as number | '')}
-            displayEmpty
+            onChange={(e) => setSelectedMonth(Number(e.target.value))}
             IconComponent={KeyboardArrowDownIcon}
             sx={{
               bgcolor: '#FFFFFF',
               borderRadius: 2.5,
+              fontWeight: 600,
               minWidth: 140,
               '& fieldset': { borderColor: '#E2E8F0' },
               '& .MuiSelect-select': { py: 1, px: 1.5 }
             }}
           >
-            <MenuItem value="">Full Year</MenuItem>
             <MenuItem value={3}>April</MenuItem>
             <MenuItem value={4}>May</MenuItem>
             <MenuItem value={5}>June</MenuItem>
@@ -212,31 +335,15 @@ const Dashboard: React.FC = () => {
             <MenuItem value={1}>February</MenuItem>
             <MenuItem value={2}>March</MenuItem>
           </Select>
-
-          <Button
-            variant="contained"
-            startIcon={<LiveTvRoundedIcon />}
-            onClick={() => navigate('/live-feed')}
-            sx={{
-              bgcolor: '#1E293B',
-              color: '#FFFFFF',
-              fontWeight: 700,
-              borderRadius: 2.5,
-              px: 2,
-              textTransform: 'none',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              '&:hover': { bgcolor: '#0F172A' }
-            }}
-          >
-            Factory Cam
-          </Button>
         </Box>
       </Box>
 
-      {/* Product Chat Alerts for Admin */}
-      <ProductChatAlerts />
-
-      {/* 2. Primary KPI Metric Cards (Matching Executive Dashboard Reference Image Exactly) */}
+      {/* 2. Top 4 Cards: Yearly Order & Workflow Metrics (Selected Financial Year) */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.25 }}>
+        <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', letterSpacing: 0.7, textTransform: 'uppercase' }}>
+          Yearly Order &amp; Workflow Metrics (FY {selectedFY})
+        </Typography>
+      </Box>
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         {/* Card 1: Total Enquiries */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -244,7 +351,7 @@ const Dashboard: React.FC = () => {
             icon={FilterAltRoundedIcon}
             title="TOTAL ENQUIRIES"
             value={summary?.totalLeads ?? 0}
-            subtitle="Active pipeline leads"
+            subtitle={`Leads in FY ${selectedFY}`}
             colorHint="#6366F1"
             bgHint="#EEF2FF"
             borderHint="#C7D2FE"
@@ -258,7 +365,7 @@ const Dashboard: React.FC = () => {
             icon={DashboardRoundedIcon}
             title="ACTIVE WORK ORDERS"
             value={summary?.activeProjects ?? 0}
-            subtitle="Live production orders"
+            subtitle={`Live orders (FY ${selectedFY})`}
             colorHint="#C89F5A"
             bgHint="#FFF4E5"
             borderHint="#FFE0B2"
@@ -272,7 +379,7 @@ const Dashboard: React.FC = () => {
             icon={CheckCircleRoundedIcon}
             title="COMPLETED ORDERS"
             value={summary?.completedProjects ?? 0}
-            subtitle="Orders fully processed & closed"
+            subtitle={`Closed in FY ${selectedFY}`}
             colorHint="#0284C7"
             bgHint="#F0F9FF"
             borderHint="#BAE6FD"
@@ -286,7 +393,7 @@ const Dashboard: React.FC = () => {
             icon={LayersRoundedIcon}
             title="TOTAL ORDERS"
             value={summary?.totalOrders ?? summary?.totalProjects ?? 0}
-            subtitle="All orders for selected period"
+            subtitle={`All orders in FY ${selectedFY}`}
             colorHint="#059669"
             bgHint="#ECFDF5"
             borderHint="#A7F3D0"
@@ -295,15 +402,20 @@ const Dashboard: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* 3. Secondary KPI & Ledger Operations Strip */}
+      {/* 3. Bottom 4 Cards: Monthly Operations & Cash Summary (Selected Month) */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.25 }}>
+        <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', letterSpacing: 0.7, textTransform: 'uppercase' }}>
+          Monthly Operations &amp; Cash Summary ({selectedMonthLabel})
+        </Typography>
+      </Box>
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
-        {/* Card 5: Petty Book Cash in Hand */}
+        {/* Card 5: Petty Book Cash in Hand (Month) */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <DashboardCard
             icon={AccountBalanceWalletRoundedIcon}
             title="PETTY BOOK CASH IN HAND"
             value={`₹${(Number(summary?.pettyCashInHand) || 0).toLocaleString('en-IN')}`}
-            subtitle="Available petty cash balance"
+            subtitle={`Cash Book net (${selectedMonthLabel})`}
             colorHint="#10B981"
             bgHint="#ECFDF5"
             borderHint="#A7F3D0"
@@ -311,13 +423,13 @@ const Dashboard: React.FC = () => {
           />
         </Grid>
 
-        {/* Card 6: Material Outward for Month */}
+        {/* Card 6: Material Outward (Month) */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <DashboardCard
             icon={LocalShippingRoundedIcon}
             title="MATERIAL OUTWARD FOR MONTH"
             value={`${(Number(summary?.materialOutwardMonth) || 0).toLocaleString('en-IN')} Pcs`}
-            subtitle="Material pieces issued to production (this month)"
+            subtitle={`From In/Out Ledger (${selectedMonthLabel})`}
             colorHint="#EA580C"
             bgHint="#FFF7ED"
             borderHint="#FFEDD5"
@@ -325,13 +437,13 @@ const Dashboard: React.FC = () => {
           />
         </Grid>
 
-        {/* Card 7: Factory Expenses */}
+        {/* Card 7: Factory Expenses (Month) */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <DashboardCard
             icon={BuildCircleRoundedIcon}
             title="FACTORY EXPENSES"
             value={`₹${(Number(summary?.factoryExpenses) || 0).toLocaleString('en-IN')}`}
-            subtitle="Operational & maintenance costs"
+            subtitle={`Expenses & Maintenance (${selectedMonthLabel})`}
             colorHint="#EF4444"
             bgHint="#FEF2F2"
             borderHint="#FECACA"
@@ -339,13 +451,13 @@ const Dashboard: React.FC = () => {
           />
         </Grid>
 
-        {/* Card 8: Material Inward for Month */}
+        {/* Card 8: Material Inward (Month) */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <DashboardCard
             icon={Inventory2RoundedIcon}
             title="MATERIAL INWARD FOR MONTH"
             value={`${(Number(summary?.materialInwardMonth) || 0).toLocaleString('en-IN')} Pcs`}
-            subtitle="Material pieces received in factory (this month)"
+            subtitle={`From In/Out Ledger (${selectedMonthLabel})`}
             colorHint="#D97706"
             bgHint="#FFFBEB"
             borderHint="#FDE68A"
@@ -354,213 +466,532 @@ const Dashboard: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* 4. Chat Rooms Section (Replaced Factory Modules Overview as per user requirement) */}
-      <Paper
-        elevation={0}
-        sx={{
-          p: 3,
-          borderRadius: 4,
-          bgcolor: '#FFFFFF',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      {/* 4. Compact Unnati Chat Launcher Box (Opens WhatsApp-Style Chat Popup on Click) */}
+      <Grid container spacing={2.5}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card
+            onClick={() => setIsUnnatiChatOpen(true)}
+            sx={{
+              p: 2.5,
+              borderRadius: 3.5,
+              bgcolor: '#FFFFFF',
+              border: totalUnreadMessages > 0 ? '1.5px solid #25D366' : '1.5px solid #A7F3D0',
+              boxShadow:
+                totalUnreadMessages > 0
+                  ? '0 6px 20px rgba(37, 211, 102, 0.16)'
+                  : '0 4px 14px rgba(7, 94, 84, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              userSelect: 'none',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                transform: 'translateY(-3px)',
+                borderColor: '#075E54',
+                boxShadow: '0 10px 24px rgba(7, 94, 84, 0.16)'
+              }
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 800,
+                    color: '#075E54',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.6,
+                    fontSize: '0.78rem'
+                  }}
+                >
+                  Unnati Chat
+                </Typography>
+                {totalUnreadMessages > 0 && (
+                  <Chip
+                    label={`${totalUnreadMessages} New`}
+                    size="small"
+                    sx={{
+                      height: 19,
+                      fontSize: '0.67rem',
+                      fontWeight: 800,
+                      bgcolor: '#25D366',
+                      color: '#FFFFFF'
+                    }}
+                  />
+                )}
+              </Box>
+              <Badge
+                badgeContent={totalUnreadMessages}
+                max={99}
+                sx={{
+                  '& .MuiBadge-badge': {
+                    bgcolor: '#25D366',
+                    color: '#FFFFFF',
+                    fontWeight: 800,
+                    fontSize: '0.68rem',
+                    border: '2px solid #FFFFFF'
+                  }
+                }}
+              >
+                <Avatar sx={{ bgcolor: '#075E54', color: '#FFFFFF', width: 38, height: 38 }}>
+                  <ForumRoundedIcon sx={{ fontSize: 20 }} />
+                </Avatar>
+              </Badge>
+            </Box>
+
+            <Box sx={{ mb: 1.25 }}>
+              <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.1 }}>
+                {isChatRoomsLoading ? '...' : activeChatRooms.length}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
+                {totalUnreadMessages > 0
+                  ? `${unreadRoomsCount} ${unreadRoomsCount === 1 ? 'room has' : 'rooms have'} unread messages`
+                  : 'Active client & team chat rooms'}
+              </Typography>
+            </Box>
+
             <Box
               sx={{
-                width: 38,
-                height: 38,
-                borderRadius: '50%',
-                bgcolor: '#FFF4E5',
-                color: '#C89F5A',
+                pt: 1.15,
+                borderTop: '1px solid #F1F5F9',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid #FFE0B2'
+                justifyContent: 'space-between'
               }}
             >
-              <ForumRoundedIcon sx={{ fontSize: 20 }} />
-            </Box>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', lineHeight: 1.2 }}>
-                Chat Rooms
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#075E54', fontSize: '0.76rem' }}>
+                Open Chat Box
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748B' }}>
-                Client-wise discussion groups for lead follow-up, production updates and coordination.
+              <ArrowForwardRoundedIcon sx={{ fontSize: 17, color: '#075E54' }} />
+            </Box>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Unnati Chat Modal Dialog (Opens when user clicks the compact Unnati Chat box or alert) */}
+      <Dialog
+        open={isUnnatiChatOpen}
+        onClose={() => setIsUnnatiChatOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 4,
+              overflow: 'hidden',
+              bgcolor: '#FFFFFF',
+              boxShadow: '0 24px 60px rgba(15, 23, 42, 0.25)'
+            }
+          }
+        }}
+      >
+        {/* Top Container Bar */}
+        <Box
+          sx={{
+            px: 2.5,
+            py: 1.5,
+            bgcolor: '#F8FAFC',
+            borderBottom: '1px solid #E2E8F0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 1.5
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar sx={{ bgcolor: '#075E54', color: '#FFFFFF', width: 38, height: 38 }}>
+              <ForumRoundedIcon sx={{ fontSize: 20 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2, fontSize: '1.05rem' }}>
+                Unnati Chat
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500 }}>
+                Live team coordination with read receipts • Completed orders hidden automatically (chats stay saved)
               </Typography>
             </Box>
           </Box>
-          <Chip
-            icon={<FiberManualRecordIcon sx={{ fontSize: 10, color: '#10B981 !important' }} />}
-            label={`${projects.filter((p: any) => p.hasChatRoom !== false).length} Active Client Rooms`}
-            size="small"
-            sx={{
-              bgcolor: '#ECFDF5',
-              color: '#065F46',
-              fontWeight: 700,
-              fontSize: '0.75rem',
-              border: '1px solid #A7F3D0'
-            }}
-          />
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {totalUnreadMessages > 0 && (
+              <Chip
+                icon={<MarkChatUnreadRoundedIcon sx={{ fontSize: '15px !important', color: '#FFFFFF !important' }} />}
+                label={`${totalUnreadMessages} Unread`}
+                size="small"
+                sx={{
+                  bgcolor: '#25D366',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.75rem'
+                }}
+              />
+            )}
+            <Chip
+              icon={<FiberManualRecordIcon sx={{ fontSize: 10, color: '#10B981 !important' }} />}
+              label={`${activeChatRooms.length} Active Rooms`}
+              size="small"
+              sx={{
+                bgcolor: '#ECFDF5',
+                color: '#065F46',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                border: '1px solid #A7F3D0'
+              }}
+            />
+            <Tooltip title="Close Unnati Chat">
+              <IconButton
+                size="small"
+                onClick={() => setIsUnnatiChatOpen(false)}
+                sx={{
+                  bgcolor: '#F1F5F9',
+                  color: '#475569',
+                  '&:hover': { bgcolor: '#E2E8F0', color: '#0F172A' }
+                }}
+              >
+                <CloseRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
 
-        {isProjectsLoading ? (
-          <Grid container spacing={2}>
-            {[1, 2, 3, 4, 5, 6].map((k) => (
-              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={k}>
-                <Skeleton variant="rounded" height={130} sx={{ borderRadius: 3 }} />
-              </Grid>
-            ))}
-          </Grid>
-        ) : projects.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: 'center', color: '#64748B' }}>
-            <Typography variant="body2">No client projects found yet. Create an enquiry to start a chat room.</Typography>
-          </Box>
-        ) : (
-          <Grid container spacing={2}>
-            {projects
-              .filter((p: any) => p.hasChatRoom !== false)
-              .map((project: any) => {
-                const displayName = project.clientName || project.name || 'Unnamed Client';
-                const initial = displayName.charAt(0).toUpperCase();
-                const isWorkOrder = project.status === 'work_order' || project.isDirectWorkOrder;
-                return (
-                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={project.id}>
-                    <Paper
-                      elevation={0}
+        {/* Contained Split-Pane WhatsApp Layout */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            height: { xs: '78vh', md: 580 },
+            maxHeight: '80vh',
+            width: '100%'
+          }}
+        >
+          {/* Left Pane: Searchable Client / Work Order List */}
+          <Box
+            sx={{
+              width: { xs: '100%', md: 350, lg: 380 },
+              flexShrink: 0,
+              borderRight: { md: '1px solid #E2E8F0' },
+              borderBottom: { xs: '1px solid #E2E8F0', md: 'none' },
+              display: {
+                xs: currentSelectedRoom ? 'none' : 'flex',
+                md: 'flex'
+              },
+              flexDirection: 'column',
+              height: '100%',
+              bgcolor: '#FFFFFF'
+            }}
+          >
+            {/* Search & Unread Filter */}
+            <Box sx={{ p: 1.35, borderBottom: '1px solid #F1F5F9', bgcolor: '#FFFFFF' }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search client or order ID..."
+                value={chatSearch}
+                onChange={(e) => setChatSearch(e.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: chatSearch ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setChatSearch('')}>
+                          <ClearRoundedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : undefined
+                  }
+                }}
+                sx={{
+                  mb: 1,
+                  '& .MuiOutlinedInput-root': {
+                    bgcolor: '#F0F2F5',
+                    borderRadius: 2.5,
+                    fontSize: '0.84rem',
+                    '& fieldset': { borderColor: 'transparent' },
+                    '&.Mui-focused fieldset': { borderColor: '#128C7E' }
+                  }
+                }}
+              />
+
+              <Box sx={{ display: 'flex', gap: 0.75 }}>
+                <Chip
+                  label={`All (${activeChatRooms.length})`}
+                  size="small"
+                  clickable
+                  onClick={() => setChatFilter('all')}
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '0.72rem',
+                    bgcolor: chatFilter === 'all' ? '#075E54' : '#F1F5F9',
+                    color: chatFilter === 'all' ? '#FFFFFF' : '#475569'
+                  }}
+                />
+                <Chip
+                  label={`Unread (${unreadRoomsCount})`}
+                  size="small"
+                  clickable
+                  onClick={() => setChatFilter('unread')}
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '0.72rem',
+                    bgcolor: chatFilter === 'unread' ? '#25D366' : '#F1F5F9',
+                    color: chatFilter === 'unread' ? '#FFFFFF' : '#475569'
+                  }}
+                />
+              </Box>
+            </Box>
+
+            {/* Scrollable Room Items */}
+            <Box sx={{ flex: 1, overflowY: 'auto' }}>
+              {isProjectsLoading || isChatRoomsLoading ? (
+                <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {[1, 2, 3, 4].map((k) => (
+                    <Skeleton key={k} variant="rounded" height={64} sx={{ borderRadius: 2 }} />
+                  ))}
+                </Box>
+              ) : filteredChatRooms.length === 0 ? (
+                <Box sx={{ p: 4, textAlign: 'center', color: '#64748B' }}>
+                  <ForumRoundedIcon sx={{ fontSize: 34, color: '#CBD5E1', mb: 1 }} />
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#475569' }}>
+                    {chatFilter === 'unread' ? 'No unread client chats' : 'No matching active rooms'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                    Completed orders are automatically archived out of active chat rooms.
+                  </Typography>
+                </Box>
+              ) : (
+                filteredChatRooms.map((room: any) => {
+                  const isSelected = currentSelectedRoom && String(currentSelectedRoom.projectId) === String(room.projectId);
+                  const displayName = room.clientName || room.projectName || 'Client Room';
+                  const isMineLast =
+                    Boolean(currentUserId && room.lastSenderId && String(room.lastSenderId) === currentUserId);
+                  const sidebarReaders = Array.isArray(room.lastMessageReadBy)
+                    ? room.lastMessageReadBy.filter((r: any) => !room.lastSenderId || String(r.userId) !== String(room.lastSenderId))
+                    : [];
+                  const isLastBlueTick =
+                    sidebarReaders.length > 0 || (Boolean(room.lastMessageIsReadByAdmin) && room.lastSenderRole !== 'admin');
+                  const sidebarSeenText =
+                    sidebarReaders.length > 0
+                      ? `Seen by ${sidebarReaders.map((r: any) => r.userName).join(', ')}`
+                      : isLastBlueTick
+                      ? 'Seen by Admin'
+                      : 'Delivered • Not seen yet';
+
+                  return (
+                    <Box
+                      key={room.projectId}
+                      onClick={() => setSelectedRoom(room)}
                       sx={{
-                        p: 2,
-                        borderRadius: 3,
-                        bgcolor: '#F8FAFC',
-                        border: '1.5px solid #E2E8F0',
+                        px: 1.75,
+                        py: 1.35,
                         display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        height: '100%',
-                        transition: 'all 0.2s ease',
+                        alignItems: 'center',
+                        gap: 1.35,
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #F1F5F9',
+                        bgcolor: isSelected
+                          ? '#E6F4F1'
+                          : room.unreadCount > 0
+                          ? '#F0FDF4'
+                          : '#FFFFFF',
+                        borderLeft: isSelected ? '4px solid #075E54' : '4px solid transparent',
+                        transition: 'background-color 0.15s ease',
                         '&:hover': {
-                          bgcolor: '#FFFFFF',
-                          borderColor: '#C89F5A',
-                          boxShadow: '0 4px 14px rgba(200, 159, 90, 0.15)',
-                          transform: 'translateY(-2px)'
+                          bgcolor: isSelected ? '#E6F4F1' : '#F8FAFC'
                         }
                       }}
                     >
-                      <Box>
-                        {/* Top row: Avatar + Client Name */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 1 }}>
-                          <Avatar
-                            sx={{
-                              width: 36,
-                              height: 36,
-                              fontSize: '0.95rem',
-                              fontWeight: 800,
-                              bgcolor: isWorkOrder ? '#C89F5A' : '#3B82F6',
-                              color: '#FFFFFF'
-                            }}
-                          >
-                            {initial}
-                          </Avatar>
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography
-                              sx={{
-                                fontWeight: 800,
-                                fontSize: '0.9rem',
-                                color: '#0F172A',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
-                              }}
-                            >
-                              {displayName}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: '#64748B',
-                                fontSize: '0.72rem',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                display: 'block'
-                              }}
-                            >
-                              {project.projectId ? `[${project.projectId}] ` : ''}{project.name}
-                            </Typography>
-                          </Box>
-                        </Box>
-
-                        {/* Status chip */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                          <Chip
-                            label={project.status || 'Active'}
-                            size="small"
-                            sx={{
-                              height: 20,
-                              fontSize: '0.68rem',
-                              fontWeight: 700,
-                              textTransform: 'capitalize',
-                              bgcolor: isWorkOrder ? '#FEF3C7' : '#EFF6FF',
-                              color: isWorkOrder ? '#92400E' : '#1D4ED8',
-                              borderRadius: 1
-                            }}
-                          />
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <FiberManualRecordIcon sx={{ fontSize: 8, color: '#10B981' }} />
-                            <Typography sx={{ fontSize: '0.7rem', color: '#10B981', fontWeight: 700 }}>
-                              Ready
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Box>
-
-                      {/* Open Chat Action */}
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<ForumRoundedIcon sx={{ fontSize: 16 }} />}
-                        onClick={() => setSelectedChatProject(project)}
+                      <Avatar
                         sx={{
-                          textTransform: 'none',
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                          borderRadius: 2,
-                          py: 0.6,
-                          bgcolor: '#C89F5A',
+                          width: 44,
+                          height: 44,
+                          fontWeight: 800,
+                          fontSize: '0.95rem',
+                          bgcolor: room.unreadCount > 0 ? '#075E54' : '#C89F5A',
                           color: '#FFFFFF',
-                          boxShadow: 'none',
-                          '&:hover': {
-                            bgcolor: '#B38B36',
-                            boxShadow: '0 2px 8px rgba(179, 139, 54, 0.3)'
-                          }
+                          flexShrink: 0
                         }}
                       >
-                        Open Chat
-                      </Button>
-                    </Paper>
-                  </Grid>
-                );
-              })}
-          </Grid>
-        )}
-      </Paper>
+                        {displayName.charAt(0).toUpperCase()}
+                      </Avatar>
 
-      {/* Live Product / Client Chat Drawer */}
-      {selectedChatProject && (
-        <ProductChatDrawer
-          open={Boolean(selectedChatProject)}
-          onClose={() => setSelectedChatProject(null)}
-          slab={{
-            id: selectedChatProject.id,
-            projectId: selectedChatProject.id,
-            name: selectedChatProject.name,
-            clientName: selectedChatProject.clientName
-          }}
-          projectId={selectedChatProject.id}
-          projectName={selectedChatProject.name}
-        />
-      )}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                          <Typography
+                            variant="subtitle2"
+                            noWrap
+                            sx={{
+                              fontWeight: room.unreadCount > 0 ? 900 : 700,
+                              color: '#111B21',
+                              fontSize: '0.89rem'
+                            }}
+                          >
+                            {displayName}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontSize: '0.68rem',
+                              fontWeight: room.unreadCount > 0 ? 800 : 500,
+                              color: room.unreadCount > 0 ? '#128C7E' : '#667781',
+                              flexShrink: 0
+                            }}
+                          >
+                            {formatRoomTimestamp(room.lastMessageTime)}
+                          </Typography>
+                        </Box>
+
+                        <Typography
+                          variant="caption"
+                          noWrap
+                          sx={{ display: 'block', color: '#64748B', fontSize: '0.72rem', fontWeight: 600 }}
+                        >
+                          {room.workOrderId ? `[${room.workOrderId}] ` : ''}
+                          {room.projectName}
+                        </Typography>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 0.25 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4, minWidth: 0, flex: 1 }}>
+                            {room.lastMessage && isMineLast && (
+                              <Tooltip title={sidebarSeenText} arrow placement="top">
+                                <Box sx={{ display: 'inline-flex', flexShrink: 0, cursor: 'pointer' }}>
+                                  <DoneAllRoundedIcon
+                                    sx={{
+                                      fontSize: 15,
+                                      color: isLastBlueTick ? '#0284C7' : '#8696A0'
+                                    }}
+                                  />
+                                </Box>
+                              </Tooltip>
+                            )}
+                            <Typography
+                              variant="caption"
+                              noWrap
+                              sx={{
+                                color: room.unreadCount > 0 ? '#111B21' : '#667781',
+                                fontWeight: room.unreadCount > 0 ? 700 : 400,
+                                fontSize: '0.75rem'
+                              }}
+                            >
+                              {room.lastMessage
+                                ? isMineLast
+                                  ? room.lastMessage
+                                  : `${room.lastSenderName ? `${room.lastSenderName}: ` : ''}${room.lastMessage}`
+                                : 'No messages yet • Click to start chat'}
+                            </Typography>
+                          </Box>
+
+                          {room.unreadCount > 0 && (
+                            <Box
+                              sx={{
+                                minWidth: 20,
+                                height: 20,
+                                px: 0.65,
+                                borderRadius: '999px',
+                                bgcolor: '#25D366',
+                                color: '#FFFFFF',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                flexShrink: 0
+                              }}
+                            >
+                              {room.unreadCount}
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+                  );
+                })
+              )}
+            </Box>
+          </Box>
+
+          {/* Right Pane: Embedded WhatsApp Thread OR Idle Placeholder */}
+          <Box
+            sx={{
+              flex: 1,
+              height: '100%',
+              display: {
+                xs: currentSelectedRoom ? 'flex' : 'none',
+                md: 'flex'
+              },
+              flexDirection: 'column',
+              minWidth: 0,
+              bgcolor: '#EFEAE2'
+            }}
+          >
+            {currentSelectedRoom ? (
+              <ChatRoomThread
+                slabId={currentSelectedRoom.slabId || currentSelectedRoom.projectId}
+                projectId={currentSelectedRoom.projectId}
+                title={currentSelectedRoom.clientName || currentSelectedRoom.projectName}
+                subtitle={`${currentSelectedRoom.workOrderId ? `[${currentSelectedRoom.workOrderId}] ` : ''}${currentSelectedRoom.projectName || ''}`}
+                avatarPhoto={currentSelectedRoom.customerPhoto}
+                isActive={isUnnatiChatOpen && Boolean(currentSelectedRoom)}
+                onClose={() => setSelectedRoom(null)}
+                onOpenOrder={() => {
+                  setIsUnnatiChatOpen(false);
+                  navigate(`/projects/${currentSelectedRoom.projectId}`);
+                }}
+                height="100%"
+              />
+            ) : (
+              <Box
+                sx={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  px: 4,
+                  bgcolor: '#F0F2F5'
+                }}
+              >
+                <Avatar
+                  sx={{
+                    width: 72,
+                    height: 72,
+                    bgcolor: '#DCFCE7',
+                    color: '#075E54',
+                    mb: 2,
+                    border: '2px solid #A7F3D0'
+                  }}
+                >
+                  <ForumRoundedIcon sx={{ fontSize: 36 }} />
+                </Avatar>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', mb: 0.75 }}>
+                  Unnati Chat
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748B', maxWidth: 400, lineHeight: 1.55 }}>
+                  Select any client or work order on the left to view permanent team discussions, share photos, and track read receipts with blue ticks.
+                </Typography>
+                <Chip
+                  icon={<LockRoundedIcon sx={{ fontSize: '13px !important', color: '#075E54 !important' }} />}
+                  label="Unread alerts stay active until opened by each user"
+                  size="small"
+                  sx={{
+                    mt: 2.5,
+                    bgcolor: '#FFFFFF',
+                    color: '#075E54',
+                    fontWeight: 700,
+                    border: '1px solid #D1D7DB'
+                  }}
+                />
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </Dialog>
     </Box>
   );
 };

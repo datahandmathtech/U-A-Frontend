@@ -412,7 +412,7 @@ export const apiSlice = createApi({
         if (params.month !== undefined && params.month !== '') queryParams.append('month', String(params.month));
         return `/dashboard/summary?${queryParams.toString()}`;
       },
-      providesTags: ['Project', 'Lead', 'Invoice']
+      providesTags: ['Project', 'Lead', 'Invoice', 'Production', 'CashBook', 'Maintenance']
     }),
     getProjectById: builder.query<any, string>({
       query: (id) => `/projects/${id}`,
@@ -424,14 +424,14 @@ export const apiSlice = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: ['Project', 'Production']
+      invalidatesTags: ['Project', 'Production', 'ProductChat']
     }),
     deleteProject: builder.mutation<any, string>({
       query: (id) => ({
         url: `/projects/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Project', 'Production']
+      invalidatesTags: ['Project', 'Production', 'ProductChat']
     }),
     getProjectMaterials: builder.query<any[], string>({
       query: (projectId) => `/projects/${projectId}/materials`,
@@ -548,7 +548,7 @@ export const apiSlice = createApi({
         method: 'POST',
         body: data
       }),
-      invalidatesTags: ['Production', 'Project', 'Dispatch']
+      invalidatesTags: ['Production', 'Project', 'Dispatch', 'ProductChat']
     }),
     dispatchBoxes: builder.mutation<any, { projectId?: string, slabId?: string, boxCodes?: string[], pieceIds?: string[], vehicleNumber?: string, driverName?: string, dispatchDate?: string, lrNumber?: string, remarks?: string }>({
       query: (data) => ({
@@ -556,7 +556,7 @@ export const apiSlice = createApi({
         method: 'POST',
         body: data
       }),
-      invalidatesTags: ['Production', 'Project', 'Dispatch']
+      invalidatesTags: ['Production', 'Project', 'Dispatch', 'ProductChat']
     }),
     replicateSlabTemplate: builder.mutation<any, { projectId: string, sourceSlabId: string, targetSlabIds?: string[], fromSlabNumber?: number, toSlabNumber?: number }>({
       query: (data) => ({
@@ -601,11 +601,11 @@ export const apiSlice = createApi({
     // QUICK PRODUCT DIRECT ACTIONS
     quickCompletePiece: builder.mutation<any, { slabId: string; pieceId?: string; machineId?: string; driverName?: string; photoUrl?: string; stage?: string; remarks?: string }>({
       query: (body) => ({ url: '/production/quick-complete-piece', method: 'POST', body }),
-      invalidatesTags: ['Production', 'Project']
+      invalidatesTags: ['Production', 'Project', 'ProductChat']
     }),
     quickRevertPiece: builder.mutation<any, { slabId: string; pieceId?: string; stage?: string; revertAll?: boolean }>({
       query: (body) => ({ url: '/production/quick-revert-piece', method: 'POST', body }),
-      invalidatesTags: ['Production', 'Project']
+      invalidatesTags: ['Production', 'Project', 'ProductChat']
     }),
     quickEditPieceLog: builder.mutation<any, { slabId: string; pieceId?: string; machineId?: string; driverName?: string; photoUrl?: string; remarks?: string }>({
       query: (body) => ({ url: '/production/quick-edit-piece-log', method: 'PATCH', body }),
@@ -631,6 +631,10 @@ export const apiSlice = createApi({
     }),
     getAdminChatAlerts: builder.query<{ totalUnread: number; alertsCount: number; alerts: any[] }, void>({
       query: () => '/product-chat/unread/admin-alerts',
+      providesTags: ['ProductChat']
+    }),
+    getChatRoomsSummary: builder.query<{ totalUnread: number; roomsCount: number; rooms: any[] }, void>({
+      query: () => '/product-chat/rooms/summary',
       providesTags: ['ProductChat']
     }),
 
@@ -808,6 +812,7 @@ export const {
   useSendProductChatMessageMutation,
   useMarkProductChatReadMutation,
   useGetAdminChatAlertsQuery,
+  useGetChatRoomsSummaryQuery,
   usePackBoxesMutation,
   useDispatchBoxesMutation,
   useGetCashBookQuery,

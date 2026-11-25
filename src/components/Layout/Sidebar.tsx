@@ -27,7 +27,6 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import GetAppRoundedIcon from '@mui/icons-material/GetAppRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import FilterAltRoundedIcon from '@mui/icons-material/FilterAltRounded';
-import LiveTvRoundedIcon from '@mui/icons-material/LiveTvRounded';
 import PendingActionsRoundedIcon from '@mui/icons-material/PendingActionsRounded';
 import FolderSpecialRoundedIcon from '@mui/icons-material/FolderSpecialRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
@@ -50,7 +49,6 @@ interface MenuItemDef {
 
 const ALL_MENU_ITEMS: MenuItemDef[] = [
   { text: 'Dashboard', icon: <DashboardRoundedIcon />, path: '/', category: 'Overview' },
-  { text: 'Live Feed', icon: <LiveTvRoundedIcon />, path: '/live-feed', category: 'Overview' },
   { text: 'Log Book', icon: <MenuBookRoundedIcon />, path: '/log-book', category: 'Operations' },
   { text: 'Enquiries Pipeline', icon: <FilterAltRoundedIcon />, path: '/crm', category: 'Operations' },
   { text: 'Active Work Orders', icon: <WorkRoundedIcon />, path: '/projects', category: 'Operations' },

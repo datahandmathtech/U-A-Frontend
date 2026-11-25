@@ -17,9 +17,13 @@ import {
   TextField,
   Avatar,
   Chip,
-  Tooltip
+  Tooltip,
+  Badge
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
+import MarkChatUnreadRoundedIcon from '@mui/icons-material/MarkChatUnreadRounded';
+import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -36,7 +40,12 @@ import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import ExitToAppRoundedIcon from '@mui/icons-material/ExitToAppRounded';
 import PrecisionManufacturingRoundedIcon from '@mui/icons-material/PrecisionManufacturingRounded';
-import { useGetProjectByIdQuery, useUpdateProjectMutation } from '../../store/apiSlice';
+import {
+  useGetProjectByIdQuery,
+  useUpdateProjectMutation,
+  useGetAdminChatAlertsQuery
+} from '../../store/apiSlice';
+import { ProductChatDrawer } from '../Production/ProductChatDrawer';
 
 interface TopbarProps {
   handleDrawerToggle: () => void;
@@ -53,8 +62,17 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
   const hasCrmAccess = isSuperAdmin || (Array.isArray(user?.modulesAccess) && user.modulesAccess.includes('/crm'));
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [notifAnchorEl, setNotifAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [activeNotifChat, setActiveNotifChat] = React.useState<any | null>(null);
   const [crmOpen, setCrmOpen] = React.useState(false);
   const [projectOpen, setProjectOpen] = React.useState(false);
+
+  const { data: chatAlertsData } = useGetAdminChatAlertsQuery(undefined, {
+    skip: !user || user?.role === 'worker',
+    pollingInterval: 10000
+  });
+  const unreadAlerts = chatAlertsData?.alerts || [];
+  const totalUnreadChats = chatAlertsData?.totalUnread || 0;
 
   // Parse path to see if we are on a project/crm details page
   const match = location.pathname.match(/\/(crm|projects)\/([a-fA-F0-9-]+|[0-9a-fA-F]{24})/);
@@ -271,6 +289,171 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
               }}
             />
           )}
+
+          {/* Global WhatsApp Chat Notifications Bell (for Admin & All Logged-in Staff) */}
+          {user && user?.role !== 'worker' && (
+            <Tooltip title={totalUnreadChats > 0 ? `${totalUnreadChats} Unread Chat Messages` : 'No unread messages'}>
+              <IconButton
+                onClick={(e) => setNotifAnchorEl(e.currentTarget)}
+                sx={{
+                  bgcolor: totalUnreadChats > 0 ? '#ECFDF5' : '#F8FAFC',
+                  border: totalUnreadChats > 0 ? '1px solid #6EE7B7' : '1px solid #E2E8F0',
+                  width: 40,
+                  height: 40,
+                  '&:hover': {
+                    bgcolor: totalUnreadChats > 0 ? '#D1FAE5' : '#F1F5F9'
+                  }
+                }}
+              >
+                <Badge
+                  badgeContent={totalUnreadChats}
+                  max={99}
+                  sx={{
+                    '& .MuiBadge-badge': {
+                      bgcolor: '#25D366',
+                      color: '#FFFFFF',
+                      fontWeight: 800,
+                      fontSize: '0.68rem',
+                      border: '2px solid #FFFFFF'
+                    }
+                  }}
+                >
+                  <NotificationsRoundedIcon
+                    sx={{
+                      fontSize: 21,
+                      color: totalUnreadChats > 0 ? '#075E54' : '#64748B'
+                    }}
+                  />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {/* Chat Notifications Popover */}
+          <Menu
+            anchorEl={notifAnchorEl}
+            open={Boolean(notifAnchorEl)}
+            onClose={() => setNotifAnchorEl(null)}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            slotProps={{
+              paper: {
+                sx: {
+                  width: 340,
+                  maxWidth: '92vw',
+                  maxHeight: 440,
+                  borderRadius: 3,
+                  p: 0,
+                  overflow: 'hidden',
+                  boxShadow: '0 14px 36px rgba(0,0,0,0.14)',
+                  border: '1px solid #E2E8F0'
+                }
+              }
+            }}
+          >
+            <Box
+              sx={{
+                bgcolor: '#075E54',
+                color: '#FFFFFF',
+                px: 2,
+                py: 1.35,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <MarkChatUnreadRoundedIcon fontSize="small" />
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  Chat Notifications
+                </Typography>
+              </Box>
+              <Chip
+                label={totalUnreadChats > 0 ? `${totalUnreadChats} Unread` : 'All Seen'}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  bgcolor: totalUnreadChats > 0 ? '#25D366' : 'rgba(255,255,255,0.2)',
+                  color: '#FFFFFF'
+                }}
+              />
+            </Box>
+
+            <Box sx={{ maxHeight: 360, overflowY: 'auto', p: 1 }}>
+              {unreadAlerts.length === 0 ? (
+                <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
+                  <DoneAllRoundedIcon sx={{ fontSize: 34, color: '#0284C7', mb: 0.75 }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1E293B' }}>
+                    You're all caught up
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748B' }}>
+                    No unread messages across active work orders.
+                  </Typography>
+                </Box>
+              ) : (
+                unreadAlerts.map((alert: any) => (
+                  <MenuItem
+                    key={alert.projectId || alert.slabId}
+                    onClick={() => {
+                      setNotifAnchorEl(null);
+                      setActiveNotifChat(alert);
+                    }}
+                    sx={{
+                      borderRadius: 2,
+                      p: 1.25,
+                      mb: 0.5,
+                      alignItems: 'flex-start',
+                      gap: 1.25,
+                      whiteSpace: 'normal',
+                      '&:hover': { bgcolor: '#F0FDF4' }
+                    }}
+                  >
+                    <Avatar
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        bgcolor: '#DCFCE7',
+                        color: '#075E54',
+                        fontWeight: 800,
+                        fontSize: '0.88rem',
+                        mt: 0.25
+                      }}
+                    >
+                      {(alert.clientName || alert.projectName || 'C').charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="subtitle2" noWrap sx={{ fontWeight: 800, color: '#1E293B', fontSize: '0.84rem' }}>
+                          {alert.clientName || alert.projectName}
+                        </Typography>
+                        <Chip
+                          label={alert.unreadCount}
+                          size="small"
+                          sx={{
+                            height: 18,
+                            minWidth: 20,
+                            fontSize: '0.67rem',
+                            fontWeight: 800,
+                            bgcolor: '#25D366',
+                            color: '#FFFFFF'
+                          }}
+                        />
+                      </Box>
+                      <Typography variant="caption" noWrap sx={{ display: 'block', color: '#64748B', fontWeight: 600 }}>
+                        {alert.workOrderId ? `[${alert.workOrderId}] ` : ''}
+                        {alert.projectName}
+                      </Typography>
+                      <Typography variant="caption" noWrap sx={{ display: 'block', color: '#334155', mt: 0.25 }}>
+                        <strong style={{ color: '#075E54' }}>{alert.lastSenderName}:</strong> {alert.lastMessage}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))
+              )}
+            </Box>
+          </Menu>
 
           <Tooltip title="Account & Navigation Menu">
             <Button
@@ -640,6 +823,27 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
             </Button>
           </DialogActions>
         </Dialog>
+        {/* Chat Drawer triggered from Topbar Notification Bell */}
+        {activeNotifChat && (
+          <ProductChatDrawer
+            open={Boolean(activeNotifChat)}
+            onClose={() => setActiveNotifChat(null)}
+            slab={{
+              id: activeNotifChat.slabId || activeNotifChat.projectId,
+              name: activeNotifChat.clientName || activeNotifChat.projectName,
+              clientName: activeNotifChat.clientName,
+              customerPhoto: activeNotifChat.customerPhoto,
+              projectId: activeNotifChat.projectId
+            }}
+            projectId={activeNotifChat.projectId}
+            projectName={`${activeNotifChat.workOrderId ? `[${activeNotifChat.workOrderId}] ` : ''}${activeNotifChat.projectName || ''}`}
+            onOpenOrder={() => {
+              const pid = activeNotifChat.projectId;
+              setActiveNotifChat(null);
+              if (pid) navigate(`/projects/${pid}`);
+            }}
+          />
+        )}
       </Toolbar>
     </AppBar>
   );

@@ -789,8 +789,23 @@ const ProjectDetails: React.FC = () => {
     setIsRevertOpen(true);
   };
 
-  const handleOpenChat = (slab: any) => {
-    setChatSlab(slab);
+  const handleOpenChat = (slab?: any) => {
+    const slabsList = Array.isArray(project?.slabs) ? project.slabs : [];
+    const slabNames = slabsList.map((s: any) => s?.name).filter(Boolean);
+    const slabSummary =
+      slabNames.length > 0
+        ? `${slabNames.length} ${slabNames.length === 1 ? 'Slab' : 'Slabs'}: ${slabNames.slice(0, 4).join(', ')}${slabNames.length > 4 ? ` +${slabNames.length - 4} more` : ''}`
+        : 'Work Order Discussion';
+
+    const resolvedRoom = {
+      id: slab?.id || id,
+      projectId: id,
+      name: project?.clientName || project?.name || 'Work Order Chat',
+      clientName: project?.clientName || project?.name || 'Work Order Chat',
+      customerPhoto: project?.customerPhoto || '',
+      size: slabSummary
+    };
+    setChatSlab(resolvedRoom);
     setIsChatOpen(true);
   };
   const { data: project, isLoading, refetch } = useGetProjectByIdQuery(id as string);
@@ -1102,18 +1117,16 @@ const ProjectDetails: React.FC = () => {
     }
   }, [viewParam, isCrmView, id, navigate]);
 
-  // Open chat if navigated with chatSlabId param from Admin Dashboard alerts
+  // Open chat if navigated with chatSlabId param from Dashboard/Topbar alerts
   React.useEffect(() => {
     const chatSlabId = queryParams.get('chatSlabId');
-    if (chatSlabId && id) {
-      const target = projectSlabs?.find((s: any) => s.id === chatSlabId) || projectSlabs?.[0] || { id, name: project?.name || 'Work Order', projectId: id };
-      setChatSlab(target);
-      setIsChatOpen(true);
+    if (chatSlabId && id && project) {
+      handleOpenChat({ id: chatSlabId });
       const p = new URLSearchParams(location.search);
       p.delete('chatSlabId');
       navigate({ search: p.toString() }, { replace: true });
     }
-  }, [location.search, projectSlabs, id, project?.name]);
+  }, [location.search, project, id, navigate]);
   const [designFinalizedDate, setDesignFinalizedDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -4522,7 +4535,7 @@ const ProjectDetails: React.FC = () => {
 
                               {/* Single Work Order Chat Box (Shared with Main Active Work Orders Screen) */}
                               <Box
-                                onClick={() => handleOpenChat(projectSlabs?.[0] || { id: id, name: project?.name || 'Work Order', projectId: id })}
+                                onClick={() => handleOpenChat({ id })}
                                 sx={{
                                   ml: 'auto',
                                   display: 'flex',
@@ -7066,7 +7079,7 @@ const ProjectDetails: React.FC = () => {
         onClose={() => setIsChatOpen(false)}
         slab={chatSlab}
         projectId={id}
-        projectName={project?.name}
+        projectName={`${project?.projectId ? `[${project.projectId}] ` : ''}${project?.name || ''}`}
       />
 
       <Snackbar

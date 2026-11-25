@@ -229,6 +229,27 @@ const InOutLedger: React.FC = () => {
     { label: 'March', year: selectedFYStartYear + 1 }
   ];
 
+  // Current period (Month / Full FY) totals and pending return status for the top KPI cards
+  const periodLogs = allLogs.filter((log: any) => {
+    if (selectedMonth === 'All') return true;
+    const d = new Date(log.createdAt);
+    const monthStr = `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
+    return monthStr === selectedMonth;
+  });
+
+  const periodOutLogs = periodLogs.filter((log: any) => log.transactionType === 'OUT');
+  const periodInLogs = periodLogs.filter((log: any) => log.transactionType === 'IN');
+
+  const periodOutTotalPcs = periodOutLogs.reduce((acc: number, l: any) => acc + Math.round(Number(l.quantityProduced) || 0), 0);
+  const periodOutPendingPcs = periodOutLogs.reduce((acc: number, l: any) => {
+    if (l.isReturned) return acc;
+    const total = Number(l.quantityProduced) || 0;
+    const ret = Number(l.returnedQty) || 0;
+    return acc + Math.max(0, total - ret);
+  }, 0);
+  const periodInTotalPcs = periodInLogs.reduce((acc: number, l: any) => acc + Math.round(Number(l.quantityProduced) || 0), 0);
+  const periodScopeLabel = selectedMonth === 'All' ? selectedFY : selectedMonth;
+
   const fyOptions = Array.from({ length: 5 }, (_, i) => {
     const y = currentYear - 2 + i;
     return `FY ${y}-${y + 1}`;
@@ -540,10 +561,13 @@ const InOutLedger: React.FC = () => {
             </Avatar>
             <Box>
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Active Outward Gate Passes
+                Material Outward ({periodScopeLabel})
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 900, color: '#C2410C', mt: 0.2 }}>
-                {activeOutLogs.length}
+                {periodOutTotalPcs.toLocaleString('en-IN')} Pcs
+              </Typography>
+              <Typography variant="caption" sx={{ color: periodOutPendingPcs > 0 ? '#DC2626' : '#16A34A', fontWeight: 700, display: 'block', mt: 0.2 }}>
+                {periodOutLogs.length} {periodOutLogs.length === 1 ? 'Pass' : 'Passes'} • {periodOutPendingPcs > 0 ? `${periodOutPendingPcs.toLocaleString('en-IN')} Pcs Pending Return` : 'All Returned'}
               </Typography>
             </Box>
           </Paper>
@@ -556,10 +580,13 @@ const InOutLedger: React.FC = () => {
             </Avatar>
             <Box>
               <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Inward Returns
+                Material Inward ({periodScopeLabel})
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 900, color: '#0369A1', mt: 0.2 }}>
-                {completedMaterialLogs.filter((l: any) => l.transactionType === 'IN').length}
+                {periodInTotalPcs.toLocaleString('en-IN')} Pcs
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#0284C7', fontWeight: 700, display: 'block', mt: 0.2 }}>
+                {periodInLogs.length} Inward {periodInLogs.length === 1 ? 'Return' : 'Returns'} ({periodScopeLabel})
               </Typography>
             </Box>
           </Paper>
@@ -576,6 +603,9 @@ const InOutLedger: React.FC = () => {
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 900, color: '#0F172A', mt: 0.2 }}>
                 {vendorsData?.length || 0} <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>Partners</span>
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, display: 'block', mt: 0.2 }}>
+                {activeOutLogs.length} Open Outward Gate Passes
               </Typography>
             </Box>
           </Paper>

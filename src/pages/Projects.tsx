@@ -234,12 +234,23 @@ const Projects: React.FC = () => {
 
   const handleOpenChat = (e: React.MouseEvent, project: any) => {
     e.stopPropagation();
-    const firstSlab = (project.slabs && project.slabs.length > 0)
-      ? project.slabs[0]
-      : { id: project.id, name: project.name || project.projectId || 'Work Order', projectId: project.id };
-    setChatSlab(firstSlab);
+    const projSlabs = Array.isArray(project.slabs) ? project.slabs : [];
+    const slabNames = projSlabs.map((s: any) => s?.name).filter(Boolean);
+    const slabSummary =
+      slabNames.length > 0
+        ? `${slabNames.length} ${slabNames.length === 1 ? 'Slab' : 'Slabs'}: ${slabNames.slice(0, 4).join(', ')}${slabNames.length > 4 ? ` +${slabNames.length - 4} more` : ''}`
+        : 'Work Order Discussion';
+
+    setChatSlab({
+      id: project.id,
+      projectId: project.id,
+      name: project.clientName || project.name || project.projectId || 'Work Order',
+      clientName: project.clientName || project.name || 'Work Order Chat',
+      customerPhoto: project.customerPhoto || '',
+      size: slabSummary
+    });
     setChatProjectId(project.id);
-    setChatProjectName(project.name || project.projectId || 'Work Order');
+    setChatProjectName(`${project.projectId ? `[${project.projectId}] ` : ''}${project.name || 'Work Order'}`);
     setChatOpen(true);
   };
   const [formData, setFormData] = useState<any>({
