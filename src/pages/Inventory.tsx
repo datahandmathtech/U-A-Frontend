@@ -204,7 +204,7 @@ const Inventory: React.FC = () => {
             Material Planning
           </Button>
 
-          <FormControl size="small" sx={{ minWidth: 140, bgcolor: '#FFF' }}>
+          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 140 }, flex: { xs: '1 1 130px', sm: 'none' }, bgcolor: '#FFF' }}>
             <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Financial Year</InputLabel>
             <Select
               value={selectedFY}
@@ -219,7 +219,7 @@ const Inventory: React.FC = () => {
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: 130, bgcolor: '#FFF' }}>
+          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 130 }, flex: { xs: '1 1 120px', sm: 'none' }, bgcolor: '#FFF' }}>
             <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Month</InputLabel>
             <Select
               value={selectedMonth}
@@ -288,10 +288,13 @@ const Inventory: React.FC = () => {
       </Grid>
 
       {/* 3. LUXURY TABS NAVIGATION */}
-      <Paper elevation={0} sx={{ p: 0.75, borderRadius: 3, bgcolor: '#F1F5F9', mb: 3, display: 'inline-flex', border: '1px solid #E2E8F0' }}>
+      <Paper elevation={0} sx={{ p: 0.75, borderRadius: 3, bgcolor: '#F1F5F9', mb: 3, display: 'inline-flex', maxWidth: '100%', overflowX: 'auto', border: '1px solid #E2E8F0' }}>
         <Tabs 
           value={activeTab} 
           onChange={handleTabChange} 
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           textColor="inherit"
           slotProps={{ indicator: { style: { display: 'none' } } }}
           sx={{ minHeight: 'unset' }}
@@ -348,8 +351,8 @@ const Inventory: React.FC = () => {
         </Paper>
       ) : (
         <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3.5, overflow: 'hidden', bgcolor: '#FFFFFF', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-          <TableContainer>
-            <Table size="medium">
+          <TableContainer sx={{ overflowX: 'auto' }}>
+            <Table size="medium" sx={{ minWidth: 640 }}>
               <TableHead sx={{ bgcolor: '#F8FAFC' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', py: 2 }}>
@@ -450,8 +453,8 @@ const Inventory: React.FC = () => {
         fullWidth
         slotProps={{ paper: { sx: { borderRadius: 4, minHeight: '60vh', bgcolor: '#FAFAFA' } } }}
       >
-        <DialogTitle sx={{ bgcolor: '#FFF', borderBottom: '1px solid #E2E8F0', p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
+        <DialogTitle sx={{ bgcolor: '#FFF', borderBottom: '1px solid #E2E8F0', p: { xs: 2, sm: 3 }, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="h5" fontWeight="bold" color="#0F172A">
               {selectedSupplier}
             </Typography>
@@ -463,12 +466,12 @@ const Inventory: React.FC = () => {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ p: 4 }}>
+        <DialogContent sx={{ p: { xs: 1.5, sm: 3, md: 4 } }}>
           {isLoadingLogs ? (
             <Typography align="center" sx={{ mt: 5 }}>Loading ledger...</Typography>
           ) : (
-            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3 }}>
-              <Table size="medium">
+            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflowX: 'auto' }}>
+              <Table size="medium" sx={{ minWidth: 680 }}>
                 <TableHead sx={{ bgcolor: '#F8FAFC' }}>
                   <TableRow>
                     <TableCell sx={{ py: 2, fontWeight: 800, color: '#475569' }}>Date</TableCell>

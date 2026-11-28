@@ -628,7 +628,7 @@ const LogBook = () => {
   };
 
   return (
-    <Box sx={{ minHeight: 'calc(100vh - 64px)', p: { xs: 2, md: 4 } }}>
+    <Box sx={{ minHeight: 'calc(100vh - 64px)', p: { xs: 1, sm: 2.5, md: 4 } }}>
       
       {/* Header Area */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
@@ -795,7 +795,7 @@ const LogBook = () => {
 
       {/* Machine Log Table */}
       <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-        <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', gap: 2, bgcolor: '#FDFBF7', alignItems: 'center' }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2.5 }, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', gap: 1.5, flexWrap: 'wrap', bgcolor: '#FDFBF7', alignItems: 'center' }}>
           <Typography sx={{ color: 'text.primary', fontWeight: 'bold' }}>Machine Log</Typography>
           <Typography sx={{ color: 'text.secondary' }}>
             {logs?.length || 0} records • {viewMode === 'day' ? `${formatDMY(selectedDate)} (Day View)` : `${months[selectedMonth]} ${selectedYear} (Full Month View)`}
@@ -974,9 +974,9 @@ const LogBook = () => {
         slotProps={{ paper: { sx: { bgcolor: '#FAFAFA', borderRadius: 4 } } }}>
         {selectedLog && (
           <>
-            <DialogTitle sx={{ borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 3, bgcolor: '#fff' }}>
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DialogTitle sx={{ borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, p: { xs: 2, sm: 3 }, bgcolor: '#fff' }}>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   <Typography variant="h5" sx={{ fontWeight: 900 }}>Duty Evidence Report</Typography>
                   {isLogCarryForward(selectedLog) && (
                     <Chip label="CARRY FORWARD" size="small" sx={{ bgcolor: '#FEF3C7', color: '#B45309', fontWeight: 800, fontSize: '0.65rem', height: 20 }} />
@@ -988,7 +988,7 @@ const LogBook = () => {
               </Box>
               <IconButton onClick={() => setSelectedLog(null)}><CloseIcon /></IconButton>
             </DialogTitle>
-            <DialogContent sx={{ p: 4 }}>
+            <DialogContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
               {isLogCarryForward(selectedLog) && (
                 <Paper elevation={0} sx={{ p: 2, mb: 3, bgcolor: '#FFFDF5', borderRadius: 2.5, border: '1px solid #FCD34D' }}>
                   <Typography variant="body2" sx={{ fontWeight: 800, color: '#92400E' }}>
@@ -1001,20 +1001,20 @@ const LogBook = () => {
               )}
               <Grid container spacing={3}>
                 <Grid size={{ xs: 12, md: 6 }}>
-                  <Paper elevation={0} sx={{ bgcolor: 'rgba(46, 125, 50, 0.05)', border: '1px solid rgba(46, 125, 50, 0.2)', borderRadius: 3, p: 3 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                  <Paper elevation={0} sx={{ bgcolor: 'rgba(46, 125, 50, 0.05)', border: '1px solid rgba(46, 125, 50, 0.2)', borderRadius: 3, p: { xs: 2, sm: 3 } }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: { xs: 2, sm: 3 } }}>
                       <Typography sx={{ color: '#2E7D32', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 1 }}>
                         <ArrowOutwardIcon fontSize="small" /> PUNCH-IN PROOF
                       </Typography>
                       <Typography sx={{ color: 'text.secondary', fontWeight: 600 }}>{formatTime(selectedLog.startTime)}</Typography>
                     </Box>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5, mb: 3 }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, minmax(0, 1fr))' }, gap: { xs: 1, sm: 1.5 }, mb: { xs: 2, sm: 3 } }}>
                       {['machinePhotoUrl', 'unitPhotoUrl', 'softwarePhotoUrl'].map((key, i) => (
                         <Box 
                           key={key} 
                           onClick={() => selectedLog[key] && setPreviewPhoto(selectedLog[key])}
                           sx={{ 
-                            height: 120, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 2, overflow: 'hidden', position: 'relative',
+                            height: { xs: 88, sm: 120 }, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 2, overflow: 'hidden', position: 'relative',
                             cursor: selectedLog[key] ? 'pointer' : 'default',
                             transition: 'all 0.2s',
                             '&:hover': selectedLog[key] ? { transform: 'scale(1.03)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } : {}
@@ -1039,8 +1039,8 @@ const LogBook = () => {
                   </Paper>
                 </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
-                  <Paper elevation={0} sx={{ bgcolor: 'rgba(25, 118, 210, 0.05)', border: '1px solid rgba(25, 118, 210, 0.2)', borderRadius: 3, p: 3, opacity: selectedLog.endTime ? 1 : 0.6 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                  <Paper elevation={0} sx={{ bgcolor: 'rgba(25, 118, 210, 0.05)', border: '1px solid rgba(25, 118, 210, 0.2)', borderRadius: 3, p: { xs: 2, sm: 3 }, opacity: selectedLog.endTime ? 1 : 0.6 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: { xs: 2, sm: 3 } }}>
                       <Typography sx={{ color: '#1976D2', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 1 }}>
                         <CallReceivedIcon fontSize="small" /> PUNCH-OUT PROOF
                       </Typography>
@@ -1048,13 +1048,13 @@ const LogBook = () => {
                     </Box>
                     {selectedLog.endTime ? (
                       <>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5, mb: 3 }}>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, minmax(0, 1fr))' }, gap: { xs: 1, sm: 1.5 }, mb: { xs: 2, sm: 3 } }}>
                           {['endMachinePhotoUrl', 'endUnitPhotoUrl', 'endSoftwarePhotoUrl'].map((key, i) => (
                             <Box 
                               key={key} 
                               onClick={() => selectedLog[key] && setPreviewPhoto(selectedLog[key])}
                               sx={{ 
-                                height: 120, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 2, overflow: 'hidden', position: 'relative',
+                                height: { xs: 88, sm: 120 }, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 2, overflow: 'hidden', position: 'relative',
                                 cursor: selectedLog[key] ? 'pointer' : 'default',
                                 transition: 'all 0.2s',
                                 '&:hover': selectedLog[key] ? { transform: 'scale(1.03)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } : {}

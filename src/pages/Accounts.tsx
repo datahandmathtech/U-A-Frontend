@@ -29,9 +29,9 @@ const Accounts: React.FC = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Accounts & Billing</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Accounts &amp; Billing</Typography>
           <Typography variant="body2" color="textSecondary">Generate and track invoices for Work Orders.</Typography>
         </Box>
         <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: 8 }}>
@@ -40,7 +40,7 @@ const Accounts: React.FC = () => {
       </Box>
 
       <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4 }}>
-        <Table>
+        <Table sx={{ minWidth: 620 }}>
           <TableHead sx={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
             <TableRow>
               <TableCell><strong>Invoice No.</strong></TableCell>

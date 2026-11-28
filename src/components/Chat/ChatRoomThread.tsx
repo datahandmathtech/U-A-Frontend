@@ -246,7 +246,10 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'column',
+        flex: 1,
         height,
+        minHeight: 0,
+        minWidth: 0,
         width: '100%',
         overflow: 'hidden',
         bgcolor: '#EFEAE2',
@@ -258,23 +261,23 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
         sx={{
           bgcolor: '#075E54',
           color: '#FFFFFF',
-          px: 2,
-          py: 1.35,
+          px: { xs: 1.25, sm: 2 },
+          py: { xs: 1, sm: 1.35 },
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 1.5,
+          gap: { xs: 0.75, sm: 1.5 },
           flexShrink: 0,
           boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
           zIndex: 2
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 }, minWidth: 0, flex: 1 }}>
           <Avatar
             src={avatarPhoto ? resolveFileUrl(avatarPhoto) : undefined}
             sx={{
-              width: 40,
-              height: 40,
+              width: { xs: 34, sm: 40 },
+              height: { xs: 34, sm: 40 },
               bgcolor: '#128C7E',
               color: '#FFFFFF',
               fontWeight: 800,
@@ -288,21 +291,21 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
             <Typography
               variant="subtitle1"
               noWrap
-              sx={{ fontWeight: 800, color: '#FFFFFF', lineHeight: 1.2, fontSize: '0.96rem' }}
+              sx={{ fontWeight: 800, color: '#FFFFFF', lineHeight: 1.2, fontSize: { xs: '0.88rem', sm: '0.96rem' } }}
             >
               {title}
             </Typography>
             <Typography
               variant="caption"
               noWrap
-              sx={{ color: 'rgba(255,255,255,0.82)', display: 'block', fontSize: '0.73rem' }}
+              sx={{ color: 'rgba(255,255,255,0.82)', display: 'block', fontSize: { xs: '0.68rem', sm: '0.73rem' } }}
             >
               {subtitle || 'Permanent Order Discussion • Active'}
             </Typography>
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.35, sm: 0.75 }, flexShrink: 0 }}>
           <Tooltip title={isSearchOpen ? 'Hide Message Search' : 'Search Messages'}>
             <IconButton
               size="small"
@@ -327,20 +330,22 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
                 size="small"
                 variant="outlined"
                 onClick={onOpenOrder}
-                endIcon={<OpenInNewRoundedIcon sx={{ fontSize: '14px !important' }} />}
+                endIcon={<OpenInNewRoundedIcon sx={{ fontSize: '13px !important' }} />}
                 sx={{
                   color: '#FFFFFF',
                   borderColor: 'rgba(255,255,255,0.35)',
                   textTransform: 'none',
                   fontWeight: 700,
-                  fontSize: '0.73rem',
+                  fontSize: { xs: '0.69rem', sm: '0.73rem' },
                   borderRadius: 2,
+                  minWidth: 'auto',
                   py: 0.4,
-                  px: 1.2,
+                  px: { xs: 0.85, sm: 1.2 },
                   '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', borderColor: '#FFFFFF' }
                 }}
               >
-                Open Order
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Open </Box>
+                Order
               </Button>
             </Tooltip>
           )}
@@ -419,8 +424,13 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
       <Box
         sx={{
           flex: 1,
+          minHeight: 0,
+          minWidth: 0,
           overflowY: 'auto',
-          px: { xs: 1.5, sm: 2.5 },
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          px: { xs: 1.25, sm: 2.5 },
           py: 2,
           display: 'flex',
           flexDirection: 'column',
@@ -774,12 +784,13 @@ export const ChatRoomThread: React.FC<ChatRoomThreadProps> = ({
       <Box
         sx={{
           bgcolor: '#F0F2F5',
-          px: 1.5,
-          py: 1.15,
+          px: { xs: 1, sm: 1.5 },
+          py: { xs: 0.9, sm: 1.15 },
           display: 'flex',
           alignItems: 'center',
-          gap: 0.85,
+          gap: { xs: 0.5, sm: 0.85 },
           borderTop: '1px solid #D1D7DB',
+          minWidth: 0,
           flexShrink: 0
         }}
       >

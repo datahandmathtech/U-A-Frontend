@@ -17,7 +17,9 @@ import {
   IconButton,
   Tooltip,
   Dialog,
-  Badge
+  Badge,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -149,6 +151,8 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
 );
 
 const Dashboard: React.FC = () => {
+  const theme = useTheme();
+  const isMobileDialog = useMediaQuery(theme.breakpoints.down('sm'));
   const currentUser = useSelector((state: any) => state.auth.user);
   const currentUserId = currentUser?.id ? String(currentUser.id) : '';
   const currentYear = new Date().getFullYear();
@@ -273,9 +277,9 @@ const Dashboard: React.FC = () => {
           mb: 3
         }}
       >
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.5px' }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 }, flexWrap: 'wrap' }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.5px', fontSize: { xs: '1.5rem', sm: '1.85rem', md: '2.125rem' } }}>
               Executive Dashboard
             </Typography>
             <Chip
@@ -297,7 +301,7 @@ const Dashboard: React.FC = () => {
         </Box>
 
         {/* Date Filter Selectors */}
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
           <Select
             size="small"
             value={selectedFY}
@@ -307,7 +311,8 @@ const Dashboard: React.FC = () => {
               bgcolor: '#FFFFFF',
               borderRadius: 2.5,
               fontWeight: 600,
-              minWidth: 150,
+              minWidth: { xs: 0, sm: 150 },
+              flex: { xs: '1 1 130px', sm: 'none' },
               '& fieldset': { borderColor: '#E2E8F0' },
               '& .MuiSelect-select': { py: 1, px: 1.5 }
             }}
@@ -328,7 +333,8 @@ const Dashboard: React.FC = () => {
               bgcolor: '#FFFFFF',
               borderRadius: 2.5,
               fontWeight: 600,
-              minWidth: 140,
+              minWidth: { xs: 0, sm: 140 },
+              flex: { xs: '1 1 120px', sm: 'none' },
               '& fieldset': { borderColor: '#E2E8F0' },
               '& .MuiSelect-select': { py: 1, px: 1.5 }
             }}
@@ -584,55 +590,87 @@ const Dashboard: React.FC = () => {
       <Dialog
         open={isUnnatiChatOpen}
         onClose={() => setIsUnnatiChatOpen(false)}
+        fullScreen={isMobileDialog}
         maxWidth="lg"
         fullWidth
         slotProps={{
           paper: {
             sx: {
-              borderRadius: 4,
+              borderRadius: { xs: 0, sm: 4 },
               overflow: 'hidden',
               bgcolor: '#FFFFFF',
+              height: { xs: '100dvh', sm: 'auto' },
+              maxHeight: { xs: '100dvh', sm: '92dvh', md: '90vh' },
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 24px 60px rgba(15, 23, 42, 0.25)'
             }
           }
         }}
       >
-        {/* Top Container Bar */}
+        {/* Top Container Bar (Hidden on mobile when a conversation is open so thread gets full viewport height) */}
         <Box
           sx={{
-            px: 2.5,
-            py: 1.5,
+            px: { xs: 1.5, sm: 2.5 },
+            py: { xs: 1.1, sm: 1.5 },
             bgcolor: '#F8FAFC',
             borderBottom: '1px solid #E2E8F0',
-            display: 'flex',
+            display: { xs: currentSelectedRoom ? 'none' : 'flex', md: 'flex' },
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: 1.5
+            gap: { xs: 1, sm: 1.5 },
+            flexShrink: 0
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Avatar sx={{ bgcolor: '#075E54', color: '#FFFFFF', width: 38, height: 38 }}>
-              <ForumRoundedIcon sx={{ fontSize: 20 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2, fontSize: '1.05rem' }}>
-                Unnati Chat
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500 }}>
-                Live Work Orders & saved Completed Order chats • Blue-tick read receipts
-              </Typography>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1.25,
+              flex: { xs: '1 1 100%', md: '1 1 auto' },
+              minWidth: 0
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+              <Avatar sx={{ bgcolor: '#075E54', color: '#FFFFFF', width: { xs: 34, sm: 38 }, height: { xs: 34, sm: 38 }, flexShrink: 0 }}>
+                <ForumRoundedIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />
+              </Avatar>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2, fontSize: { xs: '0.96rem', sm: '1.05rem' } }}>
+                  Unnati Chat
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500, display: { xs: 'none', sm: 'block' } }}>
+                  Live Work Orders &amp; saved Completed Order chats • Blue-tick read receipts
+                </Typography>
+              </Box>
             </Box>
+
+            <IconButton
+              size="small"
+              aria-label="Close Unnati Chat"
+              onClick={() => setIsUnnatiChatOpen(false)}
+              sx={{
+                display: { xs: 'inline-flex', md: 'none' },
+                bgcolor: '#F1F5F9',
+                color: '#475569',
+                flexShrink: 0,
+                '&:hover': { bgcolor: '#E2E8F0', color: '#0F172A' }
+              }}
+            >
+              <CloseRoundedIcon fontSize="small" />
+            </IconButton>
           </Box>
 
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1,
+              gap: { xs: 0.75, sm: 1 },
               flexWrap: 'wrap',
               flex: { xs: '1 1 100%', md: '0 1 auto' },
-              justifyContent: 'flex-end'
+              justifyContent: { xs: 'stretch', md: 'flex-end' }
             }}
           >
             <TextField
@@ -657,7 +695,7 @@ const Dashboard: React.FC = () => {
                 }
               }}
               sx={{
-                width: { xs: '100%', sm: 250, md: 280 },
+                width: { xs: '100%', md: 280 },
                 '& .MuiOutlinedInput-root': {
                   bgcolor: '#FFFFFF',
                   borderRadius: 2.5,
@@ -678,10 +716,12 @@ const Dashboard: React.FC = () => {
                 clickable
                 onClick={() => setChatFilter('unread')}
                 sx={{
+                  display: { xs: 'none', md: 'inline-flex' },
                   bgcolor: '#25D366',
                   color: '#FFFFFF',
                   fontWeight: 800,
-                  fontSize: '0.75rem'
+                  fontSize: '0.75rem',
+                  '&:hover, &.Mui-focusVisible': { bgcolor: '#1FB858' }
                 }}
               />
             )}
@@ -692,11 +732,15 @@ const Dashboard: React.FC = () => {
               clickable
               onClick={() => setChatFilter('active')}
               sx={{
+                display: { xs: 'none', md: 'inline-flex' },
                 bgcolor: chatFilter === 'active' ? '#D1FAE5' : '#ECFDF5',
                 color: '#065F46',
                 fontWeight: 700,
                 fontSize: '0.75rem',
-                border: chatFilter === 'active' ? '1.5px solid #059669' : '1px solid #A7F3D0'
+                border: chatFilter === 'active' ? '1.5px solid #059669' : '1px solid #A7F3D0',
+                '&:hover, &.Mui-focusVisible': {
+                  bgcolor: chatFilter === 'active' ? '#A7F3D0' : '#D1FAE5'
+                }
               }}
             />
             <Chip
@@ -705,11 +749,15 @@ const Dashboard: React.FC = () => {
               clickable
               onClick={() => setChatFilter('completed')}
               sx={{
+                display: { xs: 'none', md: 'inline-flex' },
                 bgcolor: chatFilter === 'completed' ? '#334155' : '#F1F5F9',
                 color: chatFilter === 'completed' ? '#FFFFFF' : '#475569',
                 fontWeight: 700,
                 fontSize: '0.75rem',
-                border: chatFilter === 'completed' ? '1.5px solid #1E293B' : '1px solid #CBD5E1'
+                border: chatFilter === 'completed' ? '1.5px solid #1E293B' : '1px solid #CBD5E1',
+                '&:hover, &.Mui-focusVisible': {
+                  bgcolor: chatFilter === 'completed' ? '#1E293B' : '#E2E8F0'
+                }
               }}
             />
             <Tooltip title="Close Unnati Chat">
@@ -717,6 +765,7 @@ const Dashboard: React.FC = () => {
                 size="small"
                 onClick={() => setIsUnnatiChatOpen(false)}
                 sx={{
+                  display: { xs: 'none', md: 'inline-flex' },
                   bgcolor: '#F1F5F9',
                   color: '#475569',
                   '&:hover': { bgcolor: '#E2E8F0', color: '#0F172A' }
@@ -733,29 +782,34 @@ const Dashboard: React.FC = () => {
           sx={{
             display: 'flex',
             flexDirection: { xs: 'column', md: 'row' },
-            height: { xs: '78vh', md: 580 },
-            maxHeight: '80vh',
-            width: '100%'
+            flex: 1,
+            minHeight: 0,
+            height: { xs: 'auto', md: 580 },
+            maxHeight: { xs: 'none', md: '80vh' },
+            width: '100%',
+            overflow: 'hidden'
           }}
         >
           {/* Left Pane: Searchable Client / Work Order List */}
           <Box
             sx={{
               width: { xs: '100%', md: 350, lg: 380 },
-              flexShrink: 0,
+              flex: { xs: '1 1 0%', md: '0 0 auto' },
+              minHeight: 0,
+              height: { xs: 'auto', md: '100%' },
+              overflow: 'hidden',
               borderRight: { md: '1px solid #E2E8F0' },
-              borderBottom: { xs: '1px solid #E2E8F0', md: 'none' },
+              borderBottom: { xs: 'none', md: 'none' },
               display: {
                 xs: currentSelectedRoom ? 'none' : 'flex',
                 md: 'flex'
               },
               flexDirection: 'column',
-              height: '100%',
               bgcolor: '#FFFFFF'
             }}
           >
             {/* Filter Tabs: Active / Unread / Completed */}
-            <Box sx={{ px: 1.35, py: 1.1, borderBottom: '1px solid #F1F5F9', bgcolor: '#FFFFFF' }}>
+            <Box sx={{ px: 1.35, py: 1, borderBottom: '1px solid #F1F5F9', bgcolor: '#FFFFFF', flexShrink: 0 }}>
               <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
                 <Chip
                   label={`Active (${activeChatRooms.length})`}
@@ -766,7 +820,10 @@ const Dashboard: React.FC = () => {
                     fontWeight: 700,
                     fontSize: '0.72rem',
                     bgcolor: chatFilter === 'active' ? '#075E54' : '#F1F5F9',
-                    color: chatFilter === 'active' ? '#FFFFFF' : '#475569'
+                    color: chatFilter === 'active' ? '#FFFFFF' : '#475569',
+                    '&:hover, &.Mui-focusVisible': {
+                      bgcolor: chatFilter === 'active' ? '#064E46' : '#E2E8F0'
+                    }
                   }}
                 />
                 <Chip
@@ -778,7 +835,10 @@ const Dashboard: React.FC = () => {
                     fontWeight: 700,
                     fontSize: '0.72rem',
                     bgcolor: chatFilter === 'unread' ? '#25D366' : '#F1F5F9',
-                    color: chatFilter === 'unread' ? '#FFFFFF' : '#475569'
+                    color: chatFilter === 'unread' ? '#FFFFFF' : '#475569',
+                    '&:hover, &.Mui-focusVisible': {
+                      bgcolor: chatFilter === 'unread' ? '#1FB858' : '#E2E8F0'
+                    }
                   }}
                 />
                 <Chip
@@ -790,14 +850,26 @@ const Dashboard: React.FC = () => {
                     fontWeight: 700,
                     fontSize: '0.72rem',
                     bgcolor: chatFilter === 'completed' ? '#334155' : '#F1F5F9',
-                    color: chatFilter === 'completed' ? '#FFFFFF' : '#475569'
+                    color: chatFilter === 'completed' ? '#FFFFFF' : '#475569',
+                    '&:hover, &.Mui-focusVisible': {
+                      bgcolor: chatFilter === 'completed' ? '#1E293B' : '#E2E8F0'
+                    }
                   }}
                 />
               </Box>
             </Box>
 
             {/* Scrollable Room Items */}
-            <Box sx={{ flex: 1, overflowY: 'auto' }}>
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain'
+              }}
+            >
               {isProjectsLoading || isChatRoomsLoading ? (
                 <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   {[1, 2, 3, 4].map((k) => (
@@ -1005,6 +1077,7 @@ const Dashboard: React.FC = () => {
           <Box
             sx={{
               flex: 1,
+              minHeight: 0,
               height: '100%',
               display: {
                 xs: currentSelectedRoom ? 'flex' : 'none',
@@ -1012,6 +1085,7 @@ const Dashboard: React.FC = () => {
               },
               flexDirection: 'column',
               minWidth: 0,
+              overflow: 'hidden',
               bgcolor: '#EFEAE2'
             }}
           >

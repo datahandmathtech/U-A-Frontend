@@ -369,7 +369,7 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
   }, [selectedStageFilter, allPendingProjectKeys, stagePendingMap, selectedKeys]);
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1400, mx: 'auto', pb: 10, width: '100%', height: '100%', overflowY: 'auto' }}>
+    <Box sx={{ p: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: 'auto', pb: 10, width: '100%' }}>
       {/* Toast Notification */}
       <Snackbar 
         open={toast.open} 
@@ -394,7 +394,7 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ p: 1.25, bgcolor: '#ECFDF5', color: '#059669', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FlashOnRoundedIcon sx={{ fontSize: 32 }} />
@@ -678,7 +678,7 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
                 onChange={(e) => setRemarks(e.target.value)}
                 sx={{
                   flex: 1,
-                  minWidth: 220,
+                  minWidth: { xs: '100%', sm: 220 },
                   bgcolor: '#1E293B',
                   borderRadius: 2.5,
                   '& .MuiInputBase-input': { color: '#FFFFFF', fontSize: '0.9rem', py: 1 },
@@ -1045,7 +1045,7 @@ const ManualApproval: React.FC<ManualApprovalProps> = ({ initialProjectId, isDia
             onChange={(e) => setRemarks(e.target.value)}
             sx={{
               flex: 1,
-              minWidth: 200,
+              minWidth: { xs: '100%', sm: 200 },
               bgcolor: '#1E293B',
               borderRadius: 2.5,
               '& .MuiInputBase-input': { color: '#FFFFFF', fontSize: '0.9rem', py: 1 },

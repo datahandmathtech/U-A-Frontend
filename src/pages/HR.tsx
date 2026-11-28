@@ -146,23 +146,23 @@ const HR: React.FC = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">HR & Payroll</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
+        <Typography variant="h4" fontWeight="bold">HR &amp; Payroll</Typography>
         <Button variant="contained" color="primary" startIcon={<FingerprintIcon />} onClick={handleCheckIn}>
           Mark Attendance (Check-in)
         </Button>
       </Box>
 
       <Paper sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={tab} onChange={(e, v) => setTab(v)}>
+        <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto">
           <Tab label="Manage Staff" />
         </Tabs>
       </Paper>
 
       {tab === 0 && (
         <>
-        <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 2, maxWidth: 600 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Paper elevation={0} sx={{ p: { xs: 2, sm: 3, md: 4 }, border: '1px solid', borderColor: 'divider', borderRadius: 2, maxWidth: 600 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
             <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <PersonAddIcon /> Create New Staff
             </Typography>
@@ -173,8 +173,8 @@ const HR: React.FC = () => {
           
           {successMsg && <Alert severity="success" sx={{ mb: 3 }}>{successMsg}</Alert>}
           
-          <Box component="form" onSubmit={handleCreateStaff} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box component="form" onSubmit={handleCreateStaff} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
               <TextField 
                 label="Full Name" fullWidth required 
                 value={staffData.name} onChange={(e) => setStaffData({...staffData, name: e.target.value})}
@@ -192,7 +192,7 @@ const HR: React.FC = () => {
               />
             </Box>
 
-            <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
               <TextField 
                 label="Role" fullWidth select required
                 value={staffData.role} onChange={(e) => setStaffData({...staffData, role: e.target.value})}
@@ -216,7 +216,7 @@ const HR: React.FC = () => {
         <Box mt={4}>
           <Typography variant="h6" mb={2}>All Staff Members</Typography>
           <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-            <Table>
+            <Table sx={{ minWidth: 560 }}>
               <TableHead sx={{ backgroundColor: 'secondary.main' }}>
                 <TableRow>
                   <TableCell><strong>Staff ID</strong></TableCell>

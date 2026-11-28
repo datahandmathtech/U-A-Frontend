@@ -1608,7 +1608,8 @@ const StageDetails = () => {
           </Box>
 
           <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', mb: 3 }}>
-            <Table size="small">
+            <TableContainer sx={{ overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 820 }}>
               <TableHead sx={{ bgcolor: '#F8FAFC' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5, width: '25%' }}>Piece Name</TableCell>
@@ -1713,6 +1714,7 @@ const StageDetails = () => {
                 ))}
               </TableBody>
             </Table>
+            </TableContainer>
           </Paper>
 
           {/* Matrix Actions Toolbar */}
@@ -1860,7 +1862,7 @@ const StageDetails = () => {
       {/* MAIN TRACKING TABLE PAPER */}
       <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.03)' }}>
         {/* Table Header Bar */}
-        <Box sx={{ p: 2.5, px: 3, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2.5 }, px: { xs: 2, sm: 3 }, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: { xs: 1.5, sm: 2 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', fontSize: '1.1rem' }}>
               {stageFormatted} Tracking Table
@@ -2738,12 +2740,12 @@ const StageDetails = () => {
             }
 
             return (
-              <Box sx={{ position: 'relative', ml: 2, borderLeft: '2px solid #E2E8F0', pl: 4, display: 'flex', flexDirection: 'column', gap: 3, py: 1 }}>
+              <Box sx={{ position: 'relative', ml: { xs: 1, sm: 2 }, borderLeft: '2px solid #E2E8F0', pl: { xs: 2.5, sm: 4 }, display: 'flex', flexDirection: 'column', gap: 3, py: 1 }}>
                 {combinedLogs.map((log: any, i: number) => (
                   <Box key={i} sx={{ position: 'relative' }}>
                     <Box sx={{ 
                       position: 'absolute', 
-                      left: -41, 
+                      left: { xs: -29, sm: -41 }, 
                       top: 20, 
                       width: 16, 
                       height: 16, 
@@ -2753,7 +2755,7 @@ const StageDetails = () => {
                       boxShadow: '0 0 0 2px #BAE6FD'
                     }} />
                     <Paper sx={{ 
-                      p: 3, 
+                      p: { xs: 2, sm: 3 }, 
                       borderRadius: 3.5, 
                       display: 'flex', 
                       justifyContent: 'space-between', 
@@ -2764,7 +2766,7 @@ const StageDetails = () => {
                       flexWrap: 'wrap',
                       gap: 2
                     }}>
-                      <Box sx={{ flex: 1, minWidth: 240 }}>
+                      <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 240 } }}>
                          <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 800, display: 'block', mb: 0.75, letterSpacing: '0.5px' }}>
                            {new Date(log.startTime || log.createdAt).toLocaleString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).toUpperCase()}
                          </Typography>

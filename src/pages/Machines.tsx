@@ -32,7 +32,7 @@ const Machines: React.FC = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
         <Typography variant="h4" fontWeight="bold">Machine Master</Typography>
         <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={() => setOpen(true)}>
           Add Machine
@@ -40,7 +40,7 @@ const Machines: React.FC = () => {
       </Box>
 
       <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-        <Table>
+        <Table sx={{ minWidth: 620 }}>
           <TableHead sx={{ backgroundColor: 'secondary.main' }}>
             <TableRow>
               <TableCell><strong>Machine Name</strong></TableCell>
@@ -62,8 +62,11 @@ const Machines: React.FC = () => {
                 const needsMaintenance = (machine.totalRunHours || 0) >= (machine.maintenanceIntervalHours || 200);
                 return (
                   <TableRow key={machine.id} hover>
-                    <TableCell sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <PrecisionManufacturingIcon color="action" /> {machine.name}
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <PrecisionManufacturingIcon color="action" />
+                        <span>{machine.name}</span>
+                      </Box>
                     </TableCell>
                     <TableCell>{machine.type}</TableCell>
                     <TableCell>
@@ -90,10 +93,10 @@ const Machines: React.FC = () => {
       </TableContainer>
 
       {/* Add Machine Dialog */}
-      <Dialog open={open} onClose={() => setOpen(false)}>
+      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Add New Machine</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1, minWidth: 400 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1, minWidth: { xs: 0, sm: 400 } }}>
             <TextField 
               label="Machine Name" 
               fullWidth 

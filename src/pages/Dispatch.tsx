@@ -146,15 +146,15 @@ const Dispatch: React.FC = () => {
   };
 
   return (
-    <Box sx={{ maxWidth: 1000, margin: '0 auto', p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+    <Box sx={{ maxWidth: 1000, margin: '0 auto', p: { xs: 1.5, sm: 2.5, md: 3 } }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2.5, sm: 4 } }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Dispatch & Packing List</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Dispatch &amp; Packing List</Typography>
           <Typography variant="body2" color="text.secondary">Create and download packing list PDFs for clients.</Typography>
         </Box>
       </Box>
 
-      <Paper sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2.5, sm: 4 }, borderRadius: 2 }}>
         <Typography variant="h6" fontWeight="bold" mb={2}>1. Select Client / Project</Typography>
         <TextField 
           select
@@ -174,8 +174,8 @@ const Dispatch: React.FC = () => {
       </Paper>
 
       {selectedProjectId && (
-        <Paper sx={{ p: 3, borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
             <Typography variant="h6" fontWeight="bold">2. Packing Items</Typography>
             <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddRow}>
               Add Row
@@ -183,7 +183,7 @@ const Dispatch: React.FC = () => {
           </Box>
           
           <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 3 }}>
-            <Table size="small">
+            <Table size="small" sx={{ minWidth: 650 }}>
               <TableHead sx={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
                 <TableRow>
                   <TableCell><strong>Box</strong></TableCell>

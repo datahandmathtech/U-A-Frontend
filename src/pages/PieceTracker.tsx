@@ -111,8 +111,8 @@ const PieceTracker = () => {
   if (isLoading) return <Box p={3}><Typography>Loading Pieces...</Typography></Box>;
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
         <Typography variant="h4" fontWeight={900} sx={{ color: '#1A1A1A', letterSpacing: '-0.5px' }}>
           Global Piece Tracker
         </Typography>
@@ -129,9 +129,9 @@ const PieceTracker = () => {
         )}
       </Box>
 
-      <Paper elevation={0} sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #E0E0E0' }}>
+      <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid #E0E0E0' }}>
         <TableContainer sx={{ maxHeight: '75vh' }}>
-          <Table stickyHeader>
+          <Table stickyHeader sx={{ minWidth: 820 }}>
             <TableHead>
               <TableRow>
                 <TableCell padding="checkbox" sx={{ bgcolor: '#F8F9FA' }}>

@@ -65,7 +65,7 @@ const Production: React.FC = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Production Management</Typography>
           <Typography variant="body2" color="textSecondary">Track daily stages or view overall active work orders.</Typography>
@@ -78,7 +78,7 @@ const Production: React.FC = () => {
       </Box>
 
       <Paper sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={tab} onChange={(e, v) => setTab(v)}>
+        <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
           <Tab label="Supervisor Logbook" />
           <Tab label="Active Work Orders" />
           <Tab label="Worker Machine Logs" />
@@ -88,7 +88,7 @@ const Production: React.FC = () => {
 
       {tab === 0 && (
         <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 4 }}>
-          <Table>
+          <Table sx={{ minWidth: 780 }}>
             <TableHead sx={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
               <TableRow>
                 <TableCell><strong>Work Order</strong></TableCell>

@@ -93,7 +93,7 @@ const SlabPieceTracker: React.FC = () => {
   };
 
   return (
-    <Box sx={{ width: '100%', px: { xs: 2, md: 4, lg: 6 }, py: 4, margin: 'auto' }}>
+    <Box sx={{ width: '100%', px: { xs: 1.5, sm: 2.5, md: 4, lg: 6 }, py: { xs: 2, sm: 4 }, margin: 'auto' }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3 }}>
         Back to Project
       </Button>
@@ -103,7 +103,7 @@ const SlabPieceTracker: React.FC = () => {
         Project: {project.name} | Slab Size: {slab.size || 'N/A'}
       </Typography>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
         <Typography variant="h6" color="text.secondary">
           {slab.pieces?.length || 0} Pieces Total
         </Typography>
@@ -112,8 +112,8 @@ const SlabPieceTracker: React.FC = () => {
         </Button>
       </Box>
       
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-        <Table aria-label="pieces">
+      <TableContainer component={Paper} sx={{ borderRadius: 3, overflowX: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+        <Table aria-label="pieces" sx={{ minWidth: 680 }}>
           <TableHead sx={{ bgcolor: 'primary.dark' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold', py: 2, color: 'white' }}>Piece #</TableCell>
@@ -197,7 +197,7 @@ const SlabPieceTracker: React.FC = () => {
             )}
           </TableBody>
         </Table>
-      </Paper>
+      </TableContainer>
 
       {/* Dialog for adding pieces */}
       <Dialog open={addPieceOpen} onClose={() => setAddPieceOpen(false)} maxWidth="xs" fullWidth>
@@ -261,26 +261,28 @@ const SlabPieceTracker: React.FC = () => {
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
           {viewingPiece && viewingPiece.logs && viewingPiece.logs.length > 0 ? (
-            <Table>
-              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Stage</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Operator / Vendor</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Date & Time</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Remarks</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {viewingPiece.logs.slice().reverse().map((log: any, idx: number) => (
-                  <TableRow key={idx}>
-                    <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>{log.stage}</TableCell>
-                    <TableCell>{log.vendorName || log.operatorId || '-'}</TableCell>
-                    <TableCell>{new Date(log.endTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</TableCell>
-                    <TableCell>{log.remarks || '-'}</TableCell>
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table sx={{ minWidth: 540 }}>
+                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Stage</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Operator / Vendor</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Date &amp; Time</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Remarks</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {viewingPiece.logs.slice().reverse().map((log: any, idx: number) => (
+                    <TableRow key={idx}>
+                      <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>{log.stage}</TableCell>
+                      <TableCell>{log.vendorName || log.operatorId || '-'}</TableCell>
+                      <TableCell>{new Date(log.endTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</TableCell>
+                      <TableCell>{log.remarks || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           ) : (
             <Box sx={{ p: 4, textAlign: 'center' }}>
               <Typography color="text.secondary">No historical data available for this piece yet.</Typography>

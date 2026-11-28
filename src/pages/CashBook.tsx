@@ -592,7 +592,7 @@ const CashBook: React.FC = () => {
           borderRadius: 3.5,
           border: '1px solid #E2E8F0',
           boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-          overflow: 'hidden'
+          overflowX: 'auto'
         }}
       >
         <Table sx={{ minWidth: 850 }}>
@@ -831,8 +831,8 @@ const CashBook: React.FC = () => {
           }
         }}
       >
-        <Box sx={{ px: 3, py: 2, bgcolor: formData.type === 'IN' ? '#15803D' : '#B91C1C', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ px: { xs: 2, sm: 3 }, py: { xs: 1.5, sm: 2 }, bgcolor: formData.type === 'IN' ? '#15803D' : '#B91C1C', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
             <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#FFFFFF' }}>
               {formData.type === 'IN' ? <ArrowDownwardRoundedIcon /> : <ArrowUpwardRoundedIcon />}
             </Avatar>
@@ -850,7 +850,7 @@ const CashBook: React.FC = () => {
           </IconButton>
         </Box>
 
-        <DialogContent dividers sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+        <DialogContent dividers sx={{ p: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
           {/* Toggle Type */}
           <Box>
             <Typography sx={{ fontWeight: 700, fontSize: '0.82rem', color: '#1E293B', mb: 1 }}>

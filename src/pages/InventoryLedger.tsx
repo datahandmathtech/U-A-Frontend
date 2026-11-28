@@ -203,7 +203,7 @@ const InventoryLedger = () => {
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, margin: '0 auto' }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 }, maxWidth: 1200, margin: '0 auto' }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/inventory')} sx={{ mb: 2, color: '#b8860b' }}>
         Back to Inventory
       </Button>
@@ -236,7 +236,7 @@ const InventoryLedger = () => {
         </Box>
       </Box>
 
-      <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2, overflowX: 'auto' }}>
         <Table sx={{ minWidth: 800 }}>
           <TableHead>
             <TableRow sx={{ bgcolor: '#f8f9fa' }}>

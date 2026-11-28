@@ -737,7 +737,8 @@ const CRM: React.FC = () => {
           sx={{
             borderRadius: 2.5,
             bgcolor: '#F8FAFC',
-            minWidth: 170,
+            minWidth: { xs: 0, sm: 160 },
+            flex: { xs: '1 1 140px', sm: 'none' },
             '& fieldset': { borderColor: '#E2E8F0' },
             '& .MuiSelect-select': { py: 1, px: 1.5, display: 'flex', alignItems: 'center', gap: 1 }
           }}
@@ -770,7 +771,8 @@ const CRM: React.FC = () => {
           sx={{
             borderRadius: 2.5,
             bgcolor: '#F8FAFC',
-            minWidth: 140,
+            minWidth: { xs: 0, sm: 135 },
+            flex: { xs: '1 1 120px', sm: 'none' },
             '& fieldset': { borderColor: '#E2E8F0' },
             '& .MuiSelect-select': { py: 1, px: 1.5 }
           }}
@@ -793,7 +795,8 @@ const CRM: React.FC = () => {
           sx={{
             borderRadius: 2.5,
             bgcolor: '#F8FAFC',
-            minWidth: 140,
+            minWidth: { xs: 0, sm: 135 },
+            flex: { xs: '1 1 120px', sm: 'none' },
             '& fieldset': { borderColor: '#E2E8F0' },
             '& .MuiSelect-select': { py: 1, px: 1.5, fontWeight: 600 }
           }}
@@ -844,7 +847,7 @@ const CRM: React.FC = () => {
       ) : filteredEnquiries.length === 0 ? (
         <Paper
           sx={{
-            p: 8,
+            p: { xs: 3, sm: 6, md: 8 },
             textAlign: 'center',
             borderRadius: 4,
             border: '1.5px dashed #CBD5E1',
@@ -902,7 +905,7 @@ const CRM: React.FC = () => {
             borderRadius: 4,
             border: '1px solid #E2E8F0',
             boxShadow: '0 4px 18px rgba(0,0,0,0.03)',
-            overflow: 'hidden'
+            overflowX: 'auto'
           }}
         >
           <Table sx={{ minWidth: 850 }}>

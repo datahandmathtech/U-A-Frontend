@@ -638,7 +638,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
 
                   return (
                     <MenuItem key={pId} value={pId}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', width: '100%', gap: 1 }}>
                         <Typography sx={{ fontWeight: 700, fontSize: '0.86rem' }}>
                           Piece #{p.pieceNumber} {p.productName ? `(${p.productName})` : ''}
                         </Typography>
@@ -832,7 +832,7 @@ export const QuickPieceActionDialog: React.FC<QuickPieceActionDialogProps> = ({
                   const displayLabel = stg.startsWith('Polishing') ? 'Polishing' : stg;
                   return (
                     <MenuItem key={stg} value={stg} disabled={!canSelect}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', width: '100%', gap: 1 }}>
                         <Typography sx={{ fontWeight: canSelect ? 700 : 500, fontSize: '0.88rem' }}>
                           {displayLabel}
                         </Typography>

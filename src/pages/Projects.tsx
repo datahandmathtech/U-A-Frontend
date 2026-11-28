@@ -834,8 +834,8 @@ const Projects: React.FC = () => {
           mb: 3
         }}
       >
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.5px' }}>
               Active Work Orders
             </Typography>
@@ -1121,7 +1121,11 @@ const Projects: React.FC = () => {
             setActiveTab(val);
             setPage(0);
           }}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
+            maxWidth: '100%',
             minHeight: 'auto',
             '& .MuiTabs-indicator': {
               backgroundColor: activeTab === 'active' ? '#B38B36' : '#10B981',
@@ -1248,7 +1252,7 @@ const Projects: React.FC = () => {
           borderRadius: 4,
           border: '1px solid #E2E8F0',
           boxShadow: '0 4px 18px rgba(0,0,0,0.03)',
-          overflow: 'hidden'
+          overflowX: 'auto'
         }}
       >
         <Table sx={{ minWidth: 850 }}>

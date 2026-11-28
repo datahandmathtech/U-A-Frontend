@@ -134,7 +134,7 @@ const VendorLedgerDetails = () => {
   if (isLoading) return <Box p={3}><Typography>Loading Vendor Ledger...</Typography></Box>;
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
       <Button 
         startIcon={<ArrowBackIcon />} 
         onClick={() => navigate('/vendor-ledger')} 
@@ -143,15 +143,15 @@ const VendorLedgerDetails = () => {
         Back to Vendor Summary
       </Button>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" fontWeight={900} sx={{ color: '#1A1A1A', letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: { xs: 2.5, sm: 4 } }}>
+        <Typography variant="h4" fontWeight={900} sx={{ color: '#1A1A1A', letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
           <ReceiptLongIcon fontSize="large" color="primary" />
           Detailed Statement: {selectedVendor}
         </Typography>
       </Box>
 
-      <Paper elevation={0} sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #E0E0E0' }}>
-        <Box sx={{ p: 2, bgcolor: '#F8F9FA', borderBottom: '1px solid #E0E0E0', display: 'flex', justifyContent: 'space-between' }}>
+      <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid #E0E0E0' }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: '#F8F9FA', borderBottom: '1px solid #E0E0E0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
            <Typography variant="h6" fontWeight="bold" color="primary.main">Account Statement</Typography>
            <Typography variant="subtitle1" fontWeight="bold" color="text.secondary">
              Current Pending Pieces: 
@@ -160,8 +160,8 @@ const VendorLedgerDetails = () => {
              </Typography>
            </Typography>
         </Box>
-        <TableContainer>
-          <Table>
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold', bgcolor: '#F8F9FA', width: '15%' }}>Date</TableCell>

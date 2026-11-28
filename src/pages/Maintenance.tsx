@@ -589,7 +589,7 @@ const Maintenance: React.FC = () => {
         }}
       >
         {/* Machine Filter */}
-        <FormControl size="small" sx={{ minWidth: 180 }}>
+        <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: '1 1 150px', sm: 'none' } }}>
           <InputLabel>Machine</InputLabel>
           <Select
             value={selectedMachine}
@@ -606,7 +606,7 @@ const Maintenance: React.FC = () => {
         </FormControl>
 
         {/* Status Filter */}
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 140 }, flex: { xs: '1 1 130px', sm: 'none' } }}>
           <InputLabel>Status</InputLabel>
           <Select
             value={selectedStatus}
@@ -620,7 +620,7 @@ const Maintenance: React.FC = () => {
         </FormControl>
 
         {/* Category Filter */}
-        <FormControl size="small" sx={{ minWidth: 200 }}>
+        <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 200 }, flex: { xs: '1 1 160px', sm: 'none' } }}>
           <InputLabel>Category</InputLabel>
           <Select
             value={selectedCategory}
@@ -642,7 +642,7 @@ const Maintenance: React.FC = () => {
           placeholder="Search machine, work, vendor, bill no..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ flexGrow: 1, minWidth: 220 }}
+          sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 220 } }}
           slotProps={{
             input: {
               startAdornment: (
@@ -672,7 +672,7 @@ const Maintenance: React.FC = () => {
 
       {/* Maintenance Records Table */}
       <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-        <Box sx={{ p: 2, px: 2.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 2.5 }, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <PrecisionManufacturingRoundedIcon sx={{ color: '#C28E5C', fontSize: 22 }} />
             <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A' }}>
@@ -682,7 +682,7 @@ const Maintenance: React.FC = () => {
         </Box>
 
         <TableContainer sx={{ maxHeight: 600 }}>
-          <Table stickyHeader>
+          <Table stickyHeader sx={{ minWidth: 920 }}>
             <TableHead>
               <TableRow sx={{ '& th': { bgcolor: '#F8FAFC', fontWeight: 700, color: '#475569', fontSize: '0.82rem' } }}>
                 <TableCell>#</TableCell>
@@ -913,7 +913,7 @@ const Maintenance: React.FC = () => {
         }}
       >
         {/* Clean Dialog Title matching CRM / Work Orders exactly */}
-        <DialogTitle sx={{ p: 2.5, pb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ p: { xs: 2, sm: 2.5 }, pb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B' }}>
               {editingId ? 'Edit Maintenance Record' : 'Record Machine Maintenance'}
@@ -927,7 +927,7 @@ const Maintenance: React.FC = () => {
           </IconButton>
         </DialogTitle>
 
-        <DialogContent dividers sx={{ p: 3 }}>
+        <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {/* Section 1: Machine & Service Details */}
             <Box>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dialog } from '@mui/material';
+import { Dialog, useTheme, useMediaQuery } from '@mui/material';
 import ChatRoomThread from '../Chat/ChatRoomThread';
 
 interface ProductChatDrawerProps {
@@ -19,6 +19,8 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
   projectName,
   onOpenOrder
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const slabId = slab?.id || projectId || '';
   const resolvedProjectId = projectId || slab?.projectId || slab?.id || '';
   const title = slab?.clientName || slab?.name || projectName || 'Work Order Chat';
@@ -30,15 +32,16 @@ export const ProductChatDrawer: React.FC<ProductChatDrawerProps> = ({
     <Dialog
       open={open}
       onClose={onClose}
+      fullScreen={isMobile}
       maxWidth="sm"
       fullWidth
       slotProps={{
         paper: {
           sx: {
-            borderRadius: 3.5,
+            borderRadius: { xs: 0, sm: 3.5 },
             overflow: 'hidden',
-            height: { xs: '88vh', sm: '80vh' },
-            maxHeight: 680,
+            height: { xs: '100dvh', sm: '80vh' },
+            maxHeight: { xs: '100dvh', sm: 680 },
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 24px 48px rgba(0,0,0,0.2)'

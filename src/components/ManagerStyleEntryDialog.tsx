@@ -998,7 +998,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
 
         </Box>
       </DialogContent>
-      <DialogActions sx={{ p: 3, pt: 1, bgcolor: '#FFFFFF', justifyContent: 'space-between' }}>
+      <DialogActions sx={{ p: { xs: 2, sm: 3 }, pt: { xs: 1.5, sm: 1 }, bgcolor: '#FFFFFF', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
         <Box>
           {isEditMode && onDelete && (
             <Button 
@@ -1012,7 +1012,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
             </Button>
           )}
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', ml: 'auto' }}>
           <Button onClick={onClose} disabled={loading} color="inherit" sx={{ fontWeight: 700 }}>Cancel</Button>
           <Button 
             variant="contained" 
@@ -1020,7 +1020,7 @@ const ManagerStyleEntryDialog: React.FC<ManagerStyleEntryDialogProps> = ({ open,
             disabled={loading || (formData.transactionType === 'OUT' ? vendorRows.some(r => !r.vendorId || !r.qty) : !formData.quantity)}
             sx={{ 
               borderRadius: 2.5, 
-              px: 4, 
+              px: { xs: 2.5, sm: 4 }, 
               py: 1.2,
               fontWeight: 800, 
               textTransform: 'none',

@@ -182,6 +182,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
                     <ListItemButton
                       component={NavLink}
                       to={item.path}
+                      onClick={() => {
+                        if (mobileOpen) handleDrawerToggle();
+                      }}
                       sx={{
                         borderRadius: 2.5,
                         py: 0.85,
@@ -287,15 +290,20 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
   );
 
   return (
-    <Box component="nav" sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}>
+    <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
       <Drawer
         variant="temporary"
         open={mobileOpen}
         onClose={handleDrawerToggle}
         ModalProps={{ keepMounted: true }}
         sx={{
-          display: { xs: 'block', sm: 'none' },
-          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRight: 'none', backgroundColor: '#0F172A' }
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
+            width: { xs: 'min(280px, 85vw)', sm: drawerWidth },
+            borderRight: 'none',
+            backgroundColor: '#0F172A'
+          }
         }}
       >
         {drawer}
@@ -303,7 +311,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, handleDrawerToggle, drawe
       <Drawer
         variant="permanent"
         sx={{
-          display: { xs: 'none', sm: 'block' },
+          display: { xs: 'none', md: 'block' },
           '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRight: 'none', backgroundColor: '#0F172A' }
         }}
         open

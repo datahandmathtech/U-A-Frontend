@@ -541,7 +541,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
             <CheckCircleRoundedIcon sx={{ color: '#16A34A', fontSize: 20 }} />
             <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem' }}>Production</Typography>
           </Box>
-          <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
+          <Box sx={{ width: { xs: 14, sm: 40 }, height: 2, bgcolor: '#86EFAC' }} />
 
           {/* Step 2: Polishing (only if required) */}
           {hasPolishingStage && (
@@ -550,7 +550,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                 <CheckCircleRoundedIcon sx={{ color: '#16A34A', fontSize: 20 }} />
                 <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem' }}>Polishing</Typography>
               </Box>
-              <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
+              <Box sx={{ width: { xs: 14, sm: 40 }, height: 2, bgcolor: '#86EFAC' }} />
             </>
           )}
 
@@ -561,7 +561,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
                 <CheckCircleRoundedIcon sx={{ color: '#16A34A', fontSize: 20 }} />
                 <Typography variant="body2" sx={{ fontWeight: 800, color: '#166534', fontSize: '0.85rem' }}>Packing</Typography>
               </Box>
-              <Box sx={{ width: 40, height: 2, bgcolor: '#86EFAC' }} />
+              <Box sx={{ width: { xs: 14, sm: 40 }, height: 2, bgcolor: '#86EFAC' }} />
             </>
           )}
 
@@ -604,8 +604,8 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
               )}
             </Box>
 
-            <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: 2.5, overflow: 'hidden' }}>
-              <Table size="small">
+            <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: 2.5, overflowX: 'auto' }}>
+              <Table size="small" sx={{ minWidth: 640 }}>
                 <TableHead sx={{ bgcolor: '#F8FAFC' }}>
                   <TableRow>
                     <TableCell padding="checkbox" sx={{ pl: 2, py: 1.5 }}>
@@ -721,7 +721,7 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
         {/* RIGHT COLUMN: DISPATCH VEHICLE DETAILS FORM */}
         <Box sx={{ minWidth: 0 }}>
           <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, border: '1.5px solid #E2E8F0', bgcolor: '#FFFFFF', minHeight: 460 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 2.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                 <LocalShippingRoundedIcon sx={{ color: '#059669', fontSize: 24 }} />
                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A' }}>
@@ -947,8 +947,8 @@ const DispatchWorkspace: React.FC<DispatchWorkspaceProps> = ({
           </Button>
         </Box>
 
-        <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: 2.5, overflow: 'hidden' }}>
-          <Table size="small">
+        <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: 2.5, overflowX: 'auto' }}>
+          <Table size="small" sx={{ minWidth: 780 }}>
             <TableHead sx={{ bgcolor: '#F8FAFC' }}>
               <TableRow>
                 <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', py: 1.5 }}>#</TableCell>

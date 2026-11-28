@@ -95,8 +95,8 @@ const AdminConsole: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3, bgcolor: '#f4f6f8', minHeight: '100vh', borderRadius: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, color: 'text.primary' }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, bgcolor: '#f4f6f8', minHeight: '100vh', borderRadius: { xs: 2, sm: 4 } }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: { xs: 2.5, sm: 4 }, color: 'text.primary' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <SettingsIcon sx={{ fontSize: 32, color: 'primary.main' }} />
           <Box>
@@ -104,13 +104,13 @@ const AdminConsole: React.FC = () => {
             <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Admin Console</Typography>
           </Box>
         </Box>
-        <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: 8, px: 3, py: 1.5, fontWeight: 'bold', color: 'black' }}>
+        <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: 8, px: 3, py: 1.25, fontWeight: 'bold', color: 'black' }}>
           Create New Access
         </Button>
       </Box>
 
       <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'rgba(0,0,0,0.1)', borderRadius: 4, bgcolor: '#ffffff' }}>
-        <Table>
+        <Table sx={{ minWidth: 620 }}>
           <TableHead sx={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
             <TableRow>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>USER DETAILS</TableCell>
@@ -165,13 +165,13 @@ const AdminConsole: React.FC = () => {
       </TableContainer>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth slotProps={{ paper: { sx: { bgcolor: '#ffffff', borderRadius: 4, color: 'text.primary' } } }}>
-        <DialogTitle sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)', pb: 2, pt: 3, px: 3 }}>
+        <DialogTitle sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)', pb: 2, pt: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 } }}>
           <Typography variant="h5" fontWeight="bold">{isEditing ? 'Edit Access' : 'Create New Access'}</Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 1 }}>PERMISSIONS & CREDENTIALS</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: 1 }}>PERMISSIONS &amp; CREDENTIALS</Typography>
         </DialogTitle>
-        <DialogContent sx={{ p: 3 }}>
-          <Grid container spacing={3} sx={{ mt: 0 }}>
-            <Grid xs={12} sm={6}>
+        <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Grid container spacing={2.5} sx={{ mt: 0 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField 
                 label="Full Name" 
                 fullWidth 
@@ -184,7 +184,7 @@ const AdminConsole: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField 
                 label="System Username / Unique ID" 
                 fullWidth 

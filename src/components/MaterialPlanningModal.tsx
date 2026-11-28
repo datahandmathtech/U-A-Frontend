@@ -184,16 +184,16 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
       onClose={onClose} 
       maxWidth="xl" 
       fullWidth 
-      slotProps={{ paper: { sx: { height: '92vh', borderRadius: 4, bgcolor: '#FAFAFA' } } }}
+      slotProps={{ paper: { sx: { height: { xs: '94dvh', md: '92vh' }, borderRadius: { xs: 2.5, sm: 4 }, bgcolor: '#FAFAFA' } } }}
     >
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#FFF', borderBottom: '1px solid #eee', py: 2 }}>
-        <Box>
+      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, bgcolor: '#FFF', borderBottom: '1px solid #eee', py: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 } }}>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography variant="h5" fontWeight="900" color="#0F172A">Project Material Planning</Typography>
           <Typography variant="caption" color="text.secondary">Enter buy sheets, split multi-blocks, and reserve slab inventory</Typography>
         </Box>
         <IconButton onClick={onClose} sx={{ bgcolor: '#F1F5F9' }}><CloseIcon /></IconButton>
       </DialogTitle>
-      <DialogContent sx={{ p: 3.5 }}>
+      <DialogContent sx={{ p: { xs: 1.5, sm: 3, md: 3.5 } }}>
         {initialProjectId ? (
           <Paper
             elevation={0}
@@ -725,8 +725,8 @@ export const MaterialPlanningModal: React.FC<{ open: boolean; onClose: () => voi
                 </Box>
               </Box>
 
-              <TableContainer sx={{ mb: 3, border: '1px solid #E2E8F0', borderRadius: 2.5, overflow: 'hidden' }}>
-                <Table size="small">
+              <TableContainer sx={{ mb: 3, border: '1px solid #E2E8F0', borderRadius: 2.5, overflowX: 'auto' }}>
+                <Table size="small" sx={{ minWidth: 850 }}>
                   <TableHead sx={{ bgcolor: '#F8FAFC' }}>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 800, color: '#475569', fontSize: '0.75rem' }}>SOURCE</TableCell>

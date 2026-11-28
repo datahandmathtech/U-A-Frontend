@@ -112,7 +112,8 @@ const ProductChatAlerts: React.FC<ProductChatAlertsProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 2,
+              flexWrap: 'wrap',
+              gap: { xs: 1.25, sm: 2 },
               transition: 'all 0.2s ease',
               '&:hover': {
                 borderColor: '#128C7E',

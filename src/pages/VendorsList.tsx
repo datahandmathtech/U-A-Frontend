@@ -60,25 +60,25 @@ const VendorsList = ({ hideHeader, selectedMonth, selectedFY }: { hideHeader?: b
   const filteredVendors = vendors.filter(v => v.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.contact?.includes(searchQuery));
 
   return (
-    <Box sx={{ p: hideHeader ? 0 : 3 }}>
+    <Box sx={{ p: hideHeader ? 0 : { xs: 1.5, sm: 3 } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         {!hideHeader && <Typography variant="h5" fontWeight="bold">Vendor Master</Typography>}
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', ml: 'auto' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' }, ml: { xs: 0, sm: 'auto' } }}>
           <TextField 
             placeholder="Search vendors..." 
             size="small"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ width: 260, bgcolor: '#fff', borderRadius: 1 }}
+            sx={{ width: { xs: '100%', sm: 260 }, bgcolor: '#fff', borderRadius: 1 }}
           />
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()} sx={{ width: { xs: '100%', sm: 'auto' } }}>
             + Enlist New Vendor
           </Button>
         </Box>
       </Box>
 
-      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 2 }}>
-        <Table>
+      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 2, overflowX: 'auto' }}>
+        <Table sx={{ minWidth: 620 }}>
           <TableHead>
             <TableRow sx={{ bgcolor: 'background.default' }}>
               <TableCell>Vendor Name</TableCell>

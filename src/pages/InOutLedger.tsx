@@ -256,7 +256,7 @@ const InOutLedger: React.FC = () => {
   });
 
   const renderUnifiedLogGrid = (logsToRender: any[]) => (
-    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflow: 'hidden', bgcolor: '#FFFFFF', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 3, overflowX: 'auto', bgcolor: '#FFFFFF', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
       <Table sx={{ minWidth: 650 }}>
         <TableHead sx={{ bgcolor: '#F8FAFC' }}>
           <TableRow>
@@ -476,8 +476,8 @@ const InOutLedger: React.FC = () => {
     <Box sx={{ width: '100%', px: { xs: 0, sm: 0.5, md: 1 } }}>
       {/* 1. EXECUTIVE HEADER & CONTROLS */}
       <Box sx={{ mb: 3.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Typography variant="h4" sx={{ fontWeight: 900, color: '#0F172A', letterSpacing: '-0.5px' }}>
               In/Out Material Ledger
             </Typography>
@@ -500,7 +500,7 @@ const InOutLedger: React.FC = () => {
         </Box>
 
         {/* Action Button & Filters */}
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', width: { xs: '100%', md: 'auto' } }}>
           <Button 
             variant="contained" 
             startIcon={<AddIcon />} 
@@ -515,13 +515,14 @@ const InOutLedger: React.FC = () => {
               bgcolor: '#0F172A',
               color: '#FFFFFF',
               boxShadow: '0 4px 14px rgba(15, 23, 42, 0.25)',
+              width: { xs: '100%', sm: 'auto' },
               '&:hover': { bgcolor: '#1E293B' }
             }}
           >
             New Gate Pass
           </Button>
 
-          <FormControl size="small" sx={{ minWidth: 140, bgcolor: '#FFF' }}>
+          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 140 }, flex: { xs: '1 1 130px', sm: 'none' }, bgcolor: '#FFF' }}>
             <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Financial Year</InputLabel>
             <Select 
               value={selectedFY} 
@@ -535,7 +536,7 @@ const InOutLedger: React.FC = () => {
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: 130, bgcolor: '#FFF' }}>
+          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 130 }, flex: { xs: '1 1 120px', sm: 'none' }, bgcolor: '#FFF' }}>
             <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Month</InputLabel>
             <Select 
               value={selectedMonth} 
@@ -613,13 +614,16 @@ const InOutLedger: React.FC = () => {
       </Grid>
 
       {/* 3. LUXURY TABS NAVIGATION */}
-      <Paper elevation={0} sx={{ p: 0.75, borderRadius: 3, bgcolor: '#F1F5F9', mb: 3, display: 'inline-flex', border: '1px solid #E2E8F0' }}>
+      <Paper elevation={0} sx={{ p: 0.75, borderRadius: 3, bgcolor: '#F1F5F9', mb: 3, display: 'inline-flex', maxWidth: '100%', overflowX: 'auto', border: '1px solid #E2E8F0' }}>
         <Tabs 
           value={currentTab} 
           onChange={(_e, val) => {
             setCurrentTab(val);
             setSearchParams(val === 0 ? {} : { tab: String(val) });
           }} 
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           textColor="inherit"
           slotProps={{ indicator: { style: { display: 'none' } } }}
           sx={{ minHeight: 'unset' }}

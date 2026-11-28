@@ -20,17 +20,17 @@ const WasteLedger = () => {
   const years = ['2023', '2024', '2025', '2026', '2027'];
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, margin: '0 auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 }, maxWidth: 1200, margin: '0 auto' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: { xs: 2.5, sm: 4 } }}>
         <Typography variant="h4" fontWeight="bold" color="#333">Waste Ledger</Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
+          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 120 }, flex: { xs: '1 1 120px', sm: 'none' } }}>
             <InputLabel>Month</InputLabel>
             <Select value={selectedMonth} label="Month" onChange={(e) => setSelectedMonth(e.target.value as string)}>
               {months.map(m => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 100 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 100 }, flex: { xs: '1 1 100px', sm: 'none' } }}>
             <InputLabel>Year</InputLabel>
             <Select value={selectedYear} label="Year" onChange={(e) => setSelectedYear(e.target.value as string)}>
               {years.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
@@ -40,7 +40,7 @@ const WasteLedger = () => {
       </Box>
 
       <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E0E0E0', borderRadius: 2 }}>
-        <Table>
+        <Table sx={{ minWidth: 650 }}>
           <TableHead sx={{ bgcolor: '#F5F5F5' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Date Generated</TableCell>

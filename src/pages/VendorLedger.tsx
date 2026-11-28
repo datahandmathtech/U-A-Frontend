@@ -524,7 +524,7 @@ const VendorLedger: React.FC = () => {
       </Paper>
 
       {/* 6. LEDGER TABLE CONTAINER (Exact Match to User UI) */}
-      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 2.5, overflow: 'hidden' }}>
+      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 2.5, overflowX: 'auto' }}>
         {/* Table Header Row: Production Ledger (Work Stage: Production) + Current Balance (Pending) */}
         <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#FFFFFF', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

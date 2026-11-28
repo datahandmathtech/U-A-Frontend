@@ -2271,7 +2271,7 @@ const ProjectDetails: React.FC = () => {
 
   return (
     <Box sx={{ width: '100%', px: { xs: 0, sm: 0.5, md: 1 } }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 2.5 }}>
         <Button 
           startIcon={<ArrowBackIcon />} 
           onClick={handleGoBackStep} 
@@ -2310,8 +2310,10 @@ const ProjectDetails: React.FC = () => {
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'space-between', 
-                p: 2.5, 
-                mb: 4, 
+                flexWrap: 'wrap',
+                gap: 1.5,
+                p: { xs: 1.75, sm: 2.5 }, 
+                mb: { xs: 2.5, sm: 4 }, 
                 bgcolor: '#FFF9E6', 
                 border: '1.5px solid #FFD54F', 
                 borderRadius: 3,
@@ -3105,12 +3107,12 @@ const ProjectDetails: React.FC = () => {
                 </Box>
 
                 {/* Product Estimation Table Card */}
-                <Box sx={{ mb: 4, p: 3, border: '1px solid #E2E8F0', borderRadius: 3.5, bgcolor: '#F8FAFC' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Box sx={{ mb: { xs: 2.5, sm: 4 }, p: { xs: 1.75, sm: 3 }, border: '1px solid #E2E8F0', borderRadius: 3.5, bgcolor: '#F8FAFC' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
                     <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B' }}>
                       Product Estimation Breakdown
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                       <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
                         {products.length} {products.length === 1 ? 'item' : 'items'} in quotation
                       </Typography>
@@ -4537,7 +4539,8 @@ const ProjectDetails: React.FC = () => {
                               <Box
                                 onClick={() => handleOpenChat({ id })}
                                 sx={{
-                                  ml: 'auto',
+                                  ml: { xs: 0, sm: 'auto' },
+                                  width: { xs: '100%', sm: 'auto' },
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: 1.5,
@@ -4678,7 +4681,7 @@ const ProjectDetails: React.FC = () => {
                   {/* Filter & Search Bar */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                      <FormControl size="small" sx={{ minWidth: 170 }}>
+                      <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 170 }, flex: { xs: '1 1 150px', sm: 'none' } }}>
                         <InputLabel sx={{ fontSize: '0.82rem', fontWeight: 600 }}>Slab Category</InputLabel>
                         <Select
                           value={slabCategoryFilter}
@@ -6431,12 +6434,12 @@ const ProjectDetails: React.FC = () => {
         fullWidth
         slotProps={{ paper: { sx: { borderRadius: 4, maxHeight: '92vh' } } }}
       >
-        <DialogTitle sx={{ p: 3, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', bgcolor: '#FDFBF7' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{ p: 1, bgcolor: '#FFFDF5', color: '#B38B36', border: '1px solid #FDE68A', borderRadius: 2.5, display: 'flex' }}>
+        <DialogTitle sx={{ p: { xs: 2, sm: 3 }, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, borderBottom: '1px solid #F1F5F9', bgcolor: '#FDFBF7' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
+            <Box sx={{ p: 1, bgcolor: '#FFFDF5', color: '#B38B36', border: '1px solid #FDE68A', borderRadius: 2.5, display: 'flex', flexShrink: 0 }}>
               <AutoAwesomeRoundedIcon fontSize="medium" />
             </Box>
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
                 Master Maker — Slab Pieces & Specs Replicator
               </Typography>
@@ -6451,7 +6454,7 @@ const ProjectDetails: React.FC = () => {
         </DialogTitle>
 
         {/* MODE NAVIGATION TABS */}
-        <Box sx={{ px: 3, pt: 2, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', gap: 1.5 }}>
+        <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 2, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
           <Button
             variant={masterMakerTab === 'replicate' ? 'contained' : 'text'}
             onClick={() => setMasterMakerTab('replicate')}
@@ -7039,9 +7042,9 @@ const ProjectDetails: React.FC = () => {
         slotProps={{
           paper: {
             sx: {
-              borderRadius: 4,
-              maxHeight: '90vh',
-              height: '90vh',
+              borderRadius: { xs: 2.5, sm: 4 },
+              maxHeight: { xs: '94dvh', md: '90vh' },
+              height: { xs: '94dvh', md: '90vh' },
               display: 'flex',
               flexDirection: 'column',
               overflowY: 'auto'

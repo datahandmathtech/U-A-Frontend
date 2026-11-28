@@ -229,34 +229,39 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
     <AppBar
       position="fixed"
       sx={{
-        width: { sm: `calc(100% - ${drawerWidth}px)` },
-        ml: { sm: `${drawerWidth}px` },
+        width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
+        ml: { md: `${drawerWidth}px` },
         backgroundColor: '#FFFFFF',
         color: '#1E293B',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         borderBottom: '1px solid #E2E8F0'
       }}
     >
-      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', px: { xs: 2, md: 3 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', px: { xs: 1.25, sm: 2, md: 3 }, gap: 1, minHeight: { xs: 56, sm: 64 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.75, sm: 1.5 }, minWidth: 0 }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 1, display: { sm: 'none' } }}
+            sx={{ mr: { xs: 0.5, sm: 1 }, display: { md: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px', fontSize: '1.1rem' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+            <Typography
+              variant="h6"
+              noWrap
+              sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.3px', fontSize: { xs: '0.98rem', sm: '1.1rem' } }}
+            >
               Unnati Arts
             </Typography>
             <Chip
               label="ERP v2.0"
               size="small"
               sx={{
+                display: { xs: 'none', sm: 'inline-flex' },
                 bgcolor: '#FFF4E5',
                 color: '#B38B36',
                 fontWeight: 800,
@@ -270,7 +275,7 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
         </Box>
 
         {/* User Profile & Project Stepper Quick Trigger */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.75, sm: 1.5 }, flexShrink: 0 }}>
           {isProjectPage && project && (
             <Chip
               icon={<LayersRoundedIcon sx={{ fontSize: '15px !important', color: '#B38B36 !important' }} />}
@@ -461,11 +466,12 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1.25,
+                gap: { xs: 0.5, sm: 1.25 },
                 textTransform: 'none',
                 p: 0.5,
-                pl: 1.25,
-                pr: 1.5,
+                pl: { xs: 0.5, sm: 1.25 },
+                pr: { xs: 0.75, sm: 1.5 },
+                minWidth: 0,
                 borderRadius: 4,
                 bgcolor: '#F8FAFC',
                 border: '1px solid #E2E8F0',
@@ -507,8 +513,9 @@ const Topbar: React.FC<TopbarProps> = ({ handleDrawerToggle, drawerWidth }) => {
             slotProps={{
               paper: {
                 sx: {
-                  width: 360,
-                  maxHeight: '90vh',
+                  width: { xs: 'calc(100% - 24px)', sm: 360 },
+                  maxWidth: 'calc(100% - 24px)',
+                  maxHeight: '90dvh',
                   borderRadius: 3.5,
                   p: 0.5,
                   boxShadow: '0 12px 36px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)',

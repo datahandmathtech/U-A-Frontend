@@ -34,9 +34,9 @@ const MaterialAllocation: React.FC = () => {
       {selectedProject && (
         <>
           <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>Reserve Materials for {selectedProject.name}</Typography>
-          <Box sx={{ p: 3, border: '1px solid #E0E0E0', borderRadius: 2, bgcolor: '#FAFAFA', mb: 4 }}>
+          <Box sx={{ p: { xs: 1.5, sm: 3 }, border: '1px solid #E0E0E0', borderRadius: 2, bgcolor: '#FAFAFA', mb: 4 }}>
             <TableContainer sx={{ mb: 3 }}>
-              <Table size="small">
+              <Table size="small" sx={{ minWidth: 820 }}>
                 <TableHead sx={{ bgcolor: '#EEEEEE' }}>
                   <TableRow>
                     <TableCell width="12%">Source</TableCell>

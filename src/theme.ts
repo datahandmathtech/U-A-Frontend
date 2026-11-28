@@ -1,7 +1,7 @@
-import { createTheme } from '@mui/material/styles';
+import { createTheme, responsiveFontSizes } from '@mui/material/styles';
 
 // Cream Theme Palette
-const theme = createTheme({
+let theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
@@ -58,8 +58,86 @@ const theme = createTheme({
           borderRadius: 16,
         }
       }
+    },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          width: '100%',
+          maxWidth: '100%',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        }
+      }
+    },
+    MuiDialog: {
+      defaultProps: {
+        fullWidth: true,
+      },
+      styleOverrides: {
+        paper: ({ theme: t }) => ({
+          [t.breakpoints.down('sm')]: {
+            margin: 8,
+            width: 'calc(100% - 16px)',
+            maxWidth: 'calc(100% - 16px)',
+            maxHeight: 'calc(100dvh - 16px)',
+          },
+        }),
+        paperFullScreen: ({ theme: t }) => ({
+          [t.breakpoints.down('sm')]: {
+            margin: 0,
+            width: '100%',
+            maxWidth: '100%',
+            height: '100dvh',
+            maxHeight: '100dvh',
+            borderRadius: 0,
+          },
+        }),
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: ({ theme: t }) => ({
+          [t.breakpoints.down('sm')]: {
+            padding: '12px 14px',
+            fontSize: '1.05rem',
+          },
+        }),
+      },
+    },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: ({ theme: t }) => ({
+          [t.breakpoints.down('sm')]: {
+            padding: '12px 14px',
+          },
+        }),
+      },
+    },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: ({ theme: t }) => ({
+          [t.breakpoints.down('sm')]: {
+            padding: '10px 14px',
+            flexWrap: 'wrap',
+            gap: 8,
+          },
+        }),
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: ({ theme: t }) => ({
+          [t.breakpoints.down('sm')]: {
+            minWidth: 'auto',
+            padding: '8px 12px',
+            fontSize: '0.8rem',
+          },
+        }),
+      },
     }
   },
 });
+
+theme = responsiveFontSizes(theme);
 
 export default theme;
